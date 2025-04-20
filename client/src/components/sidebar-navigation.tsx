@@ -18,7 +18,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
       <div className="h-16 p-4 border-b border-gray-200 flex items-center">
         <div className="flex items-center space-x-2">
           <Bookmark className="h-8 w-8 text-primary" />
-          <h1 className="text-xl font-semibold">Universal Bookmarks</h1>
+          <h1 className="text-xl font-semibold">ATMOS</h1>
         </div>
       </div>
       
