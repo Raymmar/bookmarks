@@ -18,7 +18,7 @@ interface AddBookmarkDialogProps {
 
 export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBookmarkDialogProps) {
   const [url, setUrl] = useState("");
-  const [tags, setTags] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [collection, setCollection] = useState("none");
   const [autoExtract, setAutoExtract] = useState(true);
@@ -39,17 +39,51 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
     setIsSubmitting(true);
 
     try {
-      const tagArray = tags.split(",").map(tag => tag.trim()).filter(Boolean);
+      // First, create any new tags that don't already exist
+      const tagPromises = selectedTags.map(async (tagName) => {
+        try {
+          // Try to find existing tag first
+          const tagsResp = await apiRequest("GET", "/api/tags");
+          const existingTag = tagsResp.find((tag) => 
+            tag.name.toLowerCase() === tagName.toLowerCase()
+          );
+          
+          if (existingTag) {
+            return existingTag.id;
+          } else {
+            // Create new tag
+            const newTag = await apiRequest("POST", "/api/tags", {
+              name: tagName,
+              type: "user"
+            });
+            return newTag.id;
+          }
+        } catch (error) {
+          console.error("Error processing tag:", tagName, error);
+          return null;
+        }
+      });
       
-      await apiRequest("POST", "/api/bookmarks", {
+      const tagIds = (await Promise.all(tagPromises)).filter(Boolean);
+      
+      // Create the bookmark
+      const bookmark = await apiRequest("POST", "/api/bookmarks", {
         url,
         title: url.split("/").pop() || url, // Generate a simple title from URL for now
         description: notes ? notes.substring(0, 100) : "", // Use part of notes as description
-        user_tags: tagArray,
+        user_tags: [], // Tags are now managed through the tag relation tables
         system_tags: [],
         source: "web"
       });
-
+      
+      // Add tag relations
+      await Promise.all(tagIds.map(tagId => 
+        apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {})
+      ));
+      
+      // Update tag counts
+      await queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      
       toast({
         title: "Bookmark added",
         description: "Your bookmark was successfully added",
@@ -57,7 +91,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
 
       // Reset form
       setUrl("");
-      setTags("");
+      setSelectedTags([]);
       setNotes("");
       setCollection("none");
       setAutoExtract(true);
@@ -101,13 +135,9 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
           </div>
           
           <div>
-            <Label htmlFor="tags">Tags <span className="text-gray-400 text-xs">(Optional)</span></Label>
-            <Input
-              id="tags"
-              placeholder="Enter tags separated by commas"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              className="mt-1"
+            <TagSelector 
+              selectedTags={selectedTags}
+              onTagsChange={setSelectedTags}
             />
           </div>
           

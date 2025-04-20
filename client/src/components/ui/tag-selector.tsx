@@ -30,8 +30,14 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
     queryFn: getQueryFn({ on401: "returnNull" })
   });
   
-  // Update filtered tags when search text or tags change
+  // Update filtered tags when search text, tags, or selectedTags change
   useEffect(() => {
+    // Avoid processing if tags aren't loaded yet
+    if (!tags || tags.length === 0) {
+      setFilteredTags([]);
+      return;
+    }
+    
     if (newTagText.trim() === "") {
       // Show top 10 most used tags that aren't already selected
       setFilteredTags(
