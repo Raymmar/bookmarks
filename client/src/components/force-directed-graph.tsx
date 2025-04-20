@@ -30,7 +30,6 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const onNodeClickRef = useRef(onNodeClick);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
   
   // Update ref when prop changes
   useEffect(() => {
@@ -238,22 +237,20 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
     svg.call(zoomBehavior.translateTo, 0, 0);
   }, []);
 
-  // Update graph when data changes
+  // One-time setup of graph with persistent state
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current || !bookmarks.length) return;
+    if (!svgRef.current || !containerRef.current) return;
     
+    // These will be persisted across renders
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     
-    // Generate the graph data
-    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
-    
-    // Setup the SVG
+    // Setup the SVG once
     const svg = d3.select(svgRef.current)
       .attr("width", width)
       .attr("height", height);
     
-    // Clear any previous content
+    // Clear any existing content
     svg.selectAll("*").remove();
     
     // Create a container for the graph that can be zoomed
@@ -261,12 +258,39 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
       .attr("class", "zoom-container");
     
     // Create the links group first (to be under nodes)
-    const linkGroup = zoomContainer.append("g")
+    zoomContainer.append("g")
       .attr("class", "links");
     
     // Create the nodes group
-    const nodeGroup = zoomContainer.append("g")
+    zoomContainer.append("g")
       .attr("class", "nodes");
+      
+    // Setup zoom functionality
+    initializeZoom();
+    
+    // Clean up on unmount ONLY
+    return () => {
+      if (simulationRef.current) {
+        simulationRef.current.stop();
+        simulationRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array - run ONCE only
+  
+  // Update graph data without redrawing everything
+  useEffect(() => {
+    if (!svgRef.current || !containerRef.current || !bookmarks.length) return;
+    
+    const svg = d3.select(svgRef.current);
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight;
+    
+    // Get references to existing containers
+    const linkGroup = svg.select(".zoom-container .links");
+    const nodeGroup = svg.select(".zoom-container .nodes");
+    
+    // Generate the graph data
+    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
     
     // Determine link color based on type
     const getLinkColor = (type: string) => {
@@ -292,6 +316,11 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
       }
     };
     
+    // Stop any existing simulation
+    if (simulationRef.current) {
+      simulationRef.current.stop();
+    }
+    
     // Create the force simulation
     const simulation = d3.forceSimulation<GraphNode>(nodes)
       .force("link", d3.forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(d => {
@@ -310,14 +339,119 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
         return 20;
       }));
     
-    // Store simulation reference for later updates
+    // Store simulation reference
     simulationRef.current = simulation;
     
-    // Create links with visual distinctions
+    // Create node click handler with direct DOM manipulation for highlighted nodes
+    const handleNodeClick = function(event: any, d: any) {
+      event.stopPropagation();
+      
+      // Direct DOM manipulation to highlight the clicked node
+      // First, reset all nodes to default appearance
+      nodeGroup.selectAll(".node circle")
+        .attr("r", node => {
+          const n = node as GraphNode;
+          switch (n.type) {
+            case "bookmark": return 8;
+            case "related": return 6;
+            case "domain": return 7;
+            case "tag": return 5;
+            default: return 6;
+          }
+        })
+        .attr("stroke-width", node => (node as GraphNode).type === "bookmark" ? 2 : 1.5);
+      
+      // Then highlight the clicked node
+      d3.select(event.currentTarget).select("circle")
+        .attr("r", 10)
+        .attr("stroke-width", 3);
+      
+      // Call the callback
+      if (d.bookmarkId) {
+        onNodeClickRef.current(d.bookmarkId);
+      } else if (d.type === "related" && d.url) {
+        // For related nodes, try to find an existing bookmark with this URL
+        const matchingBookmark = bookmarks.find(b => b.url === d.url);
+        if (matchingBookmark) {
+          onNodeClickRef.current(matchingBookmark.id);
+        }
+      }
+    };
+    
+    // Node hover handlers
+    const handleNodeMouseover = function(event: any, d: any) {
+      // Highlight connected nodes and links on hover
+      const connectedLinks = links.filter(link => 
+        link.source === d.id || 
+        (typeof link.source === 'object' && (link.source as GraphNode).id === d.id) ||
+        link.target === d.id || 
+        (typeof link.target === 'object' && (link.target as GraphNode).id === d.id)
+      );
+      
+      const connectedNodeIds = new Set<string>();
+      connectedLinks.forEach(link => {
+        const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+        const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+        connectedNodeIds.add(sourceId);
+        connectedNodeIds.add(targetId);
+      });
+      
+      // Dim unrelated nodes and links
+      nodeGroup.selectAll(".node")
+        .style("opacity", n => connectedNodeIds.has(n.id) || n.id === d.id ? 1 : 0.3);
+      
+      linkGroup.selectAll("line")
+        .style("opacity", l => {
+          const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+          const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+          return sourceId === d.id || targetId === d.id ? 1 : 0.1;
+        })
+        .style("stroke-width", l => {
+          const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+          const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+          return sourceId === d.id || targetId === d.id ? Math.sqrt(l.value) * 1.5 : Math.sqrt(l.value);
+        });
+    };
+    
+    const handleNodeMouseout = function() {
+      // Reset highlights
+      nodeGroup.selectAll(".node").style("opacity", 1);
+      linkGroup.selectAll("line")
+        .style("opacity", 0.6)
+        .style("stroke-width", d => Math.sqrt(d.value));
+    };
+    
+    // Implement drag behavior functions
+    function dragstarted(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
+      if (!event.active && simulationRef.current) simulationRef.current.alphaTarget(0.3).restart();
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
+    }
+    
+    function dragged(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
+      event.subject.fx = event.x;
+      event.subject.fy = event.y;
+    }
+    
+    function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
+      if (!event.active && simulationRef.current) simulationRef.current.alphaTarget(0);
+      // Don't release nodes after drag to maintain layout
+      // event.subject.fx = null;
+      // event.subject.fy = null;
+    }
+    
+    // UPDATE PATTERN: Use D3's join pattern for better performance
+    
+    // Update links with a proper join
     const link = linkGroup
-      .selectAll("line")
-      .data(links)
-      .enter()
+      .selectAll<SVGLineElement, GraphLink>("line")
+      .data(links, d => d.id);
+      
+    // Remove old links
+    link.exit().remove();
+    
+    // Add new links
+    const linkEnter = link.enter()
       .append("line")
       .attr("class", "link")
       .attr("stroke", d => getLinkColor(d.type))
@@ -325,71 +459,26 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
       .attr("stroke-opacity", 0.6)
       .attr("id", d => `link-${d.id}`);
     
-    // Create node groups
+    // Update existing links (none for now)
+    const linkMerge = linkEnter.merge(link);
+    
+    // Update nodes with a proper join
     const node = nodeGroup
-      .selectAll(".node")
-      .data(nodes)
-      .enter()
+      .selectAll<SVGGElement, GraphNode>(".node")
+      .data(nodes, d => d.id);
+      
+    // Remove old nodes
+    node.exit().remove();
+    
+    // Add new nodes
+    const nodeEnter = node.enter()
       .append("g")
       .attr("class", d => `node node-${d.type}`)
       .attr("id", d => `node-${d.id}`)
       .style("cursor", "pointer")
-      .on("click", function(event, d) {
-        event.stopPropagation();
-        
-        // Highlight this node
-        setSelectedNode(d.id);
-        
-        if (d.bookmarkId) {
-          onNodeClickRef.current(d.bookmarkId);
-        } else if (d.type === "related" && d.url) {
-          // For related nodes, try to find an existing bookmark with this URL
-          const matchingBookmark = bookmarks.find(b => b.url === d.url);
-          if (matchingBookmark) {
-            onNodeClickRef.current(matchingBookmark.id);
-          }
-        }
-      })
-      .on("mouseover", function(event, d) {
-        // Highlight connected nodes and links on hover
-        const connectedLinks = links.filter(link => 
-          link.source === d.id || 
-          (typeof link.source === 'object' && (link.source as GraphNode).id === d.id) ||
-          link.target === d.id || 
-          (typeof link.target === 'object' && (link.target as GraphNode).id === d.id)
-        );
-        
-        const connectedNodeIds = new Set<string>();
-        connectedLinks.forEach(link => {
-          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-          connectedNodeIds.add(sourceId);
-          connectedNodeIds.add(targetId);
-        });
-        
-        // Dim unrelated nodes and links
-        nodeGroup.selectAll(".node")
-          .style("opacity", n => connectedNodeIds.has(n.id) || n.id === d.id ? 1 : 0.3);
-        
-        linkGroup.selectAll("line")
-          .style("opacity", l => {
-            const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
-            const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-            return sourceId === d.id || targetId === d.id ? 1 : 0.1;
-          })
-          .style("stroke-width", l => {
-            const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
-            const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-            return sourceId === d.id || targetId === d.id ? Math.sqrt(l.value) * 1.5 : Math.sqrt(l.value);
-          });
-      })
-      .on("mouseout", function() {
-        // Reset highlights
-        nodeGroup.selectAll(".node").style("opacity", 1);
-        linkGroup.selectAll("line")
-          .style("opacity", 0.6)
-          .style("stroke-width", d => Math.sqrt(d.value));
-      })
+      .on("click", handleNodeClick)
+      .on("mouseover", handleNodeMouseover)
+      .on("mouseout", handleNodeMouseout)
       .call(d3.drag<SVGGElement, GraphNode>()
         .on("start", dragstarted)
         .on("drag", dragged)
@@ -397,7 +486,7 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
       );
     
     // Add circles to nodes with distinct styling based on type
-    node.append("circle")
+    nodeEnter.append("circle")
       .attr("r", d => {
         switch (d.type) {
           case "bookmark": return 8;
@@ -412,7 +501,7 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
       .attr("stroke-width", d => d.type === "bookmark" ? 2 : 1.5);
     
     // Add different shapes for different node types
-    node.each(function(d) {
+    nodeEnter.each(function(d) {
       const element = d3.select(this);
       
       if (d.type === "tag") {
@@ -442,7 +531,7 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
     });
     
     // Add labels to nodes
-    node.append("text")
+    nodeEnter.append("text")
       .attr("dx", d => {
         // Adjust label position based on node type
         switch (d.type) {
@@ -456,9 +545,12 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
       .attr("font-size", d => d.type === "bookmark" ? "11px" : "10px")
       .attr("fill", "#1F2937");
     
+    // Merge the enter selection with the update selection  
+    const nodeMerge = nodeEnter.merge(node);
+    
     // Update positions during simulation
     simulation.on("tick", () => {
-      link
+      linkMerge
         .attr("x1", d => (typeof d.source === 'string' ? 
           (nodes.find(n => n.id === d.source)?.x || 0) : 
           (d.source as GraphNode).x || 0))
@@ -472,67 +564,14 @@ function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: F
           (nodes.find(n => n.id === d.target)?.y || 0) : 
           (d.target as GraphNode).y || 0));
       
-      node
+      nodeMerge
         .attr("transform", d => `translate(${d.x},${d.y})`);
     });
     
-    // Implement drag behavior
-    function dragstarted(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      event.subject.fx = event.subject.x;
-      event.subject.fy = event.subject.y;
-    }
-    
-    function dragged(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
-      event.subject.fx = event.x;
-      event.subject.fy = event.y;
-    }
-    
-    function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
-      if (!event.active) simulation.alphaTarget(0);
-      // Don't release nodes after drag to maintain layout
-      // event.subject.fx = null;
-      // event.subject.fy = null;
-    }
-    
-    // Setup zoom functionality
-    initializeZoom();
-    
-    // Clean up on unmount
-    return () => {
-      if (simulationRef.current) {
-        simulationRef.current.stop();
-        simulationRef.current = null;
-      }
-    };
-  }, [bookmarks, insightLevel, generateGraphData, initializeZoom]);
+  }, [bookmarks, insightLevel, generateGraphData]);
   
-  // Update selected node visual when it changes
-  useEffect(() => {
-    if (!selectedNode || !svgRef.current) return;
-    
-    const svg = d3.select(svgRef.current);
-    
-    // Reset all nodes to default size
-    svg.selectAll(".node circle")
-      .attr("r", d => {
-        const node = d as GraphNode;
-        switch (node.type) {
-          case "bookmark": return 8;
-          case "related": return 6;
-          case "domain": return 7;
-          case "tag": return 5;
-          default: return 6;
-        }
-      })
-      .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5);
-    
-    // Highlight the selected node
-    svg.select(`#node-${selectedNode} circle`)
-      .attr("r", 10)
-      .attr("stroke-width", 3);
-      
-  }, [selectedNode]);
+  // We don't need the useEffect for selected node anymore
+  // The node highlight is handled directly in the click handler
 
   return (
     <div ref={containerRef} className="h-full w-full">
