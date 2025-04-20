@@ -267,59 +267,33 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     centerY: number;
     scale: number;
     timestamp: number;
-    nodeIds: string[];
   } | null>(null);
   
-  // Very SIMPLE center graph function that just applies default zooming
+  // Function to center and zoom the graph based on visible nodes
   const centerGraph = useCallback((nodes: GraphNode[]) => {
     if (!svgRef.current || !containerRef.current || !zoomRef.current || nodes.length === 0) return;
-    
-    // Skip if we have a very recent center operation (prevents zooming loops)
-    const now = Date.now();
-    if (lastCenteredStateRef.current && now - lastCenteredStateRef.current.timestamp < 1000) {
-      return;
-    }
     
     // Get container dimensions
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     
-    // Use predefined scale based on node count
-    let scale = 0.9; // Default scale
+    // Calculate bounding box of all nodes
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     
-    if (nodes.length <= 10) {
-      scale = 1.3; // Slightly larger scale for small node sets
-    } else if (nodes.length > 50) {
-      scale = 0.7; // Smaller scale for very large node sets
-    }
+    nodes.forEach(node => {
+      if (node.x === undefined || node.y === undefined) return;
+      
+      minX = Math.min(minX, node.x);
+      maxX = Math.max(maxX, node.x);
+      minY = Math.min(minY, node.y);
+      maxY = Math.max(maxY, node.y);
+    });
     
-    // Just center in middle of container
-    const centerX = width / 2;
-    const centerY = height / 2;
+    // If we couldn't determine bounds, exit
+    if (minX === Infinity || minY === Infinity) return;
     
-    // Apply the transform
-    const svg = d3.select(svgRef.current);
-    svg.transition()
-      .duration(750)
-      .call(zoomRef.current.transform, 
-        d3.zoomIdentity
-          .translate(width / 2, height / 2)
-          .scale(scale)
-          .translate(-centerX, -centerY)
-      );
-    
-    // Record that we did this zooming
-    lastCenteredStateRef.current = {
-      nodeCount: nodes.length,
-      centerX,
-      centerY,
-      scale,
-      timestamp: now,
-      nodeIds: nodes.map(n => n.id).sort()
-    };
-    
-    console.log(`Graph centered: ${nodes.length} nodes, scale: ${scale.toFixed(2)}`);
-  }, []);
+    // Add padding - use more padding for fewer nodes to make the view more comfortable
+    const padding = Math.max(30, Math.min(100, 100 - nodes.length * 2));
     minX -= padding;
     maxX += padding;
     minY -= padding;
@@ -356,30 +330,20 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const lastState = lastCenteredStateRef.current;
     
     if (lastState) {
-      // Check if we're centering the exact same set of nodes
-      const sameNodes = lastState.nodeIds.length === currentNodeIds.length &&
-        lastState.nodeIds.every((id, i) => id === currentNodeIds[i]);
-        
-      // Don't re-center if we've recently centered the same set of nodes
-      // and the position/scale change is minimal
+      // Don't re-center if we've recently centered and the change is minor
       const timeSinceLastCenter = now - lastState.timestamp;
       const centerXDiff = Math.abs(centerX - lastState.centerX);
       const centerYDiff = Math.abs(centerY - lastState.centerY);
       const scaleDiff = Math.abs(scale - lastState.scale);
+      const nodeCountDiff = Math.abs(nodes.length - lastState.nodeCount);
       
-      // Much more aggressive de-bouncing to prevent multiple zooms
-      if (sameNodes && timeSinceLastCenter < 1500) {
-        // If we're zooming the same nodes in a short time period, skip this operation
-        return;
-      }
-      
-      // Also skip minor adjustments
-      if (
-        centerXDiff < 20 && 
-        centerYDiff < 20 && 
-        scaleDiff < 0.05 &&
-        sameNodes
-      ) {
+      // More aggressive de-bouncing to reduce frequent recentering
+      if ((timeSinceLastCenter < 800 && centerXDiff < 30 && centerYDiff < 30) || 
+          (timeSinceLastCenter < 2000 && 
+            centerXDiff < 20 && 
+            centerYDiff < 20 && 
+            scaleDiff < 0.1 && 
+            nodeCountDiff === 0)) {
         return;
       }
     }
@@ -402,8 +366,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       centerX,
       centerY,
       scale,
-      timestamp: now,
-      nodeIds: currentNodeIds
+      timestamp: now
     };
     
     console.log(`Graph centered: ${nodes.length} nodes, scale: ${scale.toFixed(2)}, center: (${Math.round(centerX)}, ${Math.round(centerY)})`);
@@ -433,41 +396,28 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
 
   // Get the connected nodes for a given node ID
   const getConnectedNodeIds = useCallback((nodeId: string): Set<string> => {
-    // First defensive check - if no simulation exists
     if (!simulationRef.current) return new Set([nodeId]);
     
     const connectedIds = new Set<string>([nodeId]);
     const linkForce = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
     
-    // If there's no link force or it's not properly initialized
-    if (!linkForce || typeof linkForce.links !== 'function') return connectedIds;
+    if (!linkForce) return connectedIds;
     
-    // Get links, with defensive check in case links() returns undefined
-    const links = linkForce.links() || [];
+    const links = linkForce.links();
     
     // Find all direct connections
     const directLinks = links.filter(link => {
-      if (!link || !link.source || !link.target) return false;
-      
-      const sourceId = typeof link.source === 'string' ? link.source : 
-                      (link.source as GraphNode).id ? (link.source as GraphNode).id : '';
-      const targetId = typeof link.target === 'string' ? link.target : 
-                      (link.target as GraphNode).id ? (link.target as GraphNode).id : '';
-                      
+      const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+      const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
       return sourceId === nodeId || targetId === nodeId;
     });
     
     // Add all directly connected node IDs
     directLinks.forEach(link => {
-      if (!link || !link.source || !link.target) return;
-      
-      const sourceId = typeof link.source === 'string' ? link.source : 
-                      (link.source as GraphNode).id ? (link.source as GraphNode).id : '';
-      const targetId = typeof link.target === 'string' ? link.target : 
-                      (link.target as GraphNode).id ? (link.target as GraphNode).id : '';
-                      
-      if (sourceId) connectedIds.add(sourceId);
-      if (targetId) connectedIds.add(targetId);
+      const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+      const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+      connectedIds.add(sourceId);
+      connectedIds.add(targetId);
     });
     
     return connectedIds;
@@ -482,29 +432,37 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     );
   }, []);
   
-  // Apply visual filtering based on focused node ids - SIMPLIFIED
+  // Apply visual filtering based on focused node ids
   const applyNodeFiltering = useCallback((focusedIds: Set<string>) => {
-    if (!svgRef.current || !focusedIds || focusedIds.size === 0) return;
+    if (!svgRef.current) return;
     
-    // Get the SVG selection
     const svg = d3.select(svgRef.current);
     
-    try {
-      // Simple opacity adjustment for nodes - focused vs unfocused
-      svg.selectAll(".node")
-        .style("opacity", d => focusedIds.has(d.id) ? 1 : 0.1);
-      
-      // Simple opacity adjustment for links - connecting focused nodes vs other links
-      svg.selectAll("line.link")
-        .style("opacity", l => {
-          const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
-          const targetId = typeof l.target === 'string' ? l.target : l.target.id;
-          return (focusedIds.has(sourceId) && focusedIds.has(targetId)) ? 0.8 : 0.1;
-        });
-    } catch (err) {
-      console.error("Error applying node filtering:", err);
+    // Update node opacity
+    svg.selectAll(".node")
+      .style("opacity", (d: any) => focusedIds.has(d.id) ? 1 : 0.02);
+    
+    // Update link opacity and stroke width
+    svg.selectAll("line.link")
+      .style("opacity", (l: any) => {
+        const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+        const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+        return focusedIds.has(sourceId) && focusedIds.has(targetId) ? 0.9 : 0.02;
+      })
+      .style("stroke-width", (l: any) => {
+        const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+        const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+        return focusedIds.has(sourceId) && focusedIds.has(targetId) ? 
+          Math.sqrt(l.value) * 1.8 : 
+          Math.sqrt(l.value) * 0.3;
+      });
+    
+    // Focus the view on the filtered nodes
+    if (simulationRef.current && focusedIds.size > 0) {
+      const focusedNodes = simulationRef.current.nodes().filter(n => focusedIds.has(n.id));
+      centerGraph(focusedNodes);
     }
-  }, []);
+  }, [centerGraph]);
   
   // Function to select a node and update the graph filtering
   const selectNode = useCallback((nodeId: string, isolateView: boolean = true) => {
@@ -588,19 +546,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .style("opacity", 0.6)
       .style("stroke-width", (d: any) => Math.sqrt(d.value));
     
-    // Reset all node sizes to default (clear highlight)
-    svg.selectAll(".node circle")
-      .attr("r", (d: any) => {
-        switch (d.type) {
-          case "bookmark": return 8;
-          case "related": return 6;
-          case "domain": return 7;
-          case "tag": return 5;
-          default: return 6;
-        }
-      })
-      .attr("stroke-width", (d: any) => d.type === "bookmark" ? 2 : 1.5);
-    
     // Reset the selection state
     setGraphState(prev => ({
       ...prev,
@@ -609,22 +554,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       isFiltered: false
     }));
     
-    // Skip centering view if we're already showing all nodes to avoid excess zooming
-    if (
-      lastCenteredStateRef.current && 
-      simulationRef.current?.nodes() &&
-      lastCenteredStateRef.current.nodeCount === simulationRef.current.nodes().length
-    ) {
-      // Already centered on all nodes, don't do anything
-      return;
-    }
-    
-    // Center the view on all nodes (with a short delay to ensure state is updated)
-    setTimeout(() => {
-      if (simulationRef.current) {
-        centerGraph(simulationRef.current.nodes());
-      }
-    }, 50);
+    // Center the view on all nodes
+    centerGraph(simulationRef.current.nodes());
   }, [centerGraph]);
   
   // Initialize and render the force-directed graph
@@ -956,9 +887,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   // Listen for external node selection events (from bookmark card or tag selection)
   useEffect(() => {
     const handleSelectNode = (event: Event) => {
-      // Make sure the simulation exists before proceeding
-      if (!simulationRef.current) return;
-      
       const customEvent = event as CustomEvent;
       if (!customEvent.detail?.nodeId) return;
       
@@ -977,10 +905,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     // Reset graph event handler
     const handleResetGraph = () => {
-      // Make sure the simulation exists before proceeding
-      if (!simulationRef.current) return;
-      
-      console.log("Handling reset graph event");
       resetFilter();
     };
     
@@ -993,7 +917,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       document.removeEventListener('selectGraphNode', handleSelectNode);
       document.removeEventListener('resetGraphView', handleResetGraph);
     };
-  }, [selectNode, selectBookmarkById, resetFilter, simulationRef]);
+  }, [selectNode, selectBookmarkById, resetFilter]);
   
   return (
     <div ref={containerRef} className="h-full w-full relative">
