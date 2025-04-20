@@ -31,6 +31,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   
+  // Flag to track if the node selection came from the tag UI (external) vs direct graph click
+  const isExternalNodeSelectionRef = useRef<boolean>(false);
+  
   // Extract domain from URL
   const getDomain = (url: string): string => {
     try {
@@ -641,6 +644,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const handleSelectNode = (event: Event) => {
       const customEvent = event as CustomEvent;
       if (customEvent.detail?.nodeId) {
+        // Signal that this selection came from external UI, not from node click
+        isExternalNodeSelectionRef.current = true;
         setSelectedNode(customEvent.detail.nodeId);
       }
     };
@@ -654,7 +659,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     };
   }, []);
 
-  // Update selected node visual when it changes and center the graph around it
+
+  
+  // Update selected node visual when it changes
   useEffect(() => {
     if (!selectedNode || !svgRef.current) return;
     
@@ -681,50 +688,56 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         .attr("r", 10)
         .attr("stroke-width", 3);
       
-      // Get selected node data
-      const nodeData = simulationRef.current?.nodes().find(n => n.id === selectedNode);
-      
-      // If we have the node data and simulation is available, center the graph around this node
-      if (nodeData && simulationRef.current) {
-        // For tag nodes, we want to center the graph on all associated bookmarks
-        if (nodeData.type === "tag") {
-          // Find all nodes connected to this tag
-          const tagId = nodeData.id;
-          const relatedNodes = simulationRef.current.nodes().filter(n => {
-            // Find bookmark nodes that have a link to this tag
-            if (n.type !== "bookmark") return false;
-            
-            // Check if there's a link between this bookmark and the tag
-            const links = simulationRef.current?.force("link") as d3.ForceLink<GraphNode, GraphLink>;
-            const connection = links.links().some(link => {
-              const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-              const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-              return (sourceId === n.id && targetId === tagId) || (sourceId === tagId && targetId === n.id);
+      // Only center the view if this selection came from the external tag UI
+      // This prevents the re-centering when users click directly on nodes in the graph
+      if (isExternalNodeSelectionRef.current) {
+        // Get selected node data
+        const nodeData = simulationRef.current?.nodes().find(n => n.id === selectedNode);
+        
+        // If we have the node data and simulation is available, center the graph around this node
+        if (nodeData && simulationRef.current) {
+          // For tag nodes, center on all associated bookmarks
+          if (nodeData.type === "tag") {
+            // Find all nodes connected to this tag
+            const tagId = nodeData.id;
+            const relatedNodes = simulationRef.current.nodes().filter(n => {
+              // Find bookmark nodes that have a link to this tag
+              if (n.type !== "bookmark") return false;
+              
+              // Check if there's a link between this bookmark and the tag
+              const links = simulationRef.current?.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+              const connection = links.links().some(link => {
+                const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+                const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+                return (sourceId === n.id && targetId === tagId) || (sourceId === tagId && targetId === n.id);
+              });
+              
+              return connection;
             });
             
-            return connection;
-          });
-          
-          // Center on the cluster that includes the tag and all connected bookmarks
-          if (relatedNodes.length > 0) {
-            centerGraph([nodeData, ...relatedNodes]);
+            // Center on the cluster that includes the tag and all connected bookmarks
+            if (relatedNodes.length > 0) {
+              centerGraph([nodeData, ...relatedNodes]);
+            } else {
+              centerGraph([nodeData]);
+            }
           } else {
-            centerGraph([nodeData]);
-          }
-        } else {
-          // For non-tag nodes, just center on the node itself
-          // Find connected nodes for a better view
-          const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
-          const connectedNodes = simulationRef.current.nodes().filter(n => {
-            return links.links().some(link => {
-              const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-              const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-              return (sourceId === nodeData.id && targetId === n.id) || (sourceId === n.id && targetId === nodeData.id);
+            // For non-tag nodes, find connected nodes for a better view
+            const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+            const connectedNodes = simulationRef.current.nodes().filter(n => {
+              return links.links().some(link => {
+                const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+                const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+                return (sourceId === nodeData.id && targetId === n.id) || (sourceId === n.id && targetId === nodeData.id);
+              });
             });
-          });
-          
-          centerGraph([nodeData, ...connectedNodes]);
+            
+            centerGraph([nodeData, ...connectedNodes]);
+          }
         }
+        
+        // Reset the flag after centering
+        isExternalNodeSelectionRef.current = false;
       }
     }
   }, [selectedNode, centerGraph]);
