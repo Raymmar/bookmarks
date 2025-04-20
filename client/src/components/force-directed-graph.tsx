@@ -453,6 +453,51 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         // Highlight this node
         setSelectedNode(d.id);
         
+        // Isolate the view to show just this node and its connections
+        const svg = d3.select(svgRef.current);
+        
+        // Get all direct connections to this node
+        const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+        const directLinks = links.links().filter(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+          return sourceId === d.id || targetId === d.id;
+        });
+        
+        // Get all connected node IDs
+        const connectedNodeIds = new Set<string>([d.id]);
+        directLinks.forEach(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+          connectedNodeIds.add(sourceId);
+          connectedNodeIds.add(targetId);
+        });
+        
+        // Hide all nodes and links that aren't connected to this node
+        svg.selectAll(".node")
+          .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.1);
+        
+        svg.selectAll("line.link")
+          .style("opacity", l => {
+            const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+            const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+            return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 0.8 : 0.1;
+          })
+          .style("stroke-width", l => {
+            const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+            const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+            return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 
+              Math.sqrt((l as any).value) * 1.5 : 
+              Math.sqrt((l as any).value) * 0.7;
+          });
+        
+        // Center the graph on the connected nodes
+        const connectedNodes = simulationRef.current.nodes().filter(node => 
+          connectedNodeIds.has(node.id)
+        );
+        centerGraph(connectedNodes);
+        
+        // Trigger the callback to update the sidebar
         if (d.bookmarkId) {
           onNodeClick(d.bookmarkId);
         } else if (d.type === "related" && d.url) {
@@ -642,13 +687,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     level: insightLevel
   }), generateGraphData, initializeZoom, onNodeClick, centerGraph]);
   
-  // Listen for external node selection events (like from tag selection in parent component)
+  // Listen for external node selection events (like from bookmark card or tag selection)
   useEffect(() => {
     const handleSelectNode = (event: Event) => {
       const customEvent = event as CustomEvent;
       if (customEvent.detail?.nodeId) {
         // Find the node in our simulation with this ID - match bookmark ids to bookmark nodes
         const nodeId = customEvent.detail.nodeId;
+        const isolateView = customEvent.detail?.isolateView === true;
+        
         if (simulationRef.current) {
           // For bookmarks, we want to find the node with bookmarkId matching nodeId
           const matchingNode = simulationRef.current.nodes().find(n => {
@@ -664,6 +711,52 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           if (matchingNode) {
             setSelectedNode(matchingNode.id);
             console.log(`Selecting graph node: ${matchingNode.id} (type: ${matchingNode.type})`);
+            
+            // If we should isolate the view to just this node and its connections
+            if (isolateView && svgRef.current) {
+              const svg = d3.select(svgRef.current);
+              
+              // Get all direct connections to this node
+              const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+              const directLinks = links.links().filter(link => {
+                const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+                const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+                return sourceId === matchingNode.id || targetId === matchingNode.id;
+              });
+              
+              // Get all connected node IDs
+              const connectedNodeIds = new Set<string>([matchingNode.id]);
+              directLinks.forEach(link => {
+                const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+                const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+                connectedNodeIds.add(sourceId);
+                connectedNodeIds.add(targetId);
+              });
+              
+              // Hide all nodes and links that aren't connected to this node
+              svg.selectAll(".node")
+                .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.1);
+              
+              svg.selectAll("line.link")
+                .style("opacity", l => {
+                  const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+                  const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+                  return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 0.8 : 0.1;
+                })
+                .style("stroke-width", l => {
+                  const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+                  const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+                  return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 
+                    Math.sqrt((l as any).value) * 1.5 : 
+                    Math.sqrt((l as any).value) * 0.7;
+                });
+              
+              // Center the graph on the connected nodes
+              const connectedNodes = simulationRef.current.nodes().filter(node => 
+                connectedNodeIds.has(node.id)
+              );
+              centerGraph(connectedNodes);
+            }
           } else {
             console.log(`Could not find matching node for ID: ${nodeId}`);
           }
@@ -755,13 +848,45 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     }
   }, [selectedNode, centerGraph]);
 
+  // Function to reset the graph view to show all nodes
+  const resetGraphView = useCallback(() => {
+    if (!svgRef.current || !simulationRef.current) return;
+    
+    const svg = d3.select(svgRef.current);
+    
+    // Reset all node and link opacities
+    svg.selectAll(".node").style("opacity", 1);
+    svg.selectAll("line.link")
+      .style("opacity", 0.6)
+      .style("stroke-width", d => Math.sqrt((d as any).value));
+    
+    // Clear the selected node
+    setSelectedNode(null);
+    
+    // Recenter the entire graph
+    centerGraph(simulationRef.current.nodes());
+  }, [centerGraph]);
+  
   return (
-    <div ref={containerRef} className="h-full w-full">
+    <div ref={containerRef} className="h-full w-full relative">
       <svg 
         ref={svgRef} 
         className="w-full h-full rounded-lg"
         style={{ background: "#f9fafb" }}
       />
+      
+      {/* Reset view button - show only when nodes are filtered */}
+      <button
+        onClick={resetGraphView}
+        className="absolute top-4 right-4 bg-white hover:bg-gray-100 text-gray-800 font-semibold py-1 px-3 text-sm border border-gray-300 rounded shadow-sm flex items-center"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+        </svg>
+        Show All
+      </button>
+      
+      {/* Legend */}
       <div className="absolute bottom-4 right-4 bg-white p-2 rounded-md shadow-md text-xs text-gray-600">
         <div className="flex items-center mb-1">
           <div className="w-3 h-3 rounded-full bg-blue-600 mr-2"></div>

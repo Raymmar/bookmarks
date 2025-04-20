@@ -32,16 +32,16 @@ export default function GraphView() {
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
-  // When a bookmark is selected, center it in the graph without redrawing
+  // When a bookmark is selected, focus the graph on just that bookmark and its connections
   const handleSelectBookmark = (id: string) => {
-    // First set the selected bookmark ID for the sidebar panel
+    // Update the selected bookmark ID for the sidebar panel
     setSelectedBookmarkId(id);
     
     // Now trigger graph centering without causing a full redraw
     // No delay needed as we've modified the ForceDirectedGraph component
     // to avoid redraws when selectedBookmarkId changes
     const event = new CustomEvent('selectGraphNode', { 
-      detail: { nodeId: id } 
+      detail: { nodeId: id, isolateView: true } 
     });
     document.dispatchEvent(event);
   };
