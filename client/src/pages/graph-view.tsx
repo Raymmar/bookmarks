@@ -36,16 +36,15 @@ export default function GraphView() {
   const handleSelectBookmark = (id: string) => {
     setSelectedBookmarkId(id);
     
-    // Find the bookmark node ID format that matches our graph component
-    // In the force-directed-graph.tsx, nodes use their bookmark ID directly
-    const bookmarkNodeId = id;
-    
-    // Use custom event to notify the graph component to select and center this node
-    // No need for setTimeout as we're not redrawing the graph
-    const event = new CustomEvent('selectGraphNode', { 
-      detail: { nodeId: bookmarkNodeId } 
-    });
-    document.dispatchEvent(event);
+    // Need a small delay to ensure the graph state is ready
+    setTimeout(() => {
+      // In the ForceDirectedGraph, nodes are assigned the DOM ID "node-{id}"
+      // but the actual selectGraphNode event expects the raw ID
+      const event = new CustomEvent('selectGraphNode', { 
+        detail: { nodeId: id } 
+      });
+      document.dispatchEvent(event);
+    }, 50);
   };
   
   // Extract all unique tags from bookmarks
@@ -122,9 +121,10 @@ export default function GraphView() {
       
       // Only focus on tag node when it's newly selected and in graph view
       if (viewMode === "graph") {
-        // Find the tag node ID format that matches our graph component
+        // The node ID for tags in the ForceDirectedGraph is tag-{tag}
         const tagNodeId = `tag-${tag}`;
-        // Clear any selected bookmark
+        
+        // Clear any selected bookmark first
         setSelectedBookmarkId(null);
         
         // Use a longer delay to ensure the graph has fully updated with filtered nodes

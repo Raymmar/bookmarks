@@ -641,7 +641,27 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const handleSelectNode = (event: Event) => {
       const customEvent = event as CustomEvent;
       if (customEvent.detail?.nodeId) {
-        setSelectedNode(customEvent.detail.nodeId);
+        // Find the node in our simulation with this ID - match bookmark ids to bookmark nodes
+        const nodeId = customEvent.detail.nodeId;
+        if (simulationRef.current) {
+          // For bookmarks, we want to find the node with bookmarkId matching nodeId
+          const matchingNode = simulationRef.current.nodes().find(n => {
+            if (n.type === "bookmark" && n.bookmarkId === nodeId) {
+              return true;
+            } else if (n.id === nodeId) {
+              // For non-bookmark nodes like tags, match directly
+              return true;
+            }
+            return false;
+          });
+          
+          if (matchingNode) {
+            setSelectedNode(matchingNode.id);
+            console.log(`Selecting graph node: ${matchingNode.id} (type: ${matchingNode.type})`);
+          } else {
+            console.log(`Could not find matching node for ID: ${nodeId}`);
+          }
+        }
       }
     };
     
