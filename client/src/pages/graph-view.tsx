@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
@@ -22,6 +22,12 @@ export default function GraphView() {
   const [sortOrder, setSortOrder] = useState("newest");
   const [dateRange, setDateRange] = useState("all");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  
+  // Create a memoized callback for handling node clicks
+  // This ensures the function reference doesn't change on every render
+  const handleNodeClick = useCallback((bookmarkId: string) => {
+    setSelectedBookmarkId(bookmarkId);
+  }, []);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -249,7 +255,7 @@ export default function GraphView() {
               <ForceDirectedGraph
                 bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
-                onNodeClick={setSelectedBookmarkId}
+                onNodeClick={handleNodeClick}
               />
             </div>
           ) : (
