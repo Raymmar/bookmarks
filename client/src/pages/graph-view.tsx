@@ -175,15 +175,15 @@ export default function GraphView() {
         
         {/* Search, filters and tags section */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 w-full">
-          {/* Search input */}
-          <div className="mb-3">
-            <div className="relative flex-1 max-w-full">
+          {/* Search input and filter row */}
+          <div className="flex items-center mb-3 gap-2">
+            <div className="relative flex-1">
               <Input
                 type="text"
                 placeholder="Search bookmarks, content, tags..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full"
+                className="pl-10 pr-4 py-2 h-10 w-full"
               />
               <SearchX className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
               {searchQuery && (
@@ -193,58 +193,43 @@ export default function GraphView() {
                 />
               )}
             </div>
+            
+            <FilterControls
+              tags={allTags}
+              selectedTags={selectedTags}
+              onTagsChange={setSelectedTags}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              sources={sources}
+              onSourcesChange={setSources}
+              tagMode={tagMode}
+              onTagModeChange={setTagMode}
+              sortOrder={sortOrder}
+              onSortOrderChange={setSortOrder}
+            />
           </div>
           
-          {/* Filters and tags */}
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <FilterControls
-                tags={allTags}
-                selectedTags={selectedTags}
-                onTagsChange={setSelectedTags}
-                dateRange={dateRange}
-                onDateRangeChange={setDateRange}
-                sources={sources}
-                onSourcesChange={setSources}
-                tagMode={tagMode}
-                onTagModeChange={setTagMode}
-              />
-              
-              <div className="flex items-center">
-                <Select value={sortOrder} onValueChange={setSortOrder}>
-                  <SelectTrigger className="h-7 text-xs w-32">
-                    <SelectValue placeholder="Sort order" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest first</SelectItem>
-                    <SelectItem value="oldest">Oldest first</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            {/* Tags display */}
-            <div className="flex flex-wrap gap-1">
-              {allTags.map(tag => (
-                <Badge 
-                  key={tag}
-                  variant={selectedTags.includes(tag) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleTagSelection(tag)}
-                >
-                  {tag}
-                  {selectedTags.includes(tag) && (
-                    <X 
-                      className="h-3 w-3 ml-1" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTagSelection(tag);
-                      }}
-                    />
-                  )}
-                </Badge>
-              ))}
-            </div>
+          {/* Tags display */}
+          <div className="flex flex-wrap gap-1">
+            {allTags.map(tag => (
+              <Badge 
+                key={tag}
+                variant={selectedTags.includes(tag) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggleTagSelection(tag)}
+              >
+                {tag}
+                {selectedTags.includes(tag) && (
+                  <X 
+                    className="h-3 w-3 ml-1" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTagSelection(tag);
+                    }}
+                  />
+                )}
+              </Badge>
+            ))}
           </div>
         </div>
         
