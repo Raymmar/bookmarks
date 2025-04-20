@@ -314,14 +314,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       const scaleDiff = Math.abs(scale - lastState.scale);
       const nodeCountDiff = Math.abs(nodes.length - lastState.nodeCount);
       
-      // If it's been less than 1.5 seconds, the center point hasn't moved much, 
-      // scale is similar, and we're not showing dramatically different number of nodes, 
-      // then skip this update for smoother experience
-      if (timeSinceLastCenter < 1500 && 
-          centerXDiff < 50 && 
-          centerYDiff < 50 && 
-          scaleDiff < 0.2 &&
-          nodeCountDiff < 3) {
+      // More aggressive de-bouncing to reduce frequent recentering
+      // If it's been less than 0.8 seconds or the center point and scale are very similar
+      // skip this update for smoother experience
+      if ((timeSinceLastCenter < 800 && centerXDiff < 30 && centerYDiff < 30) || 
+          (timeSinceLastCenter < 2000 && 
+            centerXDiff < 20 && 
+            centerYDiff < 20 && 
+            scaleDiff < 0.1 &&
+            nodeCountDiff === 0)) {
         return;
       }
     }
@@ -334,8 +335,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .translate(-centerX, -centerY);
     
     svg.transition()
-      .duration(1200) // Longer animation for smoother feel
-      .ease(d3.easeCubicOut) // Smoother easing function
+      .duration(800) // Reduced duration for more responsive feel but still smooth
+      .ease(d3.easeCubicInOut) // More natural easing with a slight acceleration and deceleration
       .call(zoomBehaviorRef.current.transform, transform);
     
     // Store this state to avoid oscillation
@@ -634,7 +635,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         simulationRef.current = null;
       }
     };
-  }, [bookmarks, insightLevel, generateGraphData, initializeZoom, onNodeClick, centerGraph]);
+  // Only recreate the graph when its data fundamentally changes (filtered bookmarks change)
+  // Use a deep comparison to prevent unnecessary rerenders
+  }, [JSON.stringify({
+    bookmarkIds: bookmarks.map(b => b.id).sort(),
+    level: insightLevel
+  }), generateGraphData, initializeZoom, onNodeClick, centerGraph]);
   
   // Listen for external node selection events (like from tag selection in parent component)
   useEffect(() => {

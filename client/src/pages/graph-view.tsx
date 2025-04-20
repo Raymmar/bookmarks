@@ -34,17 +34,16 @@ export default function GraphView() {
   
   // When a bookmark is selected, center it in the graph without redrawing
   const handleSelectBookmark = (id: string) => {
+    // First set the selected bookmark ID for the sidebar panel
     setSelectedBookmarkId(id);
     
-    // Need a small delay to ensure the graph state is ready
-    setTimeout(() => {
-      // In the ForceDirectedGraph, nodes are assigned the DOM ID "node-{id}"
-      // but the actual selectGraphNode event expects the raw ID
-      const event = new CustomEvent('selectGraphNode', { 
-        detail: { nodeId: id } 
-      });
-      document.dispatchEvent(event);
-    }, 50);
+    // Now trigger graph centering without causing a full redraw
+    // No delay needed as we've modified the ForceDirectedGraph component
+    // to avoid redraws when selectedBookmarkId changes
+    const event = new CustomEvent('selectGraphNode', { 
+      detail: { nodeId: id } 
+    });
+    document.dispatchEvent(event);
   };
   
   // Extract all unique tags from bookmarks
@@ -127,15 +126,15 @@ export default function GraphView() {
         // Clear any selected bookmark first
         setSelectedBookmarkId(null);
         
-        // Use a longer delay to ensure the graph has fully updated with filtered nodes
-        // This prevents the "bouncing" effect caused by rapid zoom transitions
+        // Use a small delay to ensure tags state is updated first
+        // With our improved ForceDirectedGraph implementation, we don't need a long delay
         setTimeout(() => {
           // Use custom event to notify the graph component to select this tag
           const event = new CustomEvent('selectGraphNode', { 
             detail: { nodeId: tagNodeId } 
           });
           document.dispatchEvent(event);
-        }, 300); // Longer delay for smoother transitions
+        }, 50);
       }
     }
   };
