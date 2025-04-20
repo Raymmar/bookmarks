@@ -210,22 +210,18 @@ export default function GraphView() {
           </div>
           
           {/* Tags display */}
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex flex-wrap gap-1 mt-2">
             {allTags.map(tag => (
               <Badge 
                 key={tag}
                 variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className={`cursor-pointer px-3 py-1 rounded-full text-sm ${
-                  selectedTags.includes(tag) 
-                    ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                    : "bg-gray-100 hover:bg-gray-200 text-gray-800"
-                }`}
+                className="cursor-pointer"
                 onClick={() => toggleTagSelection(tag)}
               >
                 {tag}
                 {selectedTags.includes(tag) && (
                   <X 
-                    className="h-3.5 w-3.5 ml-1.5" 
+                    className="h-3 w-3 ml-1" 
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleTagSelection(tag);
