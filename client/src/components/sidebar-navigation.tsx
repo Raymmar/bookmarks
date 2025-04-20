@@ -77,7 +77,7 @@ export function SidebarNavigation({ className, onFiltersChange }: SidebarNavigat
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
                     <Layers className="h-5 w-5 mr-2" />
-                    Bookmark Explorer
+                    Explore
                   </a>
                 </Link>
               </li>
