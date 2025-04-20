@@ -472,10 +472,109 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     const svg = d3.select(svgRef.current);
     
+    // Get combined set of nodes to focus based on all active filters
+    const getNodesThatMatchFilters = () => {
+      // If there are no filters applied, or focusedIds is already calculated for us
+      if (focusedIds.size > 0) {
+        return focusedIds;
+      }
+      
+      // Get current filters state
+      const { activeFilters, filterMode } = graphState;
+      const isFilterActive = 
+        activeFilters.tags.size > 0 || 
+        activeFilters.bookmarks.size > 0 || 
+        activeFilters.domains.size > 0;
+        
+      // If no filters are active, show all nodes
+      if (!isFilterActive) {
+        return new Set<string>(); // Empty set means no filtering
+      }
+      
+      const matchingNodeIds = new Set<string>();
+      
+      // No nodes yet - we'll collect them based on our filter criteria
+      if (simulationRef.current) {
+        const allNodes = simulationRef.current.nodes();
+        
+        // For each node, check if it matches any or all of our filter criteria
+        allNodes.forEach(node => {
+          let matchesTags = activeFilters.tags.size === 0;
+          let matchesBookmarks = activeFilters.bookmarks.size === 0;
+          let matchesDomains = activeFilters.domains.size === 0;
+          
+          // Check if node matches tag filters
+          if (activeFilters.tags.size > 0) {
+            if (node.type === "tag" && activeFilters.tags.has(node.id)) {
+              matchesTags = true;
+            } else if (node.type === "bookmark") {
+              // Find the connected tag nodes for this bookmark
+              const connectedTags = getConnectedNodeIds(node.id);
+              // Check if any of the active tag filters match our connected tags
+              for (const tagId of activeFilters.tags) {
+                if (connectedTags.has(tagId)) {
+                  matchesTags = true;
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Check if node matches bookmark filters
+          if (activeFilters.bookmarks.size > 0) {
+            if (node.type === "bookmark" && activeFilters.bookmarks.has(node.id)) {
+              matchesBookmarks = true;
+            } else if (activeFilters.bookmarks.has(node.id)) {
+              matchesBookmarks = true;
+            }
+          }
+          
+          // Check if node matches domain filters
+          if (activeFilters.domains.size > 0) {
+            if (node.type === "domain" && activeFilters.domains.has(node.id)) {
+              matchesDomains = true;
+            } else if (node.type === "bookmark") {
+              // Find the connected domain nodes for this bookmark
+              const connectedDomains = getConnectedNodeIds(node.id);
+              // Check if any of the active domain filters match our connected domains
+              for (const domainId of activeFilters.domains) {
+                if (connectedDomains.has(domainId)) {
+                  matchesDomains = true;
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Determine if the node matches based on the filter mode
+          const matchesFilters = filterMode === 'and' 
+            ? (matchesTags && matchesBookmarks && matchesDomains) 
+            : (matchesTags || matchesBookmarks || matchesDomains);
+            
+          if (matchesFilters) {
+            matchingNodeIds.add(node.id);
+            
+            // Also add connected nodes to preserve the graph structure
+            const connectedIds = getConnectedNodeIds(node.id);
+            connectedIds.forEach(id => matchingNodeIds.add(id));
+          }
+        });
+      }
+      
+      return matchingNodeIds;
+    };
+    
+    const nodesToFocus = getNodesThatMatchFilters();
+    const hasActiveFilters = nodesToFocus.size > 0;
+    
     // Update node opacity - we only dim nodes that are not part of the focus set
     // but maintain the connections between nodes in the focus set
     svg.selectAll(".node")
-      .style("opacity", (d: any) => focusedIds.has(d.id) ? 1 : 0.02);
+      .style("opacity", (d: any) => {
+        // If no active filters, show everything
+        if (!hasActiveFilters) return 1;
+        return nodesToFocus.has(d.id) ? 1 : 0.02;
+      });
     
     // For links, show all links that connect to at least one focused node
     // This preserves the connected graph structure better
@@ -484,12 +583,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
         const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
         
+        // If no active filters, show everything
+        if (!hasActiveFilters) return 0.6;
+        
         // If both source and target are in the focus set, highlight the link strongly
-        if (focusedIds.has(sourceId) && focusedIds.has(targetId)) {
+        if (nodesToFocus.has(sourceId) && nodesToFocus.has(targetId)) {
           return 0.9;
         }
         // If at least one node is in the focus set, show the link dimmed but visible
-        else if (focusedIds.has(sourceId) || focusedIds.has(targetId)) {
+        else if (nodesToFocus.has(sourceId) || nodesToFocus.has(targetId)) {
           return 0.3;
         }
         // Otherwise, make the link nearly invisible
@@ -499,9 +601,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
         const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
         
-        if (focusedIds.has(sourceId) && focusedIds.has(targetId)) {
+        // If no active filters, use default width
+        if (!hasActiveFilters) return Math.sqrt(l.value);
+        
+        if (nodesToFocus.has(sourceId) && nodesToFocus.has(targetId)) {
           return Math.sqrt(l.value) * 1.8;
-        } else if (focusedIds.has(sourceId) || focusedIds.has(targetId)) {
+        } else if (nodesToFocus.has(sourceId) || nodesToFocus.has(targetId)) {
           return Math.sqrt(l.value) * 0.8;
         }
         return Math.sqrt(l.value) * 0.3;
@@ -526,7 +631,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     setTimeout(() => {
       isFilteringRef.current = false;
     }, 500);
-  }, [centerGraph]);
+  }, [centerGraph, getConnectedNodeIds, graphState]);
   
   // Track the last selected node ID to prevent redundant selections
   const lastSelectedNodeRef = useRef<string | null>(null);
@@ -707,6 +812,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   // Track whether we're currently resetting the filter
   const isResettingRef = useRef(false);
   
+
   // Reset the graph filtering to show all nodes
   const resetFilter = useCallback(() => {
     if (!svgRef.current || !simulationRef.current) return;
