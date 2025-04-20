@@ -8,8 +8,8 @@
 body {
   font-family: 'Inter', sans-serif;
   font-size: 14px;
-  width: 380px;
-  height: 580px;
+  width: 100%;
+  height: 100vh;
   color: #1F2937;
   overflow: hidden;
   display: flex;

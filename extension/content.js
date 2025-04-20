@@ -1,5 +1,7 @@
 // Store highlighted elements for reference
 const highlightedElements = new Set();
+let sidebarInjected = false;
+let isSidebarOpen = false;
 
 // Handle messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -46,6 +48,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     highlightSelectedText();
   }
   
+  else if (request.action === "openSidebar") {
+    if (!sidebarInjected) {
+      injectSidebar();
+    }
+    openSidebar();
+  }
+  
   return true;
 });
 
@@ -55,7 +64,7 @@ function showNotification(status, message) {
   const notification = document.createElement('div');
   notification.style.position = 'fixed';
   notification.style.bottom = '20px';
-  notification.style.right = '20px';
+  notification.style.right = isSidebarOpen ? '400px' : '20px';
   notification.style.padding = '10px 20px';
   notification.style.borderRadius = '4px';
   notification.style.zIndex = '99999';
@@ -83,6 +92,122 @@ function showNotification(status, message) {
       notification.remove();
     }, 300);
   }, 3000);
+}
+
+// Inject the sidebar into the page
+function injectSidebar() {
+  // Create sidebar container
+  const sidebar = document.createElement('div');
+  sidebar.className = 'universal-bookmarks-sidebar';
+  sidebar.id = 'universal-bookmarks-sidebar';
+  
+  // Create sidebar header
+  const header = document.createElement('div');
+  header.className = 'universal-bookmarks-sidebar-header';
+  
+  const headerLeft = document.createElement('div');
+  headerLeft.className = 'universal-bookmarks-sidebar-header-left';
+  
+  const icon = document.createElement('div');
+  icon.className = 'universal-bookmarks-sidebar-icon';
+  icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
+  
+  const title = document.createElement('h1');
+  title.className = 'universal-bookmarks-sidebar-title';
+  title.textContent = 'Universal Bookmarks';
+  
+  headerLeft.appendChild(icon);
+  headerLeft.appendChild(title);
+  
+  const closeButton = document.createElement('button');
+  closeButton.className = 'universal-bookmarks-sidebar-close';
+  closeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  closeButton.addEventListener('click', closeSidebar);
+  
+  header.appendChild(headerLeft);
+  header.appendChild(closeButton);
+  
+  // Create content area
+  const content = document.createElement('div');
+  content.className = 'universal-bookmarks-sidebar-content';
+  content.id = 'universal-bookmarks-sidebar-content';
+  
+  // Create footer
+  const footer = document.createElement('div');
+  footer.className = 'universal-bookmarks-sidebar-footer';
+  
+  const cancelButton = document.createElement('button');
+  cancelButton.className = 'btn btn-secondary';
+  cancelButton.textContent = 'Cancel';
+  cancelButton.addEventListener('click', closeSidebar);
+  
+  const saveButton = document.createElement('button');
+  saveButton.className = 'btn btn-primary';
+  saveButton.textContent = 'Save Bookmark';
+  saveButton.addEventListener('click', () => {
+    // Send message to background script to save the current page
+    chrome.runtime.sendMessage({ action: "saveCurrentPage" });
+  });
+  
+  footer.appendChild(cancelButton);
+  footer.appendChild(saveButton);
+  
+  // Assemble sidebar
+  sidebar.appendChild(header);
+  sidebar.appendChild(content);
+  sidebar.appendChild(footer);
+  
+  // Create toggle button
+  const toggleButton = document.createElement('button');
+  toggleButton.className = 'universal-bookmarks-toggle';
+  toggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
+  toggleButton.addEventListener('click', toggleSidebar);
+  
+  // Inject sidebar and toggle button into page
+  document.body.appendChild(sidebar);
+  document.body.appendChild(toggleButton);
+  
+  // Set flag
+  sidebarInjected = true;
+  
+  // Load the sidebar content from popup.html
+  chrome.runtime.sendMessage({ action: "getSidebarContent" }, (response) => {
+    if (response && response.html) {
+      content.innerHTML = response.html;
+      
+      // Initialize any scripts that need to run in the sidebar
+      // This could be extracted from the popup.js
+    }
+  });
+}
+
+// Open the sidebar
+function openSidebar() {
+  if (!sidebarInjected) {
+    injectSidebar();
+  }
+  
+  const sidebar = document.getElementById('universal-bookmarks-sidebar');
+  sidebar.classList.add('open');
+  document.body.classList.add('universal-bookmarks-sidebar-open');
+  isSidebarOpen = true;
+}
+
+// Close the sidebar
+function closeSidebar() {
+  const sidebar = document.getElementById('universal-bookmarks-sidebar');
+  sidebar.classList.remove('open');
+  document.body.classList.remove('universal-bookmarks-sidebar-open');
+  isSidebarOpen = false;
+}
+
+// Toggle the sidebar open/closed
+function toggleSidebar() {
+  if (isSidebarOpen) {
+    closeSidebar();
+  } else {
+    openSidebar();
+  }
 }
 
 // Highlight selected text on the page
@@ -221,6 +346,13 @@ function highlightSelectedText() {
 
 // Initialize the content script
 function initialize() {
+  // Load the sidebar.css
+  const sidebarStyle = document.createElement('link');
+  sidebarStyle.rel = 'stylesheet';
+  sidebarStyle.type = 'text/css';
+  sidebarStyle.href = chrome.runtime.getURL('sidebar.css');
+  document.head.appendChild(sidebarStyle);
+  
   // Inject CSS for our elements
   const style = document.createElement('style');
   style.textContent = `
@@ -255,13 +387,22 @@ function initialize() {
   
   document.head.appendChild(style);
   
-  // Add keyboard shortcut for highlighting
+  // Add keyboard shortcuts
   document.addEventListener('keydown', (event) => {
     // Alt+H for highlighting (matches the command in manifest)
     if (event.altKey && event.key === 'h') {
       highlightSelectedText();
     }
+    
+    // Alt+B for toggling sidebar
+    if (event.altKey && event.key === 'b') {
+      toggleSidebar();
+    }
   });
+  
+  // Inject the sidebar (but keep it closed by default)
+  injectSidebar();
+  closeSidebar();
 }
 
 // Run the initialization

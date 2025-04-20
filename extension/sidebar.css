@@ -1,0 +1,109 @@
+/* Sidebar styles */
+.universal-bookmarks-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100vh;
+  background-color: #ffffff;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+.universal-bookmarks-sidebar.open {
+  transform: translateX(0);
+}
+
+.universal-bookmarks-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid #E5E7EB;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.universal-bookmarks-sidebar-header-left {
+  display: flex;
+  align-items: center;
+}
+
+.universal-bookmarks-sidebar-icon {
+  width: 24px;
+  height: 24px;
+  color: #4F46E5;
+  margin-right: 8px;
+}
+
+.universal-bookmarks-sidebar-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.universal-bookmarks-sidebar-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.universal-bookmarks-sidebar-close:hover {
+  background-color: #F3F4F6;
+  color: #1F2937;
+}
+
+.universal-bookmarks-sidebar-content {
+  flex-grow: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.universal-bookmarks-sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #E5E7EB;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  background-color: #ffffff;
+}
+
+/* Toggle button to open the sidebar */
+.universal-bookmarks-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #4F46E5;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 999998;
+  border: none;
+  transition: transform 0.3s ease;
+}
+
+.universal-bookmarks-toggle:hover {
+  transform: scale(1.05);
+  background-color: #4338CA;
+}
+
+/* Adjust the page body when sidebar is open */
+body.universal-bookmarks-sidebar-open {
+  margin-right: 380px;
+}

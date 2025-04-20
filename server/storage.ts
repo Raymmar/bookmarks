@@ -6,6 +6,8 @@ import {
   insights, Insight, InsertInsight,
   activities, Activity, InsertActivity
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
@@ -41,6 +43,7 @@ export interface IStorage {
   createActivity(activity: InsertActivity): Promise<Activity>;
 }
 
+// In-memory storage implementation as a fallback
 export class MemStorage implements IStorage {
   private bookmarks: Map<string, Bookmark>;
   private notes: Map<string, Note>;
@@ -224,4 +227,129 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// PostgreSQL database storage implementation
+export class DatabaseStorage implements IStorage {
+  // Bookmarks
+  async getBookmarks(): Promise<Bookmark[]> {
+    return await db.select().from(bookmarks);
+  }
+  
+  async getBookmark(id: string): Promise<Bookmark | undefined> {
+    const [bookmark] = await db.select().from(bookmarks).where(eq(bookmarks.id, id));
+    
+    if (!bookmark) return undefined;
+    
+    // Fetch related data
+    const bookmarkNotes = await this.getNotesByBookmarkId(id);
+    const bookmarkHighlights = await this.getHighlightsByBookmarkId(id);
+    const bookmarkScreenshots = await this.getScreenshotsByBookmarkId(id);
+    const bookmarkInsight = await this.getInsightByBookmarkId(id);
+    
+    return {
+      ...bookmark,
+      notes: bookmarkNotes,
+      highlights: bookmarkHighlights,
+      screenshots: bookmarkScreenshots,
+      insights: bookmarkInsight,
+    };
+  }
+  
+  async createBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
+    const [newBookmark] = await db.insert(bookmarks).values(bookmark).returning();
+    return newBookmark;
+  }
+  
+  async updateBookmark(id: string, bookmarkUpdate: Partial<InsertBookmark>): Promise<Bookmark | undefined> {
+    const [updatedBookmark] = await db
+      .update(bookmarks)
+      .set(bookmarkUpdate)
+      .where(eq(bookmarks.id, id))
+      .returning();
+    
+    return updatedBookmark;
+  }
+  
+  async deleteBookmark(id: string): Promise<boolean> {
+    const result = await db.delete(bookmarks).where(eq(bookmarks.id, id)).returning({ id: bookmarks.id });
+    return result.length > 0;
+  }
+  
+  // Notes
+  async getNotesByBookmarkId(bookmarkId: string): Promise<Note[]> {
+    return await db.select().from(notes).where(eq(notes.bookmark_id, bookmarkId));
+  }
+  
+  async createNote(note: InsertNote): Promise<Note> {
+    const [newNote] = await db.insert(notes).values(note).returning();
+    return newNote;
+  }
+  
+  async deleteNote(id: string): Promise<boolean> {
+    const result = await db.delete(notes).where(eq(notes.id, id)).returning({ id: notes.id });
+    return result.length > 0;
+  }
+  
+  // Screenshots
+  async getScreenshotsByBookmarkId(bookmarkId: string): Promise<Screenshot[]> {
+    return await db.select().from(screenshots).where(eq(screenshots.bookmark_id, bookmarkId));
+  }
+  
+  async createScreenshot(screenshot: InsertScreenshot): Promise<Screenshot> {
+    const [newScreenshot] = await db.insert(screenshots).values(screenshot).returning();
+    return newScreenshot;
+  }
+  
+  async deleteScreenshot(id: string): Promise<boolean> {
+    const result = await db.delete(screenshots).where(eq(screenshots.id, id)).returning({ id: screenshots.id });
+    return result.length > 0;
+  }
+  
+  // Highlights
+  async getHighlightsByBookmarkId(bookmarkId: string): Promise<Highlight[]> {
+    return await db.select().from(highlights).where(eq(highlights.bookmark_id, bookmarkId));
+  }
+  
+  async createHighlight(highlight: InsertHighlight): Promise<Highlight> {
+    const [newHighlight] = await db.insert(highlights).values(highlight).returning();
+    return newHighlight;
+  }
+  
+  async deleteHighlight(id: string): Promise<boolean> {
+    const result = await db.delete(highlights).where(eq(highlights.id, id)).returning({ id: highlights.id });
+    return result.length > 0;
+  }
+  
+  // Insights
+  async getInsightByBookmarkId(bookmarkId: string): Promise<Insight | undefined> {
+    const [insight] = await db.select().from(insights).where(eq(insights.bookmark_id, bookmarkId));
+    return insight;
+  }
+  
+  async createInsight(insight: InsertInsight): Promise<Insight> {
+    const [newInsight] = await db.insert(insights).values(insight).returning();
+    return newInsight;
+  }
+  
+  async updateInsight(id: string, insightUpdate: Partial<InsertInsight>): Promise<Insight | undefined> {
+    const [updatedInsight] = await db
+      .update(insights)
+      .set(insightUpdate)
+      .where(eq(insights.id, id))
+      .returning();
+    
+    return updatedInsight;
+  }
+  
+  // Activities
+  async getActivities(): Promise<Activity[]> {
+    return await db.select().from(activities).orderBy(desc(activities.timestamp));
+  }
+  
+  async createActivity(activity: InsertActivity): Promise<Activity> {
+    const [newActivity] = await db.insert(activities).values(activity).returning();
+    return newActivity;
+  }
+}
+
+// Use the database storage implementation 
+export const storage = new DatabaseStorage();

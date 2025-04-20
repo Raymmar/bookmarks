@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, uuid, json, vector } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uuid, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -9,7 +9,8 @@ export const bookmarks = pgTable("bookmarks", {
   title: text("title").notNull(),
   description: text("description"),
   content_html: text("content_html"),
-  vector_embedding: vector("vector_embedding", { dimensions: 1536 }),
+  // Use a text array to store vector embedding until pgvector extension is properly configured
+  vector_embedding: text("vector_embedding").array(),
   date_saved: timestamp("date_saved").defaultNow().notNull(),
   user_tags: text("user_tags").array().default([]),
   system_tags: text("system_tags").array().default([]),
