@@ -475,20 +475,20 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         
         // Hide all nodes and links that aren't connected to this node
         svg.selectAll(".node")
-          .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.1);
+          .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.02);
         
         svg.selectAll("line.link")
           .style("opacity", l => {
             const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
             const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-            return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 0.8 : 0.1;
+            return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 0.9 : 0.03;
           })
           .style("stroke-width", l => {
             const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
             const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
             return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 
-              Math.sqrt((l as any).value) * 1.5 : 
-              Math.sqrt((l as any).value) * 0.7;
+              Math.sqrt((l as any).value) * 1.8 : 
+              Math.sqrt((l as any).value) * 0.3;
           });
         
         // Center the graph on the connected nodes
@@ -742,7 +742,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
               
               // Hide all nodes and links that aren't connected to this node - make them very faint (like with tags)
               svg.selectAll(".node")
-                .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.05);
+                .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.02);
               
               svg.selectAll("line.link")
                 .style("opacity", l => {
