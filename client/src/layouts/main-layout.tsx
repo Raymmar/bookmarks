@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { SidebarNavigation } from "@/components/sidebar-navigation";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { useLocation } from "wouter";
@@ -10,37 +10,11 @@ interface MainLayoutProps {
 export default function MainLayout({ children }: MainLayoutProps) {
   const [location] = useLocation();
   
-  // Filter state
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagMode, setTagMode] = useState<"any" | "all">("any");
-  const [sortOrder, setSortOrder] = useState("newest");
-  const [dateRange, setDateRange] = useState("week");
-  const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
-  const [allTags, setAllTags] = useState<string[]>([]);
-  
-  // Handle filter changes from the sidebar
-  const handleFiltersChange = (filters: {
-    tags: string[];
-    dateRange: string;
-    sources: string[];
-    tagMode?: "any" | "all";
-    sortOrder?: string;
-  }) => {
-    if (filters.tags) setSelectedTags(filters.tags);
-    if (filters.dateRange) setDateRange(filters.dateRange);
-    if (filters.sources) setSources(filters.sources);
-    if (filters.tagMode) setTagMode(filters.tagMode);
-    if (filters.sortOrder) setSortOrder(filters.sortOrder);
-  };
-  
   return (
     <div className="flex h-screen w-full">
       {/* Sidebar Navigation - Hidden on Mobile */}
       <div className="hidden md:block w-64 h-full flex-shrink-0 border-r border-gray-200">
-        <SidebarNavigation 
-          allTags={allTags}
-          onFiltersChange={handleFiltersChange}
-        />
+        <SidebarNavigation />
       </div>
       
       {/* Mobile Navigation */}

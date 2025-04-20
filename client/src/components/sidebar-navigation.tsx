@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Bookmark, FileText, Layers, HelpCircle, Home, X, Circle, SearchX } from "lucide-react";
+import { Bookmark, FileText, Layers, HelpCircle, Home, X, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
@@ -15,24 +14,15 @@ interface SidebarNavigationProps {
     tags: string[];
     dateRange: string;
     sources: string[];
-    tagMode?: "any" | "all";
-    sortOrder?: string;
   }) => void;
-  allTags?: string[];
 }
 
-export function SidebarNavigation({ 
-  className, 
-  onFiltersChange, 
-  allTags = []
-}: SidebarNavigationProps) {
+export function SidebarNavigation({ className, onFiltersChange }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState("week");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
   const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
-  const [tagMode, setTagMode] = useState<"any" | "all">("any");
-  const [sortOrder, setSortOrder] = useState("newest");
 
   const handleTagToggle = (tag: string) => {
     if (selectedTags.includes(tag)) {
@@ -57,19 +47,15 @@ export function SidebarNavigation({
         tags: selectedTags,
         dateRange,
         sources,
-        tagMode,
-        sortOrder,
       });
     }
   };
 
-  // Use passed allTags if available, otherwise use fallback
-  const availableTags = allTags.length > 0 
-    ? allTags 
-    : ["Technology", "Research", "Tutorial", "JavaScript", "Machine Learning", "API"];
+  // Dummy tag data - in a real app, these would come from the API
+  const availableTags = ["Technology", "Research", "Tutorial", "JavaScript", "Machine Learning", "API"];
 
   return (
-    <nav className={cn("flex flex-col w-full h-full bg-white z-10 sidebar-navigation", className)}>
+    <nav className={cn("flex flex-col w-full h-full bg-white z-10", className)}>
       <div className="h-16 p-4 border-b border-gray-200 flex items-center">
         <div className="flex items-center space-x-2">
           <Bookmark className="h-8 w-8 text-primary" />
@@ -127,76 +113,41 @@ export function SidebarNavigation({
           <div className="mb-6">
             <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Filters</h2>
             <div className="space-y-2">
-              <div className="mb-3">
-                <h3 className="text-xs font-medium text-gray-700 mb-1">Tags</h3>
-                <div className="flex flex-wrap gap-2">
-                  {availableTags.map((tag) => {
-                    const isSelected = selectedTags.includes(tag);
-                    return (
-                      <Badge 
-                        key={tag}
-                        variant="outline" 
-                        className={cn(
-                          "px-2 py-1 text-xs rounded-full flex items-center cursor-pointer",
-                          isSelected 
-                            ? "bg-indigo-100 text-indigo-800" 
-                            : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                        )}
-                        onClick={() => {
-                          handleTagToggle(tag);
-                          updateFilters();
-                        }}
-                      >
-                        {tag}
-                        {isSelected && (
-                          <X 
-                            className="h-3 w-3 ml-1 cursor-pointer" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleTagToggle(tag);
-                              updateFilters();
-                            }}
-                          />
-                        )}
-                      </Badge>
-                    );
-                  })}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <Badge 
+                      key={tag}
+                      variant="outline" 
+                      className={cn(
+                        "px-2 py-1 text-xs rounded-full flex items-center cursor-pointer",
+                        isSelected 
+                          ? "bg-indigo-100 text-indigo-800" 
+                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      )}
+                      onClick={() => {
+                        handleTagToggle(tag);
+                        updateFilters();
+                      }}
+                    >
+                      {tag}
+                      {isSelected && (
+                        <X 
+                          className="h-3 w-3 ml-1 cursor-pointer" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTagToggle(tag);
+                            updateFilters();
+                          }}
+                        />
+                      )}
+                    </Badge>
+                  );
+                })}
               </div>
               
-              <div className="mb-3">
-                <h3 className="text-xs font-medium text-gray-700 mb-1">Tag Match Mode</h3>
-                <Select value={tagMode} onValueChange={(value) => {
-                  setTagMode(value as "any" | "all");
-                  updateFilters();
-                }}>
-                  <SelectTrigger className="text-xs h-8 w-full">
-                    <SelectValue placeholder="Match mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Any tag</SelectItem>
-                    <SelectItem value="all">All tags</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="mb-3">
-                <h3 className="text-xs font-medium text-gray-700 mb-1">Sort Order</h3>
-                <Select value={sortOrder} onValueChange={(value) => {
-                  setSortOrder(value);
-                  updateFilters();
-                }}>
-                  <SelectTrigger className="text-xs h-8 w-full">
-                    <SelectValue placeholder="Sort order" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest first</SelectItem>
-                    <SelectItem value="oldest">Oldest first</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="mb-3">
+              <div className="mt-3">
                 <h3 className="text-xs font-medium text-gray-700 mb-1">Date Range</h3>
                 <div className="flex items-center space-x-2">
                   <Select 
@@ -206,7 +157,7 @@ export function SidebarNavigation({
                       updateFilters();
                     }}
                   >
-                    <SelectTrigger className="text-xs h-8 w-full">
+                    <SelectTrigger className="text-xs h-8">
                       <SelectValue placeholder="Select date range" />
                     </SelectTrigger>
                     <SelectContent>
@@ -219,7 +170,7 @@ export function SidebarNavigation({
                 </div>
               </div>
               
-              <div className="mb-3">
+              <div className="mt-3">
                 <h3 className="text-xs font-medium text-gray-700 mb-1">Source</h3>
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
