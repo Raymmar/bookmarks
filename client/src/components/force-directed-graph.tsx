@@ -533,6 +533,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const node = simulationRef.current.nodes().find(n => n.id === nodeId);
     if (!node) return;
     
+    // Check if we're already in a filtered state
+    const alreadyInFilteredState = graphState.isFiltered;
+    
     // Update the graph state
     setGraphState(prev => {
       // If isolating the view, get connected nodes and update filter
@@ -548,9 +551,49 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     });
     
     if (isolateView) {
-      // Apply visual filtering
+      // Get connected node IDs
       const connectedIds = getConnectedNodeIds(nodeId);
-      applyNodeFiltering(connectedIds);
+      
+      // Only apply visual filtering with zoom if we're not already in a filtered state
+      // This prevents unnecessary re-centering when clicking within an already filtered view
+      if (!alreadyInFilteredState) {
+        // Full visual filtering with zoom and center
+        applyNodeFiltering(connectedIds);
+      } else {
+        // Just apply visual filtering without re-centering
+        if (svgRef.current) {
+          const svg = d3.select(svgRef.current);
+          
+          // Update node visibility
+          svg.selectAll(".node")
+            .style("opacity", (d: any) => connectedIds.has(d.id) ? 1 : 0.02);
+          
+          // Update link visibility
+          svg.selectAll("line.link")
+            .style("opacity", (l: any) => {
+              const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+              const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+              
+              if (connectedIds.has(sourceId) && connectedIds.has(targetId)) {
+                return 0.9;
+              } else if (connectedIds.has(sourceId) || connectedIds.has(targetId)) {
+                return 0.3;
+              }
+              return 0.02;
+            })
+            .style("stroke-width", (l: any) => {
+              const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
+              const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
+              
+              if (connectedIds.has(sourceId) && connectedIds.has(targetId)) {
+                return Math.sqrt(l.value) * 1.8;
+              } else if (connectedIds.has(sourceId) || connectedIds.has(targetId)) {
+                return Math.sqrt(l.value) * 0.8;
+              }
+              return Math.sqrt(l.value) * 0.3;
+            });
+        }
+      }
       
       console.log(`Isolated view to show node ${nodeId} and ${connectedIds.size - 1} connected nodes`);
     }
@@ -582,7 +625,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     setTimeout(() => {
       lastSelectedNodeRef.current = null;
     }, 500);
-  }, [getConnectedNodeIds, applyNodeFiltering]);
+  }, [graphState.isFiltered, getConnectedNodeIds, applyNodeFiltering]);
   
   // Function to select a bookmark by ID
   const selectBookmarkById = useCallback((bookmarkId: string, isolateView: boolean = true) => {
