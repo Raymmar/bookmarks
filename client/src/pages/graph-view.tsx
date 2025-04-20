@@ -157,18 +157,6 @@ export default function GraphView() {
                   Graph
                 </Button>
               </div>
-              
-              <Select value={String(insightLevel)} onValueChange={(value) => setInsightLevel(parseInt(value))}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Insight depth" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">L1: On-page content</SelectItem>
-                  <SelectItem value="2">L2: One-click away</SelectItem>
-                  <SelectItem value="3">L3: Multi-layered</SelectItem>
-                  <SelectItem value="4">L4: Research sweep</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </div>
