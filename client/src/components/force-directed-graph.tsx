@@ -625,7 +625,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     setTimeout(() => {
       lastSelectedNodeRef.current = null;
     }, 500);
-  }, [graphState.isFiltered, getConnectedNodeIds, applyNodeFiltering]);
+  }, [getConnectedNodeIds, applyNodeFiltering]);
   
   // Function to select a bookmark by ID
   const selectBookmarkById = useCallback((bookmarkId: string, isolateView: boolean = true) => {
@@ -686,7 +686,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     setTimeout(() => {
       isResettingRef.current = false;
     }, 500);
-  }, [centerGraph, graphState.isFiltered]);
+  }, [centerGraph]);
   
   // Initialize and render the force-directed graph
   const renderGraph = useCallback(() => {
