@@ -13,7 +13,7 @@ interface BookmarkCardProps {
 function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   return (
     <div 
-      className={`p-3 rounded-lg border cursor-pointer transition-all mb-3 ${
+      className={`p-3 rounded-lg border cursor-pointer transition-all ${
         isSelected
           ? "bg-primary-50 border-primary" 
           : "bg-white border-gray-200 hover:border-gray-300"
@@ -21,7 +21,7 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
       onClick={onClick}
     >
       <h3 className="font-medium mb-1 line-clamp-1">{bookmark.title}</h3>
-      <p className="text-xs text-gray-500 mb-2">{bookmark.url}</p>
+      <p className="text-xs text-gray-500 mb-2 truncate">{bookmark.url}</p>
       <div className="flex flex-wrap gap-1">
         {bookmark.user_tags.concat(bookmark.system_tags).slice(0, 3).map((tag, i) => (
           <Badge key={i} variant="outline" className="text-xs">
@@ -86,7 +86,7 @@ export function SidebarPanel({
             No bookmarks found. Try adjusting your filters.
           </div>
         ) : (
-          <div className="space-y-0">
+          <div className="flex flex-col space-y-3">
             {bookmarks.map(bookmark => (
               <BookmarkCard
                 key={bookmark.id}

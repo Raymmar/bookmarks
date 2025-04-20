@@ -32,6 +32,23 @@ export default function GraphView() {
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
+  // When a bookmark is selected, center it in the graph
+  const handleSelectBookmark = (id: string) => {
+    setSelectedBookmarkId(id);
+    
+    // Find the bookmark node ID format that matches our graph component
+    const bookmarkNodeId = `bookmark-${id}`;
+    
+    // Use a small delay to ensure the graph has updated
+    setTimeout(() => {
+      // Use custom event to notify the graph component to select and center this node
+      const event = new CustomEvent('selectGraphNode', { 
+        detail: { nodeId: bookmarkNodeId } 
+      });
+      document.dispatchEvent(event);
+    }, 100);
+  };
+  
   // Extract all unique tags from bookmarks
   const allTags = Array.from(
     new Set(
@@ -271,7 +288,7 @@ export default function GraphView() {
               <ForceDirectedGraph
                 bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
-                onNodeClick={setSelectedBookmarkId}
+                onNodeClick={handleSelectBookmark}
               />
             </div>
           )}
@@ -281,9 +298,9 @@ export default function GraphView() {
       {/* Right Sidebar Panel - Now always show it on larger screens */}
       <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
         <SidebarPanel
-          bookmarks={filteredBookmarks}
+          bookmarks={sortedBookmarks}
           selectedBookmark={selectedBookmark}
-          onSelectBookmark={setSelectedBookmarkId}
+          onSelectBookmark={handleSelectBookmark}
           onCloseDetail={() => setSelectedBookmarkId(null)}
           isLoading={isLoading}
         />
