@@ -464,34 +464,51 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     }
   }, [centerGraph]);
   
+  // Track whether we're currently applying a filter
+  const isFilteringRef = useRef(false);
+  
   // Function to select a node and update the graph filtering
   const selectNode = useCallback((nodeId: string, isolateView: boolean = true) => {
     if (!simulationRef.current) return;
     
+    // Early return if we're already processing a filter to prevent multiple successive filter operations
+    if (isFilteringRef.current) return;
+    
+    // Mark that we're processing a filter
+    isFilteringRef.current = true;
+    
     // Get the target node
     const node = simulationRef.current.nodes().find(n => n.id === nodeId);
-    if (!node) return;
-    
-    // Update the graph state
-    setGraphState(prev => {
-      // If isolating the view, get connected nodes and update filter
-      const focusedNodeIds = isolateView ? getConnectedNodeIds(nodeId) : prev.focusedNodeIds;
-      
-      // Return the updated state
-      return {
-        ...prev,
-        selectedNodeId: nodeId,
-        focusedNodeIds: focusedNodeIds,
-        isFiltered: isolateView
-      };
-    });
+    if (!node) {
+      isFilteringRef.current = false;
+      return;
+    }
     
     if (isolateView) {
-      // Apply visual filtering
+      // Get connected nodes for filtering
       const connectedIds = getConnectedNodeIds(nodeId);
+      
+      // Update the graph state and apply filtering in one step
+      setGraphState(prev => {
+        // Return the updated state
+        return {
+          ...prev,
+          selectedNodeId: nodeId,
+          focusedNodeIds: connectedIds,
+          isFiltered: true
+        };
+      });
+      
+      // Apply visual filtering
       applyNodeFiltering(connectedIds);
       
       console.log(`Isolated view to show node ${nodeId} and ${connectedIds.size - 1} connected nodes`);
+    } else {
+      // Just update selected node without filtering
+      setGraphState(prev => ({
+        ...prev,
+        selectedNodeId: nodeId
+      }));
     }
     
     // Highlight the selected node
@@ -516,6 +533,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         .attr("r", 12)
         .attr("stroke-width", 3);
     }
+    
+    // After a short delay, allow filtering again
+    setTimeout(() => {
+      isFilteringRef.current = false;
+    }, 300);
   }, [getConnectedNodeIds, applyNodeFiltering]);
   
   // Function to select a bookmark by ID
@@ -530,9 +552,16 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     }
   }, [findNodeByBookmarkId, selectNode]);
   
+  // Track whether we're currently resetting the filter
+  const isResettingRef = useRef(false);
+  
   // Reset the graph filtering to show all nodes
   const resetFilter = useCallback(() => {
     if (!svgRef.current || !simulationRef.current) return;
+    
+    // Prevent multiple resets
+    if (isResettingRef.current) return;
+    isResettingRef.current = true;
     
     console.log("Resetting graph filters");
     
@@ -556,6 +585,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     // Center the view on all nodes
     centerGraph(simulationRef.current.nodes());
+    
+    // Allow resets after a delay
+    setTimeout(() => {
+      isResettingRef.current = false;
+    }, 300);
   }, [centerGraph]);
   
   // Initialize and render the force-directed graph
