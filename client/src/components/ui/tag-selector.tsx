@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X, Plus } from "lucide-react";
-import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
 interface Tag {
@@ -22,40 +21,31 @@ interface TagSelectorProps {
 
 export function TagSelector({ selectedTags, onTagsChange, className }: TagSelectorProps) {
   const [newTagText, setNewTagText] = useState("");
-  const [filteredTags, setFilteredTags] = useState<Tag[]>([]);
   
   // Fetch all tags from the server
-  const { data: tags = [], isLoading } = useQuery<Tag[]>({
+  const { data: tags = [] } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
     queryFn: getQueryFn({ on401: "returnNull" })
   });
   
-  // Update filtered tags when search text, tags, or selectedTags change
-  useEffect(() => {
-    // Avoid processing if tags aren't loaded yet
-    if (!tags || tags.length === 0) {
-      setFilteredTags([]);
-      return;
-    }
+  // Use useMemo instead of useEffect to prevent infinite loop
+  const filteredTags = useMemo(() => {
+    if (!tags || tags.length === 0) return [];
     
     if (newTagText.trim() === "") {
       // Show top 10 most used tags that aren't already selected
-      setFilteredTags(
-        tags
-          .filter(tag => !selectedTags.includes(tag.name))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10)
-      );
+      return tags
+        .filter(tag => !selectedTags.includes(tag.name))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
     } else {
       // Filter tags by name
-      setFilteredTags(
-        tags
-          .filter(tag => 
-            tag.name.toLowerCase().includes(newTagText.toLowerCase()) && 
-            !selectedTags.includes(tag.name)
-          )
-          .slice(0, 10)
-      );
+      return tags
+        .filter(tag => 
+          tag.name.toLowerCase().includes(newTagText.toLowerCase()) && 
+          !selectedTags.includes(tag.name)
+        )
+        .slice(0, 10);
     }
   }, [newTagText, tags, selectedTags]);
   
@@ -75,13 +65,28 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
       // Use existing tag
       onTagsChange([...selectedTags, existingTag.name]);
     } else {
-      // Create new tag
+      // Create new tag with fetch directly instead of apiRequest
       try {
-        const newTag = await apiRequest("POST", "/api/tags", {
-          name: newTagText.trim(),
-          type: "user"
+        const response = await fetch("/api/tags", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: newTagText.trim(),
+            type: "user"
+          }),
+          credentials: "include"
         });
         
+        if (!response.ok) {
+          throw new Error(`Failed to create tag: ${response.status}`);
+        }
+        
+        const newTag = await response.json();
+        
+        // Invalidate tags cache
+        queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+        
+        // Add new tag to selected tags
         onTagsChange([...selectedTags, newTag.name]);
       } catch (error) {
         console.error("Failed to create tag:", error);
@@ -117,7 +122,7 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
         ))}
       </div>
       
-      {/* Tag input and suggestions */}
+      {/* Tag input */}
       <div className="flex">
         <Input
           id="tags"
@@ -135,13 +140,13 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
       </div>
       
       {/* Tag suggestions */}
-      {newTagText.trim() !== "" || filteredTags.length > 0 ? (
+      {(newTagText.trim() !== "" || filteredTags.length > 0) && (
         <div className="mt-2">
           <div className="text-xs text-gray-500 mb-1">
             {newTagText.trim() !== "" ? "Add new or select existing tag:" : "Suggested tags:"}
           </div>
           <div className="flex flex-wrap gap-1">
-            {newTagText.trim() !== "" && !tags.some(t => t.name.toLowerCase() === newTagText.toLowerCase()) && (
+            {newTagText.trim() !== "" && !tags.some(t => t.name.toLowerCase() === newTagText.trim().toLowerCase()) && (
               <Badge 
                 key="new-tag" 
                 variant="outline" 
@@ -165,7 +170,7 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
             ))}
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
