@@ -12,6 +12,7 @@ export const bookmarks = pgTable("bookmarks", {
   // Use a text array to store vector embedding until pgvector extension is properly configured
   vector_embedding: text("vector_embedding").array(),
   date_saved: timestamp("date_saved").defaultNow().notNull(),
+  // Keeping these fields for backward compatibility until we fully migrate to the new tags system
   user_tags: text("user_tags").array().default([]),
   system_tags: text("system_tags").array().default([]),
   source: text("source", { enum: ["extension", "web", "import"] }).notNull(),
@@ -64,6 +65,22 @@ export const activities = pgTable("activities", {
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
+// Tags table for normalized tags
+export const tags = pgTable("tags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().unique(),
+  type: text("type", { enum: ["user", "system"] }).notNull().default("user"),
+  count: integer("count").notNull().default(0),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Bookmark-Tags join table
+export const bookmarkTags = pgTable("bookmark_tags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }).notNull(),
+  tag_id: uuid("tag_id").references(() => tags.id, { onDelete: "cascade" }).notNull(),
+});
+
 // Insert Schemas
 export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
   id: true,
@@ -90,6 +107,16 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
 });
 
+export const insertTagSchema = createInsertSchema(tags).omit({
+  id: true,
+  count: true,
+  created_at: true,
+});
+
+export const insertBookmarkTagSchema = createInsertSchema(bookmarkTags).omit({
+  id: true,
+});
+
 // Types
 export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
 export type Bookmark = typeof bookmarks.$inferSelect;
@@ -108,3 +135,9 @@ export type Insight = typeof insights.$inferSelect;
 
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activities.$inferSelect;
+
+export type InsertTag = z.infer<typeof insertTagSchema>;
+export type Tag = typeof tags.$inferSelect;
+
+export type InsertBookmarkTag = z.infer<typeof insertBookmarkTagSchema>;
+export type BookmarkTag = typeof bookmarkTags.$inferSelect;

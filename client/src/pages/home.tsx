@@ -250,19 +250,7 @@ export default function Home() {
               </TabsContent>
             </Tabs>
             
-            {/* Activity Feed */}
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Activity</h2>
-              
-              {isActivitiesLoading ? (
-                <div className="p-8 text-center">
-                  <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
-                  <p className="mt-2 text-gray-600">Loading activities...</p>
-                </div>
-              ) : (
-                <ActivityFeed activities={activities.slice(0, 5)} />
-              )}
-            </div>
+
           </>
         )}
       </div>

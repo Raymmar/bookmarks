@@ -4,7 +4,9 @@ import {
   screenshots, Screenshot, InsertScreenshot,
   highlights, Highlight, InsertHighlight,
   insights, Insight, InsertInsight,
-  activities, Activity, InsertActivity
+  activities, Activity, InsertActivity,
+  tags, Tag, InsertTag,
+  bookmarkTags, BookmarkTag, InsertBookmarkTag
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -41,6 +43,22 @@ export interface IStorage {
   // Activities
   getActivities(): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+  
+  // Tags
+  getTags(): Promise<Tag[]>;
+  getTag(id: string): Promise<Tag | undefined>;
+  getTagByName(name: string): Promise<Tag | undefined>;
+  createTag(tag: InsertTag): Promise<Tag>;
+  updateTag(id: string, tag: Partial<InsertTag>): Promise<Tag | undefined>;
+  incrementTagCount(id: string): Promise<Tag | undefined>;
+  decrementTagCount(id: string): Promise<Tag | undefined>;
+  deleteTag(id: string): Promise<boolean>;
+  
+  // BookmarkTags
+  getTagsByBookmarkId(bookmarkId: string): Promise<Tag[]>;
+  getBookmarksByTagId(tagId: string): Promise<Bookmark[]>;
+  addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag>;
+  removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean>;
 }
 
 // In-memory storage implementation as a fallback
