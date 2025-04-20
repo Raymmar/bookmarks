@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import * as d3 from "d3";
 import { Bookmark } from "@shared/types";
 
@@ -25,7 +25,7 @@ interface ForceDirectedGraphProps {
   onNodeClick: (bookmarkId: string) => void;
 }
 
-export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: ForceDirectedGraphProps): JSX.Element {
+function ForceDirectedGraphComponent({ bookmarks, insightLevel, onNodeClick }: ForceDirectedGraphProps): JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
@@ -562,3 +562,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     </div>
   );
 }
+
+// Wrap the component with memo to prevent unnecessary re-renders
+export const ForceDirectedGraph = memo(ForceDirectedGraphComponent, (prevProps, nextProps) => {
+  // Only re-render if bookmarks or insightLevel change
+  return (
+    prevProps.bookmarks === nextProps.bookmarks &&
+    prevProps.insightLevel === nextProps.insightLevel
+  );
+});
