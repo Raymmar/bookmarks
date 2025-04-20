@@ -24,14 +24,6 @@ interface GraphState {
   focusedNodeIds: Set<string>;
   isFiltered: boolean;
   zoomTransform: d3.ZoomTransform | null;
-  // Track active filters by type
-  activeFilters: {
-    tags: Set<string>; // Tag IDs that are being filtered
-    bookmarks: Set<string>; // Bookmark IDs that are being filtered
-    domains: Set<string>; // Domain IDs that are being filtered
-  };
-  // Track filter operation mode
-  filterMode: 'and' | 'or'; // AND requires all filters to match, OR requires any filter to match
 }
 
 interface ForceDirectedGraphProps {
@@ -53,13 +45,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     selectedNodeId: null,
     focusedNodeIds: new Set<string>(),
     isFiltered: false,
-    zoomTransform: null,
-    activeFilters: {
-      tags: new Set<string>(),
-      bookmarks: new Set<string>(),
-      domains: new Set<string>()
-    },
-    filterMode: 'or'
+    zoomTransform: null
   });
   
   // Extract domain from URL
@@ -472,109 +458,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     const svg = d3.select(svgRef.current);
     
-    // Get combined set of nodes to focus based on all active filters
-    const getNodesThatMatchFilters = () => {
-      // If there are no filters applied, or focusedIds is already calculated for us
-      if (focusedIds.size > 0) {
-        return focusedIds;
-      }
-      
-      // Get current filters state
-      const { activeFilters, filterMode } = graphState;
-      const isFilterActive = 
-        activeFilters.tags.size > 0 || 
-        activeFilters.bookmarks.size > 0 || 
-        activeFilters.domains.size > 0;
-        
-      // If no filters are active, show all nodes
-      if (!isFilterActive) {
-        return new Set<string>(); // Empty set means no filtering
-      }
-      
-      const matchingNodeIds = new Set<string>();
-      
-      // No nodes yet - we'll collect them based on our filter criteria
-      if (simulationRef.current) {
-        const allNodes = simulationRef.current.nodes();
-        
-        // For each node, check if it matches any or all of our filter criteria
-        allNodes.forEach(node => {
-          let matchesTags = activeFilters.tags.size === 0;
-          let matchesBookmarks = activeFilters.bookmarks.size === 0;
-          let matchesDomains = activeFilters.domains.size === 0;
-          
-          // Check if node matches tag filters
-          if (activeFilters.tags.size > 0) {
-            if (node.type === "tag" && activeFilters.tags.has(node.id)) {
-              matchesTags = true;
-            } else if (node.type === "bookmark") {
-              // Find the connected tag nodes for this bookmark
-              const connectedTags = getConnectedNodeIds(node.id);
-              // Check if any of the active tag filters match our connected tags
-              for (const tagId of activeFilters.tags) {
-                if (connectedTags.has(tagId)) {
-                  matchesTags = true;
-                  break;
-                }
-              }
-            }
-          }
-          
-          // Check if node matches bookmark filters
-          if (activeFilters.bookmarks.size > 0) {
-            if (node.type === "bookmark" && activeFilters.bookmarks.has(node.id)) {
-              matchesBookmarks = true;
-            } else if (activeFilters.bookmarks.has(node.id)) {
-              matchesBookmarks = true;
-            }
-          }
-          
-          // Check if node matches domain filters
-          if (activeFilters.domains.size > 0) {
-            if (node.type === "domain" && activeFilters.domains.has(node.id)) {
-              matchesDomains = true;
-            } else if (node.type === "bookmark") {
-              // Find the connected domain nodes for this bookmark
-              const connectedDomains = getConnectedNodeIds(node.id);
-              // Check if any of the active domain filters match our connected domains
-              for (const domainId of activeFilters.domains) {
-                if (connectedDomains.has(domainId)) {
-                  matchesDomains = true;
-                  break;
-                }
-              }
-            }
-          }
-          
-          // Determine if the node matches based on the filter mode
-          const matchesFilters = filterMode === 'and' 
-            ? (matchesTags && matchesBookmarks && matchesDomains) 
-            : (matchesTags || matchesBookmarks || matchesDomains);
-            
-          if (matchesFilters) {
-            matchingNodeIds.add(node.id);
-            
-            // Also add connected nodes to preserve the graph structure
-            const connectedIds = getConnectedNodeIds(node.id);
-            connectedIds.forEach(id => matchingNodeIds.add(id));
-          }
-        });
-      }
-      
-      return matchingNodeIds;
-    };
-    
-    const nodesToFocus = getNodesThatMatchFilters();
-    const hasActiveFilters = nodesToFocus.size > 0;
-    
     // Update node opacity - we only dim nodes that are not part of the focus set
     // but maintain the connections between nodes in the focus set
     svg.selectAll(".node")
-      .style("opacity", (d: any) => {
-        // If no active filters, show everything
-        if (!hasActiveFilters) return 1;
-        return nodesToFocus.has(d.id) ? 1 : 0.02;
-      });
+      .style("opacity", (d: any) => focusedIds.has(d.id) ? 1 : 0.02);
     
     // For links, show all links that connect to at least one focused node
     // This preserves the connected graph structure better
@@ -583,15 +470,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
         const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
         
-        // If no active filters, show everything
-        if (!hasActiveFilters) return 0.6;
-        
         // If both source and target are in the focus set, highlight the link strongly
-        if (nodesToFocus.has(sourceId) && nodesToFocus.has(targetId)) {
+        if (focusedIds.has(sourceId) && focusedIds.has(targetId)) {
           return 0.9;
         }
         // If at least one node is in the focus set, show the link dimmed but visible
-        else if (nodesToFocus.has(sourceId) || nodesToFocus.has(targetId)) {
+        else if (focusedIds.has(sourceId) || focusedIds.has(targetId)) {
           return 0.3;
         }
         // Otherwise, make the link nearly invisible
@@ -601,12 +485,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
         const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
         
-        // If no active filters, use default width
-        if (!hasActiveFilters) return Math.sqrt(l.value);
-        
-        if (nodesToFocus.has(sourceId) && nodesToFocus.has(targetId)) {
+        if (focusedIds.has(sourceId) && focusedIds.has(targetId)) {
           return Math.sqrt(l.value) * 1.8;
-        } else if (nodesToFocus.has(sourceId) || nodesToFocus.has(targetId)) {
+        } else if (focusedIds.has(sourceId) || focusedIds.has(targetId)) {
           return Math.sqrt(l.value) * 0.8;
         }
         return Math.sqrt(l.value) * 0.3;
@@ -631,7 +512,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     setTimeout(() => {
       isFilteringRef.current = false;
     }, 500);
-  }, [centerGraph, getConnectedNodeIds, graphState]);
+  }, [centerGraph]);
   
   // Track the last selected node ID to prevent redundant selections
   const lastSelectedNodeRef = useRef<string | null>(null);
@@ -652,61 +533,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const node = simulationRef.current.nodes().find(n => n.id === nodeId);
     if (!node) return;
     
-    // Check if we're already in a filtered state
-    const alreadyInFilteredState = graphState.isFiltered;
-    
     // Update the graph state
     setGraphState(prev => {
-      // Get node type to use for filtering
-      const { type } = node;
-      
-      // Create new filter sets by copying the current ones
-      const newActiveFilters = {
-        tags: new Set(prev.activeFilters.tags),
-        bookmarks: new Set(prev.activeFilters.bookmarks),
-        domains: new Set(prev.activeFilters.domains)
-      };
-      
-      // Add the selected node to the appropriate filter set
-      if (type === "tag") {
-        // If the tag is already filtered and this is the only filter, remove it
-        if (newActiveFilters.tags.has(nodeId) && 
-            newActiveFilters.tags.size === 1 &&
-            newActiveFilters.bookmarks.size === 0 &&
-            newActiveFilters.domains.size === 0) {
-          newActiveFilters.tags.clear();
-        } else {
-          // Otherwise add/keep it
-          newActiveFilters.tags.add(nodeId);
-        }
-      } else if (type === "bookmark") {
-        // Handle bookmark selection
-        if (newActiveFilters.bookmarks.has(nodeId) && 
-            newActiveFilters.bookmarks.size === 1 &&
-            newActiveFilters.tags.size === 0 &&
-            newActiveFilters.domains.size === 0) {
-          newActiveFilters.bookmarks.clear();
-        } else {
-          newActiveFilters.bookmarks.add(nodeId);
-        }
-      } else if (type === "domain") {
-        // Handle domain selection
-        if (newActiveFilters.domains.has(nodeId) && 
-            newActiveFilters.domains.size === 1 &&
-            newActiveFilters.tags.size === 0 &&
-            newActiveFilters.bookmarks.size === 0) {
-          newActiveFilters.domains.clear();
-        } else {
-          newActiveFilters.domains.add(nodeId);
-        }
-      }
-      
-      // Determine if any filters are active
-      const hasActiveFilters = 
-        newActiveFilters.tags.size > 0 || 
-        newActiveFilters.bookmarks.size > 0 || 
-        newActiveFilters.domains.size > 0;
-      
       // If isolating the view, get connected nodes and update filter
       const focusedNodeIds = isolateView ? getConnectedNodeIds(nodeId) : prev.focusedNodeIds;
       
@@ -715,55 +543,14 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         ...prev,
         selectedNodeId: nodeId,
         focusedNodeIds: focusedNodeIds,
-        isFiltered: hasActiveFilters || isolateView,
-        activeFilters: newActiveFilters
+        isFiltered: isolateView
       };
     });
     
     if (isolateView) {
-      // Get connected node IDs
+      // Apply visual filtering
       const connectedIds = getConnectedNodeIds(nodeId);
-      
-      // Only apply visual filtering with zoom if we're not already in a filtered state
-      // This prevents unnecessary re-centering when clicking within an already filtered view
-      if (!alreadyInFilteredState) {
-        // Full visual filtering with zoom and center
-        applyNodeFiltering(connectedIds);
-      } else {
-        // Just apply visual filtering without re-centering
-        if (svgRef.current) {
-          const svg = d3.select(svgRef.current);
-          
-          // Update node visibility
-          svg.selectAll(".node")
-            .style("opacity", (d: any) => connectedIds.has(d.id) ? 1 : 0.02);
-          
-          // Update link visibility
-          svg.selectAll("line.link")
-            .style("opacity", (l: any) => {
-              const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
-              const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-              
-              if (connectedIds.has(sourceId) && connectedIds.has(targetId)) {
-                return 0.9;
-              } else if (connectedIds.has(sourceId) || connectedIds.has(targetId)) {
-                return 0.3;
-              }
-              return 0.02;
-            })
-            .style("stroke-width", (l: any) => {
-              const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
-              const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-              
-              if (connectedIds.has(sourceId) && connectedIds.has(targetId)) {
-                return Math.sqrt(l.value) * 1.8;
-              } else if (connectedIds.has(sourceId) || connectedIds.has(targetId)) {
-                return Math.sqrt(l.value) * 0.8;
-              }
-              return Math.sqrt(l.value) * 0.3;
-            });
-        }
-      }
+      applyNodeFiltering(connectedIds);
       
       console.log(`Isolated view to show node ${nodeId} and ${connectedIds.size - 1} connected nodes`);
     }
@@ -812,7 +599,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   // Track whether we're currently resetting the filter
   const isResettingRef = useRef(false);
   
-
   // Reset the graph filtering to show all nodes
   const resetFilter = useCallback(() => {
     if (!svgRef.current || !simulationRef.current) return;
@@ -841,12 +627,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       ...prev,
       selectedNodeId: null,
       focusedNodeIds: new Set<string>(),
-      isFiltered: false,
-      activeFilters: {
-        tags: new Set<string>(),
-        bookmarks: new Set<string>(),
-        domains: new Set<string>()
-      }
+      isFiltered: false
     }));
     
     // Only center the view on all nodes if we're coming from a filtered state
@@ -862,7 +643,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     setTimeout(() => {
       isResettingRef.current = false;
     }, 500);
-  }, [centerGraph]);
+  }, [centerGraph, graphState.isFiltered]);
   
   // Initialize and render the force-directed graph
   const renderGraph = useCallback(() => {
