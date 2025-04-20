@@ -300,4 +300,44 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true; // Keeps the message channel open for the async response
   }
+  
+  if (request.action === "getSidebarContent") {
+    // Send the popup HTML content to be used in the sidebar
+    fetch(chrome.runtime.getURL("popup.html"))
+      .then(response => response.text())
+      .then(html => {
+        // For security reasons, extensions can't just inject arbitrary HTML with scripts
+        // We need to extract and modify the HTML to work within the sidebar
+        // This is a simplified version - in production, you'd need more robust parsing
+
+        // Extract the body content (simplified)
+        const bodyContent = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+        const content = bodyContent ? bodyContent[1] : html;
+        
+        // Send back the HTML content
+        sendResponse({ html: content });
+      })
+      .catch(error => {
+        console.error("Error fetching popup html:", error);
+        sendResponse({ error: error.message });
+      });
+    return true; // Keeps the message channel open for the async response
+  }
+  
+  if (request.action === "saveCurrentPage") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length > 0) {
+        savePage(tabs[0]);
+      }
+    });
+    return true;
+  }
+  
+  if (request.action === "openSidebar") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length > 0) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: "openSidebar" });
+      }
+    });
+  }
 });

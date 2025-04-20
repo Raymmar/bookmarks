@@ -87,12 +87,18 @@ export class MemStorage implements IStorage {
   
   async createBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
     const id = crypto.randomUUID();
+    // Convert string date to Date object if needed
+    const dateSaved = bookmark.date_saved ? 
+      (typeof bookmark.date_saved === 'string' ? new Date(bookmark.date_saved) : bookmark.date_saved) : 
+      new Date();
+    
     const newBookmark: Bookmark = {
       ...bookmark,
       id,
-      date_saved: bookmark.date_saved || new Date().toISOString(),
+      date_saved: dateSaved,
       user_tags: bookmark.user_tags || [],
       system_tags: bookmark.system_tags || [],
+      vector_embedding: null, // Add this field to satisfy TypeScript
     };
     
     this.bookmarks.set(id, newBookmark);
@@ -119,10 +125,15 @@ export class MemStorage implements IStorage {
   
   async createNote(note: InsertNote): Promise<Note> {
     const id = crypto.randomUUID();
+    // Convert string date to Date object if needed
+    const timestamp = note.timestamp ? 
+      (typeof note.timestamp === 'string' ? new Date(note.timestamp) : note.timestamp) : 
+      new Date();
+      
     const newNote: Note = {
       ...note,
       id,
-      timestamp: note.timestamp || new Date().toISOString(),
+      timestamp: timestamp,
     };
     
     this.notes.set(id, newNote);
@@ -142,10 +153,15 @@ export class MemStorage implements IStorage {
   
   async createScreenshot(screenshot: InsertScreenshot): Promise<Screenshot> {
     const id = crypto.randomUUID();
+    // Convert string date to Date object if needed
+    const uploadedAt = screenshot.uploaded_at ? 
+      (typeof screenshot.uploaded_at === 'string' ? new Date(screenshot.uploaded_at) : screenshot.uploaded_at) : 
+      new Date();
+      
     const newScreenshot: Screenshot = {
       ...screenshot,
       id,
-      uploaded_at: screenshot.uploaded_at || new Date().toISOString(),
+      uploaded_at: uploadedAt,
     };
     
     this.screenshots.set(id, newScreenshot);
@@ -165,9 +181,11 @@ export class MemStorage implements IStorage {
   
   async createHighlight(highlight: InsertHighlight): Promise<Highlight> {
     const id = crypto.randomUUID();
+    // Ensure position_selector is provided
     const newHighlight: Highlight = {
       ...highlight,
       id,
+      position_selector: highlight.position_selector || null,
     };
     
     this.highlights.set(id, newHighlight);
@@ -190,6 +208,8 @@ export class MemStorage implements IStorage {
     const newInsight: Insight = {
       ...insight,
       id,
+      summary: insight.summary || null,
+      sentiment: insight.sentiment || null,
       depth_level: insight.depth_level || 1,
       related_links: insight.related_links || [],
     };
@@ -245,13 +265,15 @@ export class DatabaseStorage implements IStorage {
     const bookmarkScreenshots = await this.getScreenshotsByBookmarkId(id);
     const bookmarkInsight = await this.getInsightByBookmarkId(id);
     
-    return {
-      ...bookmark,
-      notes: bookmarkNotes,
-      highlights: bookmarkHighlights,
-      screenshots: bookmarkScreenshots,
-      insights: bookmarkInsight,
-    };
+    // TypeScript complains about direct assignment of these properties,
+    // but they will be added to the returned object via the shared/types.ts interface
+    const result = bookmark as any;
+    result.notes = bookmarkNotes;
+    result.highlights = bookmarkHighlights;
+    result.screenshots = bookmarkScreenshots;
+    result.insights = bookmarkInsight;
+    
+    return result as Bookmark;
   }
   
   async createBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
