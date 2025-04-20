@@ -90,10 +90,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bookmarkData.system_tags = tags;
           }
           
-          // Create bookmark
+          // Create bookmark with proper date
           const bookmark = await storage.createBookmark({
             ...bookmarkData,
-            vector_embedding: embedding.embedding
+            vector_embedding: embedding.embedding,
+            date_saved: new Date()
           });
           
           // Generate insights based on content
@@ -158,7 +159,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           console.error("Error processing content:", error);
           // Continue with basic bookmark creation
-          const bookmark = await storage.createBookmark(bookmarkData);
+          const bookmark = await storage.createBookmark({
+            ...bookmarkData,
+            date_saved: new Date()
+          });
           
           await storage.createActivity({
             bookmark_id: bookmark.id,
@@ -171,7 +175,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // Basic bookmark creation without processing
-        const bookmark = await storage.createBookmark(bookmarkData);
+        // Ensure date_saved is a proper Date object
+        const bookmarkWithDate = {
+          ...bookmarkData,
+          date_saved: new Date()
+        };
+        
+        const bookmark = await storage.createBookmark(bookmarkWithDate);
         
         await storage.createActivity({
           bookmark_id: bookmark.id,
