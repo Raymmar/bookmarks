@@ -13,9 +13,8 @@ import MainLayout from "@/layouts/main-layout";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={GraphView} />
       <Route path="/activity" component={Activity} />
-      <Route path="/graph" component={GraphView} />
       <Route path="/ai-chat" component={AiChat} />
       <Route component={NotFound} />
     </Switch>

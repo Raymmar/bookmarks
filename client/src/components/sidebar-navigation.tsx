@@ -72,12 +72,12 @@ export function SidebarNavigation({ className, onFiltersChange }: SidebarNavigat
                 <Link href="/">
                   <a className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
-                    location === "/" 
+                    location === "/" || location === "/graph"
                       ? "bg-primary text-white" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <Home className="h-5 w-5 mr-2" />
-                    Home
+                    <Layers className="h-5 w-5 mr-2" />
+                    Bookmark Explorer
                   </a>
                 </Link>
               </li>
@@ -91,19 +91,6 @@ export function SidebarNavigation({ className, onFiltersChange }: SidebarNavigat
                   )}>
                     <FileText className="h-5 w-5 mr-2" />
                     Activity Feed
-                  </a>
-                </Link>
-              </li>
-              <li className="mb-1">
-                <Link href="/graph">
-                  <a className={cn(
-                    "flex items-center px-2 py-2 text-sm rounded-lg",
-                    location === "/graph" 
-                      ? "bg-primary text-white" 
-                      : "text-gray-700 hover:bg-gray-100"
-                  )}>
-                    <Layers className="h-5 w-5 mr-2" />
-                    Graph View
                   </a>
                 </Link>
               </li>

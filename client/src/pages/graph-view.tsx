@@ -1,19 +1,28 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
+import { BookmarkCard } from "@/components/bookmark-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, LayoutGrid, Network, SearchX } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { X, LayoutGrid, Network, SearchX, List } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Bookmark } from "@shared/types";
 
 export default function GraphView() {
+  const [searchQuery, setSearchQuery] = useState("");
   const [insightLevel, setInsightLevel] = useState(1);
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
+  const [sortOrder, setSortOrder] = useState("newest");
+  
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
@@ -30,8 +39,22 @@ export default function GraphView() {
     )
   ).sort();
   
-  // Filter bookmarks based on selected tags
+  // Filter bookmarks based on search query and selected tags
   const filteredBookmarks = bookmarks.filter(bookmark => {
+    // Search query filter
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = 
+        bookmark.title.toLowerCase().includes(searchLower) ||
+        bookmark.description?.toLowerCase().includes(searchLower) ||
+        bookmark.url.toLowerCase().includes(searchLower) ||
+        bookmark.user_tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
+        bookmark.system_tags.some(tag => tag.toLowerCase().includes(searchLower));
+      
+      if (!matchesSearch) return false;
+    }
+    
+    // Tag filter
     if (selectedTags.length === 0) return true;
     
     const bookmarkTags = [...bookmark.user_tags, ...bookmark.system_tags];
@@ -43,6 +66,16 @@ export default function GraphView() {
     }
   });
   
+  // Sort bookmarks
+  const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
+    if (sortOrder === "newest") {
+      return new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime();
+    } else if (sortOrder === "oldest") {
+      return new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime();
+    }
+    return 0;
+  });
+  
   const toggleTagSelection = (tag: string) => {
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter(t => t !== tag));
@@ -51,12 +84,36 @@ export default function GraphView() {
     }
   };
   
+  const handleDeleteBookmark = async (id: string) => {
+    try {
+      await apiRequest("DELETE", `/api/bookmarks/${id}`, undefined);
+      
+      toast({
+        title: "Bookmark deleted",
+        description: "Your bookmark was successfully deleted",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      
+      if (selectedBookmarkId === id) {
+        setSelectedBookmarkId(null);
+      }
+    } catch (error) {
+      toast({
+        title: "Error deleting bookmark",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+  
   return (
     <div className="flex flex-1 h-full">
       <div className="flex-1 flex flex-col h-full">
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-            <h2 className="text-xl font-semibold text-gray-800">Knowledge Graph</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Bookmark Explorer</h2>
             
             <div className="flex items-center space-x-2">
               <div className="flex items-center space-x-2">
@@ -94,10 +151,30 @@ export default function GraphView() {
             </div>
           </div>
           
-          {/* Tags filter */}
+          {/* Search input */}
           <div className="mt-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600">Filter by tags:</span>
+            <div className="relative flex-1 max-w-full">
+              <Input
+                type="text"
+                placeholder="Search bookmarks, content, tags..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full"
+              />
+              <SearchX className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
+              {searchQuery && (
+                <X 
+                  className="h-4 w-4 text-gray-400 absolute right-3 top-3 cursor-pointer" 
+                  onClick={() => setSearchQuery("")}
+                />
+              )}
+            </div>
+          </div>
+          
+          {/* Sort options */}
+          <div className="mt-3 flex justify-between items-center">
+            <div className="text-sm font-medium text-gray-600">Filter by tags:</div>
+            <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500">Match:</span>
                 <Select value={tagMode} onValueChange={(value) => setTagMode(value as "any" | "all")}>
@@ -110,8 +187,23 @@ export default function GraphView() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              <div className="relative">
+                <Select value={sortOrder} onValueChange={setSortOrder}>
+                  <SelectTrigger className="h-7 text-xs w-32">
+                    <SelectValue placeholder="Sort order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest first</SelectItem>
+                    <SelectItem value="oldest">Oldest first</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            
+          </div>
+          
+          {/* Tags filter */}
+          <div className="mt-2">
             <div className="flex flex-wrap gap-1 mb-1">
               {allTags.map(tag => (
                 <Badge 
@@ -150,9 +242,11 @@ export default function GraphView() {
                 <SearchX className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-900 mb-1">No bookmarks found</h3>
                 <p className="text-gray-500">
-                  {selectedTags.length > 0
-                    ? "Try selecting different tags or changing the match mode"
-                    : "Add some bookmarks to see them in the graph"}
+                  {searchQuery
+                    ? "Try using different search terms or filters"
+                    : selectedTags.length > 0
+                      ? "Try selecting different tags or changing the match mode"
+                      : "Add some bookmarks to see them in the explorer"}
                 </p>
               </div>
             </div>
