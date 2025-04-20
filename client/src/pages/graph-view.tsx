@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
-import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
+import { SidebarPanel } from "@/components/sidebar-panel";
 import { FilterControls } from "@/components/filter-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -265,7 +265,8 @@ export default function GraphView() {
                 </p>
               </div>
             </div>
-          ) : viewMode === "graph" ? (
+          ) : (
+            // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
               <ForceDirectedGraph
                 bookmarks={filteredBookmarks}
@@ -273,44 +274,18 @@ export default function GraphView() {
                 onNodeClick={setSelectedBookmarkId}
               />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-              {filteredBookmarks.map(bookmark => (
-                <div 
-                  key={bookmark.id}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                    selectedBookmarkId === bookmark.id 
-                      ? "bg-primary-50 border-primary" 
-                      : "bg-white border-gray-200 hover:border-gray-300"
-                  }`}
-                  onClick={() => setSelectedBookmarkId(bookmark.id)}
-                >
-                  <h3 className="font-medium mb-1 line-clamp-1">{bookmark.title}</h3>
-                  <p className="text-xs text-gray-500 mb-2">{bookmark.url}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {bookmark.user_tags.concat(bookmark.system_tags).slice(0, 3).map((tag, i) => (
-                      <Badge key={i} variant="outline" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {bookmark.user_tags.concat(bookmark.system_tags).length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{bookmark.user_tags.concat(bookmark.system_tags).length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
         </div>
       </div>
       
-      {/* Detail Panel */}
+      {/* Right Sidebar Panel - Now always show it on larger screens */}
       <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
-        <BookmarkDetailPanel 
-          bookmark={selectedBookmark} 
-          onClose={() => setSelectedBookmarkId(null)} 
+        <SidebarPanel
+          bookmarks={filteredBookmarks}
+          selectedBookmark={selectedBookmark}
+          onSelectBookmark={setSelectedBookmarkId}
+          onCloseDetail={() => setSelectedBookmarkId(null)}
+          isLoading={isLoading}
         />
       </div>
     </div>
