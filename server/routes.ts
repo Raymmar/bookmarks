@@ -121,7 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               bookmark_title: bookmark.title,
               type: "insight_generated",
               tags: insights.tags,
-              timestamp: new Date().toISOString()
+              timestamp: new Date()
             });
           }
           
@@ -130,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bookmark_id: bookmark.id,
             bookmark_title: bookmark.title,
             type: "bookmark_added",
-            timestamp: new Date().toISOString()
+            timestamp: new Date()
           });
           
           // Add notes if provided
@@ -140,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const note = await storage.createNote({
                   bookmark_id: bookmark.id,
                   text: noteData.text,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date()
                 });
                 
                 // Create activity for note
@@ -149,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   bookmark_title: bookmark.title,
                   type: "note_added",
                   content: noteData.text,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date()
                 });
               }
             }
@@ -168,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bookmark_id: bookmark.id,
             bookmark_title: bookmark.title,
             type: "bookmark_added",
-            timestamp: new Date().toISOString()
+            timestamp: new Date()
           });
           
           res.status(201).json(bookmark);
@@ -318,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookmark_title: bookmark.title,
         type: "highlight_added",
         content: highlight.quote,
-        timestamp: new Date().toISOString()
+        timestamp: new Date()
       });
       
       res.status(201).json(highlight);
