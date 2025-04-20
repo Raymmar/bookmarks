@@ -92,7 +92,16 @@ export function SidebarPanel({
                 key={bookmark.id}
                 bookmark={bookmark}
                 isSelected={false}
-                onClick={() => onSelectBookmark(bookmark.id)}
+                onClick={() => {
+                  // First, trigger the graph node selection with isolation
+                  const event = new CustomEvent('selectGraphNode', { 
+                    detail: { nodeId: bookmark.id, isolateView: true } 
+                  });
+                  document.dispatchEvent(event);
+                  
+                  // Then update the parent component
+                  onSelectBookmark(bookmark.id);
+                }}
               />
             ))}
           </div>
