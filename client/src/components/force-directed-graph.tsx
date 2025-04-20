@@ -412,6 +412,35 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           }
         }
       })
+      .on("dblclick", function(event, d) {
+        event.stopPropagation();
+        
+        // Zoom in on this node
+        if (svgRef.current) {
+          const svg = d3.select(svgRef.current);
+          const width = containerRef.current?.clientWidth || 0;
+          const height = containerRef.current?.clientHeight || 0;
+          
+          // Get the zoom behavior
+          const zoom = d3.zoom<SVGSVGElement, unknown>();
+          
+          // Create a transition for smooth animation
+          const transition = svg.transition().duration(750);
+          
+          // Calculate the transform to center and zoom on the node
+          // Use a higher zoom level (2.5x) for double click
+          const zoomLevel = 2.5;
+          const x = width / 2 - (d.x || 0) * zoomLevel;
+          const y = height / 2 - (d.y || 0) * zoomLevel;
+          
+          // Apply the transform with transition
+          svg.transition(transition)
+            .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(zoomLevel));
+            
+          // Prevent the regular click event from firing
+          event.preventDefault();
+        }
+      })
       .on("mouseover", function(event, d) {
         // Highlight connected nodes and links on hover
         const connectedLinks = links.filter(link => 
@@ -639,9 +668,14 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           <div className="w-3 h-3 transform rotate-45 bg-green-500 mr-2"></div>
           <span>Domain</span>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center mb-1">
           <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
           <span>Related</span>
+        </div>
+        <div className="text-xs mt-2 pt-2 border-t border-gray-200">
+          <div>Click: Select node</div>
+          <div>Double-click: Zoom in</div>
+          <div>Drag: Move node</div>
         </div>
       </div>
     </div>
