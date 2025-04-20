@@ -70,6 +70,9 @@ export class MemStorage implements IStorage {
   private insights: Map<string, Insight>;
   private activities: Map<string, Activity>;
 
+  private tags: Map<string, Tag>;
+  private bookmarkTags: Map<string, BookmarkTag>;
+  
   constructor() {
     this.bookmarks = new Map();
     this.notes = new Map();
@@ -77,6 +80,8 @@ export class MemStorage implements IStorage {
     this.highlights = new Map();
     this.insights = new Map();
     this.activities = new Map();
+    this.tags = new Map();
+    this.bookmarkTags = new Map();
   }
 
   // Bookmarks
@@ -263,6 +268,115 @@ export class MemStorage implements IStorage {
     this.activities.set(id, newActivity);
     return newActivity;
   }
+  
+  // Tags
+  async getTags(): Promise<Tag[]> {
+    return Array.from(this.tags.values());
+  }
+  
+  async getTag(id: string): Promise<Tag | undefined> {
+    return this.tags.get(id);
+  }
+  
+  async getTagByName(name: string): Promise<Tag | undefined> {
+    return Array.from(this.tags.values()).find(tag => tag.name === name);
+  }
+  
+  async createTag(tag: InsertTag): Promise<Tag> {
+    const id = crypto.randomUUID();
+    const created_at = new Date();
+    
+    const newTag: Tag = {
+      ...tag,
+      id,
+      count: 0,
+      created_at,
+    };
+    
+    this.tags.set(id, newTag);
+    return newTag;
+  }
+  
+  async updateTag(id: string, tagUpdate: Partial<InsertTag>): Promise<Tag | undefined> {
+    const tag = this.tags.get(id);
+    if (!tag) return undefined;
+    
+    const updatedTag = { ...tag, ...tagUpdate };
+    this.tags.set(id, updatedTag);
+    return updatedTag;
+  }
+  
+  async incrementTagCount(id: string): Promise<Tag | undefined> {
+    const tag = this.tags.get(id);
+    if (!tag) return undefined;
+    
+    const updatedTag = { ...tag, count: tag.count + 1 };
+    this.tags.set(id, updatedTag);
+    return updatedTag;
+  }
+  
+  async decrementTagCount(id: string): Promise<Tag | undefined> {
+    const tag = this.tags.get(id);
+    if (!tag) return undefined;
+    
+    const updatedTag = { ...tag, count: Math.max(0, tag.count - 1) };
+    this.tags.set(id, updatedTag);
+    return updatedTag;
+  }
+  
+  async deleteTag(id: string): Promise<boolean> {
+    return this.tags.delete(id);
+  }
+  
+  // BookmarkTags
+  async getTagsByBookmarkId(bookmarkId: string): Promise<Tag[]> {
+    const bookmarkTagsEntries = Array.from(this.bookmarkTags.values())
+      .filter(bt => bt.bookmark_id === bookmarkId);
+    
+    const tagIds = bookmarkTagsEntries.map(bt => bt.tag_id);
+    return tagIds.map(id => this.tags.get(id)!).filter(Boolean);
+  }
+  
+  async getBookmarksByTagId(tagId: string): Promise<Bookmark[]> {
+    const bookmarkTagsEntries = Array.from(this.bookmarkTags.values())
+      .filter(bt => bt.tag_id === tagId);
+    
+    const bookmarkIds = bookmarkTagsEntries.map(bt => bt.bookmark_id);
+    return bookmarkIds.map(id => this.bookmarks.get(id)!).filter(Boolean);
+  }
+  
+  async addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag> {
+    const id = crypto.randomUUID();
+    
+    const newBookmarkTag: BookmarkTag = {
+      id,
+      bookmark_id: bookmarkId,
+      tag_id: tagId,
+    };
+    
+    this.bookmarkTags.set(id, newBookmarkTag);
+    
+    // Increment the tag count
+    await this.incrementTagCount(tagId);
+    
+    return newBookmarkTag;
+  }
+  
+  async removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean> {
+    const bookmarkTag = Array.from(this.bookmarkTags.values())
+      .find(bt => bt.bookmark_id === bookmarkId && bt.tag_id === tagId);
+    
+    if (!bookmarkTag) return false;
+    
+    const result = this.bookmarkTags.delete(bookmarkTag.id);
+    
+    if (result) {
+      // Decrement the tag count
+      await this.decrementTagCount(tagId);
+    }
+    
+    return result;
+  }
 }
 
 // PostgreSQL database storage implementation
@@ -412,6 +526,122 @@ export class DatabaseStorage implements IStorage {
     
     const [newActivity] = await db.insert(activities).values(activityData).returning();
     return newActivity;
+  }
+  
+  // Tags
+  async getTags(): Promise<Tag[]> {
+    return await db.select().from(tags);
+  }
+  
+  async getTag(id: string): Promise<Tag | undefined> {
+    const [tag] = await db.select().from(tags).where(eq(tags.id, id));
+    return tag;
+  }
+  
+  async getTagByName(name: string): Promise<Tag | undefined> {
+    const [tag] = await db.select().from(tags).where(eq(tags.name, name));
+    return tag;
+  }
+  
+  async createTag(tag: InsertTag): Promise<Tag> {
+    const [newTag] = await db.insert(tags).values(tag).returning();
+    return newTag;
+  }
+  
+  async updateTag(id: string, tagUpdate: Partial<InsertTag>): Promise<Tag | undefined> {
+    const [updatedTag] = await db
+      .update(tags)
+      .set(tagUpdate)
+      .where(eq(tags.id, id))
+      .returning();
+    
+    return updatedTag;
+  }
+  
+  async incrementTagCount(id: string): Promise<Tag | undefined> {
+    const [tag] = await db.select().from(tags).where(eq(tags.id, id));
+    if (!tag) return undefined;
+    
+    const [updatedTag] = await db
+      .update(tags)
+      .set({ count: tag.count + 1 })
+      .where(eq(tags.id, id))
+      .returning();
+    
+    return updatedTag;
+  }
+  
+  async decrementTagCount(id: string): Promise<Tag | undefined> {
+    const [tag] = await db.select().from(tags).where(eq(tags.id, id));
+    if (!tag) return undefined;
+    
+    const [updatedTag] = await db
+      .update(tags)
+      .set({ count: Math.max(0, tag.count - 1) })
+      .where(eq(tags.id, id))
+      .returning();
+    
+    return updatedTag;
+  }
+  
+  async deleteTag(id: string): Promise<boolean> {
+    const result = await db.delete(tags).where(eq(tags.id, id)).returning({ id: tags.id });
+    return result.length > 0;
+  }
+  
+  // BookmarkTags
+  async getTagsByBookmarkId(bookmarkId: string): Promise<Tag[]> {
+    const joinResult = await db
+      .select({
+        tag: tags
+      })
+      .from(bookmarkTags)
+      .innerJoin(tags, eq(bookmarkTags.tag_id, tags.id))
+      .where(eq(bookmarkTags.bookmark_id, bookmarkId));
+    
+    return joinResult.map(result => result.tag);
+  }
+  
+  async getBookmarksByTagId(tagId: string): Promise<Bookmark[]> {
+    const joinResult = await db
+      .select({
+        bookmark: bookmarks
+      })
+      .from(bookmarkTags)
+      .innerJoin(bookmarks, eq(bookmarkTags.bookmark_id, bookmarks.id))
+      .where(eq(bookmarkTags.tag_id, tagId));
+    
+    return joinResult.map(result => result.bookmark);
+  }
+  
+  async addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag> {
+    const [newBookmarkTag] = await db
+      .insert(bookmarkTags)
+      .values({ bookmark_id: bookmarkId, tag_id: tagId })
+      .returning();
+    
+    // Increment the tag count
+    await this.incrementTagCount(tagId);
+    
+    return newBookmarkTag;
+  }
+  
+  async removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean> {
+    const result = await db
+      .delete(bookmarkTags)
+      .where(
+        eq(bookmarkTags.bookmark_id, bookmarkId) && 
+        eq(bookmarkTags.tag_id, tagId)
+      )
+      .returning({ id: bookmarkTags.id });
+    
+    if (result.length > 0) {
+      // Decrement the tag count
+      await this.decrementTagCount(tagId);
+      return true;
+    }
+    
+    return false;
   }
 }
 

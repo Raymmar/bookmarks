@@ -4,7 +4,11 @@ import { storage } from "./storage";
 import { extractMetadata } from "./lib/metadata-extractor";
 import { processContent, generateEmbedding, generateInsights, generateTags, summarizeContent, generateChatResponse } from "./lib/content-processor";
 import { z } from "zod";
-import { insertBookmarkSchema, insertNoteSchema, insertHighlightSchema, insertScreenshotSchema, insertInsightSchema, insertActivitySchema } from "@shared/schema";
+import { 
+  insertBookmarkSchema, insertNoteSchema, insertHighlightSchema, 
+  insertScreenshotSchema, insertInsightSchema, insertActivitySchema,
+  insertTagSchema, insertBookmarkTagSchema 
+} from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -478,6 +482,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ response });
     } catch (error) {
       res.status(500).json({ error: "Failed to generate chat response" });
+    }
+  });
+  
+  // Tags API endpoints
+  app.get("/api/tags", async (req, res) => {
+    try {
+      const tags = await storage.getTags();
+      res.json(tags);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve tags" });
+    }
+  });
+  
+  app.get("/api/tags/:id", async (req, res) => {
+    try {
+      const tag = await storage.getTag(req.params.id);
+      
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      res.json(tag);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve tag" });
+    }
+  });
+  
+  app.post("/api/tags", async (req, res) => {
+    try {
+      const parsedData = insertTagSchema.safeParse(req.body);
+      
+      if (!parsedData.success) {
+        return res.status(400).json({ error: "Invalid tag data", details: parsedData.error });
+      }
+      
+      // Check if tag with same name already exists
+      const existingTag = await storage.getTagByName(parsedData.data.name);
+      if (existingTag) {
+        return res.status(409).json({ 
+          error: "Tag already exists", 
+          existingTag 
+        });
+      }
+      
+      const tag = await storage.createTag(parsedData.data);
+      res.status(201).json(tag);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create tag" });
+    }
+  });
+  
+  app.patch("/api/tags/:id", async (req, res) => {
+    try {
+      const tag = await storage.getTag(req.params.id);
+      
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      // If updating the name, check for duplicates
+      if (req.body.name && req.body.name !== tag.name) {
+        const existingTag = await storage.getTagByName(req.body.name);
+        if (existingTag) {
+          return res.status(409).json({ 
+            error: "Tag with this name already exists", 
+            existingTag 
+          });
+        }
+      }
+      
+      const updatedTag = await storage.updateTag(req.params.id, req.body);
+      res.json(updatedTag);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update tag" });
+    }
+  });
+  
+  app.delete("/api/tags/:id", async (req, res) => {
+    try {
+      const tag = await storage.getTag(req.params.id);
+      
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      await storage.deleteTag(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete tag" });
+    }
+  });
+  
+  // BookmarkTags API endpoints
+  app.get("/api/bookmarks/:bookmarkId/tags", async (req, res) => {
+    try {
+      const tags = await storage.getTagsByBookmarkId(req.params.bookmarkId);
+      res.json(tags);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve tags for bookmark" });
+    }
+  });
+  
+  app.get("/api/tags/:tagId/bookmarks", async (req, res) => {
+    try {
+      const bookmarks = await storage.getBookmarksByTagId(req.params.tagId);
+      res.json(bookmarks);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve bookmarks for tag" });
+    }
+  });
+  
+  app.post("/api/bookmarks/:bookmarkId/tags/:tagId", async (req, res) => {
+    try {
+      // Check if bookmark exists
+      const bookmark = await storage.getBookmark(req.params.bookmarkId);
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      // Check if tag exists
+      const tag = await storage.getTag(req.params.tagId);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      const bookmarkTag = await storage.addTagToBookmark(req.params.bookmarkId, req.params.tagId);
+      res.status(201).json(bookmarkTag);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add tag to bookmark" });
+    }
+  });
+  
+  app.delete("/api/bookmarks/:bookmarkId/tags/:tagId", async (req, res) => {
+    try {
+      const result = await storage.removeTagFromBookmark(req.params.bookmarkId, req.params.tagId);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Tag not found on this bookmark" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove tag from bookmark" });
     }
   });
 
