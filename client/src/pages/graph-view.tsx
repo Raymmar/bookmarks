@@ -169,35 +169,7 @@ export default function GraphView() {
     <div className="flex flex-1 h-full w-full">
       {/* Main content column */}
       <div className="flex-1 flex flex-col h-full w-full">
-        {/* Header section */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 h-16 flex items-center px-4">
-          <div className="flex w-full items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Explore</h2>
-            
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "outline"}
-                  size="sm"
-                  className="h-9 px-3"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <LayoutGrid className="h-4 w-4 mr-2" />
-                  Grid
-                </Button>
-                <Button
-                  variant={viewMode === "graph" ? "default" : "outline"}
-                  size="sm"
-                  className="h-9 px-3"
-                  onClick={() => setViewMode("graph")}
-                >
-                  <Network className="h-4 w-4 mr-2" />
-                  Graph
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Header section removed as it's no longer necessary */}
         
         {/* Search, filters and tags section */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 w-full">
