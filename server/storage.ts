@@ -277,7 +277,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
-    const [newBookmark] = await db.insert(bookmarks).values(bookmark).returning();
+    // Ensure date_saved is a Date object before inserting
+    const bookmarkData = {
+      ...bookmark,
+      date_saved: new Date()
+    };
+    
+    const [newBookmark] = await db.insert(bookmarks).values(bookmarkData).returning();
     return newBookmark;
   }
   
@@ -302,7 +308,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createNote(note: InsertNote): Promise<Note> {
-    const [newNote] = await db.insert(notes).values(note).returning();
+    // Ensure timestamp is a Date object
+    const noteData = {
+      ...note,
+      timestamp: new Date()
+    };
+    
+    const [newNote] = await db.insert(notes).values(noteData).returning();
     return newNote;
   }
   
@@ -317,7 +329,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createScreenshot(screenshot: InsertScreenshot): Promise<Screenshot> {
-    const [newScreenshot] = await db.insert(screenshots).values(screenshot).returning();
+    // Ensure uploaded_at is a Date object
+    const screenshotData = {
+      ...screenshot,
+      uploaded_at: new Date()
+    };
+    
+    const [newScreenshot] = await db.insert(screenshots).values(screenshotData).returning();
     return newScreenshot;
   }
   
@@ -368,7 +386,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createActivity(activity: InsertActivity): Promise<Activity> {
-    const [newActivity] = await db.insert(activities).values(activity).returning();
+    // Ensure timestamp is a Date object
+    const activityData = {
+      ...activity,
+      timestamp: new Date()
+    };
+    
+    const [newActivity] = await db.insert(activities).values(activityData).returning();
     return newActivity;
   }
 }

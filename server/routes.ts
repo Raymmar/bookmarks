@@ -187,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bookmark_id: bookmark.id,
           bookmark_title: bookmark.title,
           type: "bookmark_added",
-          timestamp: new Date().toISOString()
+          timestamp: new Date()
         });
         
         res.status(201).json(bookmark);
@@ -264,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookmark_title: bookmark.title,
         type: "note_added",
         content: note.text,
-        timestamp: new Date().toISOString()
+        timestamp: new Date()
       });
       
       res.status(201).json(note);
