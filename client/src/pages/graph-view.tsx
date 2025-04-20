@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
-import { BookmarkCard } from "@/components/bookmark-card";
+import { FilterControls } from "@/components/filter-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { X, LayoutGrid, Network, SearchX, List } from "lucide-react";
+import { X, LayoutGrid, Network, SearchX } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bookmark } from "@shared/types";
@@ -20,6 +20,8 @@ export default function GraphView() {
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
   const [sortOrder, setSortOrder] = useState("newest");
+  const [dateRange, setDateRange] = useState("all");
+  const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -52,6 +54,23 @@ export default function GraphView() {
         bookmark.system_tags.some(tag => tag.toLowerCase().includes(searchLower));
       
       if (!matchesSearch) return false;
+    }
+    
+    // Source filter
+    if (!sources.includes(bookmark.source)) {
+      return false;
+    }
+    
+    // Date filter
+    if (dateRange !== "all") {
+      const now = new Date();
+      const bookmarkDate = new Date(bookmark.date_saved);
+      const timeDiff = now.getTime() - bookmarkDate.getTime();
+      const daysDiff = timeDiff / (1000 * 3600 * 24);
+      
+      if (dateRange === "week" && daysDiff > 7) return false;
+      if (dateRange === "month" && daysDiff > 30) return false;
+      if (dateRange === "quarter" && daysDiff > 90) return false;
     }
     
     // Tag filter
@@ -176,24 +195,22 @@ export default function GraphView() {
             </div>
           </div>
           
-          {/* Sort options */}
-          <div className="flex justify-between items-center">
-            <div className="text-sm font-medium text-gray-600">Filter by tags:</div>
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500">Match:</span>
-                <Select value={tagMode} onValueChange={(value) => setTagMode(value as "any" | "all")}>
-                  <SelectTrigger className="h-7 text-xs w-24">
-                    <SelectValue placeholder="Match mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Any tag</SelectItem>
-                    <SelectItem value="all">All tags</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Filters and tags */}
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <FilterControls
+                tags={allTags}
+                selectedTags={selectedTags}
+                onTagsChange={setSelectedTags}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+                sources={sources}
+                onSourcesChange={setSources}
+                tagMode={tagMode}
+                onTagModeChange={setTagMode}
+              />
               
-              <div className="relative">
+              <div className="flex items-center">
                 <Select value={sortOrder} onValueChange={setSortOrder}>
                   <SelectTrigger className="h-7 text-xs w-32">
                     <SelectValue placeholder="Sort order" />
@@ -205,10 +222,8 @@ export default function GraphView() {
                 </Select>
               </div>
             </div>
-          </div>
-          
-          {/* Tags filter */}
-          <div className="mt-2">
+            
+            {/* Tags display */}
             <div className="flex flex-wrap gap-1">
               {allTags.map(tag => (
                 <Badge 
