@@ -299,7 +299,12 @@ export default function GraphView() {
           bookmarks={sortedBookmarks}
           selectedBookmark={selectedBookmark}
           onSelectBookmark={handleSelectBookmark}
-          onCloseDetail={() => setSelectedBookmarkId(null)}
+          onCloseDetail={() => {
+            setSelectedBookmarkId(null);
+            // Dispatch an event to reset the graph view
+            const event = new CustomEvent('resetGraphView');
+            document.dispatchEvent(event);
+          }}
           isLoading={isLoading}
         />
       </div>
