@@ -96,27 +96,31 @@ export default function GraphView() {
   });
   
   const toggleTagSelection = (tag: string) => {
-    // Focus on tag node when selected
-    if (!selectedTags.includes(tag) && viewMode === "graph") {
-      // Find the tag node ID format that matches our graph component
-      const tagNodeId = `tag-${tag}`;
-      // Set this as selected node to trigger centering on this tag
-      setSelectedBookmarkId(null); // Clear any selected bookmark
-      
-      // Apply a small delay to allow the graph to update with filtered nodes
-      setTimeout(() => {
-        // Use custom event to notify the graph component to select this tag
-        const event = new CustomEvent('selectGraphNode', { 
-          detail: { nodeId: tagNodeId } 
-        });
-        document.dispatchEvent(event);
-      }, 50);
-    }
+    const isCurrentlySelected = selectedTags.includes(tag);
     
-    if (selectedTags.includes(tag)) {
+    // Update the tag selection first
+    if (isCurrentlySelected) {
       setSelectedTags(selectedTags.filter(t => t !== tag));
     } else {
       setSelectedTags([...selectedTags, tag]);
+      
+      // Only focus on tag node when it's newly selected and in graph view
+      if (viewMode === "graph") {
+        // Find the tag node ID format that matches our graph component
+        const tagNodeId = `tag-${tag}`;
+        // Clear any selected bookmark
+        setSelectedBookmarkId(null);
+        
+        // Use a longer delay to ensure the graph has fully updated with filtered nodes
+        // This prevents the "bouncing" effect caused by rapid zoom transitions
+        setTimeout(() => {
+          // Use custom event to notify the graph component to select this tag
+          const event = new CustomEvent('selectGraphNode', { 
+            detail: { nodeId: tagNodeId } 
+          });
+          document.dispatchEvent(event);
+        }, 300); // Longer delay for smoother transitions
+      }
     }
   };
   

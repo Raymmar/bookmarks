@@ -232,6 +232,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     zoomBehaviorRef.current = zoomBehavior;
   }, []);
   
+  // Store the last centered state to avoid unnecessary zooming
+  const lastCenteredStateRef = useRef<{
+    nodeCount: number;
+    centerX: number;
+    centerY: number;
+    scale: number;
+    timestamp: number;
+  } | null>(null);
+  
   // Function to center and zoom the graph based on visible nodes
   const centerGraph = useCallback((nodes: GraphNode[]) => {
     if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
@@ -257,8 +266,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // If we couldn't determine bounds, exit
     if (minX === Infinity || minY === Infinity) return;
     
-    // Add padding
-    const padding = 50;
+    // Add padding - use more padding for fewer nodes to make the view more comfortable
+    const padding = Math.max(30, Math.min(100, 100 - nodes.length * 2));
     minX -= padding;
     maxX += padding;
     minY -= padding;
@@ -278,16 +287,46 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       height / boundsHeight
     );
     
-    // Constrain scale to the allowed range
-    scale = Math.max(0.3, Math.min(scale, 3));
+    // Smoother scale adjustment:
+    // 1. Make scaling more gradual based on node count
+    const baseScale = scale;
     
-    // Inverse scale: more nodes = smaller scale (more zoomed out)
-    // Adjust this formula based on your preferred scaling behavior
     if (nodes.length > 15) {
-      scale = Math.max(0.3, scale * (1 - Math.min(nodes.length / 100, 0.5)));
+      // More subtle scale reduction for many nodes
+      scale = Math.max(0.5, scale * (1 - Math.min(nodes.length / 150, 0.4)));
+    } else if (nodes.length < 5) {
+      // Don't zoom in quite as aggressively for small node counts
+      scale = Math.min(1.8, scale);
     }
     
-    // Apply the transform
+    // 2. Constrain scale to the allowed range with a tighter min bound for better visibility
+    scale = Math.max(0.4, Math.min(scale, 1.8));
+    
+    // Check if this view is very similar to the last one
+    const now = Date.now();
+    const lastState = lastCenteredStateRef.current;
+    
+    if (lastState) {
+      // Don't re-center if we've recently centered and the change is minor
+      const timeSinceLastCenter = now - lastState.timestamp;
+      const centerXDiff = Math.abs(centerX - lastState.centerX);
+      const centerYDiff = Math.abs(centerY - lastState.centerY);
+      const scaleDiff = Math.abs(scale - lastState.scale);
+      const nodeCountDiff = Math.abs(nodes.length - lastState.nodeCount);
+      
+      // If it's been less than 1.5 seconds, the center point hasn't moved much, 
+      // scale is similar, and we're not showing dramatically different number of nodes, 
+      // then skip this update for smoother experience
+      if (timeSinceLastCenter < 1500 && 
+          centerXDiff < 50 && 
+          centerYDiff < 50 && 
+          scaleDiff < 0.2 &&
+          nodeCountDiff < 3) {
+        return;
+      }
+    }
+    
+    // Apply the transform with a longer duration for smoother transitions
     const svg = d3.select(svgRef.current);
     const transform = d3.zoomIdentity
       .translate(width / 2, height / 2)
@@ -295,8 +334,18 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .translate(-centerX, -centerY);
     
     svg.transition()
-      .duration(750) // Animation duration in ms
+      .duration(1200) // Longer animation for smoother feel
+      .ease(d3.easeCubicOut) // Smoother easing function
       .call(zoomBehaviorRef.current.transform, transform);
+    
+    // Store this state to avoid oscillation
+    lastCenteredStateRef.current = {
+      nodeCount: nodes.length,
+      centerX,
+      centerY,
+      scale,
+      timestamp: now
+    };
     
     console.log(`Graph centered: ${nodes.length} nodes, scale: ${scale.toFixed(2)}, center: (${Math.round(centerX)}, ${Math.round(centerY)})`);
   }, []);
@@ -561,17 +610,21 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Setup zoom functionality
     initializeZoom();
     
-    // Center graph after simulation stabilizes
+    // Center graph after simulation stabilizes with a slight delay
+    // to allow the simulation to settle more completely
     simulation.on("end", () => {
-      centerGraph(nodes);
+      // Short delay to ensure nodes are fully positioned
+      setTimeout(() => {
+        centerGraph(nodes);
+      }, 100);
     });
     
-    // Manually trigger 'end' event after a timeout if it doesn't happen naturally
+    // Manually trigger centering after a timeout if simulation doesn't end naturally
     const timeoutId = setTimeout(() => {
       if (simulationRef.current === simulation) {
         centerGraph(nodes);
       }
-    }, 2000); // 2 second timeout
+    }, 1500); // 1.5 second timeout (reduced to avoid long waiting)
     
     // Clean up on unmount
     return () => {
