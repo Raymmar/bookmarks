@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { SidebarPanel } from "@/components/sidebar-panel";
@@ -32,22 +32,21 @@ export default function GraphView() {
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
-  // When a bookmark is selected, focus the graph on just that bookmark and its connections
+  // When a bookmark is selected, center it in the graph
   const handleSelectBookmark = (id: string) => {
-    // Update the selected bookmark ID for the sidebar panel
     setSelectedBookmarkId(id);
     
-    // Now trigger graph centering without causing a full redraw
-    // No delay needed as we've modified the ForceDirectedGraph component
-    // to avoid redraws when selectedBookmarkId changes
-    const event = new CustomEvent('selectGraphNode', { 
-      detail: { 
-        nodeId: id, 
-        isBookmarkId: true, // Flag for proper node finding in graph
-        isolateView: true 
-      } 
-    });
-    document.dispatchEvent(event);
+    // Find the bookmark node ID format that matches our graph component
+    const bookmarkNodeId = `bookmark-${id}`;
+    
+    // Use a small delay to ensure the graph has updated
+    setTimeout(() => {
+      // Use custom event to notify the graph component to select and center this node
+      const event = new CustomEvent('selectGraphNode', { 
+        detail: { nodeId: bookmarkNodeId } 
+      });
+      document.dispatchEvent(event);
+    }, 100);
   };
   
   // Extract all unique tags from bookmarks
@@ -116,50 +115,28 @@ export default function GraphView() {
   const toggleTagSelection = (tag: string) => {
     const isCurrentlySelected = selectedTags.includes(tag);
     
+    // Update the tag selection first
     if (isCurrentlySelected) {
-      // Removing a tag
-      const newSelectedTags = selectedTags.filter(t => t !== tag);
-      setSelectedTags(newSelectedTags);
-      
-      // If we're in graph view, update the graph
-      if (viewMode === "graph") {
-        if (newSelectedTags.length === 0) {
-          // No tags left, reset the graph
-          setSelectedBookmarkId(null);
-          const resetEvent = new CustomEvent('resetGraphView');
-          document.dispatchEvent(resetEvent);
-        } else {
-          // Select the first remaining tag
-          const remainingTag = newSelectedTags[0];
-          setSelectedBookmarkId(null);
-          
-          // Focus the graph on the remaining tag
-          const tagNodeId = `tag-${remainingTag}`;
-          const event = new CustomEvent('selectGraphNode', { 
-            detail: { 
-              nodeId: tagNodeId,
-              isolateView: true
-            } 
-          });
-          document.dispatchEvent(event);
-        }
-      }
+      setSelectedTags(selectedTags.filter(t => t !== tag));
     } else {
-      // Adding a tag
       setSelectedTags([...selectedTags, tag]);
       
-      // If in graph view, focus on this tag
+      // Only focus on tag node when it's newly selected and in graph view
       if (viewMode === "graph") {
+        // Find the tag node ID format that matches our graph component
         const tagNodeId = `tag-${tag}`;
+        // Clear any selected bookmark
         setSelectedBookmarkId(null);
         
-        const event = new CustomEvent('selectGraphNode', { 
-          detail: { 
-            nodeId: tagNodeId,
-            isolateView: true
-          } 
-        });
-        document.dispatchEvent(event);
+        // Use a longer delay to ensure the graph has fully updated with filtered nodes
+        // This prevents the "bouncing" effect caused by rapid zoom transitions
+        setTimeout(() => {
+          // Use custom event to notify the graph component to select this tag
+          const event = new CustomEvent('selectGraphNode', { 
+            detail: { nodeId: tagNodeId } 
+          });
+          document.dispatchEvent(event);
+        }, 300); // Longer delay for smoother transitions
       }
     }
   };
@@ -291,13 +268,17 @@ export default function GraphView() {
                 <p className="mt-2 text-gray-600">Loading graph data...</p>
               </div>
             </div>
-          ) : bookmarks.length === 0 ? (
+          ) : filteredBookmarks.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="bg-white p-8 rounded-lg shadow text-center max-w-md">
                 <SearchX className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-900 mb-1">No bookmarks found</h3>
                 <p className="text-gray-500">
-                  Add some bookmarks to get started with the explorer
+                  {searchQuery
+                    ? "Try using different search terms or filters"
+                    : selectedTags.length > 0
+                      ? "Try selecting different tags or changing the match mode"
+                      : "Add some bookmarks to see them in the explorer"}
                 </p>
               </div>
             </div>
@@ -305,7 +286,7 @@ export default function GraphView() {
             // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
               <ForceDirectedGraph
-                bookmarks={bookmarks} // Use all bookmarks for graph and let the visual filtering handle the rest
+                bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
                 onNodeClick={handleSelectBookmark}
               />
@@ -317,15 +298,10 @@ export default function GraphView() {
       {/* Right Sidebar Panel - Now always show it on larger screens */}
       <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
         <SidebarPanel
-          bookmarks={sortedBookmarks} // Keep using filtered bookmarks for the sidebar list
+          bookmarks={sortedBookmarks}
           selectedBookmark={selectedBookmark}
           onSelectBookmark={handleSelectBookmark}
-          onCloseDetail={() => {
-            setSelectedBookmarkId(null);
-            // Dispatch an event to reset the graph view
-            const event = new CustomEvent('resetGraphView');
-            document.dispatchEvent(event);
-          }}
+          onCloseDetail={() => setSelectedBookmarkId(null)}
           isLoading={isLoading}
         />
       </div>
