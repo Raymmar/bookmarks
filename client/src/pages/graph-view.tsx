@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
-import { BookmarkCard } from "@/components/bookmark-card";
+import { SidebarNavigation } from "@/components/sidebar-navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { X, LayoutGrid, Network, SearchX, List } from "lucide-react";
+import { LayoutGrid, Network, SearchX, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bookmark } from "@shared/types";
@@ -20,9 +20,28 @@ export default function GraphView() {
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
   const [sortOrder, setSortOrder] = useState("newest");
+  const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  const [dateRange, setDateRange] = useState("week");
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  
+  // Function to handle filter changes from the sidebar
+  const handleFiltersChange = (filters: {
+    tags: string[];
+    dateRange: string;
+    sources: string[];
+    searchQuery?: string;
+    tagMode?: "any" | "all";
+    sortOrder?: string;
+  }) => {
+    if (filters.tags) setSelectedTags(filters.tags);
+    if (filters.dateRange) setDateRange(filters.dateRange);
+    if (filters.sources) setSources(filters.sources);
+    if (filters.searchQuery !== undefined) setSearchQuery(filters.searchQuery);
+    if (filters.tagMode) setTagMode(filters.tagMode);
+    if (filters.sortOrder) setSortOrder(filters.sortOrder);
+  };
   
   const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
@@ -154,82 +173,23 @@ export default function GraphView() {
           </div>
         </div>
         
-        {/* Search, filters and tags section */}
+        {/* Search input - Only keeping the search box in the main content */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 w-full">
-          {/* Search input */}
-          <div className="mb-3">
-            <div className="relative flex-1 max-w-full">
-              <Input
-                type="text"
-                placeholder="Search bookmarks, content, tags..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full"
+          <div className="relative flex-1 max-w-full">
+            <Input
+              type="text"
+              placeholder="Search bookmarks, content, tags..."
+              value={searchQuery}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full"
+            />
+            <SearchX className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
+            {searchQuery && (
+              <X 
+                className="h-4 w-4 text-gray-400 absolute right-3 top-3 cursor-pointer" 
+                onClick={() => setSearchQuery("")}
               />
-              <SearchX className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
-              {searchQuery && (
-                <X 
-                  className="h-4 w-4 text-gray-400 absolute right-3 top-3 cursor-pointer" 
-                  onClick={() => setSearchQuery("")}
-                />
-              )}
-            </div>
-          </div>
-          
-          {/* Sort options */}
-          <div className="flex justify-between items-center">
-            <div className="text-sm font-medium text-gray-600">Filter by tags:</div>
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500">Match:</span>
-                <Select value={tagMode} onValueChange={(value) => setTagMode(value as "any" | "all")}>
-                  <SelectTrigger className="h-7 text-xs w-24">
-                    <SelectValue placeholder="Match mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Any tag</SelectItem>
-                    <SelectItem value="all">All tags</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="relative">
-                <Select value={sortOrder} onValueChange={setSortOrder}>
-                  <SelectTrigger className="h-7 text-xs w-32">
-                    <SelectValue placeholder="Sort order" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest first</SelectItem>
-                    <SelectItem value="oldest">Oldest first</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          
-          {/* Tags filter */}
-          <div className="mt-2">
-            <div className="flex flex-wrap gap-1">
-              {allTags.map(tag => (
-                <Badge 
-                  key={tag}
-                  variant={selectedTags.includes(tag) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleTagSelection(tag)}
-                >
-                  {tag}
-                  {selectedTags.includes(tag) && (
-                    <X 
-                      className="h-3 w-3 ml-1" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTagSelection(tag);
-                      }}
-                    />
-                  )}
-                </Badge>
-              ))}
-            </div>
+            )}
           </div>
         </div>
         
