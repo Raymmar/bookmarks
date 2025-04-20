@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { SidebarPanel } from "@/components/sidebar-panel";
@@ -113,67 +113,53 @@ export default function GraphView() {
     return 0;
   });
   
+  // This flag tracks if we're handling a tag change to avoid redundant filtering
+  const isHandlingTagChangeRef = useRef(false);
+  
   const toggleTagSelection = (tag: string) => {
     const isCurrentlySelected = selectedTags.includes(tag);
-    const prevSelectedTags = [...selectedTags]; // Capture previous state
     
-    // Update the tag selection first
+    // Just update the state and rely on filteredBookmarks to update 
+    // rather than manually triggering graph node selection
     if (isCurrentlySelected) {
       // Removing a tag - update state
       const newSelectedTags = selectedTags.filter(t => t !== tag);
       setSelectedTags(newSelectedTags);
       
-      // If this was the last selected tag, reset the graph view
-      if (newSelectedTags.length === 0 && prevSelectedTags.length === 1) {
+      // If this was the last selected tag, reset the graph view as this clears all filters
+      if (newSelectedTags.length === 0) {
         setSelectedBookmarkId(null);
-        // Reset the graph filter
-        const resetEvent = new CustomEvent('resetGraphView');
-        document.dispatchEvent(resetEvent);
-      } 
-      // If we still have selected tags, but now one less, update the graph view
-      else if (newSelectedTags.length > 0) {
-        // For the remaining tags, update the filter
-        // Focus on the first remaining tag 
+        
+        // Only reset graph if we're showing a graph
         if (viewMode === "graph") {
-          const remainingTagNodeId = `tag-${newSelectedTags[0]}`;
-          
-          // Delay slightly to ensure state is updated
-          setTimeout(() => {
-            const event = new CustomEvent('selectGraphNode', { 
-              detail: { 
-                nodeId: remainingTagNodeId,
-                isolateView: true
-              } 
-            });
-            document.dispatchEvent(event);
-          }, 50);
+          const resetEvent = new CustomEvent('resetGraphView');
+          document.dispatchEvent(resetEvent);
         }
       }
+      // Otherwise let the filteredBookmarks update naturally and don't trigger node selection
     } else {
       // Adding a new tag
       setSelectedTags([...selectedTags, tag]);
       
-      // Only focus on tag node when it's newly selected and in graph view
-      if (viewMode === "graph") {
+      // If there were no tags selected before, we need to display the tag node on first selection
+      if (selectedTags.length === 0 && viewMode === "graph") {
         // The node ID for tags in the ForceDirectedGraph is tag-{tag}
         const tagNodeId = `tag-${tag}`;
         
         // Clear any selected bookmark first
         setSelectedBookmarkId(null);
         
-        // Only trigger a zoom if this is the first tag being selected
-        // or if there's a significant view change needed
-        setTimeout(() => {
-          // Use custom event to notify the graph component to select this tag
-          const event = new CustomEvent('selectGraphNode', { 
-            detail: { 
-              nodeId: tagNodeId,
-              isolateView: true // Always isolate view when selecting tags
-            } 
-          });
-          document.dispatchEvent(event);
-        }, 50);
+        // Let the filtered bookmarks update and then focus on the tag
+        const event = new CustomEvent('selectGraphNode', { 
+          detail: { 
+            nodeId: tagNodeId,
+            isolateView: true // Always isolate view when selecting tags
+          } 
+        });
+        document.dispatchEvent(event);
       }
+      // If tags were already selected, just updating filteredBookmarks is enough and doesn't
+      // require a graph selection update
     }
   };
   
