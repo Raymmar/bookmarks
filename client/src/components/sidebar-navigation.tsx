@@ -55,8 +55,8 @@ export function SidebarNavigation({ className, onFiltersChange }: SidebarNavigat
   const availableTags = ["Technology", "Research", "Tutorial", "JavaScript", "Machine Learning", "API"];
 
   return (
-    <nav className={cn("flex flex-col w-64 bg-white shadow-md z-10", className)}>
-      <div className="p-4 border-b border-gray-200">
+    <nav className={cn("flex flex-col w-full h-full bg-white z-10", className)}>
+      <div className="h-16 p-4 border-b border-gray-200 flex items-center">
         <div className="flex items-center space-x-2">
           <Bookmark className="h-8 w-8 text-primary" />
           <h1 className="text-xl font-semibold">Universal Bookmarks</h1>

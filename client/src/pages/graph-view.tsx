@@ -109,9 +109,11 @@ export default function GraphView() {
   };
   
   return (
-    <div className="flex flex-1 h-full">
-      <div className="flex-1 flex flex-col h-full">
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4 h-16 flex items-center">
+    <div className="flex flex-1 h-full w-full">
+      {/* Main content column */}
+      <div className="flex-1 flex flex-col h-full w-full">
+        {/* Header section */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 h-16 flex items-center px-4">
           <div className="flex w-full items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-800">Explore</h2>
             
@@ -153,7 +155,7 @@ export default function GraphView() {
         </div>
         
         {/* Search, filters and tags section */}
-        <div className="bg-white border-b border-gray-200 p-4">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 w-full">
           {/* Search input */}
           <div className="mb-3">
             <div className="relative flex-1 max-w-full">
@@ -231,7 +233,8 @@ export default function GraphView() {
           </div>
         </div>
         
-        <div className="flex-1 bg-gray-50 p-4 pb-20 overflow-hidden">
+        {/* Content section */}
+        <div className="flex-1 bg-gray-50 p-4 overflow-hidden w-full">
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -295,7 +298,7 @@ export default function GraphView() {
       </div>
       
       {/* Detail Panel */}
-      <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full">
+      <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
         <BookmarkDetailPanel 
           bookmark={selectedBookmark} 
           onClose={() => setSelectedBookmarkId(null)} 

@@ -11,9 +11,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [location] = useLocation();
   
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen w-full">
       {/* Sidebar Navigation - Hidden on Mobile */}
-      <div className="hidden md:block">
+      <div className="hidden md:block w-64 h-full flex-shrink-0 border-r border-gray-200">
         <SidebarNavigation />
       </div>
       
@@ -21,8 +21,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <MobileNavigation />
       
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col md:ml-64 md:pl-0 pt-16 md:pt-0">
-        <main className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 w-full">
+        <main className="flex-1 flex overflow-hidden w-full">
           {children}
         </main>
       </div>
