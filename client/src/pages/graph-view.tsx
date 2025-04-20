@@ -32,21 +32,20 @@ export default function GraphView() {
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
-  // When a bookmark is selected, center it in the graph
+  // When a bookmark is selected, center it in the graph without redrawing
   const handleSelectBookmark = (id: string) => {
     setSelectedBookmarkId(id);
     
     // Find the bookmark node ID format that matches our graph component
-    const bookmarkNodeId = `bookmark-${id}`;
+    // In the force-directed-graph.tsx, nodes use their bookmark ID directly
+    const bookmarkNodeId = id;
     
-    // Use a small delay to ensure the graph has updated
-    setTimeout(() => {
-      // Use custom event to notify the graph component to select and center this node
-      const event = new CustomEvent('selectGraphNode', { 
-        detail: { nodeId: bookmarkNodeId } 
-      });
-      document.dispatchEvent(event);
-    }, 100);
+    // Use custom event to notify the graph component to select and center this node
+    // No need for setTimeout as we're not redrawing the graph
+    const event = new CustomEvent('selectGraphNode', { 
+      detail: { nodeId: bookmarkNodeId } 
+    });
+    document.dispatchEvent(event);
   };
   
   // Extract all unique tags from bookmarks
