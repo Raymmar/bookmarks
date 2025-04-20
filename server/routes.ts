@@ -511,24 +511,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/tags", async (req, res) => {
     try {
-      const parsedData = insertTagSchema.safeParse(req.body);
+      console.log("Tag creation request body:", req.body);
       
-      if (!parsedData.success) {
-        return res.status(400).json({ error: "Invalid tag data", details: parsedData.error });
+      if (!req.body || !req.body.name) {
+        return res.status(400).json({ error: "Tag name is required" });
       }
+      
+      const tagData = {
+        name: req.body.name,
+        type: req.body.type || "user"  // Default to 'user' if not specified
+      };
       
       // Check if tag with same name already exists
-      const existingTag = await storage.getTagByName(parsedData.data.name);
+      const existingTag = await storage.getTagByName(tagData.name);
       if (existingTag) {
-        return res.status(409).json({ 
-          error: "Tag already exists", 
-          existingTag 
-        });
+        return res.status(200).json(existingTag); // Return existing tag instead of error
       }
       
-      const tag = await storage.createTag(parsedData.data);
+      const tag = await storage.createTag(tagData);
       res.status(201).json(tag);
     } catch (error) {
+      console.error("Tag creation error:", error);
       res.status(500).json({ error: "Failed to create tag" });
     }
   });

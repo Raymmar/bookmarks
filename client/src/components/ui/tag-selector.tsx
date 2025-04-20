@@ -118,7 +118,7 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
       </div>
       
       {/* Tag input and suggestions */}
-      <div className="flex gap-2">
+      <div className="flex">
         <Input
           id="tags"
           placeholder="Type to add or find tags"
@@ -130,17 +130,8 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
               handleNewTagSubmit();
             }
           }}
-          className="flex-1"
+          className="w-full"
         />
-        <Button 
-          type="button" 
-          variant="outline" 
-          size="icon" 
-          onClick={handleNewTagSubmit}
-          disabled={newTagText.trim() === ""}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
       </div>
       
       {/* Tag suggestions */}
