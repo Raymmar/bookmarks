@@ -24,6 +24,14 @@ interface GraphState {
   focusedNodeIds: Set<string>;
   isFiltered: boolean;
   zoomTransform: d3.ZoomTransform | null;
+  // Track active filters by type
+  activeFilters: {
+    tags: Set<string>; // Tag IDs that are being filtered
+    bookmarks: Set<string>; // Bookmark IDs that are being filtered
+    domains: Set<string>; // Domain IDs that are being filtered
+  };
+  // Track filter operation mode
+  filterMode: 'and' | 'or'; // AND requires all filters to match, OR requires any filter to match
 }
 
 interface ForceDirectedGraphProps {
@@ -45,7 +53,13 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     selectedNodeId: null,
     focusedNodeIds: new Set<string>(),
     isFiltered: false,
-    zoomTransform: null
+    zoomTransform: null,
+    activeFilters: {
+      tags: new Set<string>(),
+      bookmarks: new Set<string>(),
+      domains: new Set<string>()
+    },
+    filterMode: 'or'
   });
   
   // Extract domain from URL
@@ -538,6 +552,56 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     // Update the graph state
     setGraphState(prev => {
+      // Get node type to use for filtering
+      const { type } = node;
+      
+      // Create new filter sets by copying the current ones
+      const newActiveFilters = {
+        tags: new Set(prev.activeFilters.tags),
+        bookmarks: new Set(prev.activeFilters.bookmarks),
+        domains: new Set(prev.activeFilters.domains)
+      };
+      
+      // Add the selected node to the appropriate filter set
+      if (type === "tag") {
+        // If the tag is already filtered and this is the only filter, remove it
+        if (newActiveFilters.tags.has(nodeId) && 
+            newActiveFilters.tags.size === 1 &&
+            newActiveFilters.bookmarks.size === 0 &&
+            newActiveFilters.domains.size === 0) {
+          newActiveFilters.tags.clear();
+        } else {
+          // Otherwise add/keep it
+          newActiveFilters.tags.add(nodeId);
+        }
+      } else if (type === "bookmark") {
+        // Handle bookmark selection
+        if (newActiveFilters.bookmarks.has(nodeId) && 
+            newActiveFilters.bookmarks.size === 1 &&
+            newActiveFilters.tags.size === 0 &&
+            newActiveFilters.domains.size === 0) {
+          newActiveFilters.bookmarks.clear();
+        } else {
+          newActiveFilters.bookmarks.add(nodeId);
+        }
+      } else if (type === "domain") {
+        // Handle domain selection
+        if (newActiveFilters.domains.has(nodeId) && 
+            newActiveFilters.domains.size === 1 &&
+            newActiveFilters.tags.size === 0 &&
+            newActiveFilters.bookmarks.size === 0) {
+          newActiveFilters.domains.clear();
+        } else {
+          newActiveFilters.domains.add(nodeId);
+        }
+      }
+      
+      // Determine if any filters are active
+      const hasActiveFilters = 
+        newActiveFilters.tags.size > 0 || 
+        newActiveFilters.bookmarks.size > 0 || 
+        newActiveFilters.domains.size > 0;
+      
       // If isolating the view, get connected nodes and update filter
       const focusedNodeIds = isolateView ? getConnectedNodeIds(nodeId) : prev.focusedNodeIds;
       
@@ -546,7 +610,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         ...prev,
         selectedNodeId: nodeId,
         focusedNodeIds: focusedNodeIds,
-        isFiltered: isolateView
+        isFiltered: hasActiveFilters || isolateView,
+        activeFilters: newActiveFilters
       };
     });
     
@@ -670,7 +735,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       ...prev,
       selectedNodeId: null,
       focusedNodeIds: new Set<string>(),
-      isFiltered: false
+      isFiltered: false,
+      activeFilters: {
+        tags: new Set<string>(),
+        bookmarks: new Set<string>(),
+        domains: new Set<string>()
+      }
     }));
     
     // Only center the view on all nodes if we're coming from a filtered state
