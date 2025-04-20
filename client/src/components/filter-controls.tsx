@@ -54,7 +54,9 @@ export function FilterControls({
     }
   };
   
-  const filtersActive = selectedTags.length > 0 || dateRange !== "all" || sources.length < 3;
+  // Only count non-tag filters for the filter badge count
+  const filtersActive = dateRange !== "all" || sources.length < 3;
+  const filterCount = (dateRange !== "all" ? 1 : 0) + (sources.length < 3 ? 1 : 0);
   
   return (
     <div className={cn("flex items-center", className)}>
@@ -70,9 +72,9 @@ export function FilterControls({
           >
             <Filter className="h-4 w-4" />
             <span>Filters</span>
-            {filtersActive && (
+            {filterCount > 0 && (
               <Badge className="h-5 flex items-center justify-center px-1 ml-1 bg-primary text-white">
-                {selectedTags.length + (dateRange !== "all" ? 1 : 0) + (sources.length < 3 ? 1 : 0)}
+                {filterCount}
               </Badge>
             )}
           </Button>
@@ -177,22 +179,6 @@ export function FilterControls({
           </div>
         </PopoverContent>
       </Popover>
-      
-      <div className="flex flex-wrap gap-1 ml-2">
-        {selectedTags.map((tag) => (
-          <Badge
-            key={tag}
-            variant="default"
-            className="px-2 py-1 h-7 flex items-center"
-          >
-            {tag}
-            <X
-              className="h-3 w-3 ml-1 cursor-pointer"
-              onClick={() => handleTagToggle(tag)}
-            />
-          </Badge>
-        ))}
-      </div>
     </div>
   );
 }
