@@ -41,7 +41,11 @@ export default function GraphView() {
     // No delay needed as we've modified the ForceDirectedGraph component
     // to avoid redraws when selectedBookmarkId changes
     const event = new CustomEvent('selectGraphNode', { 
-      detail: { nodeId: id, isolateView: true } 
+      detail: { 
+        nodeId: id, 
+        isBookmarkId: true, // Flag for proper node finding in graph
+        isolateView: true 
+      } 
     });
     document.dispatchEvent(event);
   };
@@ -131,7 +135,10 @@ export default function GraphView() {
         setTimeout(() => {
           // Use custom event to notify the graph component to select this tag
           const event = new CustomEvent('selectGraphNode', { 
-            detail: { nodeId: tagNodeId } 
+            detail: { 
+              nodeId: tagNodeId,
+              isolateView: true // Always isolate view when selecting tags
+            } 
           });
           document.dispatchEvent(event);
         }, 50);

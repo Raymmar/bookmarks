@@ -692,21 +692,26 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const handleSelectNode = (event: Event) => {
       const customEvent = event as CustomEvent;
       if (customEvent.detail?.nodeId) {
-        // Find the node in our simulation with this ID - match bookmark ids to bookmark nodes
+        // Find the node in our simulation with this ID
         const nodeId = customEvent.detail.nodeId;
+        const isBookmarkId = customEvent.detail?.isBookmarkId === true;
         const isolateView = customEvent.detail?.isolateView === true;
         
         if (simulationRef.current) {
-          // For bookmarks, we want to find the node with bookmarkId matching nodeId
-          const matchingNode = simulationRef.current.nodes().find(n => {
-            if (n.type === "bookmark" && n.bookmarkId === nodeId) {
-              return true;
-            } else if (n.id === nodeId) {
-              // For non-bookmark nodes like tags, match directly
-              return true;
-            }
-            return false;
-          });
+          // Determine how to find the matching node
+          let matchingNode;
+          
+          if (isBookmarkId) {
+            // For bookmark selections, find node with matching bookmarkId
+            console.log(`Looking for bookmark node with bookmarkId: ${nodeId}`);
+            matchingNode = simulationRef.current.nodes().find(n => 
+              n.type === "bookmark" && n.bookmarkId === nodeId
+            );
+          } else {
+            // For tags or direct node selections, find by node.id
+            console.log(`Looking for node with id: ${nodeId}`);
+            matchingNode = simulationRef.current.nodes().find(n => n.id === nodeId);
+          }
           
           if (matchingNode) {
             setSelectedNode(matchingNode.id);
@@ -733,33 +738,38 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
                 connectedNodeIds.add(targetId);
               });
               
-              // Hide all nodes and links that aren't connected to this node
+              console.log(`Found ${connectedNodeIds.size} connected nodes to highlight`);
+              
+              // Hide all nodes and links that aren't connected to this node - make them very faint (like with tags)
               svg.selectAll(".node")
-                .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.1);
+                .style("opacity", n => connectedNodeIds.has((n as any).id) ? 1 : 0.05);
               
               svg.selectAll("line.link")
                 .style("opacity", l => {
                   const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
                   const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-                  return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 0.8 : 0.1;
+                  return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 0.9 : 0.03;
                 })
                 .style("stroke-width", l => {
                   const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
                   const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
                   return connectedNodeIds.has(sourceId) && connectedNodeIds.has(targetId) ? 
-                    Math.sqrt((l as any).value) * 1.5 : 
-                    Math.sqrt((l as any).value) * 0.7;
+                    Math.sqrt((l as any).value) * 1.8 : 
+                    Math.sqrt((l as any).value) * 0.3;
                 });
               
-              // Center the graph on the connected nodes
+              // Center the graph on the connected nodes with less delay
               const connectedNodes = simulationRef.current.nodes().filter(node => 
                 connectedNodeIds.has(node.id)
               );
-              centerGraph(connectedNodes);
+              // More aggressive centering and zooming for better focus
+              centerGraph(connectedNodes, 1.5);
             }
           } else {
-            console.log(`Could not find matching node for ID: ${nodeId}`);
+            console.log(`No matching node found for ${isBookmarkId ? 'bookmark ID' : 'node ID'}: ${nodeId}`);
           }
+        } else {
+          console.log(`Could not find matching node for ID: ${nodeId}`);
         }
       }
     };
