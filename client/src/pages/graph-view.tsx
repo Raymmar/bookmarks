@@ -113,53 +113,54 @@ export default function GraphView() {
     return 0;
   });
   
-  // This flag tracks if we're handling a tag change to avoid redundant filtering
-  const isHandlingTagChangeRef = useRef(false);
-  
   const toggleTagSelection = (tag: string) => {
     const isCurrentlySelected = selectedTags.includes(tag);
     
-    // Just update the state and rely on filteredBookmarks to update 
-    // rather than manually triggering graph node selection
     if (isCurrentlySelected) {
-      // Removing a tag - update state
+      // Removing a tag
       const newSelectedTags = selectedTags.filter(t => t !== tag);
       setSelectedTags(newSelectedTags);
       
-      // If this was the last selected tag, reset the graph view as this clears all filters
-      if (newSelectedTags.length === 0) {
-        setSelectedBookmarkId(null);
-        
-        // Only reset graph if we're showing a graph
-        if (viewMode === "graph") {
+      // If we're in graph view, update the graph
+      if (viewMode === "graph") {
+        if (newSelectedTags.length === 0) {
+          // No tags left, reset the graph
+          setSelectedBookmarkId(null);
           const resetEvent = new CustomEvent('resetGraphView');
           document.dispatchEvent(resetEvent);
+        } else {
+          // Select the first remaining tag
+          const remainingTag = newSelectedTags[0];
+          setSelectedBookmarkId(null);
+          
+          // Focus the graph on the remaining tag
+          const tagNodeId = `tag-${remainingTag}`;
+          const event = new CustomEvent('selectGraphNode', { 
+            detail: { 
+              nodeId: tagNodeId,
+              isolateView: true
+            } 
+          });
+          document.dispatchEvent(event);
         }
       }
-      // Otherwise let the filteredBookmarks update naturally and don't trigger node selection
     } else {
-      // Adding a new tag
+      // Adding a tag
       setSelectedTags([...selectedTags, tag]);
       
-      // If there were no tags selected before, we need to display the tag node on first selection
-      if (selectedTags.length === 0 && viewMode === "graph") {
-        // The node ID for tags in the ForceDirectedGraph is tag-{tag}
+      // If in graph view, focus on this tag
+      if (viewMode === "graph") {
         const tagNodeId = `tag-${tag}`;
-        
-        // Clear any selected bookmark first
         setSelectedBookmarkId(null);
         
-        // Let the filtered bookmarks update and then focus on the tag
         const event = new CustomEvent('selectGraphNode', { 
           detail: { 
             nodeId: tagNodeId,
-            isolateView: true // Always isolate view when selecting tags
+            isolateView: true
           } 
         });
         document.dispatchEvent(event);
       }
-      // If tags were already selected, just updating filteredBookmarks is enough and doesn't
-      // require a graph selection update
     }
   };
   
@@ -290,17 +291,13 @@ export default function GraphView() {
                 <p className="mt-2 text-gray-600">Loading graph data...</p>
               </div>
             </div>
-          ) : filteredBookmarks.length === 0 ? (
+          ) : bookmarks.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="bg-white p-8 rounded-lg shadow text-center max-w-md">
                 <SearchX className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-900 mb-1">No bookmarks found</h3>
                 <p className="text-gray-500">
-                  {searchQuery
-                    ? "Try using different search terms or filters"
-                    : selectedTags.length > 0
-                      ? "Try selecting different tags or changing the match mode"
-                      : "Add some bookmarks to see them in the explorer"}
+                  Add some bookmarks to get started with the explorer
                 </p>
               </div>
             </div>
@@ -308,7 +305,7 @@ export default function GraphView() {
             // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
               <ForceDirectedGraph
-                bookmarks={filteredBookmarks}
+                bookmarks={bookmarks} // Use all bookmarks for graph and let the visual filtering handle the rest
                 insightLevel={insightLevel}
                 onNodeClick={handleSelectBookmark}
               />
@@ -320,7 +317,7 @@ export default function GraphView() {
       {/* Right Sidebar Panel - Now always show it on larger screens */}
       <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
         <SidebarPanel
-          bookmarks={sortedBookmarks}
+          bookmarks={sortedBookmarks} // Keep using filtered bookmarks for the sidebar list
           selectedBookmark={selectedBookmark}
           onSelectBookmark={handleSelectBookmark}
           onCloseDetail={() => {
