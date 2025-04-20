@@ -42,11 +42,11 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       
       await apiRequest("POST", "/api/bookmarks", {
         url,
-        userTags: tagArray,
-        notes: notes ? [{ text: notes }] : [],
-        collection: collection === "none" ? "" : collection,
-        autoExtract,
-        insightDepth: parseInt(insightDepth),
+        title: url.split("/").pop() || url, // Generate a simple title from URL for now
+        description: notes ? notes.substring(0, 100) : "", // Use part of notes as description
+        user_tags: tagArray,
+        system_tags: [],
+        date_saved: new Date(),
         source: "web"
       });
 
