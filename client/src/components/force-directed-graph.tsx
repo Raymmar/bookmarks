@@ -275,7 +275,90 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Only rebuild the entire graph when the underlying data changes
     initializeGraph();
     
+    // After the graph is rendered, center on the visible nodes
+    setTimeout(() => {
+      centerGraphOnVisibleNodes();
+    }, 500); // Short delay to let simulation start
+    
   }, [bookmarksKey, generateGraphData, graphInitialized]);
+  
+  // Function to center the graph on all visible nodes
+  const centerGraphOnVisibleNodes = useCallback(() => {
+    if (!svgRef.current || !nodesRef.current.length) return;
+    
+    const svg = d3.select(svgRef.current);
+    const width = containerRef.current?.clientWidth || 0;
+    const height = containerRef.current?.clientHeight || 0;
+    
+    // Get the current zoom behavior
+    const zoom = d3.zoom<SVGSVGElement, unknown>();
+    
+    // Create a transition for smooth animation
+    const transition = svg.transition().duration(750);
+    
+    // Calculate the bounding box of all nodes
+    const nodes = nodesRef.current;
+    
+    // If there are fewer than 2 nodes, just center on the first node
+    if (nodes.length === 1) {
+      const node = nodes[0];
+      const x = width / 2 - (node.x || 0);
+      const y = height / 2 - (node.y || 0);
+      
+      svg.transition(transition)
+        .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(1));
+      return;
+    }
+    
+    // For multiple nodes, find the centroid and bounding box
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let sumX = 0, sumY = 0;
+    
+    // Count nodes with valid positions
+    let validNodeCount = 0;
+    
+    nodes.forEach(node => {
+      if (node.x !== undefined && node.y !== undefined) {
+        minX = Math.min(minX, node.x);
+        maxX = Math.max(maxX, node.x);
+        minY = Math.min(minY, node.y);
+        maxY = Math.max(maxY, node.y);
+        sumX += node.x;
+        sumY += node.y;
+        validNodeCount++;
+      }
+    });
+    
+    // If no valid positions yet, retry later
+    if (validNodeCount === 0) {
+      setTimeout(centerGraphOnVisibleNodes, 200);
+      return;
+    }
+    
+    // Calculate the centroid
+    const centerX = sumX / validNodeCount;
+    const centerY = sumY / validNodeCount;
+    
+    // Calculate the bounding box width and height
+    const boxWidth = maxX - minX;
+    const boxHeight = maxY - minY;
+    
+    // Calculate the scale to fit the bounding box with some padding
+    const padding = 100; // Padding in pixels
+    const scaleX = width / (boxWidth + padding);
+    const scaleY = height / (boxHeight + padding);
+    
+    // Use the smaller scale to ensure everything fits
+    const scale = Math.min(scaleX, scaleY, 1.5); // Cap at 1.5x zoom
+    
+    // Calculate translation to center the centroid
+    const x = width / 2 - centerX * scale;
+    const y = height / 2 - centerY * scale;
+    
+    // Apply the transform with transition
+    svg.transition(transition)
+      .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+  }, []);
   
   // Initialize or reinitialize the graph
   const initializeGraph = useCallback(() => {
