@@ -307,10 +307,14 @@ export default function GraphView() {
           selectedBookmark={selectedBookmark}
           onSelectBookmark={handleSelectBookmark}
           onCloseDetail={() => {
+            // First reset selected bookmark state
             setSelectedBookmarkId(null);
-            // Dispatch an event to reset the graph view
-            const event = new CustomEvent('resetGraphView');
-            document.dispatchEvent(event);
+            
+            // Then reset the graph view (with a slight delay to ensure state is updated)
+            setTimeout(() => {
+              const event = new CustomEvent('resetGraphView');
+              document.dispatchEvent(event);
+            }, 0);
           }}
           isLoading={isLoading}
         />
