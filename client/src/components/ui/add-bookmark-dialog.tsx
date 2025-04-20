@@ -46,7 +46,6 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         description: notes ? notes.substring(0, 100) : "", // Use part of notes as description
         user_tags: tagArray,
         system_tags: [],
-        date_saved: new Date(),
         source: "web"
       });
 
