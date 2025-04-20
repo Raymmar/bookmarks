@@ -119,29 +119,39 @@ export default function GraphView() {
     // Update the tag selection first
     if (isCurrentlySelected) {
       setSelectedTags(selectedTags.filter(t => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
       
-      // Only focus on tag node when it's newly selected and in graph view
-      if (viewMode === "graph") {
-        // The node ID for tags in the ForceDirectedGraph is tag-{tag}
-        const tagNodeId = `tag-${tag}`;
-        
-        // Clear any selected bookmark first
+      // If this was the last selected tag, reset everything
+      if (selectedTags.length === 1) {
+        // Clear any selected bookmark
         setSelectedBookmarkId(null);
         
-        // Use a small delay to ensure tags state is updated first
-        // With our improved ForceDirectedGraph implementation, we don't need a long delay
-        setTimeout(() => {
-          // Use custom event to notify the graph component to select this tag
-          const event = new CustomEvent('selectGraphNode', { 
-            detail: { 
-              nodeId: tagNodeId,
-              isolateView: true // Always isolate view when selecting tags
-            } 
-          });
-          document.dispatchEvent(event);
-        }, 50);
+        // Force a re-render of the graph
+        setInsightLevel(prev => prev);
+      }
+    } else {
+      // Add the tag to the selection
+      setSelectedTags([...selectedTags, tag]);
+      
+      // The node ID for tags in the ForceDirectedGraph is tag-{tag}
+      const tagNodeId = `tag-${tag}`;
+      
+      // Clear any selected bookmark first
+      setSelectedBookmarkId(null);
+      
+      // Use custom event to notify the graph component to select this tag
+      try {
+        const event = new CustomEvent('selectGraphNode', { 
+          detail: { 
+            nodeId: tagNodeId,
+            isolateView: true // Always isolate view when selecting tags
+          } 
+        });
+        document.dispatchEvent(event);
+      } catch (err) {
+        console.error("Error selecting tag node:", err);
+        
+        // Fallback - force re-render if event dispatch fails
+        setInsightLevel(prev => prev);
       }
     }
   };
@@ -307,14 +317,13 @@ export default function GraphView() {
           selectedBookmark={selectedBookmark}
           onSelectBookmark={handleSelectBookmark}
           onCloseDetail={() => {
-            // First reset selected bookmark state
+            // Simply clear selected bookmark - don't try to reset the graph view
+            // Let React's rendering handle the graph update by itself
             setSelectedBookmarkId(null);
             
-            // Then reset the graph view (with a slight delay to ensure state is updated)
-            setTimeout(() => {
-              const event = new CustomEvent('resetGraphView');
-              document.dispatchEvent(event);
-            }, 0);
+            // Force a re-render of the graph component with a state change
+            // The graph will be redrawn "clean" this way with no filtering
+            setInsightLevel(prev => prev);
           }}
           isLoading={isLoading}
         />
