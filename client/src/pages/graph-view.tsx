@@ -247,7 +247,6 @@ export default function GraphView() {
           ) : viewMode === "graph" ? (
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
               <ForceDirectedGraph
-                key={`graph-${filteredBookmarks.length}-${insightLevel}-${selectedTags.join('-')}-${searchQuery}`}
                 bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
                 onNodeClick={setSelectedBookmarkId}

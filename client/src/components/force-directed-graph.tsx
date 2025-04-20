@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
 import { Bookmark } from "@shared/types";
 
@@ -30,17 +30,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [graphInitialized, setGraphInitialized] = useState(false);
-  const nodesRef = useRef<GraphNode[]>([]);
-  const linksRef = useRef<GraphLink[]>([]);
-  
-  // Memoize bookmarksKey to detect when bookmarks array actually changes
-  const bookmarksKey = useMemo(() => {
-    return bookmarks.map(b => b.id).sort().join(',') + '-' + insightLevel;
-  }, [bookmarks, insightLevel]);
   
   // Extract domain from URL
-  const getDomain = useCallback((url: string): string => {
+  const getDomain = (url: string): string => {
     try {
       const urlObj = new URL(url);
       return urlObj.hostname;
@@ -48,7 +40,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       // Return a fallback for invalid URLs
       return url.split('/')[0];
     }
-  }, []);
+  };
 
   // Generate nodes and links from bookmarks
   const generateGraphData = useCallback((bookmarks: Bookmark[], insightLevel: number) => {
@@ -220,7 +212,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     }
     
     return { nodes, links };
-  }, [getDomain]);
+  }, []);
 
   // Handle the zoom behavior
   const initializeZoom = useCallback(() => {
@@ -231,9 +223,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .scaleExtent([0.3, 3])
       .on("zoom", (event) => {
         const g = svg.select("g.zoom-container");
-        if (!g.empty()) {
-          g.attr("transform", event.transform);
-        }
+        g.attr("transform", event.transform);
       });
     
     svg.call(zoomBehavior);
@@ -242,129 +232,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     svg.call(zoomBehavior.translateTo, 0, 0);
   }, []);
 
-  // Function to center the graph on all visible nodes
-  const centerGraphOnVisibleNodes = useCallback(() => {
-    if (!svgRef.current || !nodesRef.current.length) return;
-    
-    const svg = d3.select(svgRef.current);
-    const width = containerRef.current?.clientWidth || 0;
-    const height = containerRef.current?.clientHeight || 0;
-    
-    if (width === 0 || height === 0) {
-      // Container not fully loaded yet, try again later
-      setTimeout(centerGraphOnVisibleNodes, 100);
-      return;
-    }
-    
-    // Get the current zoom behavior
-    const zoom = d3.zoom<SVGSVGElement, unknown>();
-    
-    // Create a transition for smooth animation
-    const transition = svg.transition().duration(750);
-    
-    // Calculate the bounding box of all nodes
-    const nodes = nodesRef.current;
-    
-    // If there are fewer than 2 nodes, just center on the first node
-    if (nodes.length === 1) {
-      const node = nodes[0];
-      const x = width / 2 - (node.x || 0);
-      const y = height / 2 - (node.y || 0);
-      
-      svg.transition(transition)
-        .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(1));
-      return;
-    }
-    
-    // For multiple nodes, find the centroid and bounding box
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    let sumX = 0, sumY = 0;
-    
-    // Count nodes with valid positions
-    let validNodeCount = 0;
-    
-    // First check if the simulation has assigned positions
-    let hasPositions = false;
-    
-    for (let i = 0; i < Math.min(5, nodes.length); i++) {
-      if (nodes[i].x !== undefined && nodes[i].y !== undefined) {
-        hasPositions = true;
-        break;
-      }
-    }
-    
-    // If positions aren't assigned yet, wait for the simulation to run more
-    if (!hasPositions && simulationRef.current) {
-      // Ensure the simulation is running
-      simulationRef.current.alpha(0.3).restart();
-      
-      // Try again after a short delay
-      setTimeout(centerGraphOnVisibleNodes, 200);
-      return;
-    }
-    
-    // Get bookmark nodes specifically to weigh them more in the centering
-    const bookmarkNodes = nodes.filter(node => node.type === "bookmark");
-    const nodesForCentering = bookmarkNodes.length > 0 ? bookmarkNodes : nodes;
-    
-    nodesForCentering.forEach(node => {
-      if (node.x !== undefined && node.y !== undefined) {
-        minX = Math.min(minX, node.x);
-        maxX = Math.max(maxX, node.x);
-        minY = Math.min(minY, node.y);
-        maxY = Math.max(maxY, node.y);
-        sumX += node.x;
-        sumY += node.y;
-        validNodeCount++;
-      }
-    });
-    
-    // If no valid positions yet, retry later
-    if (validNodeCount === 0) {
-      setTimeout(centerGraphOnVisibleNodes, 200);
-      return;
-    }
-    
-    // Calculate the centroid
-    const centerX = sumX / validNodeCount;
-    const centerY = sumY / validNodeCount;
-    
-    // Calculate the bounding box width and height
-    const boxWidth = Math.max(maxX - minX, 10); // Prevent division by zero
-    const boxHeight = Math.max(maxY - minY, 10); // Prevent division by zero
-    
-    // Calculate the scale to fit the bounding box with some padding
-    const padding = Math.max(width, height) * 0.1; // 10% of the larger dimension as padding
-    const scaleX = width / (boxWidth + padding * 2);
-    const scaleY = height / (boxHeight + padding * 2);
-    
-    // Use the smaller scale to ensure everything fits, with min/max constraints
-    const maxScale = 2.0; // Don't zoom in too much
-    const minScale = 0.5; // Don't zoom out too much
-    const scale = Math.min(Math.max(Math.min(scaleX, scaleY), minScale), maxScale);
-    
-    // Calculate translation to center the centroid
-    const x = width / 2 - centerX * scale;
-    const y = height / 2 - centerY * scale;
-    
-    // Apply the transform with transition
-    svg.transition(transition)
-      .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
-      
-    // Log for debugging
-    console.log(`Graph centered: ${validNodeCount} nodes, scale: ${scale.toFixed(2)}, center: (${centerX.toFixed(0)}, ${centerY.toFixed(0)})`);
-  }, []);
-  
-  // Initialize or reinitialize the graph
-  const initializeGraph = useCallback(() => {
-    if (!svgRef.current || !containerRef.current) return;
+  // Update graph when data changes
+  useEffect(() => {
+    if (!svgRef.current || !containerRef.current || !bookmarks.length) return;
     
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     
-    // Use the nodes and links from our refs
-    const nodes = nodesRef.current;
-    const links = linksRef.current;
+    // Generate the graph data
+    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
     
     // Setup the SVG
     const svg = d3.select(svgRef.current)
@@ -458,28 +334,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         // Highlight this node
         setSelectedNode(d.id);
         
-        // Center this node in the viewport
-        if (svgRef.current) {
-          const svg = d3.select(svgRef.current);
-          const width = containerRef.current?.clientWidth || 0;
-          const height = containerRef.current?.clientHeight || 0;
-          
-          // Get the zoom behavior
-          const zoom = d3.zoom<SVGSVGElement, unknown>();
-          
-          // Create a transition for smooth animation
-          const transition = svg.transition().duration(750);
-          
-          // Calculate the transform to center the node
-          const scale = d3.zoomTransform(svg.node() as Element).k; // Keep current zoom level
-          const x = width / 2 - (d.x || 0) * scale;
-          const y = height / 2 - (d.y || 0) * scale;
-          
-          // Apply the transform with transition
-          svg.transition(transition)
-            .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
-        }
-        
         if (d.bookmarkId) {
           onNodeClick(d.bookmarkId);
         } else if (d.type === "related" && d.url) {
@@ -488,35 +342,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           if (matchingBookmark) {
             onNodeClick(matchingBookmark.id);
           }
-        }
-      })
-      .on("dblclick", function(event, d) {
-        event.stopPropagation();
-        
-        // Zoom in on this node
-        if (svgRef.current) {
-          const svg = d3.select(svgRef.current);
-          const width = containerRef.current?.clientWidth || 0;
-          const height = containerRef.current?.clientHeight || 0;
-          
-          // Get the zoom behavior
-          const zoom = d3.zoom<SVGSVGElement, unknown>();
-          
-          // Create a transition for smooth animation
-          const transition = svg.transition().duration(750);
-          
-          // Calculate the transform to center and zoom on the node
-          // Use a higher zoom level (2.5x) for double click
-          const zoomLevel = 2.5;
-          const x = width / 2 - (d.x || 0) * zoomLevel;
-          const y = height / 2 - (d.y || 0) * zoomLevel;
-          
-          // Apply the transform with transition
-          svg.transition(transition)
-            .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(zoomLevel));
-            
-          // Prevent the regular click event from firing
-          event.preventDefault();
         }
       })
       .on("mouseover", function(event, d) {
@@ -553,188 +378,158 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           });
       })
       .on("mouseout", function() {
-        // Reset opacity for all nodes and links
+        // Reset highlights
         nodeGroup.selectAll(".node").style("opacity", 1);
         linkGroup.selectAll("line")
           .style("opacity", 0.6)
           .style("stroke-width", d => Math.sqrt(d.value));
       })
       .call(d3.drag<SVGGElement, GraphNode>()
-        .on("start", function(event, d) {
-          if (!event.active) simulation.alphaTarget(0.3).restart();
-          d.fx = d.x;
-          d.fy = d.y;
-        })
-        .on("drag", function(event, d) {
-          d.fx = event.x;
-          d.fy = event.y;
-        })
-        .on("end", function(event, d) {
-          if (!event.active) simulation.alphaTarget(0);
-          d.fx = null;
-          d.fy = null;
-        })
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended)
       );
     
-    // Add shapes to nodes based on type
+    // Add circles to nodes with distinct styling based on type
+    node.append("circle")
+      .attr("r", d => {
+        switch (d.type) {
+          case "bookmark": return 8;
+          case "related": return 6;
+          case "domain": return 7;
+          case "tag": return 5;
+          default: return 6;
+        }
+      })
+      .attr("fill", d => getNodeColor(d.type, d.group))
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", d => d.type === "bookmark" ? 2 : 1.5);
+    
+    // Add different shapes for different node types
     node.each(function(d) {
-      const g = d3.select(this);
-      const radius = d.type === "bookmark" ? 8 : 6;
+      const element = d3.select(this);
       
-      if (d.type === "bookmark") {
-        // Circle shape for bookmark
-        g.append("circle")
-          .attr("r", radius)
+      if (d.type === "tag") {
+        // Tags get a square shape
+        element.append("rect")
+          .attr("x", -4)
+          .attr("y", -4)
+          .attr("width", 8)
+          .attr("height", 8)
           .attr("fill", getNodeColor(d.type, d.group))
-          .attr("stroke", "white")
-          .attr("stroke-width", 1);
-      } else if (d.type === "tag") {
-        // Square shape for tag
-        const size = radius * 1.8;
-        g.append("rect")
-          .attr("x", -size / 2)
-          .attr("y", -size / 2)
-          .attr("width", size)
-          .attr("height", size)
-          .attr("fill", getNodeColor(d.type, d.group))
-          .attr("stroke", "white")
-          .attr("stroke-width", 1);
+          .attr("stroke", "#ffffff")
+          .attr("stroke-width", 1.5);
+          
+        // Remove the circle for tag nodes
+        element.select("circle").remove();
       } else if (d.type === "domain") {
-        // Diamond shape for domain
-        const size = radius * 1.8;
-        g.append("polygon")
-          .attr("points", `0,-${size/2} ${size/2},0 0,${size/2} -${size/2},0`)
+        // Domains get a diamond shape
+        element.append("polygon")
+          .attr("points", "0,-7 7,0 0,7 -7,0")
           .attr("fill", getNodeColor(d.type, d.group))
-          .attr("stroke", "white")
-          .attr("stroke-width", 1);
-      } else {
-        // Circle for related or other types
-        g.append("circle")
-          .attr("r", radius)
-          .attr("fill", getNodeColor(d.type, d.group))
-          .attr("stroke", "white")
-          .attr("stroke-width", 1);
+          .attr("stroke", "#ffffff")
+          .attr("stroke-width", 1.5);
+          
+        // Remove the circle for domain nodes
+        element.select("circle").remove();
       }
-      
-      // Add tooltip label
-      g.append("title")
-        .text(d.name);
     });
     
-    // Add text labels for primary nodes
-    node.filter(d => d.type === "bookmark" || d.type === "tag")
-      .append("text")
-      .attr("dx", 12)
-      .attr("dy", ".35em")
-      .text(d => d.name.length > 20 ? d.name.substring(0, 20) + "..." : d.name)
-      .style("font-size", "10px")
-      .style("font-family", "sans-serif")
-      .style("pointer-events", "none")
-      .style("fill", "#4b5563");
+    // Add labels to nodes
+    node.append("text")
+      .attr("dx", d => {
+        // Adjust label position based on node type
+        switch (d.type) {
+          case "bookmark": return 10;
+          case "related": return 8;
+          default: return 9;
+        }
+      })
+      .attr("dy", 4)
+      .text(d => d.name)
+      .attr("font-size", d => d.type === "bookmark" ? "11px" : "10px")
+      .attr("fill", "#1F2937");
     
-    // Update positions on each tick
+    // Update positions during simulation
     simulation.on("tick", () => {
       link
-        .attr("x1", d => typeof d.source === 'string' ? 
+        .attr("x1", d => (typeof d.source === 'string' ? 
           (nodes.find(n => n.id === d.source)?.x || 0) : 
-          (d.source as GraphNode).x || 0)
-        .attr("y1", d => typeof d.source === 'string' ? 
+          (d.source as GraphNode).x || 0))
+        .attr("y1", d => (typeof d.source === 'string' ? 
           (nodes.find(n => n.id === d.source)?.y || 0) : 
-          (d.source as GraphNode).y || 0)
-        .attr("x2", d => typeof d.target === 'string' ? 
+          (d.source as GraphNode).y || 0))
+        .attr("x2", d => (typeof d.target === 'string' ? 
           (nodes.find(n => n.id === d.target)?.x || 0) : 
-          (d.target as GraphNode).x || 0)
-        .attr("y2", d => typeof d.target === 'string' ? 
+          (d.target as GraphNode).x || 0))
+        .attr("y2", d => (typeof d.target === 'string' ? 
           (nodes.find(n => n.id === d.target)?.y || 0) : 
-          (d.target as GraphNode).y || 0);
+          (d.target as GraphNode).y || 0));
       
-      node.attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
+      node
+        .attr("transform", d => `translate(${d.x},${d.y})`);
     });
     
-    // Set up zoom behavior
-    initializeZoom();
-    
-  }, [bookmarks, initializeZoom]);
-
-  // Initialize graph once
-  useEffect(() => {
-    if (graphInitialized || !svgRef.current || !containerRef.current || !bookmarks.length) return;
-    
-    // Generate the graph data from bookmarks
-    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
-    
-    // Store nodes and links for future reference
-    nodesRef.current = nodes;
-    linksRef.current = links;
-    
-    // Initialize the graph
-    initializeGraph();
-    
-    // After the graph is initialized, run the simulation for a bit to improve layout
-    if (simulationRef.current) {
-      simulationRef.current
-        .alpha(0.5) // Restart simulation with decent alpha value
-        .restart();
-        
-      // Setup a timer to run the simulation actively for a bit
-      const tick = () => {
-        simulationRef.current?.tick();
-      };
-      
-      // Run 100 steps of the simulation immediately
-      for (let i = 0; i < 100; i++) {
-        tick();
-      }
-      
-      // Mark as initialized and trigger centering 
-      setTimeout(() => {
-        setGraphInitialized(true);
-        centerGraphOnVisibleNodes();
-      }, 300);
-    } else {
-      // If no simulation, just mark as initialized
-      setGraphInitialized(true);
+    // Implement drag behavior
+    function dragstarted(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
     }
     
-  }, [bookmarks, insightLevel, generateGraphData, graphInitialized, centerGraphOnVisibleNodes, initializeGraph]);
-
-  // Only rebuild the graph when bookmarks actually change (not just selections)
-  useEffect(() => {
-    if (!graphInitialized || !svgRef.current || !containerRef.current) return;
+    function dragged(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
+      event.subject.fx = event.x;
+      event.subject.fy = event.y;
+    }
     
-    // Only rebuild the graph if the bookmarks or insight level has changed
-    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
+    function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
+      if (!event.active) simulation.alphaTarget(0);
+      // Don't release nodes after drag to maintain layout
+      // event.subject.fx = null;
+      // event.subject.fy = null;
+    }
     
-    // Update our refs
-    nodesRef.current = nodes;
-    linksRef.current = links;
+    // Setup zoom functionality
+    initializeZoom();
     
-    // Only rebuild the entire graph when the underlying data changes
-    initializeGraph();
-    
-    // After the graph is rendered, wait for the simulation to settle a bit
-    // Then center on the visible nodes
-    let attempts = 0;
-    const maxAttempts = 10;
-    const attemptCentering = () => {
-      attempts++;
-      
-      if (simulationRef.current && simulationRef.current.alpha() > 0.05 && attempts < maxAttempts) {
-        // Simulation still running, wait longer
-        setTimeout(attemptCentering, 300);
-      } else {
-        // Simulation settled or max attempts reached, center the graph
-        centerGraphOnVisibleNodes();
+    // Clean up on unmount
+    return () => {
+      if (simulationRef.current) {
+        simulationRef.current.stop();
+        simulationRef.current = null;
       }
     };
+  }, [bookmarks, insightLevel, generateGraphData, initializeZoom, onNodeClick]);
+  
+  // Update selected node visual when it changes
+  useEffect(() => {
+    if (!selectedNode || !svgRef.current) return;
     
-    // Start the centering attempts after a short initial delay
-    setTimeout(attemptCentering, 500);
+    const svg = d3.select(svgRef.current);
     
-  }, [bookmarksKey, generateGraphData, graphInitialized, centerGraphOnVisibleNodes, initializeGraph]);
+    // Reset all nodes to default size
+    svg.selectAll(".node circle")
+      .attr("r", d => {
+        const node = d as GraphNode;
+        switch (node.type) {
+          case "bookmark": return 8;
+          case "related": return 6;
+          case "domain": return 7;
+          case "tag": return 5;
+          default: return 6;
+        }
+      })
+      .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5);
+    
+    // Highlight the selected node
+    svg.select(`#node-${selectedNode} circle`)
+      .attr("r", 10)
+      .attr("stroke-width", 3);
+      
+  }, [selectedNode]);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full">
+    <div ref={containerRef} className="h-full w-full">
       <svg 
         ref={svgRef} 
         className="w-full h-full rounded-lg"
@@ -753,14 +548,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           <div className="w-3 h-3 transform rotate-45 bg-green-500 mr-2"></div>
           <span>Domain</span>
         </div>
-        <div className="flex items-center mb-1">
+        <div className="flex items-center">
           <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
           <span>Related</span>
-        </div>
-        <div className="text-xs mt-2 pt-2 border-t border-gray-200">
-          <div>Click: Select node</div>
-          <div>Double-click: Zoom in</div>
-          <div>Drag: Move node</div>
         </div>
       </div>
     </div>
