@@ -15,35 +15,24 @@ interface SidebarNavigationProps {
     tags: string[];
     dateRange: string;
     sources: string[];
-    searchQuery?: string;
     tagMode?: "any" | "all";
     sortOrder?: string;
   }) => void;
   allTags?: string[];
-  searchQuery?: string;
-  setSearchQuery?: (query: string) => void;
 }
 
 export function SidebarNavigation({ 
   className, 
   onFiltersChange, 
-  allTags = [],
-  searchQuery = "",
-  setSearchQuery
+  allTags = []
 }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState("week");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
   const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
-  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [sortOrder, setSortOrder] = useState("newest");
-
-  // Sync searchQuery if set from outside
-  useEffect(() => {
-    setLocalSearchQuery(searchQuery);
-  }, [searchQuery]);
 
   const handleTagToggle = (tag: string) => {
     if (selectedTags.includes(tag)) {
@@ -61,13 +50,6 @@ export function SidebarNavigation({
     }
   };
 
-  const handleSearchChange = (value: string) => {
-    setLocalSearchQuery(value);
-    if (setSearchQuery) {
-      setSearchQuery(value);
-    }
-  };
-
   // Update parent component with filter changes
   const updateFilters = () => {
     if (onFiltersChange) {
@@ -75,7 +57,6 @@ export function SidebarNavigation({
         tags: selectedTags,
         dateRange,
         sources,
-        searchQuery: localSearchQuery,
         tagMode,
         sortOrder,
       });
@@ -144,27 +125,7 @@ export function SidebarNavigation({
           </div>
           
           <div className="mb-6">
-            <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Search</h2>
-            <div className="mb-3">
-              <div className="relative flex-1 max-w-full">
-                <Input
-                  type="text"
-                  placeholder="Search bookmarks, content, tags..."
-                  value={localSearchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full text-sm"
-                />
-                <SearchX className="h-4 w-4 text-gray-400 absolute left-3 top-2.5" />
-                {localSearchQuery && (
-                  <X 
-                    className="h-3 w-3 text-gray-400 absolute right-3 top-3 cursor-pointer" 
-                    onClick={() => handleSearchChange("")}
-                  />
-                )}
-              </div>
-            </div>
-            
-            <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2 mt-4">Filters</h2>
+            <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Filters</h2>
             <div className="space-y-2">
               <div className="mb-3">
                 <h3 className="text-xs font-medium text-gray-700 mb-1">Tags</h3>

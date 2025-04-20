@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
-import { SidebarNavigation } from "@/components/sidebar-navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,38 +9,28 @@ import { Input } from "@/components/ui/input";
 import { LayoutGrid, Network, SearchX, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFilters } from "@/layouts/main-layout";
 import { Bookmark } from "@shared/types";
 
 export default function GraphView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [insightLevel, setInsightLevel] = useState(1);
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
-  const [sortOrder, setSortOrder] = useState("newest");
-  const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
-  const [dateRange, setDateRange] = useState("week");
+  
+  // We'll get these filter values from the context in MainLayout
+  // No need to duplicate state here since they're already stored in the layout
+  const { 
+    selectedTags, 
+    tagMode, 
+    sortOrder, 
+    sources,
+    dateRange, 
+    setAllTags 
+  } = useFilters();
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
-  // Function to handle filter changes from the sidebar
-  const handleFiltersChange = (filters: {
-    tags: string[];
-    dateRange: string;
-    sources: string[];
-    searchQuery?: string;
-    tagMode?: "any" | "all";
-    sortOrder?: string;
-  }) => {
-    if (filters.tags) setSelectedTags(filters.tags);
-    if (filters.dateRange) setDateRange(filters.dateRange);
-    if (filters.sources) setSources(filters.sources);
-    if (filters.searchQuery !== undefined) setSearchQuery(filters.searchQuery);
-    if (filters.tagMode) setTagMode(filters.tagMode);
-    if (filters.sortOrder) setSortOrder(filters.sortOrder);
-  };
   
   const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
