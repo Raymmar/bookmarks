@@ -29,7 +29,13 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
+  const onNodeClickRef = useRef(onNodeClick);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  
+  // Update ref when prop changes
+  useEffect(() => {
+    onNodeClickRef.current = onNodeClick;
+  }, [onNodeClick]);
   
   // Extract domain from URL
   const getDomain = (url: string): string => {
@@ -335,12 +341,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         setSelectedNode(d.id);
         
         if (d.bookmarkId) {
-          onNodeClick(d.bookmarkId);
+          onNodeClickRef.current(d.bookmarkId);
         } else if (d.type === "related" && d.url) {
           // For related nodes, try to find an existing bookmark with this URL
           const matchingBookmark = bookmarks.find(b => b.url === d.url);
           if (matchingBookmark) {
-            onNodeClick(matchingBookmark.id);
+            onNodeClickRef.current(matchingBookmark.id);
           }
         }
       })
@@ -499,7 +505,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         simulationRef.current = null;
       }
     };
-  }, [bookmarks, insightLevel, generateGraphData, initializeZoom, onNodeClick]);
+  }, [bookmarks, insightLevel, generateGraphData, initializeZoom]);
   
   // Update selected node visual when it changes
   useEffect(() => {
