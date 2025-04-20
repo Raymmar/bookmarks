@@ -286,9 +286,15 @@ export class MemStorage implements IStorage {
     const id = crypto.randomUUID();
     const created_at = new Date();
     
+    // Ensure type is always a valid value
+    const type = tag.type && (tag.type === "user" || tag.type === "system") 
+                 ? tag.type 
+                 : "user";
+    
     const newTag: Tag = {
-      ...tag,
       id,
+      name: tag.name,
+      type, // Use our validated type
       count: 0,
       created_at,
     };
