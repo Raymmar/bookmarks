@@ -69,7 +69,7 @@ export function SidebarNavigation({
     : ["Technology", "Research", "Tutorial", "JavaScript", "Machine Learning", "API"];
 
   return (
-    <nav className={cn("flex flex-col w-full h-full bg-white z-10", className)}>
+    <nav className={cn("flex flex-col w-full h-full bg-white z-10 sidebar-navigation", className)}>
       <div className="h-16 p-4 border-b border-gray-200 flex items-center">
         <div className="flex items-center space-x-2">
           <Bookmark className="h-8 w-8 text-primary" />

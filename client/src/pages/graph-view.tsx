@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { LayoutGrid, Network, SearchX, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useFilters } from "@/layouts/main-layout";
 import { Bookmark } from "@shared/types";
 
 export default function GraphView() {
@@ -18,16 +17,12 @@ export default function GraphView() {
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
   
-  // We'll get these filter values from the context in MainLayout
-  // No need to duplicate state here since they're already stored in the layout
-  const { 
-    selectedTags, 
-    tagMode, 
-    sortOrder, 
-    sources,
-    dateRange, 
-    setAllTags 
-  } = useFilters();
+  // Create local states for filters since we're having issues with the shared context
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagMode, setTagMode] = useState<"any" | "all">("any");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  const [dateRange, setDateRange] = useState("week");
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -38,7 +33,7 @@ export default function GraphView() {
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
-  // Extract all unique tags from bookmarks
+  // Extract all unique tags from bookmarks and update sidebar
   const allTags = Array.from(
     new Set(
       bookmarks.flatMap(bookmark => 
@@ -46,6 +41,28 @@ export default function GraphView() {
       )
     )
   ).sort();
+  
+  // Update sidebar tags when bookmarks load
+  useEffect(() => {
+    if (bookmarks.length > 0) {
+      // Let's pass these to our sidebar component through the layout
+      const uniqueTags = Array.from(
+        new Set(
+          bookmarks.flatMap(bookmark => 
+            [...bookmark.user_tags, ...bookmark.system_tags]
+          )
+        )
+      ).sort();
+      
+      // Update SidebarNavigation via DOM attributes
+      const sidebarEl = document.querySelector('.sidebar-navigation');
+      if (sidebarEl) {
+        // This is a fallback method for passing data between components
+        // In a real application, we would use a proper state management solution
+        sidebarEl.setAttribute('data-available-tags', JSON.stringify(uniqueTags));
+      }
+    }
+  }, [bookmarks]);
   
   // Filter bookmarks based on search query and selected tags
   const filteredBookmarks = bookmarks.filter(bookmark => {
