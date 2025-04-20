@@ -440,9 +440,18 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     );
   }, []);
   
+  // Track whether we're currently applying a filter
+  const isFilteringRef = useRef(false);
+  
   // Apply visual filtering based on focused node ids
   const applyNodeFiltering = useCallback((focusedIds: Set<string>) => {
     if (!svgRef.current) return;
+    
+    // Early return if we're already processing a filter to prevent multiple successive filter operations
+    if (isFilteringRef.current) return;
+    
+    // Mark that we're processing a filter
+    isFilteringRef.current = true;
     
     const svg = d3.select(svgRef.current);
     
@@ -481,17 +490,41 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         return Math.sqrt(l.value) * 0.3;
       });
     
-    // Focus the view on the filtered nodes only once per filter application
-    // This prevents multiple zoom events
-    if (simulationRef.current && focusedIds.size > 0 && !lastCenteredStateRef.current?.isFiltered) {
+    // Focus the view on the filtered nodes only once
+    if (simulationRef.current && focusedIds.size > 0) {
       const focusedNodes = simulationRef.current.nodes().filter(n => focusedIds.has(n.id));
-      centerGraph(focusedNodes, true); // Pass true to indicate this is a filtering zoom
+      
+      // Only perform the zoom once and only if we haven't recently centered on this node set
+      const currentTime = Date.now();
+      const lastFilterTime = lastCenteredStateRef.current?.timestamp || 0;
+      const timeSinceLastFilter = currentTime - lastFilterTime;
+      
+      // Only center if it's been a while since the last filter operation or we have a different set of nodes
+      if (timeSinceLastFilter > 1000 || !lastCenteredStateRef.current?.isFiltered) {
+        centerGraph(focusedNodes, true); // Pass true to indicate this is a filtering zoom
+      }
     }
+    
+    // After a short delay, allow filtering again
+    setTimeout(() => {
+      isFilteringRef.current = false;
+    }, 500);
   }, [centerGraph]);
+  
+  // Track the last selected node ID to prevent redundant selections
+  const lastSelectedNodeRef = useRef<string | null>(null);
   
   // Function to select a node and update the graph filtering
   const selectNode = useCallback((nodeId: string, isolateView: boolean = true) => {
     if (!simulationRef.current) return;
+    
+    // If we're already filtering, or this is the same node that was just selected, skip
+    if (isFilteringRef.current || (isolateView && lastSelectedNodeRef.current === nodeId)) {
+      return;
+    }
+    
+    // Record that we're now selecting this node to prevent duplicates
+    lastSelectedNodeRef.current = nodeId;
     
     // Get the target node
     const node = simulationRef.current.nodes().find(n => n.id === nodeId);
@@ -541,6 +574,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         .attr("r", 12)
         .attr("stroke-width", 3);
     }
+    
+    // Reset the last selected node after a delay to allow future selections of the same node
+    setTimeout(() => {
+      lastSelectedNodeRef.current = null;
+    }, 500);
   }, [getConnectedNodeIds, applyNodeFiltering]);
   
   // Function to select a bookmark by ID
@@ -555,9 +593,16 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     }
   }, [findNodeByBookmarkId, selectNode]);
   
+  // Track whether we're currently resetting the filter
+  const isResettingRef = useRef(false);
+  
   // Reset the graph filtering to show all nodes
   const resetFilter = useCallback(() => {
     if (!svgRef.current || !simulationRef.current) return;
+    
+    // Prevent multiple resets
+    if (isResettingRef.current) return;
+    isResettingRef.current = true;
     
     console.log("Resetting graph filters");
     
@@ -590,6 +635,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       // Center the view on all nodes
       centerGraph(simulationRef.current.nodes());
     }
+    
+    // Allow resets after a delay
+    setTimeout(() => {
+      isResettingRef.current = false;
+    }, 500);
   }, [centerGraph, graphState.isFiltered]);
   
   // Initialize and render the force-directed graph
