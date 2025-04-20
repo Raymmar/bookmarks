@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as d3 from "d3";
 import { Bookmark } from "@shared/types";
 
@@ -30,9 +30,17 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [graphInitialized, setGraphInitialized] = useState(false);
+  const nodesRef = useRef<GraphNode[]>([]);
+  const linksRef = useRef<GraphLink[]>([]);
+  
+  // Memoize bookmarksKey to detect when bookmarks array actually changes
+  const bookmarksKey = useMemo(() => {
+    return bookmarks.map(b => b.id).sort().join(',') + '-' + insightLevel;
+  }, [bookmarks, insightLevel]);
   
   // Extract domain from URL
-  const getDomain = (url: string): string => {
+  const getDomain = useCallback((url: string): string => {
     try {
       const urlObj = new URL(url);
       return urlObj.hostname;
@@ -40,7 +48,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       // Return a fallback for invalid URLs
       return url.split('/')[0];
     }
-  };
+  }, []);
 
   // Generate nodes and links from bookmarks
   const generateGraphData = useCallback((bookmarks: Bookmark[], insightLevel: number) => {
@@ -212,7 +220,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     }
     
     return { nodes, links };
-  }, []);
+  }, [getDomain]);
 
   // Handle the zoom behavior
   const initializeZoom = useCallback(() => {
@@ -223,7 +231,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .scaleExtent([0.3, 3])
       .on("zoom", (event) => {
         const g = svg.select("g.zoom-container");
-        g.attr("transform", event.transform);
+        if (!g.empty()) {
+          g.attr("transform", event.transform);
+        }
       });
     
     svg.call(zoomBehavior);
@@ -232,15 +242,51 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     svg.call(zoomBehavior.translateTo, 0, 0);
   }, []);
 
-  // Update graph when data changes
+  // Initialize graph once
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current || !bookmarks.length) return;
+    if (graphInitialized || !svgRef.current || !containerRef.current || !bookmarks.length) return;
+    
+    // Generate the graph data from bookmarks
+    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
+    
+    // Store nodes and links for future reference
+    nodesRef.current = nodes;
+    linksRef.current = links;
+    
+    // Initialize the graph
+    initializeGraph();
+    
+    // Mark as initialized
+    setGraphInitialized(true);
+    
+  }, [bookmarks, insightLevel, generateGraphData, graphInitialized]);
+
+  // Only rebuild the graph when bookmarks actually change (not just selections)
+  useEffect(() => {
+    if (!graphInitialized || !svgRef.current || !containerRef.current) return;
+    
+    // Only rebuild the graph if the bookmarks or insight level has changed
+    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
+    
+    // Update our refs
+    nodesRef.current = nodes;
+    linksRef.current = links;
+    
+    // Only rebuild the entire graph when the underlying data changes
+    initializeGraph();
+    
+  }, [bookmarksKey, generateGraphData, graphInitialized]);
+  
+  // Initialize or reinitialize the graph
+  const initializeGraph = useCallback(() => {
+    if (!svgRef.current || !containerRef.current) return;
     
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     
-    // Generate the graph data
-    const { nodes, links } = generateGraphData(bookmarks, insightLevel);
+    // Use the nodes and links from our refs
+    const nodes = nodesRef.current;
+    const links = linksRef.current;
     
     // Setup the SVG
     const svg = d3.select(svgRef.current)
@@ -333,6 +379,28 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         
         // Highlight this node
         setSelectedNode(d.id);
+        
+        // Center this node in the viewport
+        if (svgRef.current) {
+          const svg = d3.select(svgRef.current);
+          const width = containerRef.current?.clientWidth || 0;
+          const height = containerRef.current?.clientHeight || 0;
+          
+          // Get the zoom behavior
+          const zoom = d3.zoom<SVGSVGElement, unknown>();
+          
+          // Create a transition for smooth animation
+          const transition = svg.transition().duration(750);
+          
+          // Calculate the transform to center the node
+          const scale = d3.zoomTransform(svg.node() as Element).k; // Keep current zoom level
+          const x = width / 2 - (d.x || 0) * scale;
+          const y = height / 2 - (d.y || 0) * scale;
+          
+          // Apply the transform with transition
+          svg.transition(transition)
+            .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+        }
         
         if (d.bookmarkId) {
           onNodeClick(d.bookmarkId);
@@ -492,41 +560,64 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Setup zoom functionality
     initializeZoom();
     
-    // Clean up on unmount
+  }, [bookmarks, insightLevel, initializeZoom, onNodeClick]);
+  
+  // Update selected node visual when it changes
+  useEffect(() => {
+    if (!selectedNode || !svgRef.current || !graphInitialized) return;
+    
+    const svg = d3.select(svgRef.current);
+    
+    // Reset all nodes to default size
+    svg.selectAll(".node circle, .node rect, .node polygon")
+      .attr("r", function() {
+        const nodeType = d3.select(this.parentNode).datum() as GraphNode;
+        switch (nodeType.type) {
+          case "bookmark": return 8;
+          case "related": return 6;
+          case "domain": return 7; // This won't apply to polygons, but that's fine
+          case "tag": return 5; // This won't apply to rects, but that's fine
+          default: return 6;
+        }
+      })
+      .attr("stroke-width", function() {
+        const nodeType = d3.select(this.parentNode).datum() as GraphNode;
+        return nodeType.type === "bookmark" ? 2 : 1.5;
+      });
+    
+    // Highlight the selected node based on its type
+    const selectedNodeElem = svg.select(`#node-${selectedNode}`);
+    if (!selectedNodeElem.empty()) {
+      const nodeType = selectedNodeElem.datum() as GraphNode;
+      
+      if (nodeType.type === "tag") {
+        selectedNodeElem.select("rect")
+          .attr("x", -6)
+          .attr("y", -6)
+          .attr("width", 12)
+          .attr("height", 12)
+          .attr("stroke-width", 3);
+      } else if (nodeType.type === "domain") {
+        selectedNodeElem.select("polygon")
+          .attr("points", "0,-10 10,0 0,10 -10,0")
+          .attr("stroke-width", 3);
+      } else {
+        selectedNodeElem.select("circle")
+          .attr("r", 10)
+          .attr("stroke-width", 3);
+      }
+    }
+  }, [selectedNode, graphInitialized]);
+  
+  // Clean up on unmount
+  useEffect(() => {
     return () => {
       if (simulationRef.current) {
         simulationRef.current.stop();
         simulationRef.current = null;
       }
     };
-  }, [bookmarks, insightLevel, generateGraphData, initializeZoom, onNodeClick]);
-  
-  // Update selected node visual when it changes
-  useEffect(() => {
-    if (!selectedNode || !svgRef.current) return;
-    
-    const svg = d3.select(svgRef.current);
-    
-    // Reset all nodes to default size
-    svg.selectAll(".node circle")
-      .attr("r", d => {
-        const node = d as GraphNode;
-        switch (node.type) {
-          case "bookmark": return 8;
-          case "related": return 6;
-          case "domain": return 7;
-          case "tag": return 5;
-          default: return 6;
-        }
-      })
-      .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5);
-    
-    // Highlight the selected node
-    svg.select(`#node-${selectedNode} circle`)
-      .attr("r", 10)
-      .attr("stroke-width", 3);
-      
-  }, [selectedNode]);
+  }, []);
 
   return (
     <div ref={containerRef} className="h-full w-full">
