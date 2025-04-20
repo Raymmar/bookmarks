@@ -300,7 +300,7 @@ export default function GraphView() {
           ) : (
             // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
-              <ForceDirectedGraph
+              <SimplifiedGraph
                 bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
                 onNodeClick={handleSelectBookmark}

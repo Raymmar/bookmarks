@@ -270,34 +270,56 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     nodeIds: string[];
   } | null>(null);
   
-  // Function to center and zoom the graph based on visible nodes
+  // Very SIMPLE center graph function that just applies default zooming
   const centerGraph = useCallback((nodes: GraphNode[]) => {
     if (!svgRef.current || !containerRef.current || !zoomRef.current || nodes.length === 0) return;
+    
+    // Skip if we have a very recent center operation (prevents zooming loops)
+    const now = Date.now();
+    if (lastCenteredStateRef.current && now - lastCenteredStateRef.current.timestamp < 1000) {
+      return;
+    }
     
     // Get container dimensions
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     
-    // Sort the node IDs for consistent comparison
-    const currentNodeIds = nodes.map(n => n.id).sort();
+    // Use predefined scale based on node count
+    let scale = 0.9; // Default scale
     
-    // Calculate bounding box of all nodes
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    if (nodes.length <= 10) {
+      scale = 1.3; // Slightly larger scale for small node sets
+    } else if (nodes.length > 50) {
+      scale = 0.7; // Smaller scale for very large node sets
+    }
     
-    nodes.forEach(node => {
-      if (node.x === undefined || node.y === undefined) return;
-      
-      minX = Math.min(minX, node.x);
-      maxX = Math.max(maxX, node.x);
-      minY = Math.min(minY, node.y);
-      maxY = Math.max(maxY, node.y);
-    });
+    // Just center in middle of container
+    const centerX = width / 2;
+    const centerY = height / 2;
     
-    // If we couldn't determine bounds, exit
-    if (minX === Infinity || minY === Infinity) return;
+    // Apply the transform
+    const svg = d3.select(svgRef.current);
+    svg.transition()
+      .duration(750)
+      .call(zoomRef.current.transform, 
+        d3.zoomIdentity
+          .translate(width / 2, height / 2)
+          .scale(scale)
+          .translate(-centerX, -centerY)
+      );
     
-    // Add padding - use more padding for fewer nodes to make the view more comfortable
-    const padding = Math.max(30, Math.min(100, 100 - nodes.length * 2));
+    // Record that we did this zooming
+    lastCenteredStateRef.current = {
+      nodeCount: nodes.length,
+      centerX,
+      centerY,
+      scale,
+      timestamp: now,
+      nodeIds: nodes.map(n => n.id).sort()
+    };
+    
+    console.log(`Graph centered: ${nodes.length} nodes, scale: ${scale.toFixed(2)}`);
+  }, []);
     minX -= padding;
     maxX += padding;
     minY -= padding;
@@ -460,63 +482,29 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     );
   }, []);
   
-  // Apply visual filtering based on focused node ids
+  // Apply visual filtering based on focused node ids - SIMPLIFIED
   const applyNodeFiltering = useCallback((focusedIds: Set<string>) => {
     if (!svgRef.current || !focusedIds || focusedIds.size === 0) return;
     
+    // Get the SVG selection
     const svg = d3.select(svgRef.current);
     
     try {
-      // Update node opacity with safe guards
+      // Simple opacity adjustment for nodes - focused vs unfocused
       svg.selectAll(".node")
-        .style("opacity", (d: any) => {
-          if (!d || !d.id) return 0.02;
-          return focusedIds.has(d.id) ? 1 : 0.02;
-        });
+        .style("opacity", d => focusedIds.has(d.id) ? 1 : 0.1);
       
-      // Update link opacity and stroke width with safe guards
+      // Simple opacity adjustment for links - connecting focused nodes vs other links
       svg.selectAll("line.link")
-        .style("opacity", (l: any) => {
-          if (!l || !l.source || !l.target) return 0.02;
-          
-          const sourceId = typeof l.source === 'string' ? l.source : 
-                          (l.source && typeof l.source === 'object' && 'id' in l.source) ? l.source.id : '';
-          const targetId = typeof l.target === 'string' ? l.target : 
-                          (l.target && typeof l.target === 'object' && 'id' in l.target) ? l.target.id : '';
-                          
-          if (!sourceId || !targetId) return 0.02;
-          return focusedIds.has(sourceId) && focusedIds.has(targetId) ? 0.9 : 0.02;
-        })
-        .style("stroke-width", (l: any) => {
-          if (!l || !l.source || !l.target || !l.value) return 1;
-          
-          const sourceId = typeof l.source === 'string' ? l.source : 
-                          (l.source && typeof l.source === 'object' && 'id' in l.source) ? l.source.id : '';
-          const targetId = typeof l.target === 'string' ? l.target : 
-                          (l.target && typeof l.target === 'object' && 'id' in l.target) ? l.target.id : '';
-                          
-          if (!sourceId || !targetId) return 1;
-          return focusedIds.has(sourceId) && focusedIds.has(targetId) ? 
-            Math.sqrt(l.value) * 1.8 : 
-            Math.sqrt(l.value) * 0.3;
+        .style("opacity", l => {
+          const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
+          const targetId = typeof l.target === 'string' ? l.target : l.target.id;
+          return (focusedIds.has(sourceId) && focusedIds.has(targetId)) ? 0.8 : 0.1;
         });
-      
-      // Focus the view on the filtered nodes (only if there are nodes to focus on)
-      if (simulationRef.current && focusedIds.size > 0) {
-        const nodes = simulationRef.current.nodes();
-        if (nodes && nodes.length > 0) {
-          const focusedNodes = nodes.filter(n => n && n.id && focusedIds.has(n.id));
-          
-          // Only center if we have nodes to center on
-          if (focusedNodes.length > 0) {
-            centerGraph(focusedNodes);
-          }
-        }
-      }
     } catch (err) {
       console.error("Error applying node filtering:", err);
     }
-  }, [centerGraph]);
+  }, []);
   
   // Function to select a node and update the graph filtering
   const selectNode = useCallback((nodeId: string, isolateView: boolean = true) => {
