@@ -344,8 +344,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       // 1. Very recent similar center request (avoid jitter)
       // 2. Already in filtered mode and another filtering action (prevent multiple filter zooms)
       // 3. Transitioning between very similar views regardless of time (smoothness)
+      // 4. We're in the middle of a filtering or resetting operation (prevent duplicate zoom)
       if ((timeSinceLastCenter < 800 && centerXDiff < 30 && centerYDiff < 30) || 
           (lastState.isFiltered && isFilteringAction) ||
+          (isFilteringAction && isFilteringRef.current) ||
+          (!isFilteringAction && isResettingRef.current) ||
           (timeSinceLastCenter < 2000 && 
             centerXDiff < 20 && 
             centerYDiff < 20 && 
@@ -924,20 +927,27 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
     });
     
-    // Center graph after initial layout
+    // We only want to center after initial layout if we're not already in a filtered state
+    // This prevents additional centering operations when filters are applied
     simulation.on("end", () => {
-      setTimeout(() => centerGraph(nodes), 100);
+      if (!graphState.isFiltered && !isFilteringRef.current && !isResettingRef.current) {
+        // Only center after initial layout if we're not filtering
+        setTimeout(() => centerGraph(nodes), 100);
+      }
     });
     
     // Initialize zoom behavior
     initializeZoom();
     
-    // Manually trigger centering after a timeout if simulation doesn't end naturally
-    setTimeout(() => {
-      if (simulationRef.current === simulation) {
-        centerGraph(nodes);
-      }
-    }, 1000);
+    // Manually trigger centering after a timeout only if simulation doesn't end naturally
+    // and we're not in a filtered state
+    if (!graphState.isFiltered && !isFilteringRef.current && !isResettingRef.current) {
+      setTimeout(() => {
+        if (simulationRef.current === simulation && !graphState.isFiltered) {
+          centerGraph(nodes);
+        }
+      }, 1000);
+    }
     
     // If we've previously applied a filter and have a selected node, reapply that filter
     if (graphState.isFiltered && graphState.selectedNodeId) {
