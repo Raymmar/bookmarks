@@ -215,6 +215,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   }, []);
 
   // Handle the zoom behavior
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  
   const initializeZoom = useCallback(() => {
     if (!svgRef.current) return;
     
@@ -227,9 +229,76 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       });
     
     svg.call(zoomBehavior);
+    zoomBehaviorRef.current = zoomBehavior;
+  }, []);
+  
+  // Function to center and zoom the graph based on visible nodes
+  const centerGraph = useCallback((nodes: GraphNode[]) => {
+    if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
     
-    // Initial zoom to fit
-    svg.call(zoomBehavior.translateTo, 0, 0);
+    // Get container dimensions
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight;
+    
+    if (nodes.length === 0) return;
+    
+    // Calculate bounding box of all nodes
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    
+    nodes.forEach(node => {
+      if (node.x === undefined || node.y === undefined) return;
+      
+      minX = Math.min(minX, node.x);
+      maxX = Math.max(maxX, node.x);
+      minY = Math.min(minY, node.y);
+      maxY = Math.max(maxY, node.y);
+    });
+    
+    // If we couldn't determine bounds, exit
+    if (minX === Infinity || minY === Infinity) return;
+    
+    // Add padding
+    const padding = 50;
+    minX -= padding;
+    maxX += padding;
+    minY -= padding;
+    maxY += padding;
+    
+    // Calculate center point of nodes
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    
+    // Calculate required scale to fit all nodes
+    const boundsWidth = maxX - minX;
+    const boundsHeight = maxY - minY;
+    
+    // Determine scale to fit content (use the more constraining dimension)
+    let scale = Math.min(
+      width / boundsWidth,
+      height / boundsHeight
+    );
+    
+    // Constrain scale to the allowed range
+    scale = Math.max(0.3, Math.min(scale, 3));
+    
+    // Inverse scale: more nodes = smaller scale (more zoomed out)
+    // Adjust this formula based on your preferred scaling behavior
+    if (nodes.length > 15) {
+      scale = Math.max(0.3, scale * (1 - Math.min(nodes.length / 100, 0.5)));
+    }
+    
+    // Apply the transform
+    const svg = d3.select(svgRef.current);
+    const transform = d3.zoomIdentity
+      .translate(width / 2, height / 2)
+      .scale(scale)
+      .translate(-centerX, -centerY);
+    
+    svg.transition()
+      .duration(750) // Animation duration in ms
+      .call(zoomBehaviorRef.current.transform, transform);
+    
+    console.log(`Graph centered: ${nodes.length} nodes, scale: ${scale.toFixed(2)}, center: (${Math.round(centerX)}, ${Math.round(centerY)})`);
   }, []);
 
   // Update graph when data changes
@@ -492,16 +561,47 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Setup zoom functionality
     initializeZoom();
     
+    // Center graph after simulation stabilizes
+    simulation.on("end", () => {
+      centerGraph(nodes);
+    });
+    
+    // Manually trigger 'end' event after a timeout if it doesn't happen naturally
+    const timeoutId = setTimeout(() => {
+      if (simulationRef.current === simulation) {
+        centerGraph(nodes);
+      }
+    }, 2000); // 2 second timeout
+    
     // Clean up on unmount
     return () => {
+      clearTimeout(timeoutId);
       if (simulationRef.current) {
         simulationRef.current.stop();
         simulationRef.current = null;
       }
     };
-  }, [bookmarks, insightLevel, generateGraphData, initializeZoom, onNodeClick]);
+  }, [bookmarks, insightLevel, generateGraphData, initializeZoom, onNodeClick, centerGraph]);
   
-  // Update selected node visual when it changes
+  // Listen for external node selection events (like from tag selection in parent component)
+  useEffect(() => {
+    const handleSelectNode = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail?.nodeId) {
+        setSelectedNode(customEvent.detail.nodeId);
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('selectGraphNode', handleSelectNode);
+    
+    // Clean up on unmount
+    return () => {
+      document.removeEventListener('selectGraphNode', handleSelectNode);
+    };
+  }, []);
+
+  // Update selected node visual when it changes and center the graph around it
   useEffect(() => {
     if (!selectedNode || !svgRef.current) return;
     
@@ -522,11 +622,59 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5);
     
     // Highlight the selected node
-    svg.select(`#node-${selectedNode} circle`)
-      .attr("r", 10)
-      .attr("stroke-width", 3);
+    const selectedElement = svg.select(`#node-${selectedNode}`);
+    if (!selectedElement.empty()) {
+      svg.select(`#node-${selectedNode} circle`)
+        .attr("r", 10)
+        .attr("stroke-width", 3);
       
-  }, [selectedNode]);
+      // Get selected node data
+      const nodeData = simulationRef.current?.nodes().find(n => n.id === selectedNode);
+      
+      // If we have the node data and simulation is available, center the graph around this node
+      if (nodeData && simulationRef.current) {
+        // For tag nodes, we want to center the graph on all associated bookmarks
+        if (nodeData.type === "tag") {
+          // Find all nodes connected to this tag
+          const tagId = nodeData.id;
+          const relatedNodes = simulationRef.current.nodes().filter(n => {
+            // Find bookmark nodes that have a link to this tag
+            if (n.type !== "bookmark") return false;
+            
+            // Check if there's a link between this bookmark and the tag
+            const links = simulationRef.current?.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+            const connection = links.links().some(link => {
+              const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+              const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+              return (sourceId === n.id && targetId === tagId) || (sourceId === tagId && targetId === n.id);
+            });
+            
+            return connection;
+          });
+          
+          // Center on the cluster that includes the tag and all connected bookmarks
+          if (relatedNodes.length > 0) {
+            centerGraph([nodeData, ...relatedNodes]);
+          } else {
+            centerGraph([nodeData]);
+          }
+        } else {
+          // For non-tag nodes, just center on the node itself
+          // Find connected nodes for a better view
+          const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+          const connectedNodes = simulationRef.current.nodes().filter(n => {
+            return links.links().some(link => {
+              const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+              const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+              return (sourceId === nodeData.id && targetId === n.id) || (sourceId === n.id && targetId === nodeData.id);
+            });
+          });
+          
+          centerGraph([nodeData, ...connectedNodes]);
+        }
+      }
+    }
+  }, [selectedNode, centerGraph]);
 
   return (
     <div ref={containerRef} className="h-full w-full">

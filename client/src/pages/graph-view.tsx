@@ -96,6 +96,23 @@ export default function GraphView() {
   });
   
   const toggleTagSelection = (tag: string) => {
+    // Focus on tag node when selected
+    if (!selectedTags.includes(tag) && viewMode === "graph") {
+      // Find the tag node ID format that matches our graph component
+      const tagNodeId = `tag-${tag}`;
+      // Set this as selected node to trigger centering on this tag
+      setSelectedBookmarkId(null); // Clear any selected bookmark
+      
+      // Apply a small delay to allow the graph to update with filtered nodes
+      setTimeout(() => {
+        // Use custom event to notify the graph component to select this tag
+        const event = new CustomEvent('selectGraphNode', { 
+          detail: { nodeId: tagNodeId } 
+        });
+        document.dispatchEvent(event);
+      }, 50);
+    }
+    
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter(t => t !== tag));
     } else {
