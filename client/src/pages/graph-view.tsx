@@ -115,11 +115,42 @@ export default function GraphView() {
   
   const toggleTagSelection = (tag: string) => {
     const isCurrentlySelected = selectedTags.includes(tag);
+    const prevSelectedTags = [...selectedTags]; // Capture previous state
     
     // Update the tag selection first
     if (isCurrentlySelected) {
-      setSelectedTags(selectedTags.filter(t => t !== tag));
+      // Removing a tag - update state
+      const newSelectedTags = selectedTags.filter(t => t !== tag);
+      setSelectedTags(newSelectedTags);
+      
+      // If this was the last selected tag, reset the graph view
+      if (newSelectedTags.length === 0 && prevSelectedTags.length === 1) {
+        setSelectedBookmarkId(null);
+        // Reset the graph filter
+        const resetEvent = new CustomEvent('resetGraphView');
+        document.dispatchEvent(resetEvent);
+      } 
+      // If we still have selected tags, but now one less, update the graph view
+      else if (newSelectedTags.length > 0) {
+        // For the remaining tags, update the filter
+        // Focus on the first remaining tag 
+        if (viewMode === "graph") {
+          const remainingTagNodeId = `tag-${newSelectedTags[0]}`;
+          
+          // Delay slightly to ensure state is updated
+          setTimeout(() => {
+            const event = new CustomEvent('selectGraphNode', { 
+              detail: { 
+                nodeId: remainingTagNodeId,
+                isolateView: true
+              } 
+            });
+            document.dispatchEvent(event);
+          }, 50);
+        }
+      }
     } else {
+      // Adding a new tag
       setSelectedTags([...selectedTags, tag]);
       
       // Only focus on tag node when it's newly selected and in graph view
@@ -130,8 +161,8 @@ export default function GraphView() {
         // Clear any selected bookmark first
         setSelectedBookmarkId(null);
         
-        // Use a small delay to ensure tags state is updated first
-        // With our improved ForceDirectedGraph implementation, we don't need a long delay
+        // Only trigger a zoom if this is the first tag being selected
+        // or if there's a significant view change needed
         setTimeout(() => {
           // Use custom event to notify the graph component to select this tag
           const event = new CustomEvent('selectGraphNode', { 

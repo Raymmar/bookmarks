@@ -267,10 +267,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     centerY: number;
     scale: number;
     timestamp: number;
+    isFiltered?: boolean; // Track if this is a filtered state
   } | null>(null);
   
   // Function to center and zoom the graph based on visible nodes
-  const centerGraph = useCallback((nodes: GraphNode[]) => {
+  const centerGraph = useCallback((nodes: GraphNode[], isFilteringAction = false) => {
     if (!svgRef.current || !containerRef.current || !zoomRef.current || nodes.length === 0) return;
     
     // Get container dimensions
@@ -330,15 +331,21 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const lastState = lastCenteredStateRef.current;
     
     if (lastState) {
-      // Don't re-center if we've recently centered and the change is minor
+      // More aggressive debouncing to avoid redundant zoom operations
+      // If we're already in a filtered state and this is another filtering action,
+      // or if we're transitioning between similar views, prevent the zoom
       const timeSinceLastCenter = now - lastState.timestamp;
       const centerXDiff = Math.abs(centerX - lastState.centerX);
       const centerYDiff = Math.abs(centerY - lastState.centerY);
       const scaleDiff = Math.abs(scale - lastState.scale);
       const nodeCountDiff = Math.abs(nodes.length - lastState.nodeCount);
       
-      // More aggressive de-bouncing to reduce frequent recentering
+      // Don't recenter under these conditions:
+      // 1. Very recent similar center request (avoid jitter)
+      // 2. Already in filtered mode and another filtering action (prevent multiple filter zooms)
+      // 3. Transitioning between very similar views regardless of time (smoothness)
       if ((timeSinceLastCenter < 800 && centerXDiff < 30 && centerYDiff < 30) || 
+          (lastState.isFiltered && isFilteringAction) ||
           (timeSinceLastCenter < 2000 && 
             centerXDiff < 20 && 
             centerYDiff < 20 && 
@@ -366,7 +373,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       centerX,
       centerY,
       scale,
-      timestamp: now
+      timestamp: now,
+      isFiltered: isFilteringAction
     };
     
     console.log(`Graph centered: ${nodes.length} nodes, scale: ${scale.toFixed(2)}, center: (${Math.round(centerX)}, ${Math.round(centerY)})`);
@@ -438,29 +446,46 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     const svg = d3.select(svgRef.current);
     
-    // Update node opacity
+    // Update node opacity - we only dim nodes that are not part of the focus set
+    // but maintain the connections between nodes in the focus set
     svg.selectAll(".node")
       .style("opacity", (d: any) => focusedIds.has(d.id) ? 1 : 0.02);
     
-    // Update link opacity and stroke width
+    // For links, show all links that connect to at least one focused node
+    // This preserves the connected graph structure better
     svg.selectAll("line.link")
       .style("opacity", (l: any) => {
         const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
         const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-        return focusedIds.has(sourceId) && focusedIds.has(targetId) ? 0.9 : 0.02;
+        
+        // If both source and target are in the focus set, highlight the link strongly
+        if (focusedIds.has(sourceId) && focusedIds.has(targetId)) {
+          return 0.9;
+        }
+        // If at least one node is in the focus set, show the link dimmed but visible
+        else if (focusedIds.has(sourceId) || focusedIds.has(targetId)) {
+          return 0.3;
+        }
+        // Otherwise, make the link nearly invisible
+        return 0.02;
       })
       .style("stroke-width", (l: any) => {
         const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
         const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
-        return focusedIds.has(sourceId) && focusedIds.has(targetId) ? 
-          Math.sqrt(l.value) * 1.8 : 
-          Math.sqrt(l.value) * 0.3;
+        
+        if (focusedIds.has(sourceId) && focusedIds.has(targetId)) {
+          return Math.sqrt(l.value) * 1.8;
+        } else if (focusedIds.has(sourceId) || focusedIds.has(targetId)) {
+          return Math.sqrt(l.value) * 0.8;
+        }
+        return Math.sqrt(l.value) * 0.3;
       });
     
-    // Focus the view on the filtered nodes
-    if (simulationRef.current && focusedIds.size > 0) {
+    // Focus the view on the filtered nodes only once per filter application
+    // This prevents multiple zoom events
+    if (simulationRef.current && focusedIds.size > 0 && !lastCenteredStateRef.current?.isFiltered) {
       const focusedNodes = simulationRef.current.nodes().filter(n => focusedIds.has(n.id));
-      centerGraph(focusedNodes);
+      centerGraph(focusedNodes, true); // Pass true to indicate this is a filtering zoom
     }
   }, [centerGraph]);
   
@@ -546,6 +571,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .style("opacity", 0.6)
       .style("stroke-width", (d: any) => Math.sqrt(d.value));
     
+    // Check if we were previously in a filtered state
+    const wasFiltered = !!graphState.isFiltered;
+    
     // Reset the selection state
     setGraphState(prev => ({
       ...prev,
@@ -554,9 +582,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       isFiltered: false
     }));
     
-    // Center the view on all nodes
-    centerGraph(simulationRef.current.nodes());
-  }, [centerGraph]);
+    // Only center the view on all nodes if we're coming from a filtered state
+    // This prevents unnecessary zoom when the filter was already clear
+    if (wasFiltered) {
+      // We want to reset the isFiltered flag in the centered state
+      lastCenteredStateRef.current = null;
+      // Center the view on all nodes
+      centerGraph(simulationRef.current.nodes());
+    }
+  }, [centerGraph, graphState.isFiltered]);
   
   // Initialize and render the force-directed graph
   const renderGraph = useCallback(() => {
