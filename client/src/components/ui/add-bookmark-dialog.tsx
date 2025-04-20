@@ -19,7 +19,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState("");
   const [notes, setNotes] = useState("");
-  const [collection, setCollection] = useState("");
+  const [collection, setCollection] = useState("none");
   const [autoExtract, setAutoExtract] = useState(true);
   const [insightDepth, setInsightDepth] = useState("1");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +44,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         url,
         userTags: tagArray,
         notes: notes ? [{ text: notes }] : [],
-        collection,
+        collection: collection === "none" ? "" : collection,
         autoExtract,
         insightDepth: parseInt(insightDepth),
         source: "web"
@@ -59,7 +59,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       setUrl("");
       setTags("");
       setNotes("");
-      setCollection("");
+      setCollection("none");
       setAutoExtract(true);
       setInsightDepth("1");
       
@@ -131,7 +131,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="">Select a collection</SelectItem>
+                  <SelectItem value="none">Select a collection</SelectItem>
                   <SelectItem value="Research Project">Research Project</SelectItem>
                   <SelectItem value="Web Development">Web Development</SelectItem>
                   <SelectItem value="Machine Learning">Machine Learning</SelectItem>
