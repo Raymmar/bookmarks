@@ -21,17 +21,19 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
 
   if (!bookmark) {
     return (
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
+      <>
+        <div className="h-16 p-4 border-b border-gray-200 flex items-center">
+          <div className="flex w-full items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
         <div className="py-8 text-center text-gray-500">
           Select a bookmark to view details
         </div>
-      </div>
+      </>
     );
   }
 
@@ -68,8 +70,8 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
 
   return (
     <>
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
+      <div className="h-16 p-4 border-b border-gray-200 flex items-center">
+        <div className="flex w-full items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />

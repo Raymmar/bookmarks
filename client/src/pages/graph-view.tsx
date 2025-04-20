@@ -111,9 +111,9 @@ export default function GraphView() {
   return (
     <div className="flex flex-1 h-full">
       <div className="flex-1 flex flex-col h-full">
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-            <h2 className="text-xl font-semibold text-gray-800">Explore</h2>
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4 h-16 flex items-center">
+          <div className="flex w-full items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">Explore</h2>
             
             <div className="flex items-center space-x-2">
               <div className="flex items-center space-x-2">
@@ -150,9 +150,12 @@ export default function GraphView() {
               </Select>
             </div>
           </div>
-          
+        </div>
+        
+        {/* Search, filters and tags section */}
+        <div className="bg-white border-b border-gray-200 p-4">
           {/* Search input */}
-          <div className="mt-3">
+          <div className="mb-3">
             <div className="relative flex-1 max-w-full">
               <Input
                 type="text"
@@ -172,7 +175,7 @@ export default function GraphView() {
           </div>
           
           {/* Sort options */}
-          <div className="mt-3 flex justify-between items-center">
+          <div className="flex justify-between items-center">
             <div className="text-sm font-medium text-gray-600">Filter by tags:</div>
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
@@ -204,7 +207,7 @@ export default function GraphView() {
           
           {/* Tags filter */}
           <div className="mt-2">
-            <div className="flex flex-wrap gap-1 mb-1">
+            <div className="flex flex-wrap gap-1">
               {allTags.map(tag => (
                 <Badge 
                   key={tag}
@@ -259,7 +262,7 @@ export default function GraphView() {
               />
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
               {filteredBookmarks.map(bookmark => (
                 <div 
                   key={bookmark.id}
