@@ -53,6 +53,15 @@ export async function extractMetadata(url: string): Promise<Metadata> {
       
     console.log(`Extracted content length: ${content.length} characters`);
     
+    // More detailed logging
+    if (content.length === 0) {
+      console.log("Warning: Extracted zero-length content");
+      console.log("URL:", url);
+      console.log("HTML length:", html.length);
+      console.log("Body match:", bodyMatch ? "Found" : "Not found");
+      console.log("Main content match:", mainContentMatch ? "Found" : "Not found");
+    }
+    
     // Extract favicon
     const faviconMatch = html.match(/<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*href=["'](.*?)["'][^>]*>/i) || 
                          html.match(/<link[^>]*href=["'](.*?)["'][^>]*rel=["'](?:shortcut )?icon["'][^>]*>/i);
