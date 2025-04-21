@@ -1,166 +1,143 @@
 /**
- * URL Service for standardizing and normalizing URLs
- * This ensures consistent handling of URLs throughout the application
- * to prevent duplication and improve relatedness between bookmarks.
+ * URL Service 
+ * 
+ * A collection of utility functions for handling URLs in the application
+ * to ensure consistent URL normalization and domain extraction.
  */
 
 /**
- * Normalizes a URL by removing common variations that shouldn't count as different URLs
- * - Removes 'www.' prefix
- * - Standardizes protocol (http:// vs https://)
- * - Trims trailing slashes
- * - Handles case sensitivity (converts to lowercase)
+ * Normalizes a URL to a standard format to prevent duplicate entries
+ * 
+ * Normalization includes:
+ * - Converting to lowercase
+ * - Removing "www." from the hostname
+ * - Ensuring proper protocol (https:// or http://)
+ * - Removing trailing slashes
+ * - Removing certain query parameters (optional)
  * 
  * @param url The URL to normalize
- * @returns Normalized URL string
+ * @param removeParams Whether to remove tracking and session parameters
+ * @returns The normalized URL string
  */
-export function normalizeUrl(url: string): string {
-  if (!url) return '';
+export function normalizeUrl(url: string, removeParams: boolean = false): string {
+  if (!url) return url;
   
   try {
-    // Handle cases where URL might not have protocol
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    // Add protocol if missing
+    if (!url.includes('://')) {
       url = 'https://' + url;
     }
     
-    // Parse the URL into components
-    const parsedUrl = new URL(url);
+    const urlObj = new URL(url);
+    
+    // Convert to lowercase
+    urlObj.hostname = urlObj.hostname.toLowerCase();
     
     // Remove www. from hostname
-    let hostname = parsedUrl.hostname;
-    if (hostname.startsWith('www.')) {
-      hostname = hostname.substring(4);
+    if (urlObj.hostname.startsWith('www.')) {
+      urlObj.hostname = urlObj.hostname.substring(4);
     }
     
-    // Rebuild URL with normalized hostname
-    const normalizedUrl = new URL(parsedUrl.toString());
-    normalizedUrl.hostname = hostname;
-    
-    // Convert to string and remove trailing slash if present
-    let result = normalizedUrl.toString();
-    if (result.endsWith('/') && normalizedUrl.pathname === '/') {
-      result = result.slice(0, -1);
+    // Remove tracking parameters (optional)
+    if (removeParams) {
+      const paramsToRemove = [
+        'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+        'fbclid', 'gclid', 'ocid', 'msclkid', '_ga', 'mc_eid', 'mc_cid',
+        'ref', 'source', 'ref_src', '_hsenc', '_hsmi', 'mkt_tok',
+        'ref_url', 'curator_clanid', 'curator', '_gl', 'ref_url'
+      ];
+      
+      const params = new URLSearchParams(urlObj.search);
+      let paramsRemoved = false;
+      
+      paramsToRemove.forEach(param => {
+        if (params.has(param)) {
+          params.delete(param);
+          paramsRemoved = true;
+        }
+      });
+      
+      if (paramsRemoved) {
+        const paramString = params.toString();
+        urlObj.search = paramString ? `?${paramString}` : '';
+      }
     }
     
-    return result.toLowerCase();
+    // Remove trailing slash from pathname if it's just "/"
+    let normalizedUrl = urlObj.toString();
+    if (normalizedUrl.endsWith('/') && urlObj.pathname === '/') {
+      normalizedUrl = normalizedUrl.slice(0, -1);
+    }
+    
+    return normalizedUrl;
+    
   } catch (error) {
-    console.error('Error normalizing URL:', error);
-    return url.toLowerCase(); // Return original URL in lowercase as fallback
+    // If URL is invalid or normalization fails, return the original URL
+    console.error(`Failed to normalize URL: ${url}`, error);
+    return url;
   }
 }
 
 /**
  * Extracts the root domain from a URL
- * This is used for grouping related bookmarks by domain
+ * e.g., https://blog.example.com/path -> example.com
  * 
- * @param url The URL to extract domain from
- * @returns The root domain
+ * @param url The URL to extract the domain from
+ * @returns The root domain (without subdomain)
  */
 export function extractRootDomain(url: string): string {
   if (!url) return '';
   
   try {
-    // Normalize the URL first
-    const normalizedUrl = normalizeUrl(url);
+    // Add protocol if missing
+    if (!url.includes('://')) {
+      url = 'https://' + url;
+    }
     
-    // Parse the URL
-    const parsedUrl = new URL(normalizedUrl);
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
     
-    // Get hostname and split by dots
-    const hostnameParts = parsedUrl.hostname.split('.');
+    // Split hostname by dots
+    const parts = hostname.split('.');
     
-    // Handle special cases like co.uk, com.au, etc.
-    if (hostnameParts.length > 2) {
-      const tld = hostnameParts[hostnameParts.length - 1];
-      const sld = hostnameParts[hostnameParts.length - 2];
+    // Handle special TLDs with multiple parts (e.g., co.uk, com.au)
+    const specialTlds = ['co.uk', 'com.au', 'net.au', 'org.au', 'gov.au', 'ac.uk', 'edu.au'];
+    
+    if (parts.length > 2) {
+      const lastTwoParts = parts.slice(-2).join('.');
       
-      // Check for country-specific TLDs that use a pattern like co.uk, com.au
-      if ((sld === 'co' || sld === 'com' || sld === 'org' || sld === 'net' || sld === 'gov' || sld === 'edu') && 
-          tld.length === 2) { // Country code is typically 2 chars
-        // Return something like example.co.uk
-        if (hostnameParts.length > 3) {
-          return `${hostnameParts[hostnameParts.length - 3]}.${sld}.${tld}`;
-        }
+      if (specialTlds.includes(lastTwoParts) && parts.length > 3) {
+        // For special TLDs, we need domain + special TLD
+        return parts.slice(-3).join('.');
+      } else {
+        // Regular case, get last two parts
+        return parts.slice(-2).join('.');
       }
     }
     
-    // For regular domains like example.com, return the hostname
-    // For subdomains like sub.example.com, return example.com
-    if (hostnameParts.length > 1) {
-      return `${hostnameParts[hostnameParts.length - 2]}.${hostnameParts[hostnameParts.length - 1]}`;
-    }
+    // If there are only two parts or fewer, return the whole hostname
+    return hostname;
     
-    return parsedUrl.hostname;
   } catch (error) {
-    console.error('Error extracting root domain:', error);
-    return ''; // Return empty string on error
+    console.error(`Failed to extract domain from URL: ${url}`, error);
+    return '';
   }
 }
 
 /**
- * Compares two URLs to determine if they're effectively the same
- * Used to prevent duplicate bookmark entries
+ * Checks if two URLs should be considered equivalent after normalization
  * 
- * @param url1 First URL to compare
- * @param url2 Second URL to compare
- * @returns True if URLs should be considered the same
+ * @param url1 The first URL to compare
+ * @param url2 The second URL to compare
+ * @param strictMode If true, compares exact URLs; if false, compares normalized URLs
+ * @returns Whether the URLs are equivalent
  */
-export function areUrlsEquivalent(url1: string, url2: string): boolean {
+export function areUrlsEquivalent(url1: string, url2: string, strictMode: boolean = false): boolean {
   if (!url1 || !url2) return false;
   
-  return normalizeUrl(url1) === normalizeUrl(url2);
-}
-
-/**
- * Checks if a URL already exists in a collection of bookmarks
- * 
- * @param url URL to check
- * @param bookmarks Array of bookmarks to check against
- * @returns The existing bookmark if found, undefined otherwise
- */
-export function findExistingBookmarkByUrl(url: string, bookmarks: { url: string; id: string }[]): { url: string; id: string } | undefined {
-  if (!url || !bookmarks || bookmarks.length === 0) return undefined;
-  
-  const normalizedUrl = normalizeUrl(url);
-  return bookmarks.find(bookmark => normalizeUrl(bookmark.url) === normalizedUrl);
-}
-
-/**
- * Removes tracking parameters from URLs
- * This helps group related URLs and prevents duplicates from tracking variations
- * 
- * @param url URL to clean
- * @returns URL with tracking parameters removed
- */
-export function removeTrackingParameters(url: string): string {
-  if (!url) return '';
-  
-  try {
-    const parsedUrl = new URL(url);
-    
-    // Common tracking parameters to remove
-    const trackingParams = [
-      'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 
-      'fbclid', 'gclid', 'msclkid', 'ref', 'source', 'mc_cid', 'mc_eid',
-      '_hsenc', '_hsmi', 'yclid', 'zanpid', 'dclid'
-    ];
-    
-    // Create a new URLSearchParams object without the tracking parameters
-    const searchParams = parsedUrl.searchParams;
-    const cleanParams = new URLSearchParams();
-    
-    // Only keep non-tracking parameters
-    for (const [key, value] of searchParams.entries()) {
-      if (!trackingParams.includes(key.toLowerCase())) {
-        cleanParams.append(key, value);
-      }
-    }
-    
-    // Rebuild the URL
-    parsedUrl.search = cleanParams.toString();
-    return parsedUrl.toString();
-  } catch (error) {
-    console.error('Error removing tracking parameters:', error);
-    return url; // Return original URL as fallback
+  if (strictMode) {
+    return url1 === url2;
   }
+  
+  return normalizeUrl(url1) === normalizeUrl(url2);
 }

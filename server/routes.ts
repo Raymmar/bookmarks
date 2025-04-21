@@ -10,7 +10,7 @@ import {
   insertTagSchema, insertBookmarkTagSchema, 
   insertChatSessionSchema, insertChatMessageSchema
 } from "@shared/schema";
-import { normalizeUrl, areUrlsEquivalent, removeTrackingParameters } from "@shared/url-service";
+import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -71,10 +71,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Clean and normalize the URL to prevent duplicates
       if (bookmarkData.url) {
-        // First remove any tracking parameters
-        const cleanUrl = removeTrackingParameters(bookmarkData.url);
-        // Then normalize the URL (remove www, standardize protocol, etc)
-        const normalizedUrl = normalizeUrl(cleanUrl);
+        // Use normalizeUrl with removeParams=true to handle tracking parameters
+        const normalizedUrl = normalizeUrl(bookmarkData.url, true);
         
         console.log(`URL normalization: Original: ${bookmarkData.url}, Normalized: ${normalizedUrl}`);
         
@@ -449,10 +447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "URL is required" });
       }
       
-      // Remove tracking parameters
-      const cleanUrl = removeTrackingParameters(url);
-      // Normalize the URL
-      const normalizedUrl = normalizeUrl(cleanUrl);
+      // Normalize the URL (with tracking param removal)
+      const normalizedUrl = normalizeUrl(url, true);
       
       // Check if a bookmark with this normalized URL already exists
       const bookmarks = await storage.getBookmarks();
