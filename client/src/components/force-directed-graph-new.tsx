@@ -481,40 +481,17 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         svg.select(`#link-${l.id}`).attr("opacity", 1);
       });
       
-      // Get node's actual SVG position for tooltip placement
-      // This positions the tooltip near the actual node instead of at the cursor
-      let tooltipX, tooltipY;
-      
-      // If we have the node position, use it for the tooltip
-      if (d.x !== undefined && d.y !== undefined) {
-        // Get the SVG's position on the page
-        const svgRect = svgRef.current.getBoundingClientRect();
-        
-        // Calculate tooltip position based on node's coordinates within the SVG
-        // and adjust for current zoom level and any transform
-        const zoomContainer = d3.select(svgRef.current).select("g.zoom-container");
-        let transform = d3.zoomTransform(zoomContainer.node() as Element);
-        
-        // Apply the zoom transform to get the actual screen coordinates
-        const screenX = transform.applyX(d.x) + svgRect.left;
-        const screenY = transform.applyY(d.y) + svgRect.top;
-        
-        // Position the tooltip right at the node with minimal offset
-        // Just enough offset to not overlap the node itself
-        tooltipX = screenX;
-        tooltipY = screenY - 5;
-      } else {
-        // Fallback to cursor position if node position isn't available
-        tooltipX = event.pageX + 10;
-        tooltipY = event.pageY - 10;
-      }
-      
-      // Show tooltip with name
+      // Show tooltip with node info in fixed position at bottom left
       d3.select("#tooltip")
         .style("opacity", 1)
-        .style("left", tooltipX + "px")
-        .style("top", tooltipY + "px")
-        .html(`<div class="font-medium">${d.name}</div><div class="text-gray-600 text-xs">${d.type}</div>`);
+        .html(`
+          <div>
+            <div class="font-medium text-base">${d.name}</div>
+            <div class="text-gray-600 text-xs my-1">Type: ${d.type}</div>
+            ${d.type === "bookmark" ? `<div class="text-gray-600 text-xs">Bookmark ID: ${d.bookmarkId || 'N/A'}</div>` : ''}
+            ${d.url ? `<div class="text-gray-600 text-xs truncate max-w-[300px]">URL: ${d.url}</div>` : ''}
+          </div>
+        `);
     } else {
       // Reset all opacities on mouseout
       svg.selectAll(".node").attr("opacity", 1);
@@ -1301,11 +1278,13 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
 
   return (
     <div className="w-full h-full relative" ref={containerRef}>
-      {/* Tooltip container for hover info */}
+      {/* Node info panel - fixed position in bottom left corner */}
       <div 
         id="tooltip" 
-        className="absolute bg-white p-2 rounded-md shadow-lg text-sm pointer-events-none opacity-0 transition-opacity z-50 max-w-xs border border-gray-200 transform -translate-x-1/2 text-center"
-      />
+        className="absolute bottom-4 left-4 bg-white p-3 rounded-md shadow-lg text-sm pointer-events-none opacity-0 transition-opacity z-50 min-w-[200px] border border-gray-200 text-left"
+      >
+        <div className="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>
+      </div>
       
       <svg 
         ref={svgRef} 
