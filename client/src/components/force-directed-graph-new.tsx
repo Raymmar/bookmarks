@@ -773,36 +773,46 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .force("link", d3.forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(d => {
         // Use smaller distances for small graphs
         if (isFewNodes) {
-          if (d.type === "domain") return 40; 
+          if (d.type === "domain") return 60; // Increased to spread domain nodes out more
           if (d.type === "tag") return 50;
-          if (d.type === "related") return 35;
-          return 40;
+          if (d.type === "related") return 40;
+          return 45;
         } else {
           // Normal distances for larger graphs
-          if (d.type === "domain") return 80;
+          if (d.type === "domain") return 120; // Push domains further away
           if (d.type === "tag") return 100;
-          if (d.type === "related") return 60;
-          return 70;
+          if (d.type === "related") return 70;
+          return 85; // Slightly increased spacing between regular nodes
         }
-      }).strength(linkStrength))
-      .force("charge", d3.forceManyBody().strength(repulsionStrength))
+      }).strength(d => {
+        // Weaker link strength for domain connections to let them move more freely
+        if (d.type === "domain") return linkStrength * 0.7;
+        return linkStrength;
+      }))
+      // Stronger repulsion to better spread nodes
+      .force("charge", d3.forceManyBody().strength(d => {
+        // Make domain nodes repel others more strongly
+        if (d.type === "domain") return repulsionStrength * 1.5;
+        return repulsionStrength;
+      }))
       .force("center", d3.forceCenter(width / 2, height / 2).strength(isFewNodes ? 0.2 : 0.1))
       .force("x", d3.forceX(width / 2).strength(isFewNodes ? 0.3 : 0.05))
       .force("y", d3.forceY(height / 2).strength(isFewNodes ? 0.3 : 0.05))
       .force("collision", d3.forceCollide().radius(d => {
         // Smaller collision radius for small graphs
         if (isFewNodes) {
-          if (d.type === "bookmark") return 20;
-          if (d.type === "domain") return 15;
-          return 12;
-        } else {
-          // Normal collision radius for larger graphs
-          if (d.type === "bookmark") return 30;
-          if (d.type === "domain") return 25;
-          if (d.type === "tag") return 20;
+          if (d.type === "bookmark") return 25;
+          if (d.type === "domain") return 25; // Increased to prevent domain nodes from overlapping
+          if (d.type === "tag") return 18;
           return 15;
+        } else {
+          // Enhanced collision radius for larger graphs
+          if (d.type === "bookmark") return 35;
+          if (d.type === "domain") return 40; // Much larger collision radius for domain nodes 
+          if (d.type === "tag") return 25;
+          return 20;
         }
-      }).strength(isFewNodes ? 0.5 : 0.8));
+      }).strength(isFewNodes ? 0.6 : 0.9));
     
     // Store simulation reference for later updates
     simulationRef.current = simulation;
@@ -1027,24 +1037,32 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
           .id(d => d.id)
           .distance(d => {
-            // Normal distances for larger node counts
-            if (d.type === "domain") return 80;
+            // Enhanced distances for better spacing
+            if (d.type === "domain") return 120; // Push domains further away
             if (d.type === "tag") return 100;
-            if (d.type === "related") return 60;
-            return 70;
+            if (d.type === "related") return 70;
+            return 85; // Slightly increased spacing
           })
-          .strength(0.2))
-        .force("charge", d3.forceManyBody().strength(-300))
+          .strength(d => {
+            // Weaker link strength for domain connections to let them move more freely
+            if (d.type === "domain") return 0.14; // 0.7 of the default 0.2
+            return 0.2;
+          }))
+        .force("charge", d3.forceManyBody().strength(d => {
+          // Make domain nodes repel others more strongly
+          if (d.type === "domain") return -450; // 1.5 times stronger repulsion
+          return -300;
+        }))
         .force("center", d3.forceCenter(width / 2, height / 2).strength(0.1))
         .force("x", d3.forceX(width / 2).strength(0.05))
         .force("y", d3.forceY(height / 2).strength(0.05))
         .force("collision", d3.forceCollide().radius(d => {
-          // Normal collision radius for larger node counts
-          if (d.type === "bookmark") return 40;
-          if (d.type === "domain") return 30;
+          // Enhanced collision radius for larger node counts
+          if (d.type === "bookmark") return 35;
+          if (d.type === "domain") return 40; // Much larger collision radius for domain nodes 
           if (d.type === "tag") return 25;
           return 20;
-        }).strength(0.8));
+        }).strength(0.9));
     }
     
     // Update visuals
