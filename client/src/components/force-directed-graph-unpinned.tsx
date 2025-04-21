@@ -879,20 +879,19 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       // Update visual selection
       setSelectedNode(nodeId);
       
-      // If this is a bookmark node and coming from a sidebar selection,
-      // extract the bookmark ID and set the selectedBookmarkId prop
-      // This will trigger the same zoom behavior used when clicking directly in the graph
-      if (nodeId.startsWith('bookmark-') && customEvent.detail.source === 'bookmarkSelection') {
-        const bookmarkId = nodeId.replace('bookmark-', '');
-        // Check if this is different from the current selection to avoid double zooming
-        if (selectedBookmarkId !== bookmarkId) {
-          onNodeClick(bookmarkId);
-          return; // Let the selectedBookmarkId effect handle the centering
-        }
-      }
+      // IMPORTANT: For all node selections, whether from graph click or bookmark card,
+      // use a unified approach to ensure consistent behavior
       
-      // For other node types or sources (tags, domains), use centerOnNode
-      centerOnNode(nodeId);
+      // If it's a bookmark node, extract the ID and use it for the selectedBookmarkId effect
+      if (nodeId.startsWith('bookmark-')) {
+        const bookmarkId = nodeId.replace('bookmark-', '');
+        // Using onNodeClick will update the selectedBookmarkId prop which triggers
+        // the rich zoom/focus effect in the useEffect for selectedBookmarkId
+        onNodeClick(bookmarkId);
+      } else {
+        // Only for non-bookmark nodes (tags, domains), use centerOnNode
+        centerOnNode(nodeId);
+      }
     };
     
     // Handle tag changed events from other components
