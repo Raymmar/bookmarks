@@ -268,15 +268,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     }
   }, []);
     
-  // Determine node color based on type and group
+  // Determine node color based on type
   const getNodeColor = useCallback((type: string, group: number) => {
     switch (type) {
       case "bookmark": 
-        // Use a color scale based on group
-        return d3.schemeCategory10[group % 10];
+        // All bookmarks are black
+        return "#000000";
       case "related": return "#F59E0B"; // Orange
-      case "domain": return "#10B981"; // Green
-      case "tag": return "#8B5CF6"; // Purple
+      case "domain": return "#3B82F6"; // Blue
+      case "tag": return "#10B981"; // Green
       default: return "#4F46E5"; // Blue default
     }
   }, []);
@@ -762,10 +762,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
         .id(d => d.id)
         .distance(d => {
-          // Standard link distances
-          if (d.type === "domain") return 80;
-          if (d.type === "tag") return 100;
-          if (d.type === "related") return 60;
+          // Adjusted link distances - domain connections are half as long as tag connections
+          if (d.type === "domain") return 50; // Shorter connections for domains
+          if (d.type === "tag") return 100;   // Longer connections for tags
+          if (d.type === "related") return 70;
           return 70;
         })
         .strength(0.2))
@@ -824,23 +824,36 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           .on("end", dragended)
       );
     
-    // Add circles to nodes
-    node.append("circle")
-      .attr("r", d => {
-        switch (d.type) {
-          case "bookmark": return 8;
-          case "related": return 6;
-          case "domain": return 7;
-          case "tag": return 5;
-          default: return 6;
-        }
-      })
-      .attr("fill", d => getNodeColor(d.type, d.group))
-      .attr("stroke", d => {
-        if (d.type === "bookmark") return d3.rgb(getNodeColor(d.type, d.group)).darker(0.8).toString();
-        return d3.rgb(getNodeColor(d.type, d.group)).darker(0.5).toString();
-      })
-      .attr("stroke-width", d => d.type === "bookmark" ? 2 : 1.5);
+    // Add shapes to nodes with distinct styling based on type
+    node.each(function(d) {
+      const element = d3.select(this);
+      
+      if (d.type === "tag") {
+        // Tags get a square shape
+        element.append("rect")
+          .attr("x", -5)
+          .attr("y", -5)
+          .attr("width", 10)
+          .attr("height", 10)
+          .attr("fill", getNodeColor(d.type, d.group))
+          .attr("stroke", "#ffffff")
+          .attr("stroke-width", 1.5);
+      } else if (d.type === "domain") {
+        // Domains get a diamond shape
+        element.append("polygon")
+          .attr("points", "0,-7 7,0 0,7 -7,0")
+          .attr("fill", getNodeColor(d.type, d.group))
+          .attr("stroke", "#ffffff")
+          .attr("stroke-width", 1.5);
+      } else {
+        // Bookmarks and other types get circles
+        element.append("circle")
+          .attr("r", d.type === "bookmark" ? 8 : 6)
+          .attr("fill", getNodeColor(d.type, d.group))
+          .attr("stroke", "#ffffff")
+          .attr("stroke-width", d.type === "bookmark" ? 2 : 1.5);
+      }
+    });
     
     // Add labels to nodes selectively (to avoid crowding)
     node.filter(d => d.type === "tag" || d.type === "domain")
@@ -1182,9 +1195,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       {/* Node info panel - fixed position in bottom left corner */}
       <div 
         id="tooltip" 
-        className="absolute bottom-4 left-4 bg-white p-3 rounded-md shadow-lg text-sm pointer-events-none opacity-0 transition-opacity z-50 min-w-[200px] border border-gray-200 text-left"
+        className="absolute bottom-4 left-4 bg-white p-3 rounded-md shadow-lg text-sm pointer-events-none opacity-1 transition-opacity z-50 min-w-[200px] border border-gray-200 text-left"
       >
         <div className="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>
+        <div className="text-sm text-gray-500">Hover over a node to see details</div>
       </div>
       
       <svg 
