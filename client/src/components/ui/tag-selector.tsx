@@ -40,10 +40,35 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
     if (!tags || tags.length === 0) return [];
     
     if (newTagText.trim() === "") {
-      // Show top 10 most used tags that aren't already selected
+      // Sort tags with a combined scoring of recency and usage count
+      // This ensures new tags appear in suggestions while keeping popular tags visible
       return tags
         .filter(tag => !selectedTags.includes(tag.name))
-        .sort((a, b) => b.count - a.count)
+        .sort((a, b) => {
+          // Parse created_at to Date objects
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          
+          // Calculate a score based on recency (newer = higher) and count
+          // Give higher weight to recently created tags
+          const recencyWeight = 2; // Adjust this to control how much recency matters
+          
+          // Calculate time difference in hours (more recent = smaller diff)
+          const now = new Date();
+          const hoursAgo_A = (now.getTime() - dateA.getTime()) / (1000 * 60 * 60);
+          const hoursAgo_B = (now.getTime() - dateB.getTime()) / (1000 * 60 * 60);
+          
+          // Recency score - recent items get higher scores
+          const recencyScore_A = recencyWeight * (1 / (hoursAgo_A + 1));
+          const recencyScore_B = recencyWeight * (1 / (hoursAgo_B + 1));
+          
+          // Combine recency and count scores
+          const scoreA = recencyScore_A + a.count;
+          const scoreB = recencyScore_B + b.count;
+          
+          // Sort by combined score (higher first)
+          return scoreB - scoreA;
+        })
         .slice(0, 10);
     } else {
       // Filter tags by name
