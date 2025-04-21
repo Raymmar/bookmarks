@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,24 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  // Fetch the latest tags directly when dialog opens
+  const fetchLatestTags = async () => {
+    try {
+      // Immediately refetch to ensure we have the latest tags
+      await queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/tags"] });
+    } catch (error) {
+      console.error("Error fetching latest tags:", error);
+    }
+  };
+  
+  // Fetch tags when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchLatestTags();
+    }
+  }, [open]);
+
   const handleSubmit = async () => {
     if (!url) {
       toast({
@@ -39,7 +57,10 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
     setIsSubmitting(true);
 
     try {
-      // Get all existing tags first
+      // Ensure we have the most up-to-date tags
+      await fetchLatestTags();
+      
+      // Get all existing tags
       const existingTags = await apiRequest("GET", "/api/tags");
       console.log("Existing tags:", existingTags);
       
