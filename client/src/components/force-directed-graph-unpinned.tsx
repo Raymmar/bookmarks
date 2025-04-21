@@ -260,7 +260,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   // Determine link color based on type
   const getLinkColor = useCallback((type: string) => {
     switch (type) {
-      case "tag": return "#8B5CF6"; // Purple for tag connections
+      case "tag": return "#3B82F6"; // Blue for tag connections
       case "domain": return "#10B981"; // Green for domain connections
       case "related": return "#F59E0B"; // Orange for related content
       case "content": return "#EF4444"; // Red for content similarity
@@ -275,8 +275,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         // All bookmarks are black
         return "#000000";
       case "related": return "#F59E0B"; // Orange
-      case "domain": return "#3B82F6"; // Blue
-      case "tag": return "#10B981"; // Green
+      case "domain": return "#10B981"; // Green for domains
+      case "tag": return "#3B82F6"; // Blue for tags
       default: return "#4F46E5"; // Blue default
     }
   }, []);
@@ -596,7 +596,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       }
       
       // Set tooltip content and make it visible
-      tooltip.innerHTML = `<div class="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>${content}`;
+      tooltip.innerHTML = content;
       tooltip.style.opacity = "1";
       
       // Highlight connected links
