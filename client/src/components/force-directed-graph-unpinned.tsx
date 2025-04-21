@@ -939,7 +939,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   
   // Effect for handling the selected bookmark
   useEffect(() => {
-    if (!selectedBookmarkId || !svgRef.current || !simulationRef.current) return;
+    if (!selectedBookmarkId || !svgRef.current || !simulationRef.current || !zoomBehaviorRef.current) return;
     
     // Set the selected node in state
     setSelectedNode(selectedBookmarkId);
@@ -958,13 +958,42 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         });
       });
       
-      // Center on the selected node and its connections
-      centerGraph([selectedNode, ...connectedNodes]);
+      // Apply strong zoom effect to focus closely on the selected node
+      if (selectedNode.x !== undefined && selectedNode.y !== undefined) {
+        // Get container dimensions
+        const width = containerRef.current?.clientWidth || 800;
+        const height = containerRef.current?.clientHeight || 600;
+        
+        // Calculate zoom level - higher number means closer zoom
+        const zoomLevel = 2.0; 
+        
+        // Calculate a small offset so the node isn't perfectly centered
+        // This helps to show more of its connected nodes in the visible area
+        const offsetX = width * 0.05; // 5% offset
+        const offsetY = height * 0.05;
+        
+        // Apply the zoom transformation
+        const svg = d3.select(svgRef.current);
+        
+        // Create a transition for smoother zoom effect
+        svg.transition()
+          .duration(500) // Half-second transition
+          .call(
+            zoomBehaviorRef.current.transform,
+            d3.zoomIdentity
+              .translate(width / 2 - selectedNode.x * zoomLevel + offsetX, 
+                        height / 2 - selectedNode.y * zoomLevel + offsetY)
+              .scale(zoomLevel)
+          );
+      } else {
+        // Fallback to standard centering if coordinates aren't available
+        centerGraph([selectedNode, ...connectedNodes]);
+      }
       
       // Reset all nodes to default appearance first
       d3.select(svgRef.current)
         .selectAll('.node')
-        .style('opacity', 0.6) // Dim all nodes
+        .style('opacity', 0.4) // Dim all nodes more dramatically 
         .select('circle')
         .attr('stroke-width', 1.5)
         .attr('r', (d: any) => d.type === "bookmark" ? 7 : 5);
@@ -979,23 +1008,31 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         .style('opacity', 0.9)
         .select('circle')
         .attr('stroke-width', 2)
-        .attr('r', (d: any) => d.type === "bookmark" ? 8 : 6);
+        .attr('r', (d: any) => d.type === "bookmark" ? 9 : 7);
       
-      // Visually highlight the selected node with strong emphasis
+      // Visually highlight the selected node with very strong emphasis
       d3.select(svgRef.current)
         .select(`#node-${selectedBookmarkId}`)
         .style('opacity', 1)
         .raise() // Bring to front
         .select('circle')
-        .attr('stroke-width', 3)
+        .attr('stroke-width', 4)
         .attr('stroke', '#3b82f6') // Blue highlight border
-        .attr('r', (d: any) => d.type === "bookmark" ? 12 : 10) // Make significantly larger
-        .style('filter', 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.5))'); // Add glow effect
+        .attr('r', (d: any) => d.type === "bookmark" ? 18 : 14) // Make MUCH larger (2x+)
+        .style('filter', 'drop-shadow(0 0 10px rgba(59, 130, 246, 0.8))'); // Stronger glow effect
+        
+      // Also highlight the label - make it visible and larger
+      d3.select(svgRef.current)
+        .select(`#node-${selectedBookmarkId}`)
+        .select('text')
+        .style('opacity', 1)
+        .style('font-weight', 'bold')
+        .style('font-size', '14px'); // Larger font
         
       // Also highlight the directly connected links
       d3.select(svgRef.current)
         .selectAll('.link')
-        .style('opacity', 0.2); // Dim all links
+        .style('opacity', 0.1); // Dim all links more dramatically
         
       d3.select(svgRef.current)
         .selectAll('.link')
@@ -1005,7 +1042,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           return sourceId === selectedBookmarkId || targetId === selectedBookmarkId;
         })
         .style('opacity', 1)
-        .attr('stroke-width', (d: any) => d.value + 1) // Make connected links thicker
+        .attr('stroke-width', (d: any) => d.value + 2) // Make connected links much thicker
         .raise(); // Bring links to front
     }
     
@@ -1021,6 +1058,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           .attr('stroke', '#999')
           .attr('r', (d: any) => d.type === "bookmark" ? 7 : 5)
           .style('filter', null);
+          
+        // Reset text labels
+        d3.select(svgRef.current).selectAll('.node text')
+          .style('opacity', 0.9)
+          .style('font-weight', 'normal')
+          .style('font-size', '12px');
           
         d3.select(svgRef.current).selectAll('.link')
           .style('opacity', 0.6)
