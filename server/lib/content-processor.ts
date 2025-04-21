@@ -129,13 +129,14 @@ export async function generateInsights(
     // Otherwise try to get it from storage
     else {
       try {
-        const customPrompt = await storage.getSetting("bookmark_system_prompt");
+        // Use the summary prompt instead of the bookmark system prompt
+        const customPrompt = await storage.getSetting("summary_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
-          console.log("Retrieved custom system prompt from storage for insights generation");
+          console.log("Retrieved custom summary prompt from storage for insights generation");
         }
       } catch (err) {
-        console.warn("Could not retrieve custom bookmark system prompt, using default:", err);
+        console.warn("Could not retrieve custom summary prompt, using default:", err);
       }
     }
     

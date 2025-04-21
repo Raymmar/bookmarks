@@ -190,7 +190,7 @@ export class BookmarkService {
             }
             
             // Pass the custom tagging prompt to the generateTags function
-            const tags = await generateTags(processedText, url, systemPrompts.taggingPrompt);
+            const tags = await generateTags(processedText || '', url, systemPrompts.taggingPrompt);
             console.log(`Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(', ')}`);
             return tags;
           } catch (error) {
@@ -216,7 +216,8 @@ export class BookmarkService {
               }
             }
             
-            const result = await generateInsights(url, processedText, insightDepth);
+            // Pass the custom summary prompt to the generateInsights function
+            const result = await generateInsights(url, processedText || '', insightDepth, systemPrompts.summaryPrompt);
             console.log(`Insights generated for bookmark ${bookmarkId}. Summary length: ${result.summary.length}`);
             return result;
           } catch (error) {
