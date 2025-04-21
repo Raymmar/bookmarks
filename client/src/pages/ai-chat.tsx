@@ -31,9 +31,11 @@ export default function AiChat() {
   // Extract all unique tags from bookmarks
   const allTags = Array.from(
     new Set(
-      bookmarks.flatMap(bookmark => 
-        [...bookmark.user_tags, ...bookmark.system_tags]
-      )
+      bookmarks.flatMap(bookmark => {
+        // Handle case where user_tags might not exist
+        const systemTags = bookmark.system_tags || [];
+        return systemTags;
+      })
     )
   ).sort();
   
