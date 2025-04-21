@@ -719,125 +719,17 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     simulation.nodes(graphData.nodes);
     simulation.force("link", d3.forceLink<GraphNode, GraphLink>(graphData.links).id(d => d.id));
     
-    // Get the SVG element
-    const svg = d3.select(svgRef.current);
+    // Instead of modifying the DOM directly, which can cause insertBefore DOM errors,
+    // we'll use a simpler approach that works with the existing updateGraphData logic
     
-    // Create a container for all visual elements if it doesn't exist
-    let g = svg.select("g.zoom-container");
-    if (g.empty()) {
-      g = svg.append("g").attr("class", "zoom-container");
-    }
-    
-    // Update links
-    const link = g.selectAll(".link")
-      .data(graphData.links, (d: any) => d.id);
-    
-    // Remove old links
-    link.exit().remove();
-    
-    // Add new links
-    const linkEnter = link.enter().append("line")
-      .attr("class", "link")
-      .attr("stroke", (d: any) => getLinkColor(d.type))
-      .attr("stroke-width", (d: any) => Math.sqrt(d.value))
-      .style("opacity", 0.6);
-    
-    // Merge links
-    const linkMerge = linkEnter.merge(link as any);
-    
-    // Update nodes
-    const node = g.selectAll(".node")
-      .data(graphData.nodes, (d: any) => d.id);
-    
-    // Remove old nodes
-    node.exit().remove();
-    
-    // Add new nodes
-    const nodeEnter = node.enter().append("g")
-      .attr("class", "node")
-      .attr("id", (d: any) => `node-${d.id}`)
-      .style("cursor", "pointer")
-      .call(d3.drag<SVGGElement, GraphNode>()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended))
-      .on("click", (event, d) => handleNodeClick(event, d));
-    
-    // Add circles for nodes
-    nodeEnter.append("circle")
-      .attr("r", (d: any) => {
-        switch (d.type) {
-          case "bookmark": return 8;
-          case "related": return 6;
-          case "domain": return 7;
-          case "tag": return 5;
-          default: return 6;
-        }
-      })
-      .attr("fill", (d: any) => getNodeColor(d.type, d.group))
-      .attr("stroke", (d: any) => {
-        if (d.type === "bookmark") {
-          return d3.rgb(getNodeColor(d.type, d.group)).darker(0.8).toString();
-        }
-        return d3.rgb(getNodeColor(d.type, d.group)).darker(0.5).toString();
-      })
-      .attr("stroke-width", (d: any) => d.type === "bookmark" ? 2 : 1.5);
-    
-    // Add labels for nodes
-    nodeEnter.append("text")
-      .attr("dx", 12)
-      .attr("dy", ".35em")
-      .style("font-size", "12px")
-      .style("font-family", "system-ui, sans-serif")
-      .style("pointer-events", "none")
-      .style("opacity", 0.9)
-      .text((d: any) => d.name);
-    
-    // Merge nodes
-    const nodeMerge = nodeEnter.merge(node as any);
-    
-    // Update the simulation
+    // Re-heat the simulation with new data
     simulation
       .alpha(0.3) // Re-heat the simulation
       .restart(); // Restart the simulation
     
-    // Attach event listeners for node hover
-    nodeMerge.on("mouseover", (event, d) => handleNodeHover(event, d, true))
-      .on("mouseout", (event, d) => handleNodeHover(event, d, false));
-    
-    // Update the positions on each tick
-    simulation.on("tick", () => {
-      // Apply constraints to prevent nodes from leaving the visible area
-      simulation.nodes().forEach(node => {
-        node.x = Math.max(10, Math.min(width - 10, node.x || width/2));
-        node.y = Math.max(10, Math.min(height - 10, node.y || height/2));
-      });
-      
-      // Update link positions
-      linkMerge
-        .attr("x1", (d: any) => {
-          const source = d.source as GraphNode;
-          return source.x || 0;
-        })
-        .attr("y1", (d: any) => {
-          const source = d.source as GraphNode;
-          return source.y || 0;
-        })
-        .attr("x2", (d: any) => {
-          const target = d.target as GraphNode;
-          return target.x || 0;
-        })
-        .attr("y2", (d: any) => {
-          const target = d.target as GraphNode;
-          return target.y || 0;
-        });
-      
-      // Update node positions
-      nodeMerge.attr("transform", (d: any) => `translate(${d.x || 0},${d.y || 0})`);
-    });
-    
+    // Return the updated simulation
     return simulation;
-  }, [getLinkColor, getNodeColor, handleNodeClick, handleNodeHover, dragstarted, dragged, dragended]);
+  }, []);
   
   // Update graph data without recreating the simulation
   const updateGraphData = useCallback(() => {
@@ -1076,30 +968,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
             // trigger a full redraw to ensure all tags are included
             console.log("Refreshing graph for focused bookmark tag change");
             
-            // Important: Temporarily clear the selected bookmark ID to force a full redraw
-            // then restore it after a minimal delay
-            const currentSelection = selectedBookmarkId;
-            
-            // First update with null to reset any focus filters (forces inclusion of all nodes)
-            const dataWithoutFocus = generateGraphData(bookmarks, insightLevel);
-            graphDataRef.current = dataWithoutFocus;
-            
-            // Apply this immediately to simulation to update the graph
-            applyGraphDataToSimulation(dataWithoutFocus, simulationRef.current);
-            
-            // Then restore the focused view
-            setTimeout(() => {
-              // Regenerate data with the focus ID to ensure new tag connections are shown
-              const updatedDataWithFocus = generateGraphData(bookmarks, insightLevel, currentSelection);
-              graphDataRef.current = updatedDataWithFocus;
-              
-              // Apply to simulation
-              applyGraphDataToSimulation(updatedDataWithFocus, simulationRef.current);
-              
-              // Re-center on the bookmark to ensure proper focus
-              centerOnNode(`bookmark-${currentSelection}`);
-            }, 50);
-          }, 150); // Wait a bit longer for server data to update
+            // Use the standard update method rather than applying data directly
+            // This avoids DOM manipulation issues and ensures proper graph update
+            updateGraphData();
+          }, 200); // Wait a bit longer for server data to update
         } else {
           // Standard update for non-focused views
           setTimeout(() => {
