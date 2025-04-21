@@ -7,13 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   X, Send, User, Bot, 
   Clock, Folder, FileText, 
-  Plus, MoreVertical, Trash, Edit
+  Plus, MoreVertical, Trash, Edit,
+  Check
 } from "lucide-react";
 import { 
   chatWithBookmarks, 
   getChatSessions, 
   getChatSessionWithMessages,
   createChatSession,
+  updateChatSession,
+  deleteChatSession,
   type ChatMessage as ApiChatMessage,
   type ChatSession,
   type ChatFilters
