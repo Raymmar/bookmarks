@@ -266,9 +266,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       // Create a Set of IDs for nodes in our focus set
       const focusNodeIds = new Set(nodes.map(n => n.id));
       
-      // Count how many domain and tag nodes we have in the focus set for special handling
-      let domainNodesCount = 0;
+      // Group nodes by type for special handling
+      let focusedNodes: GraphNode[] = [];
       let domainNodes: GraphNode[] = [];
+      let tagNodes: GraphNode[] = [];
+      let bookmarkNodes: GraphNode[] = [];
       
       // Adjust forces for better focus view display
       allNodes.forEach(node => {
@@ -278,110 +280,159 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           node.fx = null;
           node.fy = null;
           
-          // Track domain nodes for special handling with higher repulsion
+          // Track nodes by type for specialized repulsion
+          focusedNodes.push(node);
           if (node.type === "domain") {
-            domainNodesCount++;
             domainNodes.push(node);
+          } else if (node.type === "tag") {
+            tagNodes.push(node);
+          } else if (node.type === "bookmark") {
+            bookmarkNodes.push(node);
           }
         } else {
           // For non-focus nodes, make them less influential by pushing them far away
-          if (node.type === "bookmark" || node.type === "domain") {
-            // Push other nodes very far away to not interfere with layout
-            node.fx = node.x ? node.x + (Math.random() - 0.5) * 3000 : null;
-            node.fy = node.y ? node.y + (Math.random() - 0.5) * 3000 : null;
-          }
+          // Push all non-focus nodes very far away to not interfere with layout at all
+          node.fx = node.x ? node.x + (Math.random() - 0.5) * 5000 : null;
+          node.fy = node.y ? node.y + (Math.random() - 0.5) * 5000 : null;
         }
       });
       
-      // If we have multiple domain nodes, apply initial positions to spread them apart
-      if (domainNodes.length > 1) {
+      // Apply optimal initial positions for all focus nodes, not just domains
+      const nodeCount = focusedNodes.length;
+      if (nodeCount > 1) {
         const centerX = width / 2;
         const centerY = height / 2;
-        const spreadRadius = 150; // Larger initial spread for domains
+        const spreadRadius = 180; // Large spreading radius for all nodes
         
-        // Position domain nodes in an even circle around the center for better separation
-        domainNodes.forEach((node, i) => {
-          const angle = (i / domainNodes.length) * 2 * Math.PI;
-          // Don't fix them, but give them a good starting position
-          node.x = centerX + spreadRadius * Math.cos(angle);
-          node.y = centerY + spreadRadius * Math.sin(angle);
+        // Create a golden ratio spiral distribution for more natural spread
+        // Unlike a circle, this gives more organic placement
+        focusedNodes.forEach((node, i) => {
+          const goldenRatio = 1.618033988749895;
+          const goldenAngle = Math.PI * 2 * (1 - 1 / goldenRatio);
+          const angle = i * goldenAngle;
           
-          // Give them a slight velocity in the outward direction to help separation
-          node.vx = Math.cos(angle) * 2;
-          node.vy = Math.sin(angle) * 2;
+          // Radius increases with index for a spiral effect, scaled by node count
+          const radius = spreadRadius * Math.sqrt(i / nodeCount);
+          
+          // Position node along spiral
+          node.x = centerX + radius * Math.cos(angle);
+          node.y = centerY + radius * Math.sin(angle);
+          
+          // Add gentle outward velocity for organic spread
+          const velScale = 3;
+          node.vx = Math.cos(angle) * velScale;
+          node.vy = Math.sin(angle) * velScale;
         });
       }
       
-      // Prepare special domain-specific repulsion forces
-      const domainRepulsionStrength = -400; // Much stronger repulsion between domains
-      
-      // Create custom domain repulsion force function
-      const domainRepulsionForce = (alpha: number) => {
-        for (let i = 0; i < domainNodes.length; i++) {
-          for (let j = i + 1; j < domainNodes.length; j++) {
-            const nodeA = domainNodes[i];
-            const nodeB = domainNodes[j];
+      // Custom all-to-all repulsion force for maximum organic spread
+      // This ensures nodes repel each other more naturally than D3's default
+      const customRepulsionForce = (alpha: number) => {
+        // Apply repulsion between all pairs of focus nodes
+        for (let i = 0; i < focusedNodes.length; i++) {
+          for (let j = i + 1; j < focusedNodes.length; j++) {
+            const nodeA = focusedNodes[i];
+            const nodeB = focusedNodes[j];
             
             if (!nodeA.x || !nodeA.y || !nodeB.x || !nodeB.y) continue;
             
-            // Calculate distance between domains
+            // Calculate distance between nodes
             const dx = nodeA.x - nodeB.x;
             const dy = nodeA.y - nodeB.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            // Apply repulsive force
-            if (distance > 0) {
-              const force = (domainRepulsionStrength * alpha) / (distance * distance);
-              const forceX = dx * force;
-              const forceY = dy * force;
-              
-              // Apply the force to both nodes
-              nodeA.vx = (nodeA.vx || 0) + forceX;
-              nodeA.vy = (nodeA.vy || 0) + forceY;
-              nodeB.vx = (nodeB.vx || 0) - forceX;
-              nodeB.vy = (nodeB.vy || 0) - forceY;
+            if (distance === 0) continue;
+            
+            // Determine repulsion strength based on node types for maximum readability
+            let repulsionStrength = -350; // Base repulsion for all nodes
+            
+            // Enhance repulsion between similar types to prevent clustering
+            if (nodeA.type === nodeB.type) {
+              repulsionStrength *= 1.5; // 50% stronger repulsion between same-type nodes
             }
+            
+            // Special cases for max readability
+            if (nodeA.type === "domain" && nodeB.type === "domain") {
+              repulsionStrength *= 1.5; // Even stronger repulsion between domains
+            }
+            
+            // Scale force by distance quadratically, with a minimum distance to prevent extreme forces
+            const minDistance = 10;
+            const effectiveDistance = Math.max(distance, minDistance);
+            const force = (repulsionStrength * alpha) / (effectiveDistance * effectiveDistance);
+            
+            // Calculate force components
+            const forceX = dx * force;
+            const forceY = dy * force;
+            
+            // Apply force with a scaling factor based on node type
+            // This makes certain nodes (like domains) more influential
+            const getNodeWeight = (node: GraphNode) => {
+              if (node.type === "domain") return 1.2; // Domains influence layout more
+              if (node.type === "tag") return 1.1;   // Tags a bit less
+              return 1.0;                           // Default weight
+            };
+            
+            const weightA = getNodeWeight(nodeA);
+            const weightB = getNodeWeight(nodeB);
+            
+            // Apply forces scaled by node weight
+            nodeA.vx = (nodeA.vx || 0) + forceX * weightA;
+            nodeA.vy = (nodeA.vy || 0) + forceY * weightA;
+            nodeB.vx = (nodeB.vx || 0) - forceX * weightB;
+            nodeB.vy = (nodeB.vy || 0) - forceY * weightB;
           }
         }
       };
       
       // Update force parameters for more organic small-group layout
       simulationRef.current
-        // Higher repulsion for all nodes to prevent grid-like formations
-        .force("charge", d3.forceManyBody().strength(nodes.length <= 5 ? -250 : -300))
+        // Strong repulsion for all nodes to prevent grid-like formations
+        .force("charge", d3.forceManyBody()
+          .strength(nodes.length <= 5 ? -400 : -500) // Much stronger for all nodes
+          .distanceMax(500) // Limit distance effect to avoid extreme spreading
+        )
         
-        // Use a different link force approach for small sets
-        .force("link", d3.forceLink<GraphNode, GraphLink>().id(d => d.id).distance(d => {
-          // Modify distances to spread things out more organically
-          if (d.type === "domain") return 120; // Dramatically increased for better spread
-          if (d.type === "tag") return 90;
-          if (d.type === "related") return 70;
-          return 80;
-        }).strength(0.4)) // Weaker links to allow more organic movement
+        // Use longer distances for links to create more space
+        .force("link", d3.forceLink<GraphNode, GraphLink>().id(d => d.id)
+          .distance(d => {
+            // Much larger distances for maximum spread
+            if (d.type === "domain") return 160; // Extremely generous for domains
+            if (d.type === "tag") return 130;
+            if (d.type === "related") return 110;
+            return 120;
+          })
+          .strength(0.2) // Very weak links to allow nodes to spread naturally
+        )
         
-        // Add stronger center force to keep things balanced
-        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.05))
+        // Weak center force - just enough to keep nodes from flying off screen
+        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.03))
         
-        // Add x/y forces for better distribution
+        // Very weak x/y forces for subtle layout correction
         .force("x", d3.forceX(width / 2).strength(0.01))
         .force("y", d3.forceY(height / 2).strength(0.01))
         
-        // Larger collision radius to prevent overlap
-        .force("collision", d3.forceCollide().radius(d => {
-          // Much larger collision radii to ensure separation
-          if (d.type === "bookmark") return 55;
-          if (d.type === "domain") return 70; // Increased dramatically for domains
-          if (d.type === "tag") return 45;
-          return 40;
-        }).strength(0.9).iterations(2)) // Higher strength and more iterations for better collision handling
+        // Generous collision detection to ensure no overlap
+        .force("collision", d3.forceCollide()
+          .radius(d => {
+            // Much larger collision radii to ensure wide separation
+            if (d.type === "bookmark") return 75; // Significantly increased
+            if (d.type === "domain") return 90;  // Extra large for domains
+            if (d.type === "tag") return 65;     // Larger for tags too
+            return 60;                          // Large for any other types
+          })
+          .strength(1.0)  // Maximum strength for collision
+          .iterations(4)  // More iterations for better collision resolution
+        )
         
-        // Register our custom domain repulsion force
-        .force("domainRepulsion", domainRepulsionForce)
+        // Add our custom repulsion force for maximum readability
+        .force("customRepulsion", customRepulsionForce)
         
-        .alpha(0.5) // Stronger reset of simulation
-        .alphaDecay(0.02) // Slower decay for more movement
-        .velocityDecay(0.3) // Lower decay to allow nodes to move more freely
-        .restart(); // Restart simulation to apply new forces
+        // Simulation parameters for more organic movement
+        .alpha(0.8)           // Full reset of simulation
+        .alphaDecay(0.01)     // Very slow decay for long-lasting movement
+        .velocityDecay(0.2)   // Lower decay for more fluid, sweeping movements
+        .restart();           // Restart simulation to apply new forces
     }
     
     // Calculate bounding box of all nodes
@@ -629,16 +680,17 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Store simulation reference for later updates
     simulationRef.current = simulation;
     
-    // Create links with visual distinctions
+    // Create links with visual distinctions and curved paths to avoid crossing
     const link = linkGroup
-      .selectAll("line")
+      .selectAll("path") // Use paths instead of lines for curved edges
       .data(links)
       .enter()
-      .append("line")
+      .append("path") // Using paths allows for curves
       .attr("class", "link")
       .attr("stroke", d => getLinkColor(d.type))
       .attr("stroke-width", d => Math.sqrt(d.value))
       .attr("stroke-opacity", 0.6)
+      .attr("fill", "none") // Important for paths
       .attr("id", d => `link-${d.id}`);
     
     // Create node groups
@@ -687,7 +739,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         nodeGroup.selectAll(".node")
           .style("opacity", n => connectedNodeIds.has(n.id) || n.id === d.id ? 1 : 0.3);
         
-        linkGroup.selectAll("line")
+        linkGroup.selectAll("path") // Updated from "line" to "path"
           .style("opacity", l => {
             const sourceId = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id;
             const targetId = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id;
@@ -702,7 +754,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .on("mouseout", function() {
         // Reset highlights
         nodeGroup.selectAll(".node").style("opacity", 1);
-        linkGroup.selectAll("line")
+        linkGroup.selectAll("path") // Updated from "line" to "path"
           .style("opacity", 0.6)
           .style("stroke-width", d => Math.sqrt(d.value));
       })
@@ -772,24 +824,74 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .attr("font-size", d => d.type === "bookmark" ? "11px" : "10px")
       .attr("fill", "#1F2937");
     
-    // Update positions during simulation
+    // Update positions during simulation with curved paths for better readability
     simulation.on("tick", () => {
-      link
-        .attr("x1", d => (typeof d.source === 'string' ? 
-          (nodes.find(n => n.id === d.source)?.x || 0) : 
-          (d.source as GraphNode).x || 0))
-        .attr("y1", d => (typeof d.source === 'string' ? 
-          (nodes.find(n => n.id === d.source)?.y || 0) : 
-          (d.source as GraphNode).y || 0))
-        .attr("x2", d => (typeof d.target === 'string' ? 
-          (nodes.find(n => n.id === d.target)?.x || 0) : 
-          (d.target as GraphNode).x || 0))
-        .attr("y2", d => (typeof d.target === 'string' ? 
-          (nodes.find(n => n.id === d.target)?.y || 0) : 
-          (d.target as GraphNode).y || 0));
+      // Function to get node position since it could be string ID or object reference
+      const getNodePos = (nodeRef: string | GraphNode, key: 'x' | 'y'): number => {
+        if (typeof nodeRef === 'string') {
+          return nodes.find(n => n.id === nodeRef)?.[key] || 0;
+        } else {
+          return (nodeRef as GraphNode)[key] || 0;
+        }
+      };
       
-      node
-        .attr("transform", d => `translate(${d.x},${d.y})`);
+      // Advanced edge routing to minimize crossings and generate more aesthetically pleasing curves
+      link.attr("d", (d) => {
+        // Get source and target coordinates
+        const sourceX = getNodePos(d.source, 'x');
+        const sourceY = getNodePos(d.source, 'y');
+        const targetX = getNodePos(d.target, 'x');
+        const targetY = getNodePos(d.target, 'y');
+        
+        // Calculate midpoint
+        const midX = (sourceX + targetX) / 2;
+        const midY = (sourceY + targetY) / 2;
+        
+        // Calculate normal vector (perpendicular to the line connecting source and target)
+        const dx = targetX - sourceX;
+        const dy = targetY - sourceY;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        
+        // Default for very short links to avoid division by zero
+        if (len < 1) {
+          return `M${sourceX},${sourceY} L${targetX},${targetY}`;
+        }
+        
+        // Normalize the perpendicular vector
+        const nx = -dy / len;
+        const ny = dx / len;
+        
+        // Special curving for different link types to create visual distinction
+        // and avoid edge crossing with other links of same type
+        let curveFactor = 0;
+        
+        // Adjust curve based on link type for better visual separation
+        switch (d.type) {
+          case "domain":
+            curveFactor = 0.3; // Gentle curve for domain links
+            break;
+          case "tag":
+            curveFactor = 0.2; // Slight curve for tag links
+            break;
+          case "related":
+            curveFactor = 0.15; // Very subtle curve
+            break;
+          default:
+            curveFactor = 0.1; // Almost straight for other links
+        }
+        
+        // Calculate control point offset (perpendicular to the line)
+        // This creates a quadratic curve that helps avoid edge crossings
+        const offsetDistance = len * curveFactor;
+        const controlX = midX + nx * offsetDistance;
+        const controlY = midY + ny * offsetDistance;
+        
+        // Draw a quadratic Bezier curve
+        return `M${sourceX},${sourceY} Q${controlX},${controlY} ${targetX},${targetY}`;
+      });
+      
+      // Update node positions normally
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
     });
     
     // Implement drag behavior
