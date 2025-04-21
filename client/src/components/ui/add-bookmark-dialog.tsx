@@ -73,16 +73,43 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         return;
       }
       
+      // Create a temporary optimistic bookmark entry
+      const tempTitle = url.split("/").pop() || url;
+      const tempId = `temp-${Date.now()}`;
+      const optimisticBookmark = {
+        id: tempId,
+        url,
+        title: tempTitle,
+        description: notes ? notes.substring(0, 100) : "",
+        content_html: "",
+        date_saved: new Date().toISOString(),
+        system_tags: [],
+        user_tags: selectedTags,
+        thumbnail_url: null,
+        source: "web",
+        reading_time: 0
+      };
+      
+      // Update the cache optimistically
+      queryClient.setQueryData(["/api/bookmarks"], (oldData: any) => {
+        // If we have existing data, add our new bookmark to it
+        if (Array.isArray(oldData)) {
+          return [optimisticBookmark, ...oldData];
+        }
+        // If we don't have data yet, create an array with just our new bookmark
+        return [optimisticBookmark];
+      });
+      
       // Create the bookmark using the centralized bookmark service API
       // The bookmark service will handle tag creation, association, metadata extraction, etc.
       const bookmark = await apiRequest("POST", "/api/bookmarks", {
         url,
-        title: url.split("/").pop() || url, // Generate a simple title from URL for now
-        description: notes ? notes.substring(0, 100) : "", // Use part of notes as description
-        notes, // Pass notes as a separate field
-        tags: selectedTags, // Pass the raw tag names, service will handle creation/association
-        autoExtract, // Pass auto-extract flag
-        insightDepth: autoExtract ? insightDepth : null, // Only pass insightDepth if autoExtract is enabled
+        title: tempTitle, 
+        description: notes ? notes.substring(0, 100) : "", 
+        notes,
+        tags: selectedTags,
+        autoExtract,
+        insightDepth: autoExtract ? insightDepth : null,
         source: "web"
       });
       
