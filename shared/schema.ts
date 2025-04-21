@@ -1,6 +1,24 @@
-import { pgTable, text, serial, integer, boolean, timestamp, uuid, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uuid, json, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Chat Sessions table for persistent chat
+export const chatSessions = pgTable("chat_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull().default("New Chat"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+  filters: jsonb("filters") // Stores the filter settings for this chat session
+});
+
+// Chat Messages table to store conversation history
+export const chatMessages = pgTable("chat_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  session_id: uuid("session_id").references(() => chatSessions.id, { onDelete: "cascade" }).notNull(),
+  role: text("role", { enum: ["user", "assistant"] }).notNull(),
+  content: text("content").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull()
+});
 
 // Bookmarks table
 export const bookmarks = pgTable("bookmarks", {
@@ -117,6 +135,18 @@ export const insertBookmarkTagSchema = createInsertSchema(bookmarkTags).omit({
   id: true,
 });
 
+// Chat Schemas
+export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Types
 export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
 export type Bookmark = typeof bookmarks.$inferSelect;
@@ -141,3 +171,9 @@ export type Tag = typeof tags.$inferSelect;
 
 export type InsertBookmarkTag = z.infer<typeof insertBookmarkTagSchema>;
 export type BookmarkTag = typeof bookmarkTags.$inferSelect;
+
+export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
+export type ChatSession = typeof chatSessions.$inferSelect;
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;

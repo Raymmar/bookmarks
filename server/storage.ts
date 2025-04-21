@@ -6,7 +6,9 @@ import {
   insights, Insight, InsertInsight,
   activities, Activity, InsertActivity,
   tags, Tag, InsertTag,
-  bookmarkTags, BookmarkTag, InsertBookmarkTag
+  bookmarkTags, BookmarkTag, InsertBookmarkTag,
+  chatSessions, ChatSession, InsertChatSession,
+  chatMessages, ChatMessage, InsertChatMessage
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -59,6 +61,18 @@ export interface IStorage {
   getBookmarksByTagId(tagId: string): Promise<Bookmark[]>;
   addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag>;
   removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean>;
+  
+  // Chat Sessions
+  getChatSessions(): Promise<ChatSession[]>;
+  getChatSession(id: string): Promise<ChatSession | undefined>;
+  createChatSession(session: InsertChatSession): Promise<ChatSession>;
+  updateChatSession(id: string, session: Partial<InsertChatSession>): Promise<ChatSession | undefined>;
+  deleteChatSession(id: string): Promise<boolean>;
+  
+  // Chat Messages
+  getChatMessagesBySessionId(sessionId: string): Promise<ChatMessage[]>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  deleteChatMessagesBySessionId(sessionId: string): Promise<boolean>;
 }
 
 // In-memory storage implementation as a fallback
