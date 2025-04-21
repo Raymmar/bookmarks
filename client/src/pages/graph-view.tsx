@@ -112,8 +112,14 @@ export default function GraphView() {
     bookmarkTagsMap.set(bookmark.id, bookmark.tags.map(tag => tag.name));
   });
   
+  // Create a map of bookmarks with tags by ID for easier access
+  const bookmarksWithTagsMap = new Map<string, BookmarkWithTags>();
+  bookmarksWithTags.forEach(bookmark => {
+    bookmarksWithTagsMap.set(bookmark.id, bookmark);
+  });
+  
   // Filter bookmarks based on search query, selected tags, and domain
-  const filteredBookmarks = bookmarks.filter(bookmark => {
+  const filteredBookmarkIds = bookmarks.filter(bookmark => {
     // Get this bookmark's tags from our map
     const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
     const bookmarkSystemTags = bookmark.system_tags || [];
@@ -171,7 +177,12 @@ export default function GraphView() {
     } else {
       return selectedTags.every(tag => allBookmarkTags.includes(tag));
     }
-  });
+  }).map(bookmark => bookmark.id);
+  
+  // Filter bookmarksWithTags based on the filtered bookmark IDs
+  const filteredBookmarks = bookmarksWithTags.filter(bookmark => 
+    filteredBookmarkIds.includes(bookmark.id)
+  );
   
   // Sort bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
