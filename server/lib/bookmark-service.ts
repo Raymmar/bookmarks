@@ -18,12 +18,12 @@ import {
 } from '../../shared/schema';
 import { normalizeUrl, areUrlsEquivalent } from '../../shared/url-service';
 import { 
-  extractMetadata, 
   processContent, 
   generateEmbedding,
   generateTags, 
   generateInsights
 } from './content-processor';
+import { extractMetadata } from './metadata-extractor';
 
 export interface BookmarkCreationOptions {
   url: string;
@@ -234,8 +234,7 @@ export class BookmarkService {
             // Create the tag if it doesn't exist
             tag = await this.storage.createTag({
               name: tagName,
-              type: "user",
-              count: 0
+              type: "user"
             });
           }
           
@@ -277,15 +276,16 @@ export class BookmarkService {
       try {
         await this.storage.createScreenshot({
           bookmark_id: bookmark.id,
-          url: options.screenshotUrl,
-          timestamp: new Date()
+          image_url: options.screenshotUrl,
+          uploaded_at: new Date()
         });
         
         // Create activity for screenshot
         await this.storage.createActivity({
           bookmark_id: bookmark.id,
           bookmark_title: bookmark.title,
-          type: "screenshot_added",
+          type: "bookmark_added", // Use an enum-compatible type
+          content: "Screenshot added",
           timestamp: new Date()
         });
       } catch (error) {
@@ -300,8 +300,7 @@ export class BookmarkService {
           await this.storage.createHighlight({
             bookmark_id: bookmark.id,
             quote: highlight.quote,
-            note: highlight.noteText || null,
-            timestamp: new Date()
+            // Note: don't include noteText as a property on highlight entity
           });
           
           // Create activity for highlight
@@ -395,8 +394,7 @@ export class BookmarkService {
           // Create the tag if it doesn't exist
           tag = await this.storage.createTag({
             name: tagName,
-            type: "user",
-            count: 0
+            type: "user"
           });
         }
         
