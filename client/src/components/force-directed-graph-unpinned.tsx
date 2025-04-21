@@ -894,7 +894,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   }, [bookmarks, insightLevel, generateGraphData, centerGraph, getLinkColor, 
       getNodeColor, handleNodeClick, handleNodeHover, dragstarted, dragged, dragended]);
 
-  // Listen for external node selection
+  // Listen for external node selection and tag changes
   useEffect(() => {
     const handleSelectNode = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -907,6 +907,25 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       
       // Center the graph on the selected node
       centerOnNode(nodeId);
+    };
+    
+    // Handle tag changed events from other components
+    const handleTagChanged = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (!customEvent.detail) return;
+      
+      const { bookmarkId, tagId, action, tagName } = customEvent.detail;
+      
+      console.log(`Tag change detected: ${action} tag ${tagId} ${tagName ? `(${tagName})` : ''} to/from bookmark ${bookmarkId}`);
+      
+      // Force update of the graph data
+      if (graphInitializedRef.current && simulationRef.current) {
+        // Schedule an update after a slight delay to ensure the server data is refreshed
+        setTimeout(() => {
+          console.log("Refreshing graph for tag change");
+          updateGraphData();
+        }, 100);
+      }
     };
     
     // Handle centerFullGraph event to reset view when detail is closed
@@ -975,13 +994,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     // Add event listeners
     document.addEventListener('selectGraphNode', handleSelectNode);
     document.addEventListener('centerFullGraph', handleCenterFullGraph);
+    document.addEventListener('tagChanged', handleTagChanged); // Listen for tag change events
     
     // Clean up on unmount
     return () => {
       document.removeEventListener('selectGraphNode', handleSelectNode);
       document.removeEventListener('centerFullGraph', handleCenterFullGraph);
+      document.removeEventListener('tagChanged', handleTagChanged);
     };
-  }, [centerOnNode, getNodeColor, centerGraph]);
+  }, [centerOnNode, getNodeColor, centerGraph, updateGraphData]);
   
   // Update selected node visually without redrawing graph
   useEffect(() => {

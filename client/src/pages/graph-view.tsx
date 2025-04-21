@@ -52,7 +52,7 @@ export default function GraphView() {
   });
 
   // Fetch bookmark-tag associations for each bookmark
-  const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags } = useQuery<BookmarkWithTags[]>({
+  const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags, refetch: refetchBookmarkTags } = useQuery<BookmarkWithTags[]>({
     queryKey: ["/api/bookmarks-with-tags"],
     enabled: !isLoadingBookmarks && !isLoadingTags,
     queryFn: async () => {
@@ -80,6 +80,28 @@ export default function GraphView() {
       }));
     }
   });
+  
+  // Listen for tag changes to refresh the data
+  useEffect(() => {
+    const handleTagChanged = (event: CustomEvent) => {
+      console.log("Graph view detected tag change event, refreshing data");
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
+      
+      // Explicitly refetch the bookmarks with tags
+      refetchBookmarkTags();
+    };
+    
+    // Add event listener
+    document.addEventListener('tagChanged', handleTagChanged as EventListener);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('tagChanged', handleTagChanged as EventListener);
+    };
+  }, [queryClient, refetchBookmarkTags]);
   
   // Combined loading state
   const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags;
