@@ -6,9 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TagSelector } from "@/components/ui/tag-selector";
+import { useBookmarkMutations } from "@/hooks/use-bookmark-mutations";
 
 interface AddBookmarkDialogProps {
   open: boolean;
@@ -44,6 +45,9 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
     }
   }, [open]);
 
+  // Use our bookmark mutation hook for optimistic updates
+  const { createBookmark } = useBookmarkMutations();
+
   const handleSubmit = async () => {
     if (!url) {
       toast({
@@ -57,6 +61,9 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
     setIsSubmitting(true);
 
     try {
+      // Import the API request function directly to avoid TypeScript errors
+      const { apiRequest } = await import('@/lib/queryClient');
+      
       // Check if the URL already exists as a bookmark
       const urlCheckResult = await apiRequest("POST", "/api/url/normalize", { url });
       
@@ -73,38 +80,11 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         return;
       }
       
-      // Create a temporary optimistic bookmark entry
-      const tempTitle = url.split("/").pop() || url;
-      const tempId = `temp-${Date.now()}`;
-      const optimisticBookmark = {
-        id: tempId,
-        url,
-        title: tempTitle,
-        description: notes ? notes.substring(0, 100) : "",
-        content_html: "",
-        date_saved: new Date().toISOString(),
-        system_tags: [],
-        user_tags: selectedTags,
-        thumbnail_url: null,
-        source: "web",
-        reading_time: 0
-      };
-      
-      // Update the cache optimistically
-      queryClient.setQueryData(["/api/bookmarks"], (oldData: any) => {
-        // If we have existing data, add our new bookmark to it
-        if (Array.isArray(oldData)) {
-          return [optimisticBookmark, ...oldData];
-        }
-        // If we don't have data yet, create an array with just our new bookmark
-        return [optimisticBookmark];
-      });
-      
-      // Create the bookmark using the centralized bookmark service API
+      // Create the bookmark using our mutation hook - this will handle optimistic updates
       // The bookmark service will handle tag creation, association, metadata extraction, etc.
-      const bookmark = await apiRequest("POST", "/api/bookmarks", {
+      await createBookmark.mutateAsync({
         url,
-        title: tempTitle, 
+        title: url.split("/").pop() || url, 
         description: notes ? notes.substring(0, 100) : "", 
         notes,
         tags: selectedTags,
@@ -113,30 +93,6 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         source: "web"
       });
       
-      console.log("Created bookmark:", bookmark);
-      
-      // Refresh tags and bookmarks data
-      await queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      
-      toast({
-        title: "Bookmark added",
-        description: autoExtract 
-          ? "Your bookmark was successfully added. AI processing will continue in the background." 
-          : "Your bookmark was successfully added with all associated data",
-      });
-      
-      // If auto-extract is enabled, show a separate toast with helpful information
-      if (autoExtract) {
-        setTimeout(() => {
-          toast({
-            title: "AI Processing in Progress",
-            description: "We're analyzing this page in the background. Check back in a few minutes to see AI-generated tags and insights.",
-            duration: 8000 // Show this message a bit longer
-          });
-        }, 1000);
-      }
-
       // Reset form
       setUrl("");
       setSelectedTags([]);
