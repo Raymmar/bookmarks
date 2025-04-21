@@ -118,10 +118,13 @@ export default function GraphView() {
       const nodeId = `bookmark-${id}`;
       
       // Use custom event to notify the graph component to select and center this node
+      // Adding a source parameter to track where the selection came from (for debugging)
       const event = new CustomEvent('selectGraphNode', { 
-        detail: { nodeId: nodeId } 
+        detail: { nodeId: nodeId, source: 'bookmarkSelection' } 
       });
       document.dispatchEvent(event);
+      
+      console.log(`Dispatched selectGraphNode event for node ${nodeId}`);
     }, 100);
   };
   
