@@ -79,6 +79,116 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
       setOptimisticNotes([]);
     }
   }, [bookmark]);
+  
+  // Check AI processing status
+  useEffect(() => {
+    if (bookmark) {
+      // Set initial status based on bookmark data
+      if (bookmark.ai_processing_status) {
+        setAiProcessingStatus(bookmark.ai_processing_status as any);
+      } else {
+        // Check if we have insights or system tags
+        const hasInsights = bookmark.insights && Object.keys(bookmark.insights).length > 0;
+        const hasSystemTags = tags.some(tag => tag.type === 'system');
+        
+        if (hasInsights || hasSystemTags) {
+          setAiProcessingStatus('completed');
+        } else {
+          setAiProcessingStatus('pending');
+        }
+      }
+      
+      // Fetch the current processing status
+      const checkProcessingStatus = async () => {
+        try {
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
+          if (response.ok) {
+            const statusData = await response.json();
+            
+            if (statusData.aiProcessingComplete) {
+              setAiProcessingStatus('completed');
+            }
+          }
+        } catch (error) {
+          console.error("Error checking AI processing status:", error);
+        }
+      };
+      
+      checkProcessingStatus();
+    }
+  }, [bookmark, tags]);
+  
+  // Trigger AI processing for the bookmark
+  const handleTriggerAiProcessing = async () => {
+    if (!bookmark) return;
+    
+    setIsProcessingAi(true);
+    setAiProcessingStatus('processing');
+    
+    try {
+      await apiRequest("POST", `/api/bookmarks/${bookmark.id}/process`, {
+        insightDepth: 2 // Request deeper insights
+      });
+      
+      toast({
+        title: "AI processing started",
+        description: "The AI analysis has been triggered and will run in the background",
+      });
+      
+      // Poll for status updates
+      const checkInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
+          if (response.ok) {
+            const statusData = await response.json();
+            
+            if (statusData.aiProcessingComplete) {
+              clearInterval(checkInterval);
+              setAiProcessingStatus('completed');
+              setIsProcessingAi(false);
+              
+              // Refresh bookmark data
+              queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+              queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+              
+              toast({
+                title: "AI processing complete",
+                description: "The bookmark has been analyzed and insights are now available",
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error checking processing status:", error);
+        }
+      }, 5000); // Check every 5 seconds
+      
+      // Clear interval after 60 seconds (timeout)
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        if (aiProcessingStatus === 'processing') {
+          setAiProcessingStatus('failed');
+          setIsProcessingAi(false);
+          
+          toast({
+            title: "AI processing timed out",
+            description: "The AI analysis is taking longer than expected. Try again later.",
+            variant: "destructive"
+          });
+        }
+      }, 60000);
+      
+    } catch (error) {
+      console.error("Error triggering AI processing:", error);
+      setAiProcessingStatus('failed');
+      setIsProcessingAi(false);
+      
+      toast({
+        title: "Error processing bookmark",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (!bookmark) {
     return (
@@ -368,14 +478,100 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
           </a>
         </div>
         
-        {bookmark.insights?.summary && (
-          <div className="mb-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Summary</h4>
-            <p className="text-sm text-gray-600">
-              {bookmark.insights.summary}
-            </p>
+        {/* AI Insights Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-700">AI Insights</h4>
+            {/* AI Processing Status & Trigger Button */}
+            {aiProcessingStatus === 'pending' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 text-xs font-medium"
+                onClick={handleTriggerAiProcessing}
+                disabled={isProcessingAi}
+              >
+                <Brain className="h-3.5 w-3.5 mr-1" />
+                Analyze Content
+              </Button>
+            )}
+            {aiProcessingStatus === 'processing' && (
+              <div className="flex items-center text-xs text-amber-600">
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                Processing...
+              </div>
+            )}
+            {aiProcessingStatus === 'completed' && bookmark.insights?.summary && (
+              <div className="flex items-center text-xs text-green-600">
+                <RefreshCw 
+                  className="h-3.5 w-3.5 mr-1 cursor-pointer hover:text-primary" 
+                  onClick={handleTriggerAiProcessing}
+                />
+                <span title="Re-analyze content">Analysis Complete</span>
+              </div>
+            )}
+            {aiProcessingStatus === 'completed' && !bookmark.insights?.summary && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 text-xs font-medium"
+                onClick={handleTriggerAiProcessing}
+                disabled={isProcessingAi}
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                Re-analyze
+              </Button>
+            )}
+            {aiProcessingStatus === 'failed' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 text-xs text-destructive font-medium"
+                onClick={handleTriggerAiProcessing}
+                disabled={isProcessingAi}
+              >
+                <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                Retry Analysis
+              </Button>
+            )}
           </div>
-        )}
+          
+          {bookmark.insights?.summary ? (
+            <div>
+              <h5 className="text-xs font-medium text-gray-600 mb-1">Summary</h5>
+              <p className="text-sm text-gray-600 mb-3">
+                {bookmark.insights.summary}
+              </p>
+              
+              {bookmark.insights.related_links && bookmark.insights.related_links.length > 0 && (
+                <div>
+                  <h5 className="text-xs font-medium text-gray-600 mb-1">Related Links</h5>
+                  <ul className="text-sm text-blue-600 space-y-1">
+                    {bookmark.insights.related_links.map((link: string, index: number) => (
+                      <li key={index}>
+                        <a 
+                          href={link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="hover:underline truncate block"
+                        >
+                          {link}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 italic">
+              {aiProcessingStatus === 'pending' && "AI hasn't analyzed this content yet. Click 'Analyze Content' to start."}
+              {aiProcessingStatus === 'processing' && "AI is currently analyzing this content..."}
+              {aiProcessingStatus === 'completed' && "No insights available. Try re-analyzing the content."}
+              {aiProcessingStatus === 'failed' && "AI analysis failed. Please try again."}
+            </div>
+          )}
+        </div>
         
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
