@@ -5,6 +5,16 @@ import { Pencil, Trash2, Clock, FileText, SquareStack } from "lucide-react";
 import { Bookmark } from "@shared/types";
 import { formatDate, truncateText } from "@/lib/utils";
 import { Link } from "wouter";
+import { useEffect, useState } from "react";
+
+// Tag interface
+interface Tag {
+  id: string;
+  name: string;
+  type: string;
+  count: number;
+  created_at: string;
+}
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
@@ -13,6 +23,24 @@ interface BookmarkCardProps {
 }
 
 export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) {
+  const [tags, setTags] = useState<Tag[]>([]);
+  
+  // Fetch tags for this bookmark
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+        if (response.ok) {
+          const bookmarkTags = await response.json();
+          setTags(bookmarkTags);
+        }
+      } catch (error) {
+        console.error("Error fetching tags for bookmark:", error);
+      }
+    };
+    
+    fetchTags();
+  }, [bookmark.id]);
   return (
     <Card className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
       <CardContent className="p-4">
@@ -48,14 +76,15 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
         </div>
         
         <div className="flex flex-wrap gap-1 mb-3">
-          {bookmark.user_tags.concat(bookmark.system_tags).slice(0, 3).map((tag, index) => (
+          {/* Get tag names from normalized tags and combine with system_tags */}
+          {[...tags.map(tag => tag.name), ...(bookmark.system_tags || [])].slice(0, 3).map((tag, index) => (
             <Badge key={index} variant="outline" className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
               {tag}
             </Badge>
           ))}
-          {bookmark.user_tags.concat(bookmark.system_tags).length > 3 && (
+          {tags.length + (bookmark.system_tags?.length || 0) > 3 && (
             <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">
-              +{bookmark.user_tags.concat(bookmark.system_tags).length - 3} more
+              +{tags.length + (bookmark.system_tags?.length || 0) - 3} more
             </Badge>
           )}
         </div>

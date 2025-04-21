@@ -3,6 +3,16 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { Bookmark } from "@shared/types";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
+import { useEffect, useState } from "react";
+
+// Tag interface
+interface Tag {
+  id: string;
+  name: string;
+  type: string;
+  count: number;
+  created_at: string;
+}
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
@@ -11,6 +21,30 @@ interface BookmarkCardProps {
 }
 
 function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
+  const [tags, setTags] = useState<Tag[]>([]);
+  
+  // Fetch tags for this bookmark
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+        if (response.ok) {
+          const bookmarkTags = await response.json();
+          setTags(bookmarkTags);
+        }
+      } catch (error) {
+        console.error("Error fetching tags for bookmark:", error);
+      }
+    };
+    
+    fetchTags();
+  }, [bookmark.id]);
+  
+  // Prepare tag names for display
+  const tagNames = tags.map(tag => tag.name);
+  const systemTags = bookmark.system_tags || [];
+  const allTags = [...tagNames, ...systemTags];
+  
   return (
     <div 
       className={`p-3 rounded-lg border cursor-pointer transition-all ${
@@ -23,14 +57,14 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
       <h3 className="font-medium mb-1 line-clamp-1">{bookmark.title}</h3>
       <p className="text-xs text-gray-500 mb-2 truncate">{bookmark.url}</p>
       <div className="flex flex-wrap gap-1">
-        {bookmark.user_tags.concat(bookmark.system_tags).slice(0, 3).map((tag, i) => (
+        {allTags.slice(0, 3).map((tag, i) => (
           <Badge key={i} variant="outline" className="text-xs">
             {tag}
           </Badge>
         ))}
-        {bookmark.user_tags.concat(bookmark.system_tags).length > 3 && (
+        {allTags.length > 3 && (
           <Badge variant="outline" className="text-xs">
-            +{bookmark.user_tags.concat(bookmark.system_tags).length - 3}
+            +{allTags.length - 3}
           </Badge>
         )}
       </div>

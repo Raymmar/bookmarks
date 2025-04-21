@@ -3,7 +3,16 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { Bookmark, Highlight, Note } from "@shared/types";
 import { formatDate } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// Tag interface
+interface Tag {
+  id: string;
+  name: string;
+  type: string;
+  count: number;
+  created_at: string;
+}
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +26,27 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
   const { toast } = useToast();
+  
+  // Fetch tags for this bookmark
+  useEffect(() => {
+    if (bookmark) {
+      const fetchTags = async () => {
+        try {
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+          if (response.ok) {
+            const bookmarkTags = await response.json();
+            setTags(bookmarkTags);
+          }
+        } catch (error) {
+          console.error("Error fetching tags for bookmark:", error);
+        }
+      };
+      
+      fetchTags();
+    }
+  }, [bookmark?.id]);
 
   if (!bookmark) {
     return (
@@ -104,11 +133,15 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
         <div className="mb-4">
           <h4 className="text-sm font-medium text-gray-700 mb-2">Tags</h4>
           <div className="flex flex-wrap gap-1">
-            {bookmark.user_tags.concat(bookmark.system_tags).map((tag, index) => (
+            {/* Combine normalized tags with system tags */}
+            {[...tags.map(tag => tag.name), ...(bookmark.system_tags || [])].map((tag, index) => (
               <Badge key={index} variant="outline" className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
                 {tag}
               </Badge>
             ))}
+            {tags.length === 0 && (!bookmark.system_tags || bookmark.system_tags.length === 0) && (
+              <div className="text-sm text-gray-500 italic">No tags</div>
+            )}
           </div>
         </div>
         
