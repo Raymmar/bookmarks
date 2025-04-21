@@ -509,6 +509,60 @@ export class MemStorage implements IStorage {
     
     return allDeleted;
   }
+  
+  // Settings
+  async getSettings(): Promise<Setting[]> {
+    return Array.from(this.settings.values());
+  }
+  
+  async getSetting(key: string): Promise<Setting | undefined> {
+    // Find setting by key (case-sensitive match)
+    return Array.from(this.settings.values()).find(setting => setting.key === key);
+  }
+  
+  async createSetting(setting: InsertSetting): Promise<Setting> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    // Create the new setting
+    const newSetting: Setting = {
+      id,
+      key: setting.key,
+      value: setting.value,
+      description: setting.description || null,
+      updated_at: now
+    };
+    
+    // Save by ID for consistency, but also get by key
+    this.settings.set(id, newSetting);
+    return newSetting;
+  }
+  
+  async updateSetting(key: string, value: string): Promise<Setting | undefined> {
+    // Find the setting by key
+    const setting = Array.from(this.settings.values()).find(setting => setting.key === key);
+    if (!setting) return undefined;
+    
+    // Update the setting
+    const updatedSetting: Setting = {
+      ...setting,
+      value,
+      updated_at: new Date()
+    };
+    
+    // Update in map
+    this.settings.set(setting.id, updatedSetting);
+    return updatedSetting;
+  }
+  
+  async deleteSetting(key: string): Promise<boolean> {
+    // Find the setting by key
+    const setting = Array.from(this.settings.values()).find(setting => setting.key === key);
+    if (!setting) return false;
+    
+    // Delete the setting
+    return this.settings.delete(setting.id);
+  }
 }
 
 // PostgreSQL database storage implementation
@@ -941,6 +995,58 @@ export class DatabaseStorage implements IStorage {
       .delete(chatMessages)
       .where(eq(chatMessages.session_id, sessionId))
       .returning({ id: chatMessages.id });
+    
+    return result.length > 0;
+  }
+  
+  // Settings
+  async getSettings(): Promise<Setting[]> {
+    return await db
+      .select()
+      .from(settings)
+      .orderBy(settings.key);
+  }
+  
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const result = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key))
+      .limit(1);
+    
+    return result[0];
+  }
+  
+  async createSetting(setting: InsertSetting): Promise<Setting> {
+    const [newSetting] = await db
+      .insert(settings)
+      .values({
+        ...setting,
+        updated_at: new Date()
+      })
+      .returning();
+    
+    return newSetting;
+  }
+  
+  async updateSetting(key: string, value: string): Promise<Setting | undefined> {
+    const result = await db
+      .update(settings)
+      .set({
+        value,
+        updated_at: new Date()
+      })
+      .where(eq(settings.key, key))
+      .returning();
+    
+    return result[0];
+  }
+  
+  async deleteSetting(key: string): Promise<boolean> {
+    const result = await db
+      .delete(settings)
+      .where(eq(settings.key, key))
+      .returning({ id: settings.id });
     
     return result.length > 0;
   }

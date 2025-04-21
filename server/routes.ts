@@ -8,7 +8,7 @@ import {
   insertBookmarkSchema, insertNoteSchema, insertHighlightSchema, 
   insertScreenshotSchema, insertInsightSchema, insertActivitySchema,
   insertTagSchema, insertBookmarkTagSchema, 
-  insertChatSessionSchema, insertChatMessageSchema
+  insertChatSessionSchema, insertChatMessageSchema, insertSettingSchema
 } from "@shared/schema";
 import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 
