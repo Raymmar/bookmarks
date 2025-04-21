@@ -30,9 +30,10 @@ interface ForceDirectedGraphProps {
   onNodeClick: (bookmarkId: string) => void;
   onTagClick?: (tagName: string) => void;
   onDomainClick?: (domainName: string) => void;
+  selectedBookmarkId?: string | null;
 }
 
-export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTagClick, onDomainClick }: ForceDirectedGraphProps): JSX.Element {
+export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTagClick, onDomainClick, selectedBookmarkId }: ForceDirectedGraphProps): JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
@@ -935,6 +936,39 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       updateGraphData();
     }
   }, [bookmarks, insightLevel, updateGraphData]);
+  
+  // Effect for handling the selected bookmark
+  useEffect(() => {
+    if (!selectedBookmarkId || !svgRef.current || !simulationRef.current) return;
+    
+    // Set the selected node in state
+    setSelectedNode(selectedBookmarkId);
+    
+    // Highlight the selected node and center the graph on it and its connections
+    const selectedNode = simulationRef.current.nodes().find(n => n.id === selectedBookmarkId);
+    if (selectedNode) {
+      // Find directly connected nodes for better focus context
+      const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+      const connectedNodes = simulationRef.current.nodes().filter(n => {
+        return links.links().some(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+          return (sourceId === selectedBookmarkId && targetId === n.id) || 
+                 (sourceId === n.id && targetId === selectedBookmarkId);
+        });
+      });
+      
+      // Center on the selected node and its connections
+      centerGraph([selectedNode, ...connectedNodes]);
+      
+      // Visually highlight the node
+      d3.select(svgRef.current)
+        .select(`#node-${selectedBookmarkId}`)
+        .select('circle')
+        .attr('stroke-width', 4)
+        .attr('r', (d: any) => d.type === "bookmark" ? 10 : 8);
+    }
+  }, [selectedBookmarkId, centerGraph]);
 
   return (
     <div className="w-full h-full relative" ref={containerRef}>
