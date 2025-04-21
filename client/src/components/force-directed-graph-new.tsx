@@ -446,32 +446,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const svg = d3.select(svgRef.current);
     const { links } = graphDataRef.current;
     
-    // Check if we're in focus mode (selected node exists)
-    const isFocusMode = svg.classed("focus-mode-active");
-    
-    // If we're in focus mode, don't allow hover effects to override the focus
-    if (isFocusMode) {
-      // Just show the tooltip but preserve focus highlighting
-      if (isEntering) {
-        // Show tooltip with node info
-        d3.select("#tooltip")
-          .style("opacity", 1)
-          .html(`
-            <div>
-              <div class="font-medium text-base">${d.name}</div>
-              <div class="text-gray-600 text-xs my-1">Type: ${d.type}</div>
-              ${d.type === 'bookmark' && d.url ? 
-                `<div class="text-gray-500 text-xs truncate max-w-[200px]">${d.url}</div>` : ''}
-            </div>
-          `);
-      } else {
-        // Hide tooltip
-        d3.select("#tooltip").style("opacity", 0);
-      }
-      return; // Exit early, maintaining focus mode highlighting
-    }
-    
-    // Regular hover behavior when not in focus mode
     if (isEntering) {
       // Highlight connected nodes and links on hover
       const connectedLinks = links.filter(link => 
@@ -534,7 +508,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     const svg = d3.select(svgRef.current);
     
-    // Reset all nodes to default size and appearance
+    // Reset all nodes to default size
     svg.selectAll(".node circle")
       .attr("r", d => {
         const node = d as GraphNode;
@@ -547,13 +521,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         }
       })
       .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5)
-      .attr("stroke-opacity", 1)
-      .attr("stroke", "#ffffff"); // Reset stroke color
-    
-    // Reset all links to default appearance
-    svg.selectAll("line")
-      .attr("stroke-opacity", 0.6)
-      .attr("stroke-width", d => Math.sqrt((d as GraphLink).value));
+      .attr("stroke-opacity", 1);
     
     // If no node is selected, show all nodes and links
     if (!nodeId) {
@@ -562,7 +530,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       return;
     }
     
-    // Get the selected node's connected nodes and links
+    // Get the selected node's connected nodes
     const { links } = graphDataRef.current;
     
     // Find all connected links to the selected node
@@ -581,47 +549,54 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       else connectedNodeIds.add(sourceId);
     });
     
-    // Dim unconnected nodes and links significantly
-    svg.selectAll(".node").attr("opacity", 0.1);
-    svg.selectAll("line").attr("opacity", 0.05);
+    // Hide all nodes initially
+    svg.selectAll(".node").attr("opacity", 0.15);
+    svg.selectAll("line").attr("opacity", 0.1);
     
-    // Enhance selected node appearance
+    // Show only connected nodes
+    connectedNodeIds.forEach(id => {
+      svg.select(`#node-${id}`).attr("opacity", 1);
+    });
+    
+    // Show only connected links
+    connectedLinks.forEach(link => {
+      svg.select(`#link-${link.id}`).attr("opacity", 0.8);
+    });
+    
+    // Highlight the selected node
     const selectedElement = svg.select(`#node-${nodeId}`);
     if (!selectedElement.empty()) {
-      // Make the selected node larger and add a distinctive border
+      // Highlight just this node
       svg.select(`#node-${nodeId} circle`)
-        .attr("r", 14)
-        .attr("stroke-width", 4)
-        .attr("stroke", "#ff6b6b") // Bright red border for selected node
+        .attr("r", 12)
+        .attr("stroke-width", 3)
         .attr("stroke-opacity", 1);
-      
-      // Make selected node fully opaque
+        
+      // Dim other nodes slightly to make selected node stand out
+      svg.selectAll(".node").attr("opacity", 0.7);
+      svg.selectAll("line").attr("opacity", 0.4);
       svg.select(`#node-${nodeId}`).attr("opacity", 1);
       
-      // Highlight connected nodes and links
-      connectedNodeIds.forEach(id => {
-        if (id !== nodeId) {
-          // Connected nodes get a different visual treatment
-          svg.select(`#node-${id}`)
-            .attr("opacity", 0.9);
+      // Find and highlight connected nodes/links
+      const graphData = graphDataRef.current;
+      if (graphData) {
+        const connectedLinks = graphData.links.filter(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+          return sourceId === nodeId || targetId === nodeId;
+        });
+        
+        // Highlight connected nodes
+        connectedLinks.forEach(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
           
-          svg.select(`#node-${id} circle`)
-            .attr("stroke-width", 3)
-            .attr("stroke", "#4dabf7"); // Blue border for connected nodes
-        }
-      });
-      
-      // Enhance connected links
-      connectedLinks.forEach(link => {
-        svg.select(`#link-${link.id}`)
-          .attr("opacity", 0.9)
-          .attr("stroke-width", Math.sqrt(link.value) + 1)
-          .attr("stroke-opacity", 0.9);
-      });
+          const otherNodeId = sourceId === nodeId ? targetId : sourceId;
+          svg.select(`#node-${otherNodeId}`).attr("opacity", 1);
+          svg.select(`#link-${link.id}`).attr("opacity", 0.8);
+        });
+      }
     }
-    
-    // Apply a class to the SVG to indicate focus mode is active
-    svg.classed("focus-mode-active", !!nodeId);
   }, []);
 
   // Center on specific node or node group
@@ -765,18 +740,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
   }, [updateSelectedNode]);
 
-  // Handle background click to clear selection
-  const handleBackgroundClick = useCallback(() => {
-    // Clear the selected node if we have one
-    if (selectedNode) {
-      setSelectedNode(null);
-      // Reset the graph to show all nodes
-      updateSelectedNode(null);
-      // Notify parent component
-      onNodeClick("");
-    }
-  }, [selectedNode, updateSelectedNode, onNodeClick]);
-
   // Initialize the graph
   const initializeGraph = useCallback(() => {
     if (!svgRef.current || !containerRef.current || !bookmarks.length) return;
@@ -795,8 +758,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Setup the SVG
     const svg = d3.select(svgRef.current)
       .attr("width", width)
-      .attr("height", height)
-      .on("click", handleBackgroundClick); // Add background click to clear selection
+      .attr("height", height);
     
     // Clear any previous content
     svg.selectAll("*").remove();
