@@ -972,16 +972,31 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       }
     };
     
+    // Add a handler for bookmark added events
+    const handleBookmarkAdded = (event: any) => {
+      console.log("Bookmark added event received, updating graph visualization");
+      if (graphInitializedRef.current) {
+        // A slight delay allows for the cache to be properly updated
+        setTimeout(() => {
+          updateGraphData();
+          // Center graph with slight delay to allow for data processing
+          setTimeout(() => centerGraph(), 200);
+        }, 100);
+      }
+    };
+    
     // Add event listeners
     document.addEventListener('selectGraphNode', handleSelectNode);
     document.addEventListener('centerFullGraph', handleCenterFullGraph);
+    document.addEventListener('bookmarkAdded', handleBookmarkAdded);
     
     // Clean up on unmount
     return () => {
       document.removeEventListener('selectGraphNode', handleSelectNode);
       document.removeEventListener('centerFullGraph', handleCenterFullGraph);
+      document.removeEventListener('bookmarkAdded', handleBookmarkAdded);
     };
-  }, [centerOnNode, getNodeColor, centerGraph]);
+  }, [centerOnNode, getNodeColor, centerGraph, updateGraphData]);
   
   // Update selected node visually without redrawing graph
   useEffect(() => {
