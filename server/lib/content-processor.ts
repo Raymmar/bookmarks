@@ -265,17 +265,25 @@ export async function generateChatResponse(
       bookmarks.map(async (bookmark) => {
         const insights = await storage.getInsightByBookmarkId(bookmark.id);
         const highlights = await storage.getHighlightsByBookmarkId(bookmark.id);
+        const normalizedTags = await storage.getTagsByBookmarkId(bookmark.id);
         
         let highlightsText = "";
         if (highlights && highlights.length > 0) {
           highlightsText = "Highlights:\n" + highlights.map(h => `- ${h.quote}`).join("\n");
         }
         
+        // Get all tags for this bookmark
+        const normalizedTagNames = normalizedTags.map(tag => tag.name);
+        const systemTagNames = bookmark.system_tags || [];
+        const allTags = [...new Set([...normalizedTagNames, ...systemTagNames])];
+        const tagsText = allTags.length > 0 ? `Tags: ${allTags.join(', ')}` : "No tags";
+        
         return {
           title: bookmark.title,
           url: bookmark.url,
           summary: insights?.summary || "",
-          highlights: highlightsText
+          highlights: highlightsText,
+          tags: tagsText
         };
       })
     );
@@ -283,6 +291,7 @@ export async function generateChatResponse(
     // Create context for the AI
     const context = bookmarkContent.map((bookmark, index) => 
       `[${index + 1}] ${bookmark.title} (${bookmark.url})
+       ${bookmark.tags}
        ${bookmark.summary}
        ${bookmark.highlights}`
     ).join("\n\n");
@@ -297,6 +306,34 @@ export async function generateChatResponse(
       console.log("Warning: No bookmarks in context!");
     }
     
+    // Create filter information for AI
+    let filterInfo = "";
+    if (filters) {
+      const filterParts = [];
+      
+      if (filters.tags && filters.tags.length > 0) {
+        filterParts.push(`Tags: ${filters.tags.join(', ')}`);
+      }
+      
+      if (filters.startDate) {
+        const dateObj = new Date(filters.startDate);
+        filterParts.push(`Date Range: Starting from ${dateObj.toLocaleDateString()}`);
+      }
+      
+      if (filters.endDate) {
+        const dateObj = new Date(filters.endDate);
+        filterParts.push(`Date Range: Until ${dateObj.toLocaleDateString()}`);
+      }
+      
+      if (filters.source && filters.source.length > 0) {
+        filterParts.push(`Sources: ${filters.source.join(', ')}`);
+      }
+      
+      if (filterParts.length > 0) {
+        filterInfo = "Filters applied:\n" + filterParts.join("\n") + "\n\n";
+      }
+    }
+    
     // Send query to OpenAI
     const response = await openai.chat.completions.create({
       model: MODEL,
@@ -304,8 +341,9 @@ export async function generateChatResponse(
         {
           role: "system",
           content: `You are an AI assistant that helps users explore and understand their bookmarked content. 
-          You have access to the following bookmarks (with their summaries and highlights). 
-          Answer the user's question based on this information. If you don't know, say so.
+          You have access to the following bookmarks (with their summaries and highlights).
+          ${filterInfo ? `The user has applied the following filters to narrow down the bookmarks: \n${filterInfo}` : ''}
+          Answer the user's question based on this information. If asked about filters or tags, mention the filters that have been applied.
           
           ${context}`
         },
