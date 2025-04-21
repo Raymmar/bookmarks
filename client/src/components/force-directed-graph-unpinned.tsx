@@ -909,14 +909,79 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       centerOnNode(nodeId);
     };
     
-    // Add event listener
+    // Handle centerFullGraph event to reset view when detail is closed
+    const handleCenterFullGraph = (event: Event) => {
+      // Skip if there is no graph data
+      if (!simulationRef.current || !svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+      
+      // When event is received, reset the selection state
+      setSelectedNode(null);
+      
+      // Reset visual styling of nodes and links to their default state
+      const svg = d3.select(svgRef.current);
+      
+      // Reset all nodes and links to default appearance
+      svg.selectAll('.node')
+        .style('opacity', 1)
+        .select('circle')
+        .attr('stroke-width', (d: any) => d.type === "bookmark" ? 2 : 1.5)
+        .attr('stroke', (d: any) => {
+          if (d.type === "bookmark") return d3.rgb(getNodeColor(d.type, d.group)).darker(0.8).toString();
+          return d3.rgb(getNodeColor(d.type, d.group)).darker(0.5).toString();
+        })
+        .attr('r', (d: any) => {
+          switch (d.type) {
+            case "bookmark": return 8;
+            case "related": return 6;
+            case "domain": return 7;
+            case "tag": return 5;
+            default: return 6;
+          }
+        })
+        .style('filter', null);
+        
+      // Reset text labels
+      svg.selectAll('.node text')
+        .style('opacity', 0.9)
+        .style('font-weight', 'normal')
+        .style('font-size', '12px');
+        
+      svg.selectAll('.link')
+        .style('opacity', 0.6)
+        .attr('stroke-width', (d: any) => Math.sqrt(d.value));
+      
+      // Get container dimensions
+      const width = containerRef.current.clientWidth;
+      const height = containerRef.current.clientHeight;
+      
+      // Create a smooth zoom-out effect
+      svg.transition()
+        .duration(750) // Longer transition for smoother effect
+        .call(
+          zoomBehaviorRef.current.transform,
+          d3.zoomIdentity
+            .translate(width / 2, height / 2)
+            .scale(0.9) // Slightly zoomed out to see the whole graph
+        );
+      
+      // After reset, center on all nodes to ensure proper layout
+      if (simulationRef.current.nodes().length > 0) {
+        setTimeout(() => {
+          centerGraph(simulationRef.current.nodes());
+        }, 100);
+      }
+    };
+    
+    // Add event listeners
     document.addEventListener('selectGraphNode', handleSelectNode);
+    document.addEventListener('centerFullGraph', handleCenterFullGraph);
     
     // Clean up on unmount
     return () => {
       document.removeEventListener('selectGraphNode', handleSelectNode);
+      document.removeEventListener('centerFullGraph', handleCenterFullGraph);
     };
-  }, [centerOnNode]);
+  }, [centerOnNode, getNodeColor, centerGraph]);
   
   // Update selected node visually without redrawing graph
   useEffect(() => {
