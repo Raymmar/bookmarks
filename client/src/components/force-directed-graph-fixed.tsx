@@ -348,8 +348,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     }
   }, []);
   
-  // Center on specific node 
-  const centerOnNode = useCallback((nodeId: string) => {
+  // Center on specific node with optional animation speed control
+  const centerOnNode = useCallback((nodeId: string, animationDuration: number = 300) => {
     if (!simulationRef.current || !svgRef.current || !graphDataRef.current) return;
     
     const nodeData = simulationRef.current.nodes().find(n => n.id === nodeId);
@@ -455,9 +455,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         .scale(scale)
         .translate(-centerX, -centerY);
       
-      // Apply smoother transition
+      // Apply smoother transition with configurable duration
       svg.transition()
-        .duration(800)
+        .duration(animationDuration)
         .ease(d3.easeCubicOut)
         .call(zoomBehaviorRef.current.transform, transform);
     }
@@ -529,8 +529,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Highlight this node
     setSelectedNode(d.id);
     
-    // Center the graph on this node
-    centerOnNode(d.id);
+    // Center the graph on this node with a consistent speed for direct clicks
+    centerOnNode(d.id, 300);
     
     if (d.bookmarkId) {
       onNodeClick(d.bookmarkId);
@@ -1215,7 +1215,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
             
             d3.select(svgRef.current)
               .transition()
-              .duration(300) // Much faster transition for immediate feedback
+              .duration(300) // Consistent 300ms transition for immediate feedback
               .call(zoomBehaviorRef.current.transform, transform);
           }
         }
