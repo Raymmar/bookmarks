@@ -428,6 +428,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Highlight this node
     setSelectedNode(d.id);
     
+    // Center the graph on this node
+    centerOnNode(d.id);
+    
     if (d.bookmarkId) {
       onNodeClick(d.bookmarkId);
     } else if (d.type === "related" && d.url) {
@@ -437,7 +440,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         onNodeClick(matchingBookmark.id);
       }
     }
-  }, [bookmarks, onNodeClick]);
+  }, [bookmarks, onNodeClick, centerOnNode]);
 
   // Handle node hover effects
   const handleNodeHover = useCallback((event: MouseEvent, d: GraphNode, isEntering: boolean) => {
@@ -1225,9 +1228,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Restart with a higher alpha for better stabilization
     simulationRef.current.alpha(0.5).restart();
     
-    // Center the graph after data update (with a longer delay to allow simulation to stabilize)
+    // Only center the graph if no node is currently selected
+    // This avoids competing with manual node selection
     setTimeout(() => {
-      centerGraph(newGraphData.nodes);
+      if (!selectedNode) {
+        centerGraph(newGraphData.nodes);
+      }
     }, 300);
     
   }, [bookmarks, insightLevel, generateGraphData, centerGraph, getLinkColor, 
