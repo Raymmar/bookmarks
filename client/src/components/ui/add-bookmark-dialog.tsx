@@ -93,8 +93,21 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       
       toast({
         title: "Bookmark added",
-        description: "Your bookmark was successfully added with all associated data",
+        description: autoExtract 
+          ? "Your bookmark was successfully added. AI processing will continue in the background." 
+          : "Your bookmark was successfully added with all associated data",
       });
+      
+      // If auto-extract is enabled, show a separate toast with helpful information
+      if (autoExtract) {
+        setTimeout(() => {
+          toast({
+            title: "AI Processing in Progress",
+            description: "We're analyzing this page in the background. Check back in a few minutes to see AI-generated tags and insights.",
+            duration: 8000 // Show this message a bit longer
+          });
+        }, 1000);
+      }
 
       // Reset form
       setUrl("");

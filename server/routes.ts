@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from 'ws';
 import { storage } from "./storage";
 import { extractMetadata } from "./lib/metadata-extractor";
 import { processContent, generateEmbedding, generateInsights, generateTags, summarizeContent, generateChatResponse } from "./lib/content-processor";
@@ -14,128 +13,9 @@ import {
 import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 import { bookmarkService } from "./lib/bookmark-service";
 
-// WebSocket client tracker
-interface WebSocketClient {
-  socket: WebSocket;
-  isAlive: boolean;
-}
-
-// Map to track active WebSocket connections
-const webSocketClients = new Map<string, WebSocketClient>();
-
-// Function to broadcast messages to all connected clients
-function broadcastToAll(message: any) {
-  const messageStr = JSON.stringify(message);
-  webSocketClients.forEach((client) => {
-    if (client.socket.readyState === WebSocket.OPEN) {
-      client.socket.send(messageStr);
-    }
-  });
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
-  
-  // Set up WebSocket server on the same HTTP server as Express
-  const wss = new WebSocketServer({ 
-    server: httpServer,
-    path: '/ws' // Use a distinct path so it doesn't conflict with Vite's HMR websocket
-  });
-
-  // Set up WebSocket connection handling
-  wss.on('connection', (ws, req) => {
-    const clientId = Math.random().toString(36).substring(2, 15);
-    console.log(`WebSocket client connected: ${clientId}`);
-    
-    webSocketClients.set(clientId, { socket: ws, isAlive: true });
-    
-    // Handle client messages (we don't expect many, but good to handle)
-    ws.on('message', (message) => {
-      try {
-        // If we ever want to handle client messages in the future
-        const parsedMessage = JSON.parse(message.toString());
-        console.log('Received message:', parsedMessage);
-      } catch (error) {
-        console.error('Error parsing message:', error);
-      }
-    });
-    
-    // Handle client disconnection
-    ws.on('close', () => {
-      console.log(`WebSocket client disconnected: ${clientId}`);
-      webSocketClients.delete(clientId);
-    });
-    
-    // Set up ping-pong to detect dead connections
-    ws.on('pong', () => {
-      const client = webSocketClients.get(clientId);
-      if (client) {
-        client.isAlive = true;
-      }
-    });
-    
-    // Send a welcome message
-    ws.send(JSON.stringify({ 
-      type: 'connection', 
-      message: 'Connected to Universal Bookmarks WebSocket server' 
-    }));
-  });
-  
-  // Set up interval to ping clients and clean up dead connections
-  const pingInterval = setInterval(() => {
-    webSocketClients.forEach((client, id) => {
-      if (!client.isAlive) {
-        client.socket.terminate();
-        webSocketClients.delete(id);
-        return;
-      }
-      
-      client.isAlive = false;
-      client.socket.ping();
-    });
-  }, 30000); // Check every 30 seconds
-  
-  // Clean up interval on server close
-  wss.on('close', () => {
-    clearInterval(pingInterval);
-  });
-  
-  // Override the bookmarkService's processAiBookmarkData method to add WebSocket notifications
-  const originalProcessAiBookmarkData = bookmarkService.processAiBookmarkData.bind(bookmarkService);
-  bookmarkService.processAiBookmarkData = async (bookmarkId, url, content_html, insightDepth) => {
-    // Notify clients that AI processing is starting
-    broadcastToAll({
-      type: 'ai_processing_started',
-      bookmarkId,
-      timestamp: new Date(),
-      message: 'AI processing started'
-    });
-    
-    try {
-      // Call the original method
-      await originalProcessAiBookmarkData(bookmarkId, url, content_html, insightDepth);
-      
-      // Notify clients that AI processing is complete
-      broadcastToAll({
-        type: 'ai_processing_completed',
-        bookmarkId,
-        timestamp: new Date(),
-        message: 'AI processing completed successfully'
-      });
-    } catch (error) {
-      // Notify clients of errors
-      broadcastToAll({
-        type: 'ai_processing_error',
-        bookmarkId,
-        timestamp: new Date(),
-        message: `AI processing error: ${error.message}`
-      });
-      
-      // Re-throw to preserve original error handling
-      throw error;
-    }
-  };
 
   // Bookmarks API endpoints
   app.get("/api/bookmarks", async (req, res) => {
