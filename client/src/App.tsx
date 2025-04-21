@@ -8,6 +8,7 @@ import Home from "@/pages/home";
 import Activity from "@/pages/activity";
 import GraphView from "@/pages/graph-view";
 import AiChat from "@/pages/ai-chat";
+import Settings from "@/pages/settings";
 import MainLayout from "@/layouts/main-layout";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/" component={GraphView} />
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

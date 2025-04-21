@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Bookmark, FileText, Layers, HelpCircle, Circle } from "lucide-react";
+import { Bookmark, FileText, Layers, HelpCircle, Circle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
 
@@ -63,6 +63,19 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   )}>
                     <HelpCircle className="h-5 w-5 mr-2" />
                     AI Chat
+                  </a>
+                </Link>
+              </li>
+              <li className="mb-1">
+                <Link href="/settings">
+                  <a className={cn(
+                    "flex items-center px-2 py-2 text-sm rounded-lg",
+                    location === "/settings" 
+                      ? "bg-primary text-white" 
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}>
+                    <Settings className="h-5 w-5 mr-2" />
+                    Settings
                   </a>
                 </Link>
               </li>

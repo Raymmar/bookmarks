@@ -63,16 +63,35 @@ export async function generateInsights(
 ): Promise<{ summary: string; sentiment: number; tags: string[]; relatedLinks: string[] }> {
   try {
     const contentToAnalyze = content.slice(0, 8000); // Limit content to avoid token limits
+    
+    // Get custom bookmark system prompt from settings if available
+    let systemPrompt = `You are an AI assistant that analyzes web content and extracts insights. 
+    Analyze the content from the URL ${url} based on a depth level of ${depthLevel} (1-4, where 1 is on-page content only, 
+    4 is in-depth research sweep). Generate a concise summary, sentiment score (0-10), relevant tags (at least 3), 
+    and related links that might be valuable. Respond in JSON format.`;
+    
+    try {
+      const customPrompt = await storage.getSetting("bookmark_system_prompt");
+      if (customPrompt && customPrompt.value) {
+        systemPrompt = customPrompt.value;
+        // Add URL and depth level context if not already in the custom prompt
+        if (!systemPrompt.includes("URL") && url) {
+          systemPrompt += `\n\nThe content is from URL: ${url}`;
+        }
+        if (!systemPrompt.includes("depth") && depthLevel > 1) {
+          systemPrompt += `\n\nAnalyze at depth level: ${depthLevel} (1-4 scale)`;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not retrieve custom bookmark system prompt, using default:", err);
+    }
 
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: [
         {
           role: "system",
-          content: `You are an AI assistant that analyzes web content and extracts insights. 
-          Analyze the content from the URL ${url} based on a depth level of ${depthLevel} (1-4, where 1 is on-page content only, 
-          4 is in-depth research sweep). Generate a concise summary, sentiment score (0-10), relevant tags (at least 3), 
-          and related links that might be valuable. Respond in JSON format.`
+          content: systemPrompt
         },
         {
           role: "user",
