@@ -410,6 +410,45 @@ export default function GraphView() {
         
         {/* Filters display at the bottom of the graph area */}
         <div className="flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
+          {/* Bookmark filter indicator if a bookmark is selected */}
+          {selectedBookmarkId && (
+            <div className="mb-2 flex items-center">
+              <span className="text-sm text-gray-600 mr-2">Focused on:</span>
+              <Badge 
+                variant="default"
+                className="cursor-pointer bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  setSelectedBookmarkId(null);
+                  
+                  // Trigger zoom-out when clicking the badge
+                  setTimeout(() => {
+                    const event = new CustomEvent('centerFullGraph', { 
+                      detail: { source: 'closeBookmarkFilter' } 
+                    });
+                    document.dispatchEvent(event);
+                  }, 50);
+                }}
+              >
+                {selectedBookmark?.title || 'Bookmark'}
+                <X 
+                  className="h-3 w-3 ml-1" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBookmarkId(null);
+                    
+                    // Trigger zoom-out when clicking the X
+                    setTimeout(() => {
+                      const event = new CustomEvent('centerFullGraph', { 
+                        detail: { source: 'closeBookmarkFilter' } 
+                      });
+                      document.dispatchEvent(event);
+                    }, 50);
+                  }}
+                />
+              </Badge>
+            </div>
+          )}
+          
           {/* Domain filter indicator if selected */}
           {selectedDomain && (
             <div className="mb-2 flex items-center">
