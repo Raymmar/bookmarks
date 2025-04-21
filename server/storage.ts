@@ -9,7 +9,7 @@ import {
   bookmarkTags, BookmarkTag, InsertBookmarkTag
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
