@@ -69,6 +69,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         
         // Close dialog
         onOpenChange(false);
+        setIsSubmitting(false);
         return;
       }
       

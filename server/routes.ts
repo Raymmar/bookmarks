@@ -344,6 +344,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to normalize URL" });
     }
   });
+  
+  // Endpoint to check AI processing status
+  app.get("/api/bookmarks/:id/processing-status", async (req, res) => {
+    try {
+      const bookmarkId = req.params.id;
+      const bookmark = await storage.getBookmark(bookmarkId);
+      
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      // Check if insights exist for this bookmark
+      const insight = await storage.getInsightByBookmarkId(bookmarkId);
+      
+      // Get AI-generated tags
+      const allTags = await storage.getTagsByBookmarkId(bookmarkId);
+      const systemTags = allTags.filter(tag => tag.type === 'system');
+      
+      const processingComplete = insight !== undefined || systemTags.length > 0;
+      
+      return res.json({
+        bookmarkId,
+        aiProcessingComplete: processingComplete,
+        hasInsights: insight !== undefined,
+        insightCount: insight ? 1 : 0,
+        systemTagCount: systemTags.length
+      });
+    } catch (error) {
+      console.error("Error checking AI processing status:", error);
+      res.status(500).json({ error: "Failed to check AI processing status" });
+    }
+  });
 
   // AI Processing endpoints
   app.post("/api/embeddings", async (req, res) => {
