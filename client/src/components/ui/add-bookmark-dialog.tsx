@@ -94,8 +94,10 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       await Promise.all(tagAssociationPromises);
       console.log("Tag associations complete");
       
-      // Update tag counts
+      // Update tag counts and refetch tags to ensure UI is updated
       await queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      // Force refetch tags in other components like tag selector
+      await queryClient.refetchQueries({ queryKey: ["/api/tags"] });
       
       toast({
         title: "Bookmark added",

@@ -22,10 +22,15 @@ interface TagSelectorProps {
 export function TagSelector({ selectedTags, onTagsChange, className }: TagSelectorProps) {
   const [newTagText, setNewTagText] = useState("");
   
-  // Fetch all tags from the server
-  const { data: tags = [] } = useQuery<Tag[]>({
+  // Fetch all tags from the server with proper refetch options
+  const { 
+    data: tags = [],
+    refetch: refetchTags
+  } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
-    queryFn: getQueryFn({ on401: "returnNull" })
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    staleTime: 5000, // Consider data stale after 5 seconds
+    refetchOnWindowFocus: true, // Refresh when window gets focus
   });
   
   // Use useMemo instead of useEffect to prevent infinite loop
@@ -79,8 +84,11 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
         
         console.log("Created new tag:", newTag);
         
-        // Invalidate tags cache
+        // Invalidate tags cache and explicitly refetch
         queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+        
+        // Explicitly refetch tags to ensure UI updates immediately
+        await refetchTags();
         
         // Add new tag to selected tags
         onTagsChange([...selectedTags, tagName]);
