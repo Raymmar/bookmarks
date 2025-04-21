@@ -846,7 +846,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   ]);
   
   // Update graph data when bookmarks or insight level changes
-  const updateGraphData = useCallback(() => {
+  const updateGraphData = useCallback((shouldAutocenter: boolean = false) => {
     if (!simulationRef.current || !graphInitializedRef.current || !bookmarks.length) return;
     
     // Save positions of existing nodes to preserve layout when possible
@@ -1105,13 +1105,17 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Restart with a higher alpha for better stabilization
     simulationRef.current.alpha(0.5).restart();
     
-    // Only center the graph if no node is currently selected
-    // This avoids competing with manual node selection
-    setTimeout(() => {
-      if (!selectedNode) {
-        centerGraph(newGraphData.nodes);
-      }
-    }, 300);
+    // Only auto-center in certain situations to avoid disrupting user-initiated actions
+    if (shouldAutocenter || bookmarks.length <= 10) {
+      // For filtered views, we want to zoom in to show the filtered results
+      // Or if explicitly requested via shouldAutocenter parameter
+      setTimeout(() => {
+        if (!selectedNode) {
+          console.log("Auto-centering graph due to data change or filter");
+          centerGraph(newGraphData.nodes);
+        }
+      }, 300);
+    }
     
   }, [
     bookmarks, 
