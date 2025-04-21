@@ -282,6 +282,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     if (nodes.length === 0) return;
     
+    // Special handling for very few nodes
+    const isFewNodes = nodes.length <= 10;
+    
     // Calculate bounding box of all nodes
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     
@@ -297,8 +300,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // If we couldn't determine bounds, exit
     if (minX === Infinity || minY === Infinity) return;
     
-    // Add padding - use more padding for fewer nodes to make the view more comfortable
-    const padding = Math.max(30, Math.min(100, 100 - nodes.length * 2));
+    // Add padding - adaptive based on node count
+    // More padding for fewer nodes to prevent them from appearing too spread out
+    const paddingScale = isFewNodes ? 0.25 : 0.1;
+    const padding = Math.min(width, height) * paddingScale;
+    
     minX -= padding;
     maxX += padding;
     minY -= padding;
@@ -312,25 +318,38 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const boundsWidth = maxX - minX;
     const boundsHeight = maxY - minY;
     
-    // Determine scale to fit content (use the more constraining dimension)
-    let scale = Math.min(
-      width / boundsWidth,
-      height / boundsHeight
-    );
+    // For few nodes, ensure the scale isn't too large or small
+    // by enforcing a minimum bounding box size
+    let effectiveBoundsWidth = boundsWidth;
+    let effectiveBoundsHeight = boundsHeight;
     
-    // Smoother scale adjustment:
-    // 1. Make scaling more gradual based on node count
-    const baseScale = scale;
-    
-    if (nodes.length > 15) {
-      // More subtle scale reduction for many nodes
-      scale = Math.max(0.5, scale * (1 - Math.min(nodes.length / 150, 0.4)));
-    } else if (nodes.length < 5) {
-      // Don't zoom in quite as aggressively for small node counts
-      scale = Math.min(1.8, scale);
+    if (isFewNodes) {
+      // For few nodes, ensure a reasonable minimum bounds to avoid excessive zoom
+      const minBoundSize = Math.min(width, height) * 0.4; // Minimum 40% of container
+      effectiveBoundsWidth = Math.max(boundsWidth, minBoundSize);
+      effectiveBoundsHeight = Math.max(boundsHeight, minBoundSize);
     }
     
-    // 2. Constrain scale to the allowed range with a tighter min bound for better visibility
+    // Determine scale to fit content (use the more constraining dimension)
+    let scale = Math.min(
+      width / effectiveBoundsWidth,
+      height / effectiveBoundsHeight
+    );
+    
+    // Scale adjustment based on node count
+    if (nodes.length > 20) {
+      // Reduce scale for many nodes to fit them better
+      scale = Math.max(0.5, scale * (1 - Math.min(nodes.length / 150, 0.4)));
+    } else if (nodes.length < 5) {
+      // For very few nodes, use a moderate scale to avoid them appearing tiny
+      // But also avoid zooming in too much for better context
+      scale = Math.min(scale, 1.1);
+    } else if (nodes.length < 10) {
+      // For a moderate number of nodes, slightly reduce zoom
+      scale = Math.min(scale, 1.2);
+    }
+    
+    // Constrain scale to the allowed range
     scale = Math.max(0.4, Math.min(scale, 1.8));
     
     // Check if this view is very similar to the last one
@@ -365,7 +384,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .translate(-centerX, -centerY);
     
     svg.transition()
-      .duration(1200) // Longer animation for smoother feel
+      .duration(1000) // Smooth animation
       .ease(d3.easeCubicOut) // Smoother easing function
       .call(zoomBehaviorRef.current.transform, transform);
     
@@ -698,18 +717,39 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .attr("class", "nodes");
     
     // Initialize node positions with a more stable pattern before simulation
+    const nodeCount = nodes.length;
+    
+    // Adaptive layout based on node count
+    // For very few nodes, use a tighter, more centered layout
+    const useCompactLayout = nodeCount <= 10;
+    
+    // Calculate radius based on node count - smaller radius for fewer nodes
+    const radiusScale = useCompactLayout ? 
+      Math.max(0.15, Math.min(0.25, nodeCount / 30)) : // Small circle for few nodes
+      Math.max(0.25, Math.min(0.4, nodeCount / 50));   // Larger circle for many nodes
+    
+    const radius = Math.min(width, height) * radiusScale;
+    
     nodes.forEach((node, i) => {
       // Set initial positions in a circular layout
       const angle = (i / nodes.length) * 2 * Math.PI;
-      const radius = Math.min(width, height) / 3;
       node.x = width / 2 + radius * Math.cos(angle);
       node.y = height / 2 + radius * Math.sin(angle);
       
-      // Pin nodes in their initial positions to prevent collapse
-      // Only for tag and domain nodes to provide anchors
-      if (node.type === "tag" || node.type === "domain") {
-        node.fx = node.x;
-        node.fy = node.y;
+      // Pin tag and domain nodes for stability
+      // If few nodes, pin fewer to allow more natural arrangement
+      if ((node.type === "tag" || node.type === "domain")) {
+        if (useCompactLayout) {
+          // For few nodes, don't pin everything, but use softer constraints
+          if (i % 2 === 0) { // Pin only some nodes when few
+            node.fx = node.x;
+            node.fy = node.y;
+          }
+        } else {
+          // For many nodes, pin all tags and domains for stability
+          node.fx = node.x;
+          node.fy = node.y;
+        }
       }
     });
 
@@ -889,21 +929,55 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     const width = containerRef.current!.clientWidth;
     const height = containerRef.current!.clientHeight;
     
-    // Initialize positions for any new nodes
+    // Initialize positions for any new nodes with adaptive spacing
+    const nodeCount = newGraphData.nodes.length;
+    
+    // Adaptive layout based on node count
+    // For very few nodes, use a tighter, more centered layout
+    const useCompactLayout = nodeCount <= 10;
+    
+    // Calculate radius based on node count - smaller radius for fewer nodes
+    const radiusScale = useCompactLayout ? 
+      Math.max(0.15, Math.min(0.25, nodeCount / 30)) : // Small circle for few nodes
+      Math.max(0.25, Math.min(0.4, nodeCount / 50));   // Larger circle for many nodes
+    
+    const radius = Math.min(width, height) * radiusScale;
+    
+    // Reset fixed positions if we have very few nodes to allow better arrangement
+    if (useCompactLayout) {
+      newGraphData.nodes.forEach(node => {
+        // Keep some nodes fixed but let others float freely for better spacing with few nodes
+        if (node.type !== "tag" && node.type !== "domain") {
+          node.fx = null;
+          node.fy = null;
+        }
+      });
+    }
+    
+    // Now position any new nodes
     newGraphData.nodes.forEach((node, i) => {
       // If it's a new node without position
       if (node.x === undefined || node.y === undefined) {
         // Set initial positions in a circular layout
-        const angle = (i / newGraphData.nodes.length) * 2 * Math.PI;
-        const radius = Math.min(width, height) / 3;
+        const angle = (i / nodeCount) * 2 * Math.PI;
         node.x = width / 2 + radius * Math.cos(angle);
         node.y = height / 2 + radius * Math.sin(angle);
       }
       
-      // Pin tag and domain nodes in position
-      if ((node.type === "tag" || node.type === "domain") && !node.fx && !node.fy) {
-        node.fx = node.x;
-        node.fy = node.y;
+      // Pin tag and domain nodes for stability
+      // If few nodes, pin fewer to allow more natural arrangement
+      if ((node.type === "tag" || node.type === "domain")) {
+        if (useCompactLayout) {
+          // For few nodes, don't pin everything, but use softer constraints
+          if (i % 2 === 0) { // Pin only some nodes when few
+            node.fx = node.x;
+            node.fy = node.y;
+          }
+        } else {
+          // For many nodes, pin all tags and domains for stability
+          node.fx = node.x;
+          node.fy = node.y;
+        }
       }
     });
 
