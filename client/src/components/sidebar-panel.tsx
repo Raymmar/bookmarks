@@ -55,19 +55,7 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
       onClick={onClick}
     >
       <h3 className="font-medium mb-1 line-clamp-1">{bookmark.title}</h3>
-      <p className="text-xs text-gray-500 mb-2 truncate">{bookmark.url}</p>
-      <div className="flex flex-wrap gap-1">
-        {allTags.slice(0, 3).map((tag, i) => (
-          <Badge key={i} variant="outline" className="text-xs">
-            {tag}
-          </Badge>
-        ))}
-        {allTags.length > 3 && (
-          <Badge variant="outline" className="text-xs">
-            +{allTags.length - 3}
-          </Badge>
-        )}
-      </div>
+      <p className="text-xs text-gray-500 truncate">{bookmark.url}</p>
     </div>
   );
 }
