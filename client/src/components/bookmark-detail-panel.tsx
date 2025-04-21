@@ -123,8 +123,20 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
         description: `Tag "${tagToAdd.name}" has been added to the bookmark`,
       });
       
-      // Invalidate relevant queries
+      // Invalidate ALL related queries to ensure UI consistency across components
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+      
+      // Dispatch a custom event to notify the graph of the tag change
+      const event = new CustomEvent('tagChanged', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          tagId: tagId,
+          action: 'add'
+        } 
+      });
+      document.dispatchEvent(event);
       
     } catch (error) {
       // Revert the optimistic update on error
@@ -155,6 +167,7 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
       
       // Optimistically update the UI
       setTags(prev => [...prev, newTag]);
+      setAllTags(prev => [...prev, newTag]); // Update the local cache of all tags
       
       // Add tag to bookmark
       await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${newTag.id}`, {});
@@ -164,9 +177,21 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
         description: `New tag "${newTag.name}" has been created and added to the bookmark`,
       });
       
-      // Invalidate relevant queries
+      // Invalidate ALL related queries to ensure UI consistency across components
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+      
+      // Dispatch a custom event to notify the graph of the tag change
+      const event = new CustomEvent('tagChanged', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          tagId: newTag.id,
+          action: 'add',
+          tagName: newTag.name
+        } 
+      });
+      document.dispatchEvent(event);
       
       // Reset the input
       setNewTagText("");
@@ -203,9 +228,12 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
         description: `Tag "${tagToRemove.name}" has been removed from the bookmark`,
       });
       
-      // Invalidate relevant queries
+      // Invalidate ALL related queries to ensure UI consistency across components
+      // This ensures the graph, sidebar, and detail panel all update correctly
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+      queryClient.invalidateQueries(); // Force a complete refresh of all queries
       
       // Force a refresh of the tags for this bookmark
       const refreshTags = async () => {
@@ -224,6 +252,16 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
       setTimeout(() => {
         refreshTags();
       }, 100);
+      
+      // Dispatch a custom event to notify the graph of the tag change
+      const event = new CustomEvent('tagChanged', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          tagId: tagId,
+          action: 'remove'
+        } 
+      });
+      document.dispatchEvent(event);
       
     } catch (error) {
       // Revert the optimistic update on error
