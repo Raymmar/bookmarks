@@ -12,8 +12,7 @@ export const bookmarks = pgTable("bookmarks", {
   // Use a text array to store vector embedding until pgvector extension is properly configured
   vector_embedding: text("vector_embedding").array(),
   date_saved: timestamp("date_saved").defaultNow().notNull(),
-  // Keeping these fields for backward compatibility until we fully migrate to the new tags system
-  user_tags: text("user_tags").array().default([]),
+  // Only keeping system_tags for internal tag generation
   system_tags: text("system_tags").array().default([]),
   source: text("source", { enum: ["extension", "web", "import"] }).notNull(),
 });
@@ -85,6 +84,7 @@ export const bookmarkTags = pgTable("bookmark_tags", {
 export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
   id: true,
   vector_embedding: true,
+  user_tags: true, // Remove user_tags since we're using the normalized tag system now
 });
 
 export const insertNoteSchema = createInsertSchema(notes).omit({

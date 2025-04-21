@@ -661,7 +661,7 @@ export class DatabaseStorage implements IStorage {
   
   // BookmarkTags
   async getTagsByBookmarkId(bookmarkId: string): Promise<Tag[]> {
-    // First try to get tags from the normalized system
+    // Get tags from the normalized system
     const joinResult = await db
       .select({
         tag: tags
@@ -670,67 +670,11 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(tags, eq(bookmarkTags.tag_id, tags.id))
       .where(eq(bookmarkTags.bookmark_id, bookmarkId));
     
-    const normalizedTags = joinResult.map(result => result.tag);
-    
-    // If we have normalized tags, return them
-    if (normalizedTags.length > 0) {
-      return normalizedTags;
-    }
-    
-    // Otherwise, fall back to the old system by getting the bookmark's user_tags and system_tags
-    // and convert them to Tag objects on the fly
-    const [bookmark] = await db.select().from(bookmarks).where(eq(bookmarks.id, bookmarkId));
-    
-    if (!bookmark) {
-      return [];
-    }
-    
-    // Convert user_tags array to Tag objects
-    const userTagsPromises = (bookmark.user_tags || []).map(async tagName => {
-      // Try to find existing tag first
-      const [existingTag] = await db.select().from(tags).where(eq(tags.name, tagName));
-      
-      if (existingTag) {
-        return existingTag;
-      }
-      
-      // Create tag on the fly if it doesn't exist
-      const [newTag] = await db.insert(tags).values({
-        name: tagName,
-        type: "user",
-        count: 1
-      }).returning();
-      
-      return newTag;
-    });
-    
-    // Convert system_tags array to Tag objects
-    const systemTagsPromises = (bookmark.system_tags || []).map(async tagName => {
-      // Try to find existing tag first
-      const [existingTag] = await db.select().from(tags).where(eq(tags.name, tagName));
-      
-      if (existingTag) {
-        return existingTag;
-      }
-      
-      // Create tag on the fly if it doesn't exist
-      const [newTag] = await db.insert(tags).values({
-        name: tagName,
-        type: "system",
-        count: 1
-      }).returning();
-      
-      return newTag;
-    });
-    
-    const userTags = await Promise.all(userTagsPromises);
-    const systemTags = await Promise.all(systemTagsPromises);
-    
-    return [...userTags, ...systemTags];
+    return joinResult.map(result => result.tag);
   }
   
   async getBookmarksByTagId(tagId: string): Promise<Bookmark[]> {
-    // First try the normalized system
+    // Get bookmarks from the normalized system only
     const joinResult = await db
       .select({
         bookmark: bookmarks
@@ -739,39 +683,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(bookmarks, eq(bookmarkTags.bookmark_id, bookmarks.id))
       .where(eq(bookmarkTags.tag_id, tagId));
     
-    const normalizedBookmarks = joinResult.map(result => result.bookmark);
-    
-    // If we found bookmarks in the normalized system, return them
-    if (normalizedBookmarks.length > 0) {
-      return normalizedBookmarks;
-    }
-    
-    // Otherwise, fall back to the old system
-    // Get the tag to find its name
-    const [tag] = await db.select().from(tags).where(eq(tags.id, tagId));
-    
-    if (!tag) {
-      return [];
-    }
-    
-    // Search for bookmarks with this tag name in user_tags or system_tags
-    // We'll use a workaround since the array.includes operator might not be available
-    // Get all bookmarks and filter manually
-    const allBookmarks = await db.select().from(bookmarks);
-    
-    const taggedBookmarks = allBookmarks.filter(bookmark => {
-      if (tag.type === "user") {
-        return bookmark.user_tags && 
-               Array.isArray(bookmark.user_tags) &&
-               bookmark.user_tags.includes(tag.name);
-      } else {
-        return bookmark.system_tags && 
-               Array.isArray(bookmark.system_tags) &&
-               bookmark.system_tags.includes(tag.name);
-      }
-    });
-    
-    return taggedBookmarks;
+    return joinResult.map(result => result.bookmark);
   }
   
   async addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag> {
