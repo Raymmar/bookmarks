@@ -70,6 +70,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const bookmarkData = parsedData.data;
       
+      // Log full request body for debugging
+      console.log("Creating bookmark with request body:", JSON.stringify(req.body, null, 2));
+      
       // Use centralized bookmark service for creation with all processing
       const result = await bookmarkService.createBookmark({
         url: bookmarkData.url,
@@ -77,9 +80,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: bookmarkData.description,
         content_html: bookmarkData.content_html,
         notes: req.body.notes ? (Array.isArray(req.body.notes) ? req.body.notes[0]?.text : req.body.notes) : undefined,
-        tags: bookmarkData.user_tags || [], // Convert legacy user_tags if present
-        autoExtract: req.body.autoExtract,
-        insightDepth: req.body.insightDepth,
+        tags: req.body.tags || bookmarkData.user_tags || [], // Get tags from req.body.tags first, then fall back to legacy user_tags
+        autoExtract: req.body.autoExtract === true || req.body.autoExtract === "true", // Ensure boolean conversion
+        insightDepth: req.body.insightDepth ? parseInt(req.body.insightDepth) : 1, // Ensure numeric
         source: bookmarkData.source || 'web'
       });
       
@@ -104,12 +107,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Use centralized bookmark service for updates
       try {
+        console.log("Updating bookmark with request body:", JSON.stringify(req.body, null, 2));
+        
         const updatedBookmark = await bookmarkService.updateBookmark(req.params.id, {
           url: req.body.url,
           title: req.body.title,
           description: req.body.description,
           notes: req.body.notes,
-          tags: req.body.user_tags || req.body.tags || [],
+          tags: req.body.tags || req.body.user_tags || [], // Check tags first, then legacy user_tags
           source: req.body.source
         });
         res.json(updatedBookmark);
