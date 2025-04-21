@@ -773,28 +773,36 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .force("link", d3.forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(d => {
         // Use smaller distances for small graphs
         if (isFewNodes) {
-          if (d.type === "domain") return 60; // Increased to spread domain nodes out more
+          if (d.type === "domain") return 80; // Further increased for domain nodes
           if (d.type === "tag") return 50;
           if (d.type === "related") return 40;
           return 45;
         } else {
           // Normal distances for larger graphs
-          if (d.type === "domain") return 120; // Push domains further away
+          if (d.type === "domain") return 140; // Push domains even further away
           if (d.type === "tag") return 100;
           if (d.type === "related") return 70;
           return 85; // Slightly increased spacing between regular nodes
         }
       }).strength(d => {
-        // Weaker link strength for domain connections to let them move more freely
-        if (d.type === "domain") return linkStrength * 0.7;
+        // Much weaker link strength for domain connections to let them move more freely
+        // This is critical for allowing them to spread out
+        if (d.type === "domain") return linkStrength * 0.5; // Reduced even more
         return linkStrength;
       }))
       // Stronger repulsion to better spread nodes
-      .force("charge", d3.forceManyBody().strength(d => {
-        // Make domain nodes repel others more strongly
-        if (d.type === "domain") return repulsionStrength * 1.5;
-        return repulsionStrength;
-      }))
+      // Use multiple charge forces for better control
+      // First a general repulsion that applies to all nodes
+      .force("charge", d3.forceManyBody().strength(repulsionStrength))
+      // Then add a specific domain repulsion force that only affects domain nodes
+      .force("domain-repulsion", d3.forceManyBody()
+        .strength(d => {
+          // Only domain nodes exert this extra repulsive force
+          if (d.type === "domain") return repulsionStrength * 2.5;
+          return 0; // No extra repulsion for non-domain nodes
+        })
+        .distanceMax(350) // Limit the range of this repulsion
+      )
       .force("center", d3.forceCenter(width / 2, height / 2).strength(isFewNodes ? 0.2 : 0.1))
       .force("x", d3.forceX(width / 2).strength(isFewNodes ? 0.3 : 0.05))
       .force("y", d3.forceY(height / 2).strength(isFewNodes ? 0.3 : 0.05))
@@ -1038,21 +1046,29 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           .id(d => d.id)
           .distance(d => {
             // Enhanced distances for better spacing
-            if (d.type === "domain") return 120; // Push domains further away
+            if (d.type === "domain") return 140; // Push domains even further away
             if (d.type === "tag") return 100;
             if (d.type === "related") return 70;
             return 85; // Slightly increased spacing
           })
           .strength(d => {
-            // Weaker link strength for domain connections to let them move more freely
-            if (d.type === "domain") return 0.14; // 0.7 of the default 0.2
+            // Much weaker link strength for domain connections to let them move more freely
+            // This is critical for allowing them to spread out
+            if (d.type === "domain") return 0.1; // Even lower strength (0.5 * 0.2)
             return 0.2;
           }))
-        .force("charge", d3.forceManyBody().strength(d => {
-          // Make domain nodes repel others more strongly
-          if (d.type === "domain") return -450; // 1.5 times stronger repulsion
-          return -300;
-        }))
+        // Use multiple charge forces for better control
+        // First a general repulsion that applies to all nodes
+        .force("charge", d3.forceManyBody().strength(-300))
+        // Then add a specific domain repulsion force that only affects domain nodes
+        .force("domain-repulsion", d3.forceManyBody()
+          .strength(d => {
+            // Only domain nodes exert this extra repulsive force
+            if (d.type === "domain") return -750; // 2.5 times stronger repulsion
+            return 0; // No extra repulsion for non-domain nodes
+          })
+          .distanceMax(350) // Limit the range of this repulsion
+        )
         .force("center", d3.forceCenter(width / 2, height / 2).strength(0.1))
         .force("x", d3.forceX(width / 2).strength(0.05))
         .force("y", d3.forceY(height / 2).strength(0.05))
