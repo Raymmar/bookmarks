@@ -48,6 +48,8 @@ export default function AiChat() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showSessions, setShowSessions] = useState(true);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editSessionTitle, setEditSessionTitle] = useState("");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -309,6 +311,67 @@ export default function AiChat() {
     }
   };
   
+  // Function to rename a chat session
+  const renameSession = async (sessionId: string, newTitle: string) => {
+    try {
+      setSessionsLoading(true);
+      
+      // Update the session with the new title
+      await updateChatSession(sessionId, { title: newTitle.trim() || "New Chat" });
+      
+      // Reset editing state
+      setEditingSessionId(null);
+      setEditSessionTitle("");
+      
+      // Refetch the sessions to update the list
+      await refetchSessions();
+    } catch (error) {
+      console.error("Failed to rename chat session:", error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+  
+  // Function to delete a chat session
+  const deleteSession = async (sessionId: string) => {
+    try {
+      setSessionsLoading(true);
+      
+      // Delete the session
+      await deleteChatSession(sessionId);
+      
+      // If the deleted session was active, load another one or clear the UI
+      if (activeChatId === sessionId) {
+        // Refresh sessions first
+        await refetchSessions();
+        const remainingSessions = await getChatSessions();
+        
+        if (remainingSessions.length > 0) {
+          // Load the most recent session
+          const sortedSessions = [...remainingSessions].sort((a, b) => 
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+          );
+          
+          await loadChatSession(sortedSessions[0].id);
+        } else {
+          // No sessions left, clear the UI
+          setActiveChatId(null);
+          setMessages([]);
+          setSelectedTags([]);
+          setDateRange("all");
+          setSources(["extension", "web", "import"]);
+        }
+      } else {
+        // Just refresh the sessions list
+        await refetchSessions();
+      }
+    } catch (error) {
+      console.error("Failed to delete chat session:", error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+  
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -369,9 +432,53 @@ export default function AiChat() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <FileText className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm font-medium truncate max-w-36">
-                        {session.title || "New Chat"}
-                      </span>
+                      {editingSessionId === session.id ? (
+                        <div 
+                          className="flex items-center space-x-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="text"
+                            value={editSessionTitle}
+                            onChange={(e) => setEditSessionTitle(e.target.value)}
+                            className="text-sm p-1 border rounded w-28 focus:outline-none focus:ring-1 focus:ring-primary"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                renameSession(session.id, editSessionTitle);
+                              } else if (e.key === "Escape") {
+                                setEditingSessionId(null);
+                                setEditSessionTitle("");
+                              }
+                            }}
+                          />
+                          <div className="flex">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 w-7 p-0"
+                              onClick={() => renameSession(session.id, editSessionTitle)}
+                            >
+                              <Check className="h-3 w-3 text-green-500" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 w-7 p-0"
+                              onClick={() => {
+                                setEditingSessionId(null);
+                                setEditSessionTitle("");
+                              }}
+                            >
+                              <X className="h-3 w-3 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-medium truncate max-w-36">
+                          {session.title || "New Chat"}
+                        </span>
+                      )}
                     </div>
                     
                     <DropdownMenu>
@@ -386,11 +493,23 @@ export default function AiChat() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSessionId(session.id);
+                            setEditSessionTitle(session.title || "New Chat");
+                          }}
+                        >
                           <Edit className="h-4 w-4 mr-2" />
                           Rename
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-500">
+                        <DropdownMenuItem 
+                          className="text-red-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSession(session.id);
+                          }}
+                        >
                           <Trash className="h-4 w-4 mr-2" />
                           Delete
                         </DropdownMenuItem>

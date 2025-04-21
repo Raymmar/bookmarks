@@ -203,5 +203,52 @@ export async function createChatSession(title?: string, filters?: ChatFilters): 
   }
 }
 
+/**
+ * Updates an existing chat session
+ */
+export async function updateChatSession(sessionId: string, updates: {
+  title?: string;
+  filters?: ChatFilters;
+}): Promise<ChatSession> {
+  try {
+    const response = await fetch(`/api/chat/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+      credentials: "include"
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating chat session:", error);
+    throw new Error("Failed to update chat session");
+  }
+}
+
+/**
+ * Deletes a chat session
+ */
+export async function deleteChatSession(sessionId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/chat/sessions/${sessionId}`, {
+      method: "DELETE",
+      credentials: "include"
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error deleting chat session:", error);
+    throw new Error("Failed to delete chat session");
+  }
+}
+
 // Export functions
 export { chatWithBookmarks };
