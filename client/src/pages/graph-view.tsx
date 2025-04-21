@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ForceDirectedGraph } from "@/components/force-directed-graph-fixed";
+import { ForceDirectedGraph } from "@/components/force-directed-graph-unpinned";
 import { SidebarPanel } from "@/components/sidebar-panel";
 import { FilterControls } from "@/components/filter-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
