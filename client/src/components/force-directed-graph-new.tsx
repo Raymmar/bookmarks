@@ -973,16 +973,13 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     const radius = Math.min(width, height) * radiusScale;
     
-    // Reset fixed positions if we have very few nodes to allow better arrangement
-    if (useCompactLayout) {
-      newGraphData.nodes.forEach(node => {
-        // Keep some nodes fixed but let others float freely for better spacing with few nodes
-        if (node.type !== "tag" && node.type !== "domain") {
-          node.fx = null;
-          node.fy = null;
-        }
-      });
-    }
+    // Reset ALL fixed positions for all nodes regardless of count to allow organic arrangement
+    // Make sure nodes can float naturally and be dragged in both full and focus view
+    newGraphData.nodes.forEach(node => {
+      // Remove any fixed positions to allow organic motion
+      node.fx = null;
+      node.fy = null;
+    });
     
     // Now position any new nodes
     newGraphData.nodes.forEach((node, i) => {
