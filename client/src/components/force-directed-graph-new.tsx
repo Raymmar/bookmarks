@@ -1003,56 +1003,111 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     });
 
-    // Adjust force parameters based on node count - much gentler for small node counts
-    const linkDistance = (d: any) => {
-      // For small node counts, use extremely tight distances to prevent stretching
-      if (newGraphData.nodes.length <= 10) {
-        // Extremely short distances for few nodes to keep them tightly clustered
-        if (d.type === "domain") return 10;
-        if (d.type === "tag") return 12;
-        if (d.type === "related") return 10;
-        return 10;
+    // If we have a small number of nodes (filtered view), use a completely different physics setup
+    const isFilteredView = newGraphData.nodes.length <= 10;
+    
+    if (isFilteredView) {
+      // For filtered views, use a deterministic arrangement instead of physics simulation
+      // This completely bypasses the force layout for small node counts
+      
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const nodeCount = newGraphData.nodes.length;
+      
+      if (nodeCount <= 7) {
+        // Circular arrangement for very small node sets
+        const radius = 50; // Small fixed radius
+        
+        newGraphData.nodes.forEach((node, i) => {
+          // First node goes at the center
+          if (i === 0) {
+            node.x = centerX;
+            node.y = centerY;
+            // Fix this node in place
+            node.fx = centerX;
+            node.fy = centerY;
+          } else {
+            // Arrange other nodes in a perfect circle
+            const angle = 2 * Math.PI * (i - 1) / (nodeCount - 1);
+            node.x = centerX + radius * Math.cos(angle);
+            node.y = centerY + radius * Math.sin(angle);
+            // Fix these nodes in place too
+            node.fx = node.x;
+            node.fy = node.y;
+          }
+        });
+        
+        // Use minimal forces just to maintain the fixed positions
+        simulationRef.current
+          .nodes(newGraphData.nodes)
+          .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
+            .id(d => d.id)
+            .distance(10)
+            .strength(0)) // Zero strength as positions are fixed
+          .force("charge", null) // No charge forces
+          .force("center", null) // No centering force
+          .force("x", null) // No X force
+          .force("y", null) // No Y force
+          .force("collision", null); // No collision force
       } else {
-        // Normal distances for larger node counts
-        if (d.type === "domain") return 80;
-        if (d.type === "tag") return 100;
-        if (d.type === "related") return 60;
-        return 70;
+        // Grid arrangement for larger filtered sets
+        // Calculate grid dimensions
+        const gridSize = Math.ceil(Math.sqrt(nodeCount));
+        const cellSize = 40; // Space between nodes
+        const gridWidth = gridSize * cellSize;
+        const startX = centerX - gridWidth / 2 + cellSize / 2;
+        const startY = centerY - gridWidth / 2 + cellSize / 2;
+        
+        // Position nodes in a grid
+        newGraphData.nodes.forEach((node, i) => {
+          const row = Math.floor(i / gridSize);
+          const col = i % gridSize;
+          node.x = startX + col * cellSize;
+          node.y = startY + row * cellSize;
+          // Fix all nodes in place
+          node.fx = node.x;
+          node.fy = node.y;
+        });
+        
+        // Use minimal forces just to maintain the fixed positions
+        simulationRef.current
+          .nodes(newGraphData.nodes)
+          .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
+            .id(d => d.id)
+            .distance(10)
+            .strength(0)) // Zero strength as positions are fixed
+          .force("charge", null) // No charge forces
+          .force("center", null) // No centering force
+          .force("x", null) // No X force
+          .force("y", null) // No Y force
+          .force("collision", null); // No collision force
       }
-    };
-    
-    // Calculate appropriate repulsion force based on node count
-    // Dramatically reduce repulsion for fewer nodes to prevent them from flying apart
-    const repulsionStrength = newGraphData.nodes.length <= 10 ? -30 : -300;
-    
-    // Much stronger centering force for small node counts to keep them tightly clustered
-    const centeringForceStrength = newGraphData.nodes.length <= 10 ? 0.7 : 0.05;
-    
-    // Update the simulation with the appropriate forces
-    simulationRef.current
-      .nodes(newGraphData.nodes)
-      .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
-        .id(d => d.id)
-        .distance(linkDistance)
-        .strength(newGraphData.nodes.length <= 10 ? 0.8 : 0.2)) // Much stronger link forces for small node sets
-      .force("charge", d3.forceManyBody().strength(repulsionStrength))
-      .force("center", d3.forceCenter(width / 2, height / 2).strength(newGraphData.nodes.length <= 10 ? 0.6 : 0.1)) // Stronger center force
-      .force("x", d3.forceX(width / 2).strength(centeringForceStrength))
-      .force("y", d3.forceY(height / 2).strength(centeringForceStrength))
-      .force("collision", d3.forceCollide().radius(d => {
-        // Smaller collision radius for small node counts
-        if (newGraphData.nodes.length <= 10) {
-          if (d.type === "bookmark") return 20;
-          if (d.type === "domain") return 15;
-          return 12;
-        } else {
+    } else {
+      // NORMAL (UNFILTERED) VIEW PHYSICS - Standard force configuration
+      simulationRef.current
+        .nodes(newGraphData.nodes)
+        .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
+          .id(d => d.id)
+          .distance(d => {
+            // Normal distances for larger node counts
+            if (d.type === "domain") return 80;
+            if (d.type === "tag") return 100;
+            if (d.type === "related") return 60;
+            return 70;
+          })
+          .strength(0.2))
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.1))
+        .force("x", d3.forceX(width / 2).strength(0.05))
+        .force("y", d3.forceY(height / 2).strength(0.05))
+        .force("collision", d3.forceCollide().radius(d => {
           // Normal collision radius for larger node counts
           if (d.type === "bookmark") return 40;
           if (d.type === "domain") return 30;
           if (d.type === "tag") return 25;
           return 20;
-        }
-      }).strength(newGraphData.nodes.length <= 10 ? 0.5 : 0.8));
+        }).strength(0.8));
+    }
     
     // Update visuals
     if (!svgRef.current) return;
