@@ -109,7 +109,15 @@ export async function generateInsights(
       ? `Visit and analyze the content from the URL ${url}` 
       : `Analyze the provided content from URL ${url}`} based on a depth level of ${depthLevel} (1-4, where 1 is on-page content only, 
     4 is in-depth research sweep). Generate a concise summary, sentiment score (0-10), relevant tags (at least 3), 
-    and related links that might be valuable. Respond in JSON format with keys: summary, sentiment, tags, relatedLinks.`;
+    and related links that might be valuable. 
+    
+    You must respond in JSON format with the following structure:
+    {
+      "summary": "A concise summary of the content",
+      "sentiment": 5, // A number from 0-10 representing the sentiment
+      "tags": ["tag1", "tag2", "tag3"], // At least 3 relevant tags
+      "relatedLinks": [] // Any related links if available
+    }`;
     
     try {
       const customPrompt = await storage.getSetting("bookmark_system_prompt");
@@ -139,7 +147,7 @@ export async function generateInsights(
     if (useUrlDirectly) {
       messages.push({
         role: "user",
-        content: `Please analyze the content at ${url} and provide insights according to the instructions.`
+        content: `Please analyze the content at ${url} and provide insights in JSON format according to the instructions.`
       });
     } else {
       // Use provided content (with length limit)
@@ -261,7 +269,14 @@ export async function generateTags(content: string, url?: string): Promise<strin
     console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
     // Get custom tag generation prompt from settings if available
-    let systemPrompt = "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Return the tags as a JSON array of strings.";
+    let systemPrompt = `You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. 
+    
+    You must respond with a JSON object in the following format:
+    {
+      "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
+    }
+    
+    The tags should be single words or short phrases that capture the main topics in the content.`;
     try {
       const customPrompt = await storage.getSetting("auto_tagging_prompt");
       if (customPrompt && customPrompt.value) {
@@ -283,7 +298,7 @@ export async function generateTags(content: string, url?: string): Promise<strin
     if (useUrlDirectly && url) {
       messages.push({
         role: "user",
-        content: `Please visit the URL ${url} and extract relevant tags from its content. Return the tags as a JSON array of strings.`
+        content: `Please visit the URL ${url} and extract relevant tags from its content. Return a JSON object with a "tags" property containing an array of tag strings.`
       });
     } else {
       // Use provided content (with length limit)
