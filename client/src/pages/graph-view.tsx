@@ -377,6 +377,7 @@ export default function GraphView() {
                 onNodeClick={handleSelectBookmark}
                 onTagClick={handleTagClick}
                 onDomainClick={handleDomainSelection}
+                selectedBookmarkId={selectedBookmarkId}
               />
             </div>
           )}
