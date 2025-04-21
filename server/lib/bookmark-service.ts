@@ -148,28 +148,50 @@ export class BookmarkService {
         console.log(`Processing content for URL: ${bookmarkData.url}`);
         processedContent = await processContent(bookmarkData.content_html);
         
+        if (!processedContent) {
+          console.error("Error: processContent returned null");
+          throw new Error("Failed to process content");
+        }
+        
+        console.log(`Content processed successfully. Text length: ${processedContent.text.length}`);
+        
         // Generate embedding for search
-        const embedding = await generateEmbedding(processedContent.text);
+        try {
+          const embedding = await generateEmbedding(processedContent.text);
+          console.log(`Embedding generated successfully: ${embedding.embedding.length} dimensions`);
+          bookmarkData.vector_embedding = embedding.embedding;
+        } catch (embeddingError) {
+          console.error("Error generating embedding:", embeddingError);
+          // Continue without embedding
+        }
         
         // Generate auto tags if not provided
         if (!options.tags || options.tags.length === 0) {
-          const generatedTags = await generateTags(processedContent.text);
-          bookmarkData.system_tags = generatedTags;
+          try {
+            console.log("Generating AI tags...");
+            const generatedTags = await generateTags(processedContent.text);
+            console.log(`Generated ${generatedTags.length} AI tags: ${generatedTags.join(', ')}`);
+            bookmarkData.system_tags = generatedTags;
+          } catch (tagError) {
+            console.error("Error generating tags:", tagError);
+            // Continue without AI tags
+          }
         }
         
-        // Create bookmark with embedding
+        // Create bookmark with all the data we've collected
         bookmark = await this.storage.createBookmark({
           ...bookmarkData,
-          vector_embedding: embedding.embedding,
           date_saved: new Date()
         });
+        console.log(`Created bookmark with processed content: ${bookmark.id}`);
       } catch (error) {
-        console.error("Error processing content:", error);
+        console.error("Error in content processing workflow:", error);
         // Fall back to basic bookmark creation if content processing fails
         bookmark = await this.storage.createBookmark({
           ...bookmarkData,
           date_saved: new Date()
         });
+        console.log(`Created basic bookmark (processing failed): ${bookmark.id}`);
       }
     } else {
       // Basic bookmark creation without processing
@@ -177,6 +199,7 @@ export class BookmarkService {
         ...bookmarkData,
         date_saved: new Date()
       });
+      console.log(`Created basic bookmark (no auto-extract): ${bookmark.id}`);
     }
 
     // Create activity for bookmark creation
@@ -195,31 +218,83 @@ export class BookmarkService {
           : options.insightDepth;
         
         console.log(`Generating insights with depth ${insightDepth} for bookmark: ${bookmark.id}`);
-        const insights = await generateInsights(
-          bookmarkData.url,
-          processedContent.text,
-          insightDepth
-        );
         
-        // Store insights
-        await this.storage.createInsight({
-          bookmark_id: bookmark.id,
-          summary: insights.summary,
-          sentiment: insights.sentiment,
-          depth_level: insightDepth,
-          related_links: insights.relatedLinks || []
-        });
-        
-        // Create activity for insight generation
-        await this.storage.createActivity({
-          bookmark_id: bookmark.id,
-          bookmark_title: bookmark.title,
-          type: "insight_generated",
-          tags: insights.tags,
-          timestamp: new Date()
-        });
+        try {
+          // Generate insights with OpenAI
+          const insights = await generateInsights(
+            bookmarkData.url,
+            processedContent.text,
+            insightDepth
+          );
+          
+          console.log(`Insights generated successfully. Summary length: ${insights.summary.length}, tags: ${insights.tags.join(', ')}`);
+          
+          // Store insights
+          await this.storage.createInsight({
+            bookmark_id: bookmark.id,
+            summary: insights.summary,
+            sentiment: insights.sentiment,
+            depth_level: insightDepth,
+            related_links: insights.relatedLinks || []
+          });
+          
+          console.log(`Insights stored in database for bookmark: ${bookmark.id}`);
+          
+          // Add AI-generated tags to the bookmark if they don't exist already
+          if (insights.tags && insights.tags.length > 0) {
+            for (const tagName of insights.tags) {
+              try {
+                // Check if this tag is already associated with the bookmark
+                const existingTags = await this.storage.getTagsByBookmarkId(bookmark.id);
+                const tagExists = existingTags.some(t => t.name.toLowerCase() === tagName.toLowerCase());
+                
+                if (!tagExists) {
+                  // First check if the tag already exists in the system
+                  let tag = await this.storage.getTagByName(tagName);
+                  
+                  if (!tag) {
+                    // Create the tag if it doesn't exist
+                    tag = await this.storage.createTag({
+                      name: tagName,
+                      type: "system" // This is an AI-generated tag
+                    });
+                  }
+                  
+                  // Associate tag with bookmark
+                  await this.storage.addTagToBookmark(bookmark.id, tag.id);
+                  
+                  // Increment tag count
+                  await this.storage.incrementTagCount(tag.id);
+                }
+              } catch (tagError) {
+                console.error(`Error adding AI tag ${tagName}:`, tagError);
+              }
+            }
+          }
+          
+          // Create activity for insight generation
+          await this.storage.createActivity({
+            bookmark_id: bookmark.id,
+            bookmark_title: bookmark.title,
+            type: "insight_generated",
+            tags: insights.tags,
+            timestamp: new Date()
+          });
+          
+          console.log(`Activity created for insight generation on bookmark: ${bookmark.id}`);
+        } catch (insightError) {
+          console.error("Error in OpenAI insight generation:", insightError);
+          // Create basic insight if AI failed
+          await this.storage.createInsight({
+            bookmark_id: bookmark.id,
+            summary: "Could not generate AI insights for this content.",
+            sentiment: 5, // neutral sentiment
+            depth_level: insightDepth,
+            related_links: []
+          });
+        }
       } catch (error) {
-        console.error("Error generating insights:", error);
+        console.error("Error in insight processing workflow:", error);
       }
     }
 
