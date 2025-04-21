@@ -1128,7 +1128,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     selectedNode
   ]);
   
-  // Listen for external node selection
+  // Listen for external node selection and graph centering events
   useEffect(() => {
     const handleSelectNode = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -1143,14 +1143,78 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       centerOnNode(nodeId);
     };
     
-    // Add event listener
+    const handleCenterFullGraph = () => {
+      // Clear selection
+      setSelectedNode(null);
+      
+      // Reset all node styling
+      updateSelectedNode(null);
+      
+      // Center the entire graph with a faster transition
+      if (simulationRef.current?.nodes()) {
+        // Use a faster duration for immediate feedback
+        const nodes = simulationRef.current.nodes();
+        
+        if (zoomBehaviorRef.current && svgRef.current && containerRef.current) {
+          const width = containerRef.current.clientWidth;
+          const height = containerRef.current.clientHeight;
+          
+          // Compute bounds of all nodes
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          
+          nodes.forEach(node => {
+            if (node.x === undefined || node.y === undefined) return;
+            
+            minX = Math.min(minX, node.x);
+            maxX = Math.max(maxX, node.x);
+            minY = Math.min(minY, node.y);
+            maxY = Math.max(maxY, node.y);
+          });
+          
+          if (minX === Infinity || minY === Infinity) return;
+          
+          // Add padding
+          const padding = 50;
+          minX -= padding;
+          maxX += padding;
+          minY -= padding;
+          maxY += padding;
+          
+          // Calculate center and scale
+          const centerX = (minX + maxX) / 2;
+          const centerY = (minY + maxY) / 2;
+          const boundWidth = maxX - minX;
+          const boundHeight = maxY - minY;
+          
+          const scale = Math.min(
+            0.9 * width / boundWidth,
+            0.9 * height / boundHeight
+          );
+          
+          // Apply zoom transform with faster transition
+          const transform = d3.zoomIdentity
+            .translate(width / 2, height / 2)
+            .scale(scale)
+            .translate(-centerX, -centerY);
+          
+          d3.select(svgRef.current)
+            .transition()
+            .duration(300) // Much faster transition for immediate feedback
+            .call(zoomBehaviorRef.current.transform, transform);
+        }
+      }
+    };
+    
+    // Add event listeners
     document.addEventListener('selectGraphNode', handleSelectNode);
+    document.addEventListener('centerFullGraph', handleCenterFullGraph);
     
     // Clean up on unmount
     return () => {
       document.removeEventListener('selectGraphNode', handleSelectNode);
+      document.removeEventListener('centerFullGraph', handleCenterFullGraph);
     };
-  }, [centerOnNode]);
+  }, [centerOnNode, updateSelectedNode]);
   
   // Update selected node visually without redrawing graph
   useEffect(() => {

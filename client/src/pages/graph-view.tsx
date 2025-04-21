@@ -273,7 +273,14 @@ export default function GraphView() {
           bookmarks={sortedBookmarks}
           selectedBookmark={selectedBookmark}
           onSelectBookmark={handleSelectBookmark}
-          onCloseDetail={() => setSelectedBookmarkId(null)}
+          onCloseDetail={() => {
+            setSelectedBookmarkId(null);
+            // Immediately center the full graph when focus is cleared
+            setTimeout(() => {
+              const event = new CustomEvent('centerFullGraph');
+              document.dispatchEvent(event);
+            }, 10);
+          }}
           isLoading={isLoading}
         />
       </div>
