@@ -76,8 +76,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       const group = tagGroups[primaryTag];
       
       // Add the main bookmark node
+      // Use consistent prefixed ID format for bookmark nodes (bookmark-id)
       nodes.push({
-        id: bookmark.id,
+        id: `bookmark-${bookmark.id}`,
         name: bookmark.title,
         group,
         bookmarkId: bookmark.id,
@@ -97,10 +98,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         });
       }
       
-      // Connect bookmark to its domain
+      // Connect bookmark to its domain - use the prefixed IDs for consistency
       links.push({
         id: `link-${bookmark.id}-${domain}`,
-        source: bookmark.id,
+        source: `bookmark-${bookmark.id}`,
         target: `domain-${domain}`,
         value: 2,
         type: "domain"
@@ -130,10 +131,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           });
         }
         
-        // Connect bookmark to tag
+        // Connect bookmark to tag - use prefixed IDs
         links.push({
           id: `link-${bookmark.id}-tag-${tag}`,
-          source: bookmark.id,
+          source: `bookmark-${bookmark.id}`,
           target: `tag-${tag}`,
           value: 1,
           type: "tag"
@@ -172,7 +173,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           
           links.push({
             id: `link-${bookmark.id}-${relatedId}`,
-            source: bookmark.id,
+            source: `bookmark-${bookmark.id}`,
             target: relatedId,
             value: 2,
             type: "related"
@@ -194,8 +195,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
             bookmarkB.insights?.related_links?.some(link => link.includes(bookmarkA.url))) {
           links.push({
             id: `link-ref-${bookmarkA.id}-${bookmarkB.id}`,
-            source: bookmarkA.id,
-            target: bookmarkB.id,
+            source: `bookmark-${bookmarkA.id}`,
+            target: `bookmark-${bookmarkB.id}`,
             value: 3,
             type: "content"
           });
@@ -410,8 +411,20 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   const centerOnNode = useCallback((nodeId: string) => {
     if (!simulationRef.current || !svgRef.current || !graphDataRef.current) return;
     
-    const nodeData = simulationRef.current.nodes().find(n => n.id === nodeId);
-    if (!nodeData) return;
+    // First, try to find the node with the exact ID
+    let nodeData = simulationRef.current.nodes().find(n => n.id === nodeId);
+    
+    // If not found and it's a bookmark ID without prefix, try with the prefix
+    if (!nodeData && !nodeId.includes('-')) {
+      const prefixedId = `bookmark-${nodeId}`;
+      nodeData = simulationRef.current.nodes().find(n => n.id === prefixedId);
+      console.log(`Found node in simulation: ${prefixedId}, type: ${nodeData?.type}`);
+    }
+    
+    if (!nodeData) {
+      console.warn(`Could not find node to center: ${nodeId}`);
+      return;
+    }
     
     // Check if we need to redraw the graph or just pan to the node
     // Find the node's position
