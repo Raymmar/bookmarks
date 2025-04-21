@@ -87,6 +87,10 @@ export class MemStorage implements IStorage {
   private tags: Map<string, Tag>;
   private bookmarkTags: Map<string, BookmarkTag>;
   
+  // Chat persistence
+  private chatSessions: Map<string, ChatSession>;
+  private chatMessages: Map<string, ChatMessage>;
+  
   constructor() {
     this.bookmarks = new Map();
     this.notes = new Map();
@@ -96,6 +100,8 @@ export class MemStorage implements IStorage {
     this.activities = new Map();
     this.tags = new Map();
     this.bookmarkTags = new Map();
+    this.chatSessions = new Map();
+    this.chatMessages = new Map();
   }
 
   // Bookmarks
@@ -401,6 +407,95 @@ export class MemStorage implements IStorage {
     }
     
     return result;
+  }
+  
+  // Chat Sessions
+  async getChatSessions(): Promise<ChatSession[]> {
+    return Array.from(this.chatSessions.values())
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  }
+
+  async getChatSession(id: string): Promise<ChatSession | undefined> {
+    return this.chatSessions.get(id);
+  }
+
+  async createChatSession(session: InsertChatSession): Promise<ChatSession> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newSession: ChatSession = {
+      ...session,
+      id,
+      created_at: now,
+      updated_at: now,
+      filters: session.filters || null,
+    };
+    
+    this.chatSessions.set(id, newSession);
+    return newSession;
+  }
+
+  async updateChatSession(id: string, sessionUpdate: Partial<InsertChatSession>): Promise<ChatSession | undefined> {
+    const session = this.chatSessions.get(id);
+    if (!session) return undefined;
+    
+    const updatedSession: ChatSession = {
+      ...session,
+      ...sessionUpdate,
+      updated_at: new Date(),
+    };
+    
+    this.chatSessions.set(id, updatedSession);
+    return updatedSession;
+  }
+
+  async deleteChatSession(id: string): Promise<boolean> {
+    // Delete all messages in the session first
+    await this.deleteChatMessagesBySessionId(id);
+    
+    // Then delete the session itself
+    return this.chatSessions.delete(id);
+  }
+  
+  // Chat Messages
+  async getChatMessagesBySessionId(sessionId: string): Promise<ChatMessage[]> {
+    return Array.from(this.chatMessages.values())
+      .filter(message => message.session_id === sessionId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newMessage: ChatMessage = {
+      ...message,
+      id,
+      timestamp: now,
+    };
+    
+    this.chatMessages.set(id, newMessage);
+    
+    // Update the parent session's updated_at timestamp
+    await this.updateChatSession(message.session_id, {});
+    
+    return newMessage;
+  }
+
+  async deleteChatMessagesBySessionId(sessionId: string): Promise<boolean> {
+    const messagesToDelete = Array.from(this.chatMessages.values())
+      .filter(message => message.session_id === sessionId);
+    
+    if (messagesToDelete.length === 0) return false;
+    
+    let allDeleted = true;
+    for (const message of messagesToDelete) {
+      if (!this.chatMessages.delete(message.id)) {
+        allDeleted = false;
+      }
+    }
+    
+    return allDeleted;
   }
 }
 
@@ -740,6 +835,102 @@ export class DatabaseStorage implements IStorage {
     }
     
     return false;
+  }
+
+  // Chat Sessions
+  async getChatSessions(): Promise<ChatSession[]> {
+    return await db
+      .select()
+      .from(chatSessions)
+      .orderBy(desc(chatSessions.updated_at));
+  }
+
+  async getChatSession(id: string): Promise<ChatSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.id, id));
+    return session;
+  }
+
+  async createChatSession(session: InsertChatSession): Promise<ChatSession> {
+    const now = new Date();
+    const sessionData = {
+      ...session,
+      created_at: now,
+      updated_at: now
+    };
+    
+    const [newSession] = await db
+      .insert(chatSessions)
+      .values(sessionData)
+      .returning();
+    
+    return newSession;
+  }
+
+  async updateChatSession(id: string, sessionUpdate: Partial<InsertChatSession>): Promise<ChatSession | undefined> {
+    // Always update the updated_at timestamp
+    const updates = {
+      ...sessionUpdate,
+      updated_at: new Date()
+    };
+
+    const [updatedSession] = await db
+      .update(chatSessions)
+      .set(updates)
+      .where(eq(chatSessions.id, id))
+      .returning();
+    
+    return updatedSession;
+  }
+
+  async deleteChatSession(id: string): Promise<boolean> {
+    // Delete all messages in the session first
+    await this.deleteChatMessagesBySessionId(id);
+    
+    // Then delete the session itself
+    const result = await db
+      .delete(chatSessions)
+      .where(eq(chatSessions.id, id))
+      .returning({ id: chatSessions.id });
+    
+    return result.length > 0;
+  }
+  
+  // Chat Messages
+  async getChatMessagesBySessionId(sessionId: string): Promise<ChatMessage[]> {
+    return await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.session_id, sessionId))
+      .orderBy(chatMessages.timestamp);
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const messageData = {
+      ...message,
+      timestamp: new Date()
+    };
+    
+    const [newMessage] = await db
+      .insert(chatMessages)
+      .values(messageData)
+      .returning();
+    
+    // Update the parent session's updated_at timestamp
+    await this.updateChatSession(message.session_id, {});
+    
+    return newMessage;
+  }
+
+  async deleteChatMessagesBySessionId(sessionId: string): Promise<boolean> {
+    const result = await db
+      .delete(chatMessages)
+      .where(eq(chatMessages.session_id, sessionId))
+      .returning({ id: chatMessages.id });
+    
+    return result.length > 0;
   }
 }
 

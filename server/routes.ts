@@ -7,7 +7,8 @@ import { z } from "zod";
 import { 
   insertBookmarkSchema, insertNoteSchema, insertHighlightSchema, 
   insertScreenshotSchema, insertInsightSchema, insertActivitySchema,
-  insertTagSchema, insertBookmarkTagSchema 
+  insertTagSchema, insertBookmarkTagSchema, 
+  insertChatSessionSchema, insertChatMessageSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
