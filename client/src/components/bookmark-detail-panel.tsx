@@ -204,7 +204,26 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
       });
       
       // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+      
+      // Force a refresh of the tags for this bookmark
+      const refreshTags = async () => {
+        try {
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+          if (response.ok) {
+            const bookmarkTags = await response.json();
+            setTags(bookmarkTags);
+          }
+        } catch (error) {
+          console.error("Error refreshing tags for bookmark:", error);
+        }
+      };
+      
+      // Refresh tags after a short delay to ensure the server has processed the deletion
+      setTimeout(() => {
+        refreshTags();
+      }, 100);
       
     } catch (error) {
       // Revert the optimistic update on error
