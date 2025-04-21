@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Plus, RefreshCw } from "lucide-react";
+import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2 } from "lucide-react";
 import { Bookmark, Highlight, Note } from "@shared/types";
 import { formatDate } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -35,6 +35,8 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isSubmittingTag, setIsSubmittingTag] = useState(false);
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
+  const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
+  const [isProcessingAi, setIsProcessingAi] = useState(false);
   const { toast } = useToast();
   
   // Fetch all available tags for selection

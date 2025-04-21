@@ -33,6 +33,10 @@ export const bookmarks = pgTable("bookmarks", {
   // Only keeping system_tags for internal tag generation
   system_tags: text("system_tags").array().default([]),
   source: text("source", { enum: ["extension", "web", "import"] }).notNull(),
+  // AI processing status to track the workflow
+  ai_processing_status: text("ai_processing_status", { 
+    enum: ["pending", "processing", "completed", "failed"] 
+  }).default("pending"),
 });
 
 // Notes table

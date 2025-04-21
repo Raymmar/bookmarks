@@ -314,6 +314,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to retrieve insight" });
     }
   });
+  
+  // Trigger AI processing for a bookmark
+  app.post("/api/bookmarks/:id/process", async (req, res) => {
+    try {
+      const bookmarkId = req.params.id;
+      
+      // Get the bookmark first
+      const bookmark = await storage.getBookmark(bookmarkId);
+      if (!bookmark) {
+        return res.status(404).json({ error: 'Bookmark not found' });
+      }
+      
+      // Start AI processing in the background
+      console.log(`Manually triggering AI processing for bookmark ${bookmarkId}`);
+      
+      // Set a processing flag on the bookmark
+      await storage.updateBookmark(bookmarkId, {
+        ai_processing_status: 'processing'
+      });
+      
+      // Return immediately to client
+      res.json({ 
+        status: 'processing',
+        message: 'AI processing started in the background'
+      });
+      
+      // Start the AI processing
+      bookmarkService.processAiBookmarkData(
+        bookmarkId,
+        bookmark.url,
+        bookmark.content_html,
+        req.body.insightDepth || 1
+      ).then(async () => {
+        // Update status flag when completed
+        await storage.updateBookmark(bookmarkId, {
+          ai_processing_status: 'completed'
+        });
+        console.log(`AI processing completed for bookmark ${bookmarkId}`);
+      }).catch(async (error) => {
+        // Update status flag on error
+        await storage.updateBookmark(bookmarkId, {
+          ai_processing_status: 'failed'
+        });
+        console.error(`AI processing failed for bookmark ${bookmarkId}:`, error);
+      });
+      
+    } catch (error) {
+      console.error('Error triggering AI processing:', error);
+      res.status(500).json({ error: 'Failed to trigger AI processing' });
+    }
+  });
 
   // Activities API endpoints
   app.get("/api/activities", async (req, res) => {
