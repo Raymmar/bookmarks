@@ -279,7 +279,12 @@ export class MemStorage implements IStorage {
   }
   
   async getTagByName(name: string): Promise<Tag | undefined> {
-    return Array.from(this.tags.values()).find(tag => tag.name === name);
+    if (!name) return undefined;
+    
+    // Use case-insensitive comparison
+    return Array.from(this.tags.values()).find(
+      tag => tag.name.toLowerCase() === name.toLowerCase()
+    );
   }
   
   async createTag(tag: InsertTag): Promise<Tag> {
@@ -609,7 +614,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getTagByName(name: string): Promise<Tag | undefined> {
-    const [tag] = await db.select().from(tags).where(eq(tags.name, name));
+    if (!name) return undefined;
+    
+    // Use SQL LOWER function for case-insensitive comparison
+    const [tag] = await db
+      .select()
+      .from(tags)
+      .where(sql`LOWER(${tags.name}) = LOWER(${name})`);
+    
     return tag;
   }
   

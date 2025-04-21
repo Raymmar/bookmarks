@@ -65,38 +65,19 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
       // Use existing tag
       onTagsChange([...selectedTags, existingTag.name]);
     } else {
-      // Create new tag - use multiple approaches for reliability
+      // Create new tag using apiRequest
       try {
         console.log("Creating tag with text:", newTagText.trim());
         
-        // Approach 1: Use Fetch directly with stringified body
         const tagName = newTagText.trim();
         
-        const response = await fetch("/api/tags", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify({
-            name: tagName,
-            type: "user"
-          })
+        // Use apiRequest for consistent error handling and response parsing
+        const newTag = await apiRequest("POST", "/api/tags", {
+          name: tagName,
+          type: "user"
         });
         
-        console.log("Tag creation response status:", response.status);
-        const responseText = await response.text();
-        console.log("Tag creation response text:", responseText);
-        
-        let newTag;
-        try {
-          // Try to parse response as JSON
-          newTag = JSON.parse(responseText);
-        } catch (e) {
-          // If parsing fails, create a synthetic tag for now to keep the UI working
-          console.error("Failed to parse tag response as JSON:", e);
-          newTag = { id: crypto.randomUUID(), name: tagName };
-        }
+        console.log("Created new tag:", newTag);
         
         // Invalidate tags cache
         queryClient.invalidateQueries({ queryKey: ["/api/tags"] });

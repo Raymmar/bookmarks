@@ -440,7 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tags", async (req, res) => {
+  app.post("/api/generate-tags", async (req, res) => {
     try {
       const { content } = req.body;
       
@@ -513,21 +513,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Tag creation request body:", req.body);
       
-      // Force a tag name if none provided (for debugging)
-      let tagName = "default-tag"; 
-      let tagType: "user" | "system" = "user"; // Type annotation here
-      
-      // Extract from request if available
-      if (req.body && typeof req.body === 'object') {
-        if (req.body.name) {
-          tagName = req.body.name;
-        }
-        if (req.body.type === "user" || req.body.type === "system") {
-          tagType = req.body.type;
-        }
+      // Validate required fields
+      if (!req.body || typeof req.body !== 'object') {
+        console.error("Invalid tag creation request: missing or invalid body");
+        return res.status(400).json({ error: "Invalid request body" });
       }
       
-      // Create a new tag with hardcoded values if needed
+      // Get tag name with validation
+      let tagName = req.body.name;
+      if (!tagName || typeof tagName !== 'string' || tagName.trim() === '') {
+        console.error("Invalid tag name:", tagName);
+        return res.status(400).json({ error: "Tag name is required and must be a non-empty string" });
+      }
+      
+      tagName = tagName.trim();
+      
+      // Get tag type with validation
+      let tagType: "user" | "system" = "user";
+      if (req.body.type === "system") {
+        tagType = "system";
+      }
+      
+      // Create a tag data object
       const tagData = {
         name: tagName,
         type: tagType
@@ -535,15 +542,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Creating tag with data:", tagData);
       
-      // Check if tag with same name already exists
+      // Check if tag with same name already exists (case-insensitive)
       const existingTag = await storage.getTagByName(tagData.name);
       if (existingTag) {
         console.log("Tag already exists:", existingTag);
         return res.status(200).json(existingTag); // Return existing tag instead of error
       }
       
+      // Create the tag
       const tag = await storage.createTag(tagData);
-      console.log("Created new tag:", tag);
+      console.log("Created new tag successfully:", tag);
       res.status(201).json(tag);
     } catch (error: any) {
       console.error("Tag creation error:", error);

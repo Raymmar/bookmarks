@@ -39,32 +39,40 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
     setIsSubmitting(true);
 
     try {
-      // First, create any new tags that don't already exist
-      const tagPromises = selectedTags.map(async (tagName) => {
-        try {
-          // Try to find existing tag first
-          const tagsResp = await apiRequest("GET", "/api/tags");
-          const existingTag = tagsResp.find((tag) => 
-            tag.name.toLowerCase() === tagName.toLowerCase()
-          );
-          
-          if (existingTag) {
-            return existingTag.id;
-          } else {
-            // Create new tag
+      // Get all existing tags first
+      const existingTags = await apiRequest("GET", "/api/tags");
+      console.log("Existing tags:", existingTags);
+      
+      // Process each selected tag - create new ones if needed and get their IDs
+      const tagIdsPromises = selectedTags.map(async (tagName) => {
+        // Check if tag already exists (case-insensitive comparison)
+        const existingTag = existingTags.find(tag => 
+          tag.name.toLowerCase() === tagName.toLowerCase()
+        );
+        
+        if (existingTag) {
+          console.log(`Using existing tag: ${existingTag.name} (${existingTag.id})`);
+          return existingTag.id;
+        } else {
+          try {
+            // Create a new tag
+            console.log(`Creating new tag: ${tagName}`);
             const newTag = await apiRequest("POST", "/api/tags", {
               name: tagName,
               type: "user"
             });
+            console.log(`Created new tag:`, newTag);
             return newTag.id;
+          } catch (error) {
+            console.error(`Failed to create tag: ${tagName}`, error);
+            return null;
           }
-        } catch (error) {
-          console.error("Error processing tag:", tagName, error);
-          return null;
         }
       });
       
-      const tagIds = (await Promise.all(tagPromises)).filter(Boolean);
+      // Wait for all tag processing to complete and filter out any failures
+      const tagIds = (await Promise.all(tagIdsPromises)).filter(Boolean);
+      console.log("Tag IDs to associate with bookmark:", tagIds);
       
       // Create the bookmark
       const bookmark = await apiRequest("POST", "/api/bookmarks", {
@@ -75,11 +83,16 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         system_tags: [],
         source: "web"
       });
+      console.log("Created bookmark:", bookmark);
       
       // Add tag relations
-      await Promise.all(tagIds.map(tagId => 
-        apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {})
-      ));
+      const tagAssociationPromises = tagIds.map(tagId => {
+        console.log(`Associating tag ${tagId} with bookmark ${bookmark.id}`);
+        return apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {});
+      });
+      
+      await Promise.all(tagAssociationPromises);
+      console.log("Tag associations complete");
       
       // Update tag counts
       await queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
