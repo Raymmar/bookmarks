@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph-fixed";
 import { SidebarPanel } from "@/components/sidebar-panel";
@@ -11,6 +11,20 @@ import { X, LayoutGrid, Network, SearchX } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bookmark } from "@shared/types";
+
+// Tag interfaces
+interface Tag {
+  id: string;
+  name: string;
+  type: string;
+  count: number;
+  created_at: string;
+}
+
+// Interface for bookmarks with associated tags
+interface BookmarkWithTags extends Bookmark {
+  tags: Tag[];
+}
 
 export default function GraphView() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -27,9 +41,48 @@ export default function GraphView() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
+  // Fetch bookmarks
+  const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
   });
+
+  // Fetch tags
+  const { data: tags = [], isLoading: isLoadingTags } = useQuery<Tag[]>({
+    queryKey: ["/api/tags"],
+  });
+
+  // Fetch bookmark-tag associations for each bookmark
+  const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags } = useQuery<BookmarkWithTags[]>({
+    queryKey: ["/api/bookmarks-with-tags"],
+    enabled: !isLoadingBookmarks && !isLoadingTags,
+    queryFn: async () => {
+      // Create a map to store tags for each bookmark
+      const bookmarkTagsMap = new Map<string, Tag[]>();
+      
+      // For each bookmark, fetch its tags
+      for (const bookmark of bookmarks) {
+        try {
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+          if (response.ok) {
+            const bookmarkTags = await response.json();
+            bookmarkTagsMap.set(bookmark.id, bookmarkTags);
+          }
+        } catch (error) {
+          console.error(`Error fetching tags for bookmark ${bookmark.id}:`, error);
+          bookmarkTagsMap.set(bookmark.id, []);
+        }
+      }
+      
+      // Combine bookmarks with their tags
+      return bookmarks.map(bookmark => ({
+        ...bookmark,
+        tags: bookmarkTagsMap.get(bookmark.id) || []
+      }));
+    }
+  });
+  
+  // Combined loading state
+  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags;
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
@@ -50,17 +103,22 @@ export default function GraphView() {
     }, 100);
   };
   
-  // Extract all unique tags from bookmarks
-  const allTags = Array.from(
-    new Set(
-      bookmarks.flatMap(bookmark => 
-        [...bookmark.user_tags, ...bookmark.system_tags]
-      )
-    )
-  ).sort();
+  // Extract all unique tags from the normalized tags system
+  const allTags = tags.map(tag => tag.name).sort();
+  
+  // Get bookmark tags using the bookmarksWithTags data
+  const bookmarkTagsMap = new Map<string, string[]>();
+  bookmarksWithTags.forEach(bookmark => {
+    bookmarkTagsMap.set(bookmark.id, bookmark.tags.map(tag => tag.name));
+  });
   
   // Filter bookmarks based on search query, selected tags, and domain
   const filteredBookmarks = bookmarks.filter(bookmark => {
+    // Get this bookmark's tags from our map
+    const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
+    const bookmarkSystemTags = bookmark.system_tags || [];
+    const allBookmarkTags = [...bookmarkTags, ...bookmarkSystemTags];
+    
     // Search query filter
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
@@ -68,8 +126,7 @@ export default function GraphView() {
         bookmark.title.toLowerCase().includes(searchLower) ||
         bookmark.description?.toLowerCase().includes(searchLower) ||
         bookmark.url.toLowerCase().includes(searchLower) ||
-        bookmark.user_tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
-        bookmark.system_tags.some(tag => tag.toLowerCase().includes(searchLower));
+        allBookmarkTags.some(tag => tag.toLowerCase().includes(searchLower));
       
       if (!matchesSearch) return false;
     }
@@ -109,12 +166,10 @@ export default function GraphView() {
     // Tag filter
     if (selectedTags.length === 0) return true;
     
-    const bookmarkTags = [...bookmark.user_tags, ...bookmark.system_tags];
-    
     if (tagMode === "any") {
-      return selectedTags.some(tag => bookmarkTags.includes(tag));
+      return selectedTags.some(tag => allBookmarkTags.includes(tag));
     } else {
-      return selectedTags.every(tag => bookmarkTags.includes(tag));
+      return selectedTags.every(tag => allBookmarkTags.includes(tag));
     }
   });
   
