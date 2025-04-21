@@ -8,6 +8,7 @@
 import { db, pool } from "../server/db";
 import { bookmarks, tags, bookmarkTags } from "../shared/schema";
 import { eq } from "drizzle-orm";
+import crypto from "crypto";
 
 async function migrateTagsToNormalizedSystem() {
   console.log("Starting tag migration process...");
@@ -95,6 +96,7 @@ async function migrateTagsToNormalizedSystem() {
           try {
             // Create relation
             await db.insert(bookmarkTags).values({
+              id: crypto.randomUUID(),
               bookmark_id: bookmark.id,
               tag_id: tag.id
             });
