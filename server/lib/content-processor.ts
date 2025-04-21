@@ -320,7 +320,9 @@ export async function generateChatResponse(
         // Get all tags for this bookmark
         const normalizedTagNames = normalizedTags.map(tag => tag.name);
         const systemTagNames = bookmark.system_tags || [];
-        const allTags = [...new Set([...normalizedTagNames, ...systemTagNames])];
+        // Use concat and filter for uniqueness instead of Set
+        const allTags = normalizedTagNames.concat(systemTagNames)
+          .filter((value, index, self) => self.indexOf(value) === index);
         const tagsText = allTags.length > 0 ? `Tags: ${allTags.join(', ')}` : "No tags";
         
         return {

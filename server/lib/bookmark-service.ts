@@ -25,6 +25,8 @@ import {
 } from './content-processor';
 import { extractMetadata } from './metadata-extractor';
 
+import { InsertBookmark } from '@shared/schema';
+
 export interface BookmarkCreationOptions {
   url: string;
   title?: string;
