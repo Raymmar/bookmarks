@@ -258,181 +258,209 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     if (nodes.length === 0) return;
     
-    // For small sets of nodes (focus mode), ensure organic layout by modifying simulation
+    // Completely reworked focus mode layout to eliminate grid formations
     if (nodes.length <= 15 && simulationRef.current) {
-      // Get all nodes in the simulation
-      const allNodes = simulationRef.current.nodes();
+      // Stop current simulation to ensure clean state
+      simulationRef.current.stop();
       
-      // Create a Set of IDs for nodes in our focus set
+      // Get all nodes and put non-focus nodes far away
+      const allNodes = simulationRef.current.nodes();
       const focusNodeIds = new Set(nodes.map(n => n.id));
       
-      // Group nodes by type for special handling
-      let focusedNodes: GraphNode[] = [];
-      let domainNodes: GraphNode[] = [];
-      let tagNodes: GraphNode[] = [];
-      let bookmarkNodes: GraphNode[] = [];
-      
-      // Adjust forces for better focus view display
+      // Clear all fixed positions for focused nodes
       allNodes.forEach(node => {
-        // If this node is in our focus set
         if (focusNodeIds.has(node.id)) {
-          // For focus nodes, remove any fixed positions to allow natural placement
+          // Reset positions to null to allow force simulation to work
           node.fx = null;
           node.fy = null;
-          
-          // Track nodes by type for specialized repulsion
-          focusedNodes.push(node);
-          if (node.type === "domain") {
-            domainNodes.push(node);
-          } else if (node.type === "tag") {
-            tagNodes.push(node);
-          } else if (node.type === "bookmark") {
-            bookmarkNodes.push(node);
-          }
+          node.vx = 0;
+          node.vy = 0;
         } else {
-          // For non-focus nodes, make them less influential by pushing them far away
-          // Push all non-focus nodes very far away to not interfere with layout at all
-          node.fx = node.x ? node.x + (Math.random() - 0.5) * 5000 : null;
-          node.fy = node.y ? node.y + (Math.random() - 0.5) * 5000 : null;
+          // Move non-focus nodes very far away
+          node.fx = node.x ? node.x + (Math.random() - 0.5) * 10000 : null;
+          node.fy = node.y ? node.y + (Math.random() - 0.5) * 10000 : null;
         }
       });
       
-      // Apply optimal initial positions for all focus nodes, not just domains
-      const nodeCount = focusedNodes.length;
-      if (nodeCount > 1) {
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const spreadRadius = 180; // Large spreading radius for all nodes
-        
-        // Create a golden ratio spiral distribution for more natural spread
-        // Unlike a circle, this gives more organic placement
-        focusedNodes.forEach((node, i) => {
-          const goldenRatio = 1.618033988749895;
-          const goldenAngle = Math.PI * 2 * (1 - 1 / goldenRatio);
-          const angle = i * goldenAngle;
-          
-          // Radius increases with index for a spiral effect, scaled by node count
-          const radius = spreadRadius * Math.sqrt(i / nodeCount);
-          
-          // Position node along spiral
-          node.x = centerX + radius * Math.cos(angle);
-          node.y = centerY + radius * Math.sin(angle);
-          
-          // Add gentle outward velocity for organic spread
-          const velScale = 3;
-          node.vx = Math.cos(angle) * velScale;
-          node.vy = Math.sin(angle) * velScale;
-        });
-      }
+      // Get only the focused nodes
+      const focusedNodes = nodes.filter(n => focusNodeIds.has(n.id));
+      const centerX = width / 2;
+      const centerY = height / 2;
       
-      // Custom all-to-all repulsion force for maximum organic spread
-      // This ensures nodes repel each other more naturally than D3's default
-      const customRepulsionForce = (alpha: number) => {
-        // Apply repulsion between all pairs of focus nodes
-        for (let i = 0; i < focusedNodes.length; i++) {
-          for (let j = i + 1; j < focusedNodes.length; j++) {
-            const nodeA = focusedNodes[i];
-            const nodeB = focusedNodes[j];
+      // First arrange nodes in a completely random organic pattern
+      // This helps break any pre-existing grid patterns
+      focusedNodes.forEach(node => {
+        // Add random noise to positions - this is key to breaking grid patterns
+        const randomAngle = Math.random() * Math.PI * 2;
+        const randomDistance = Math.random() * 120 + 80; // Varied distances 80-200px from center
+        
+        node.x = centerX + Math.cos(randomAngle) * randomDistance;
+        node.y = centerY + Math.sin(randomAngle) * randomDistance;
+        
+        // Add random initial velocities for more chaotic starting conditions
+        node.vx = (Math.random() - 0.5) * 10;
+        node.vy = (Math.random() - 0.5) * 10;
+      });
+      
+      // Create a completely new force simulation for focus mode
+      // This is critical - we don't want to inherit any forces from the main view
+      const focusSimulation = d3.forceSimulation<GraphNode>(allNodes)
+        // Apply very strong node repulsion
+        .force("charge", d3.forceManyBody()
+          .strength(-800)  // Much stronger negative charge
+          .distanceMax(600) // Increased maximum distance
+          .theta(0.7)  // More accurate force calculations
+        );
+      
+      // Apply custom node positioning strategy
+      // For different node types in different regions to maximize spacing
+      const positioningForce = () => {
+        // Group nodes by type
+        const domainNodes: GraphNode[] = [];
+        const bookmarkNodes: GraphNode[] = [];
+        const tagNodes: GraphNode[] = [];
+        const otherNodes: GraphNode[] = [];
+        
+        focusedNodes.forEach(node => {
+          if (node.type === "domain") domainNodes.push(node);
+          else if (node.type === "bookmark") bookmarkNodes.push(node);
+          else if (node.type === "tag") tagNodes.push(node);
+          else otherNodes.push(node);
+        });
+        
+        // Position domains most prominently in separate regions
+        if (domainNodes.length > 0) {
+          const domainSpread = Math.PI * 2 / domainNodes.length;
+          domainNodes.forEach((node, i) => {
+            // Place domains in a wide circle 
+            const angle = i * domainSpread + (Math.random() * 0.2);
+            const distance = 170 + (Math.random() * 40);
             
-            if (!nodeA.x || !nodeA.y || !nodeB.x || !nodeB.y) continue;
+            // Create a strong pull toward this position
+            const targetX = centerX + Math.cos(angle) * distance;
+            const targetY = centerY + Math.sin(angle) * distance;
             
-            // Calculate distance between nodes
-            const dx = nodeA.x - nodeB.x;
-            const dy = nodeA.y - nodeB.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+            // Apply force toward the target position
+            const dx = targetX - (node.x || 0);
+            const dy = targetY - (node.y || 0);
+            const distance2 = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance === 0) continue;
-            
-            // Determine repulsion strength based on node types for maximum readability
-            let repulsionStrength = -350; // Base repulsion for all nodes
-            
-            // Enhance repulsion between similar types to prevent clustering
-            if (nodeA.type === nodeB.type) {
-              repulsionStrength *= 1.5; // 50% stronger repulsion between same-type nodes
+            if (distance2 > 5) {  // Only if we're not already close
+              node.vx = (node.vx || 0) + dx * 0.1;
+              node.vy = (node.vy || 0) + dy * 0.1;
             }
-            
-            // Special cases for max readability
-            if (nodeA.type === "domain" && nodeB.type === "domain") {
-              repulsionStrength *= 1.5; // Even stronger repulsion between domains
-            }
-            
-            // Scale force by distance quadratically, with a minimum distance to prevent extreme forces
-            const minDistance = 10;
-            const effectiveDistance = Math.max(distance, minDistance);
-            const force = (repulsionStrength * alpha) / (effectiveDistance * effectiveDistance);
-            
-            // Calculate force components
-            const forceX = dx * force;
-            const forceY = dy * force;
-            
-            // Apply force with a scaling factor based on node type
-            // This makes certain nodes (like domains) more influential
-            const getNodeWeight = (node: GraphNode) => {
-              if (node.type === "domain") return 1.2; // Domains influence layout more
-              if (node.type === "tag") return 1.1;   // Tags a bit less
-              return 1.0;                           // Default weight
-            };
-            
-            const weightA = getNodeWeight(nodeA);
-            const weightB = getNodeWeight(nodeB);
-            
-            // Apply forces scaled by node weight
-            nodeA.vx = (nodeA.vx || 0) + forceX * weightA;
-            nodeA.vy = (nodeA.vy || 0) + forceY * weightA;
-            nodeB.vx = (nodeB.vx || 0) - forceX * weightB;
-            nodeB.vy = (nodeB.vy || 0) - forceY * weightB;
-          }
+          });
         }
       };
       
-      // Update force parameters for more organic small-group layout
-      simulationRef.current
-        // Strong repulsion for all nodes to prevent grid-like formations
-        .force("charge", d3.forceManyBody()
-          .strength(nodes.length <= 5 ? -400 : -500) // Much stronger for all nodes
-          .distanceMax(500) // Limit distance effect to avoid extreme spreading
+      // Add special forces just for this focused view
+      focusSimulation
+        // Use longer distances for links
+        .force("link", d3.forceLink<GraphNode, GraphLink>()
+          .id(d => d.id)
+          .links(links.filter(link => {
+            // Only include links where both nodes are in focus
+            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+            return focusNodeIds.has(sourceId) && focusNodeIds.has(targetId);
+          }))
+          .distance(() => 120 + Math.random() * 80) // Varied distances for organic look
+          .strength(0.15) // Very weak link strength
         )
         
-        // Use longer distances for links to create more space
-        .force("link", d3.forceLink<GraphNode, GraphLink>().id(d => d.id)
-          .distance(d => {
-            // Much larger distances for maximum spread
-            if (d.type === "domain") return 160; // Extremely generous for domains
-            if (d.type === "tag") return 130;
-            if (d.type === "related") return 110;
-            return 120;
-          })
-          .strength(0.2) // Very weak links to allow nodes to spread naturally
-        )
+        // Use a weak centering force
+        .force("center", d3.forceCenter(centerX, centerY).strength(0.05))
         
-        // Weak center force - just enough to keep nodes from flying off screen
-        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.03))
+        // Add radial force to spread nodes out from center
+        .force("radial", d3.forceRadial(
+          (d) => {
+            // Vary the distance by node type
+            if (d.type === "domain") return 180 + Math.random() * 40; 
+            if (d.type === "tag") return 140 + Math.random() * 30;
+            return 120 + Math.random() * 40;
+          }, 
+          centerX, 
+          centerY
+        ).strength(0.2))
         
-        // Very weak x/y forces for subtle layout correction
-        .force("x", d3.forceX(width / 2).strength(0.01))
-        .force("y", d3.forceY(height / 2).strength(0.01))
+        // Add our custom positioning force
+        .force("positioning", positioningForce)
         
-        // Generous collision detection to ensure no overlap
+        // Add very large collision detection
         .force("collision", d3.forceCollide()
           .radius(d => {
-            // Much larger collision radii to ensure wide separation
-            if (d.type === "bookmark") return 75; // Significantly increased
-            if (d.type === "domain") return 90;  // Extra large for domains
-            if (d.type === "tag") return 65;     // Larger for tags too
-            return 60;                          // Large for any other types
+            switch (d.type) {
+              case "domain": return 80 + Math.random() * 20;  // Largest for domains
+              case "bookmark": return 65 + Math.random() * 15; // Large for bookmarks
+              case "tag": return 55 + Math.random() * 10;     // Medium for tags
+              default: return 50 + Math.random() * 10;        // Smaller for others
+            }
           })
-          .strength(1.0)  // Maximum strength for collision
-          .iterations(4)  // More iterations for better collision resolution
+          .strength(0.85)  // Strong collision detection
+          .iterations(4)   // More collision iterations
         )
         
-        // Add our custom repulsion force for maximum readability
-        .force("customRepulsion", customRepulsionForce)
-        
-        // Simulation parameters for more organic movement
-        .alpha(0.8)           // Full reset of simulation
-        .alphaDecay(0.01)     // Very slow decay for long-lasting movement
-        .velocityDecay(0.2)   // Lower decay for more fluid, sweeping movements
-        .restart();           // Restart simulation to apply new forces
+        // Add x-y positioning for better spread
+        .force("x", d3.forceX(centerX).strength(d => {
+          // Vary strength by type to create uneven, organic clustering
+          if (d.type === "domain") return 0.02;
+          return 0.04;
+        }))
+        .force("y", d3.forceY(centerY).strength(d => {
+          if (d.type === "domain") return 0.02;
+          return 0.04;
+        }));
+      
+      // Special force to explicitly break grid patterns
+      const breakGridForce = () => {
+        focusedNodes.forEach(node => {
+          // Add small random movement to each node
+          node.vx = (node.vx || 0) + (Math.random() - 0.5) * 2;
+          node.vy = (node.vy || 0) + (Math.random() - 0.5) * 2;
+          
+          // Find nodes that are too aligned (in grid formation)
+          const alignedNodes = focusedNodes.filter(other => {
+            if (node === other) return false;
+            
+            // Check if nodes are horizontally or vertically aligned (grid pattern)
+            const dx = Math.abs((node.x || 0) - (other.x || 0));
+            const dy = Math.abs((node.y || 0) - (other.y || 0));
+            
+            // If they're very closely aligned on either axis (but not both)
+            return (dx < 10 && dy > 20) || (dy < 10 && dx > 20);
+          });
+          
+          // For each aligned node, add a force to break the alignment
+          alignedNodes.forEach(other => {
+            const dx = (node.x || 0) - (other.x || 0);
+            const dy = (node.y || 0) - (other.y || 0);
+            
+            // If horizontally aligned, add vertical force
+            if (Math.abs(dx) < 10) {
+              node.vy = (node.vy || 0) + (Math.random() - 0.5) * 5;
+            }
+            
+            // If vertically aligned, add horizontal force
+            if (Math.abs(dy) < 10) {
+              node.vx = (node.vx || 0) + (Math.random() - 0.5) * 5;
+            }
+          });
+        });
+      };
+      
+      // Add the grid-breaking force
+      focusSimulation.force("breakGrid", breakGridForce);
+      
+      // Configure the simulation for a more chaotic, organic result
+      focusSimulation
+        .alpha(0.9)            // Start with high energy
+        .alphaMin(0.001)       // Run longer by using a lower min alpha
+        .alphaDecay(0.008)     // Very slow alpha decay
+        .velocityDecay(0.3)    // Moderate velocity decay for momentum
+        .restart();            // Start the simulation
+      
+      // Override the main simulation with our focused one
+      simulationRef.current = focusSimulation;
     }
     
     // Calculate bounding box of all nodes
