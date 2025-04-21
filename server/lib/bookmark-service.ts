@@ -368,7 +368,6 @@ export class BookmarkService {
       title: options.title || urlResult.normalized.split("/").pop() || "Untitled",
       description: options.description || "",
       content_html: options.content_html || null,
-      system_tags: [],
       source: options.source,
       vector_embedding: null
     };

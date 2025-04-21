@@ -428,20 +428,18 @@ export async function generateChatResponse(
               const normalizedTags = await storage.getTagsByBookmarkId(bookmark.id);
               // Extract tag names from normalized tags
               const normalizedTagNames = normalizedTags.map(tag => tag.name);
-              // Combine with system tags
-              const allTagNames = [...(bookmark.system_tags || []), ...normalizedTagNames];
               
-              console.log(`Bookmark "${bookmark.title}" has tags: ${allTagNames.join(', ') || 'none'}`);
+              console.log(`Bookmark "${bookmark.title}" has tags: ${normalizedTagNames.join(', ') || 'none'}`);
               
               return {
                 bookmark,
-                tags: allTagNames
+                tags: normalizedTagNames
               };
             } catch (error) {
               console.error(`Error getting tags for bookmark ${bookmark.id}:`, error);
               return {
                 bookmark,
-                tags: bookmark.system_tags || []
+                tags: []
               };
             }
           })
@@ -513,11 +511,8 @@ export async function generateChatResponse(
         
         // Get all tags for this bookmark
         const normalizedTagNames = normalizedTags.map(tag => tag.name);
-        const systemTagNames = bookmark.system_tags || [];
-        // Use concat and filter for uniqueness instead of Set
-        const allTags = normalizedTagNames.concat(systemTagNames)
-          .filter((value, index, self) => self.indexOf(value) === index);
-        const tagsText = allTags.length > 0 ? `Tags: ${allTags.join(', ')}` : "No tags";
+        // Using only normalized tags now
+        const tagsText = normalizedTagNames.length > 0 ? `Tags: ${normalizedTagNames.join(', ')}` : "No tags";
         
         return {
           title: bookmark.title,

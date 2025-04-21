@@ -93,7 +93,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       if (bookmark.ai_processing_status) {
         setAiProcessingStatus(bookmark.ai_processing_status as any);
       } else {
-        // Check if we have insights or system tags
+        // Check if we have insights or system-generated tags
         const hasInsights = bookmark.insights && Object.keys(bookmark.insights).length > 0;
         const hasSystemTags = tags.some(tag => tag.type === 'system');
         
@@ -747,18 +747,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               </Badge>
             ))}
             
-            {/* System tags without remove capability */}
-            {(bookmark.system_tags || []).map((tag, index) => (
-              <Badge 
-                key={`system-${index}`} 
-                variant="outline" 
-                className="bg-blue-100 text-blue-800 hover:bg-blue-200"
-              >
-                {tag}
-              </Badge>
-            ))}
-            
-            {tags.length === 0 && (!bookmark.system_tags || bookmark.system_tags.length === 0) && (
+            {tags.length === 0 && (
               <div className="text-sm text-gray-500 italic">No tags</div>
             )}
           </div>

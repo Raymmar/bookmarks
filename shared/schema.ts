@@ -30,8 +30,6 @@ export const bookmarks = pgTable("bookmarks", {
   // Use a text array to store vector embedding until pgvector extension is properly configured
   vector_embedding: text("vector_embedding").array(),
   date_saved: timestamp("date_saved").defaultNow().notNull(),
-  // Only keeping system_tags for internal tag generation
-  system_tags: text("system_tags").array().default([]),
   source: text("source", { enum: ["extension", "web", "import"] }).notNull(),
   // AI processing status to track the workflow
   ai_processing_status: text("ai_processing_status", { 
