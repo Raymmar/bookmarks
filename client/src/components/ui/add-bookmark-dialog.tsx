@@ -57,72 +57,43 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
     setIsSubmitting(true);
 
     try {
-      // Ensure we have the most up-to-date tags
-      await fetchLatestTags();
+      // Check if the URL already exists as a bookmark
+      const urlCheckResult = await apiRequest("POST", "/api/url/normalize", { url });
       
-      // Get all existing tags
-      const existingTags = await apiRequest("GET", "/api/tags");
-      console.log("Existing tags:", existingTags);
-      
-      // Process each selected tag - create new ones if needed and get their IDs
-      const tagIdsPromises = selectedTags.map(async (tagName) => {
-        // Check if tag already exists (case-insensitive comparison)
-        const existingTag = existingTags.find(tag => 
-          tag.name.toLowerCase() === tagName.toLowerCase()
-        );
+      if (urlCheckResult.exists) {
+        toast({
+          title: "URL already exists",
+          description: "This URL has already been bookmarked",
+          variant: "default",
+        });
         
-        if (existingTag) {
-          console.log(`Using existing tag: ${existingTag.name} (${existingTag.id})`);
-          return existingTag.id;
-        } else {
-          try {
-            // Create a new tag
-            console.log(`Creating new tag: ${tagName}`);
-            const newTag = await apiRequest("POST", "/api/tags", {
-              name: tagName,
-              type: "user"
-            });
-            console.log(`Created new tag:`, newTag);
-            return newTag.id;
-          } catch (error) {
-            console.error(`Failed to create tag: ${tagName}`, error);
-            return null;
-          }
-        }
-      });
+        // Close dialog
+        onOpenChange(false);
+        return;
+      }
       
-      // Wait for all tag processing to complete and filter out any failures
-      const tagIds = (await Promise.all(tagIdsPromises)).filter(Boolean);
-      console.log("Tag IDs to associate with bookmark:", tagIds);
-      
-      // Create the bookmark
+      // Create the bookmark using the centralized bookmark service API
+      // The bookmark service will handle tag creation, association, metadata extraction, etc.
       const bookmark = await apiRequest("POST", "/api/bookmarks", {
         url,
         title: url.split("/").pop() || url, // Generate a simple title from URL for now
         description: notes ? notes.substring(0, 100) : "", // Use part of notes as description
-        user_tags: [], // Tags are now managed through the tag relation tables
-        system_tags: [],
+        notes, // Pass notes as a separate field
+        tags: selectedTags, // Pass the raw tag names, service will handle creation/association
+        autoExtract, // Pass auto-extract flag
+        insightDepth: autoExtract ? insightDepth : null, // Only pass insightDepth if autoExtract is enabled
         source: "web"
       });
+      
       console.log("Created bookmark:", bookmark);
       
-      // Add tag relations
-      const tagAssociationPromises = tagIds.map(tagId => {
-        console.log(`Associating tag ${tagId} with bookmark ${bookmark.id}`);
-        return apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {});
-      });
-      
-      await Promise.all(tagAssociationPromises);
-      console.log("Tag associations complete");
-      
-      // Update tag counts and refetch tags to ensure UI is updated
+      // Refresh tags and bookmarks data
       await queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
-      // Force refetch tags in other components like tag selector
-      await queryClient.refetchQueries({ queryKey: ["/api/tags"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       
       toast({
         title: "Bookmark added",
-        description: "Your bookmark was successfully added",
+        description: "Your bookmark was successfully added with all associated data",
       });
 
       // Reset form

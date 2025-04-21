@@ -70,162 +70,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const bookmarkData = parsedData.data;
       
-      // Clean and normalize the URL to prevent duplicates
-      if (bookmarkData.url) {
-        // Use normalizeUrl with removeParams=true to handle tracking parameters
-        const normalizedUrl = normalizeUrl(bookmarkData.url, true);
-        
-        console.log(`URL normalization: Original: ${bookmarkData.url}, Normalized: ${normalizedUrl}`);
-        
-        // Check if a bookmark with this normalized URL already exists
-        const bookmarks = await storage.getBookmarks();
-        const existingBookmark = bookmarks.find(bookmark => 
-          areUrlsEquivalent(bookmark.url, normalizedUrl)
-        );
-        
-        if (existingBookmark) {
-          console.log(`Found existing bookmark with equivalent URL: ${existingBookmark.id}`);
-          // Return the existing bookmark instead of creating a duplicate
-          return res.status(200).json({
-            ...existingBookmark,
-            message: "URL already exists in bookmarks",
-            existingBookmarkId: existingBookmark.id
-          });
-        }
-        
-        // Update the URL to the normalized version
-        bookmarkData.url = normalizedUrl;
-      }
+      // Use centralized bookmark service for creation with all processing
+      const result = await bookmarkService.createBookmark({
+        url: bookmarkData.url,
+        title: bookmarkData.title,
+        description: bookmarkData.description,
+        content_html: bookmarkData.content_html,
+        notes: req.body.notes ? (Array.isArray(req.body.notes) ? req.body.notes[0]?.text : req.body.notes) : undefined,
+        tags: bookmarkData.user_tags || [], // Convert legacy user_tags if present
+        autoExtract: req.body.autoExtract,
+        insightDepth: req.body.insightDepth,
+        source: bookmarkData.source || 'web'
+      });
       
-      // Extract metadata if URL is provided but no title/description
-      if (bookmarkData.url && (!bookmarkData.title || !bookmarkData.description)) {
-        try {
-          const metadata = await extractMetadata(bookmarkData.url);
-          bookmarkData.title = bookmarkData.title || metadata.title;
-          bookmarkData.description = bookmarkData.description || metadata.description;
-          bookmarkData.content_html = metadata.content;
-        } catch (error) {
-          console.error("Error extracting metadata:", error);
-          // Continue with available data
-        }
-      }
-      
-      // Process content if auto-extract is enabled
-      if (req.body.autoExtract && bookmarkData.content_html) {
-        try {
-          const processedContent = await processContent(bookmarkData.content_html);
-          
-          // Generate embedding for search
-          const embedding = await generateEmbedding(processedContent.text);
-          
-          // Generate auto tags if not provided
-          if (!bookmarkData.system_tags || bookmarkData.system_tags.length === 0) {
-            const tags = await generateTags(processedContent.text);
-            bookmarkData.system_tags = tags;
-          }
-          
-          // Create bookmark with proper date
-          const bookmark = await storage.createBookmark({
-            ...bookmarkData,
-            vector_embedding: embedding.embedding,
-            date_saved: new Date()
-          });
-          
-          // Generate insights based on content
-          if (req.body.insightDepth) {
-            const insightDepth = parseInt(req.body.insightDepth);
-            const insights = await generateInsights(
-              bookmarkData.url,
-              processedContent.text,
-              insightDepth
-            );
-            
-            // Store insights
-            await storage.createInsight({
-              bookmark_id: bookmark.id,
-              summary: insights.summary,
-              sentiment: insights.sentiment,
-              depth_level: insightDepth,
-              related_links: insights.relatedLinks || []
-            });
-            
-            // Create activity for insight generation
-            await storage.createActivity({
-              bookmark_id: bookmark.id,
-              bookmark_title: bookmark.title,
-              type: "insight_generated",
-              tags: insights.tags,
-              timestamp: new Date()
-            });
-          }
-          
-          // Create activity for bookmark
-          await storage.createActivity({
-            bookmark_id: bookmark.id,
-            bookmark_title: bookmark.title,
-            type: "bookmark_added",
-            timestamp: new Date()
-          });
-          
-          // Add notes if provided
-          if (req.body.notes && Array.isArray(req.body.notes)) {
-            for (const noteData of req.body.notes) {
-              if (noteData.text) {
-                const note = await storage.createNote({
-                  bookmark_id: bookmark.id,
-                  text: noteData.text,
-                  timestamp: new Date()
-                });
-                
-                // Create activity for note
-                await storage.createActivity({
-                  bookmark_id: bookmark.id,
-                  bookmark_title: bookmark.title,
-                  type: "note_added",
-                  content: noteData.text,
-                  timestamp: new Date()
-                });
-              }
-            }
-          }
-          
-          res.status(201).json(bookmark);
-        } catch (error) {
-          console.error("Error processing content:", error);
-          // Continue with basic bookmark creation
-          const bookmark = await storage.createBookmark({
-            ...bookmarkData,
-            date_saved: new Date()
-          });
-          
-          await storage.createActivity({
-            bookmark_id: bookmark.id,
-            bookmark_title: bookmark.title,
-            type: "bookmark_added",
-            timestamp: new Date()
-          });
-          
-          res.status(201).json(bookmark);
-        }
-      } else {
-        // Basic bookmark creation without processing
-        // Ensure date_saved is a proper Date object
-        const bookmarkWithDate = {
-          ...bookmarkData,
-          date_saved: new Date()
-        };
-        
-        const bookmark = await storage.createBookmark(bookmarkWithDate);
-        
-        await storage.createActivity({
-          bookmark_id: bookmark.id,
-          bookmark_title: bookmark.title,
-          type: "bookmark_added",
-          timestamp: new Date()
+      if (result.isExisting) {
+        // If URL already exists, return it with appropriate message
+        return res.status(200).json({
+          ...result.bookmark,
+          message: "URL already exists in bookmarks",
+          existingBookmarkId: result.bookmark.id
         });
-        
-        res.status(201).json(bookmark);
       }
+      
+      // Return the newly created bookmark
+      res.status(201).json(result.bookmark);
     } catch (error) {
       console.error("Error creating bookmark:", error);
       res.status(500).json({ error: "Failed to create bookmark" });
@@ -234,30 +102,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/bookmarks/:id", async (req, res) => {
     try {
-      const bookmark = await storage.getBookmark(req.params.id);
-      
-      if (!bookmark) {
-        return res.status(404).json({ error: "Bookmark not found" });
+      // Use centralized bookmark service for updates
+      try {
+        const updatedBookmark = await bookmarkService.updateBookmark(req.params.id, {
+          url: req.body.url,
+          title: req.body.title,
+          description: req.body.description,
+          notes: req.body.notes,
+          tags: req.body.user_tags || req.body.tags || [],
+          source: req.body.source
+        });
+        res.json(updatedBookmark);
+      } catch (error) {
+        if (error.message === "Bookmark not found") {
+          return res.status(404).json({ error: "Bookmark not found" });
+        }
+        throw error;
       }
-      
-      const updatedBookmark = await storage.updateBookmark(req.params.id, req.body);
-      res.json(updatedBookmark);
     } catch (error) {
+      console.error("Error updating bookmark:", error);
       res.status(500).json({ error: "Failed to update bookmark" });
     }
   });
 
   app.delete("/api/bookmarks/:id", async (req, res) => {
     try {
-      const bookmark = await storage.getBookmark(req.params.id);
-      
-      if (!bookmark) {
-        return res.status(404).json({ error: "Bookmark not found" });
+      // Use centralized bookmark service for deletion
+      try {
+        await bookmarkService.deleteBookmark(req.params.id);
+        res.status(204).send();
+      } catch (error) {
+        if (error.message === "Bookmark not found") {
+          return res.status(404).json({ error: "Bookmark not found" });
+        }
+        throw error;
       }
-      
-      await storage.deleteBookmark(req.params.id);
-      res.status(204).send();
     } catch (error) {
+      console.error("Error deleting bookmark:", error);
       res.status(500).json({ error: "Failed to delete bookmark" });
     }
   });
@@ -448,31 +329,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "URL is required" });
       }
       
-      // Normalize the URL (with tracking param removal)
-      const normalizedUrl = normalizeUrl(url, true);
+      // Use the bookmark service to process the URL
+      const urlResult = await bookmarkService.processUrl(url);
       
-      // Check if a bookmark with this normalized URL already exists
-      const bookmarks = await storage.getBookmarks();
-      const existingBookmark = bookmarks.find(bookmark => 
-        areUrlsEquivalent(bookmark.url, normalizedUrl)
-      );
-      
-      if (existingBookmark) {
-        // Return existence info along with normalized URL
-        return res.json({
-          original: url,
-          normalized: normalizedUrl,
-          exists: true,
-          existingBookmarkId: existingBookmark.id
-        });
-      } else {
-        // Just return the normalized URL
-        return res.json({
-          original: url,
-          normalized: normalizedUrl,
-          exists: false
-        });
-      }
+      // Return the result directly from the service
+      return res.json(urlResult);
     } catch (error) {
       console.error("Error normalizing URL:", error);
       res.status(500).json({ error: "Failed to normalize URL" });
