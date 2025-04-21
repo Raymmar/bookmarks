@@ -1051,7 +1051,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           if (d.type === "tag") return 25;
           return 20;
         }
-      }).strength(isFewNodes ? 0.5 : 0.8));
+      }).strength(newGraphData.nodes.length <= 10 ? 0.5 : 0.8));
     
     // Update visuals
     if (!svgRef.current) return;
