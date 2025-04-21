@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
+import { processAITags, TAG_SYSTEM_PROMPT } from "./tag-normalizer";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const MODEL = "gpt-4o";
@@ -199,20 +200,23 @@ export async function generateInsights(
       sentiment = Math.max(0, Math.min(10, sentiment));
       
       // Extract tags with fallbacks
-      let tags = [];
+      let rawTags = [];
       if (Array.isArray(result.tags)) {
-        tags = result.tags;
+        rawTags = result.tags;
       } else if (Array.isArray(result.Tags)) {
-        tags = result.Tags;
+        rawTags = result.Tags;
       } else if (typeof result.tags === 'string') {
-        tags = result.tags.split(',').map(tag => tag.trim());
+        rawTags = result.tags.split(',').map(tag => tag.trim());
       }
       
-      // Filter and clean tags
-      tags = tags
+      // First do basic cleaning
+      const cleanedTags = rawTags
         .filter(tag => tag && typeof tag === 'string')
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
+        
+      // Then apply enhanced tag normalization with deduplication
+      const tags = processAITags(cleanedTags);
       
       // Extract related links with fallbacks
       let relatedLinks = [];
@@ -268,15 +272,9 @@ export async function generateTags(content: string, url?: string): Promise<strin
     const useUrlDirectly = url && (!content || content.length < 100);
     console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
-    // Get custom tag generation prompt from settings if available
-    let systemPrompt = `You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. 
-    
-    You must respond with a JSON object in the following format:
-    {
-      "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
-    }
-    
-    The tags should be single words or short phrases that capture the main topics in the content.`;
+    // Fully respect the user's custom prompt from settings
+    let systemPrompt = "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Always respond with a JSON object containing a tags array.";
+    // We prioritize the user's custom prompt but still ensure JSON output format
     try {
       const customPrompt = await storage.getSetting("auto_tagging_prompt");
       if (customPrompt && customPrompt.value) {
@@ -343,14 +341,18 @@ export async function generateTags(content: string, url?: string): Promise<strin
       }
     }
     
-    // Clean and normalize tags
-    tags = tags
+    // First basic cleaning
+    let cleanedTags = tags
       .filter(tag => tag && typeof tag === 'string')
       .map((tag: string) => tag.trim())
       .filter(tag => tag.length > 0);
     
-    console.log("Processed tags:", tags);
-    return tags;
+    // Then apply our enhanced normalization and deduplication
+    const normalizedTags = processAITags(cleanedTags);
+    
+    console.log("Raw tags:", cleanedTags);
+    console.log("Normalized tags:", normalizedTags);
+    return normalizedTags;
   } catch (error) {
     console.error("Error generating tags:", error);
     return [];
