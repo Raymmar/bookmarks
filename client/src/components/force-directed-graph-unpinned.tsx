@@ -583,23 +583,21 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           break;
         case "tag":
           content = `<div class="font-semibold text-sm mb-1">Tag: ${d.name}</div>`;
-          content += `<div class="text-xs text-gray-500">Click to focus on related bookmarks</div>`;
           break;
         case "domain":
           content = `<div class="font-semibold text-sm mb-1">Domain: ${d.name}</div>`;
-          content += `<div class="text-xs text-gray-500">Click to focus on related bookmarks</div>`;
           break;
         case "related":
           content = `<div class="font-semibold text-sm mb-1">Related: ${d.name}</div>`;
           if (d.url) {
             content += `<div class="text-xs text-gray-500 truncate">${d.url}</div>`;
           }
-          content += `<div class="text-xs text-gray-500">Click to open link</div>`;
           break;
       }
       
-      // Set tooltip content
+      // Set tooltip content and make it visible
       tooltip.innerHTML = `<div class="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>${content}`;
+      tooltip.style.opacity = "1";
       
       // Highlight connected links
       const svg = d3.select(svgRef.current);
@@ -632,11 +630,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       }
       
     } else {
-      // Reset tooltip to default message
-      tooltip.innerHTML = `
-        <div class="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>
-        <div class="text-sm text-gray-500">Hover over a node to see details</div>
-      `;
+      // Hide tooltip when not hovering
+      tooltip.style.opacity = "0";
       
       // Reset all links
       d3.select(svgRef.current)
@@ -1199,10 +1194,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       {/* Node info panel - fixed position in bottom left corner */}
       <div 
         id="tooltip" 
-        className="absolute bottom-4 left-4 bg-white p-3 rounded-md shadow-lg text-sm pointer-events-none opacity-1 transition-opacity z-50 min-w-[200px] border border-gray-200 text-left"
+        className="absolute bottom-4 left-4 bg-white p-3 rounded-md shadow-lg text-sm pointer-events-none opacity-0 transition-opacity z-50 min-w-[200px] border border-gray-200 text-left"
       >
         <div className="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>
-        <div className="text-sm text-gray-500">Hover over a node to see details</div>
       </div>
       
       <svg 
