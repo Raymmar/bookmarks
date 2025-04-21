@@ -1124,30 +1124,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         <div className="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>
       </div>
       
-      {/* Floating back button when a node is selected */}
-      {selectedNode && (
-        <button
-          className="absolute top-4 left-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md px-3 py-1 text-sm font-medium flex items-center shadow-md z-50 transition-all hover:shadow-lg"
-          onClick={() => {
-            // Reset selected node
-            setSelectedNode(null);
-            
-            // Trigger full graph view
-            setTimeout(() => {
-              const event = new CustomEvent('centerFullGraph', { 
-                detail: { source: 'backButton' } 
-              });
-              document.dispatchEvent(event);
-            }, 50);
-          }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back to full view
-        </button>
-      )}
-      
       <svg 
         ref={svgRef} 
         className="w-full h-full"
