@@ -601,23 +601,6 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       // Set tooltip content
       tooltip.innerHTML = `<div class="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>${content}`;
       
-      // Position tooltip near mouse but ensure it stays within viewport
-      const containerRect = containerRef.current!.getBoundingClientRect();
-      const nodeRect = (event.target as SVGCircleElement).getBoundingClientRect();
-      
-      const tooltipX = Math.min(
-        containerRect.width - tooltip.offsetWidth - 10,
-        Math.max(10, nodeRect.right - containerRect.left + 10)
-      );
-      
-      const tooltipY = Math.min(
-        containerRect.height - tooltip.offsetHeight - 10,
-        Math.max(10, nodeRect.top - containerRect.top - tooltip.offsetHeight / 2)
-      );
-      
-      tooltip.style.transform = `translate(${tooltipX}px, ${tooltipY}px)`;
-      tooltip.style.opacity = "1";
-      
       // Highlight connected links
       const svg = d3.select(svgRef.current);
       
@@ -634,27 +617,48 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         })
         .style("opacity", 1);
       
-      // Highlight the hovered node
-      d3.select(event.currentTarget as Element)
-        .select("circle")
-        .style("stroke-width", d.type === "bookmark" ? 3 : 2.5);
+      // Highlight the hovered node based on its type
+      const element = d3.select(event.currentTarget as Element);
+      
+      if (d.type === "tag") {
+        element.select("rect")
+          .style("stroke-width", 2.5);
+      } else if (d.type === "domain") {
+        element.select("polygon")
+          .style("stroke-width", 2.5);
+      } else {
+        element.select("circle")
+          .style("stroke-width", d.type === "bookmark" ? 3 : 2.5);
+      }
       
     } else {
-      // Reset tooltip
-      tooltip.style.opacity = "0";
+      // Reset tooltip to default message
+      tooltip.innerHTML = `
+        <div class="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>
+        <div class="text-sm text-gray-500">Hover over a node to see details</div>
+      `;
       
       // Reset all links
       d3.select(svgRef.current)
         .selectAll(".link")
         .style("opacity", 0.6);
       
-      // Reset node appearance (except selected node)
-      d3.select(event.currentTarget as Element)
-        .select("circle")
-        .style("stroke-width", d => {
-          if (selectedNode === d.id) return 4;
-          return d.type === "bookmark" ? 2 : 1.5;
-        });
+      // Reset node appearance - handle different shapes appropriately
+      const element = d3.select(event.currentTarget as Element);
+      
+      if (d.type === "tag") {
+        element.select("rect")
+          .style("stroke-width", 1.5);
+      } else if (d.type === "domain") {
+        element.select("polygon")
+          .style("stroke-width", 1.5);
+      } else {
+        element.select("circle")
+          .style("stroke-width", d => {
+            if (selectedNode === d.id) return 4;
+            return d.type === "bookmark" ? 2 : 1.5;
+          });
+      }
     }
   }, [selectedNode]);
 
