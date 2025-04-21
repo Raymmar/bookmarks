@@ -107,13 +107,24 @@ export async function generateInsights(
 export async function generateTags(content: string): Promise<string[]> {
   try {
     const contentToAnalyze = content.slice(0, 8000); // Limit content to avoid token limits
+    
+    // Get custom tag generation prompt from settings if available
+    let systemPrompt = "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Return the tags as a JSON array.";
+    try {
+      const customPrompt = await storage.getSetting("auto_tagging_prompt");
+      if (customPrompt && customPrompt.value) {
+        systemPrompt = customPrompt.value;
+      }
+    } catch (err) {
+      console.warn("Could not retrieve custom tagging prompt, using default:", err);
+    }
 
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: [
         {
           role: "system",
-          content: "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Return the tags as a JSON array."
+          content: systemPrompt
         },
         {
           role: "user",
@@ -137,13 +148,24 @@ export async function generateTags(content: string): Promise<string[]> {
 export async function summarizeContent(content: string): Promise<string> {
   try {
     const contentToSummarize = content.slice(0, 8000); // Limit content to avoid token limits
+    
+    // Get custom summary prompt from settings if available
+    let systemPrompt = "You are an AI assistant that summarizes content. Provide a concise, informative summary of the given content in about 2-3 sentences.";
+    try {
+      const customPrompt = await storage.getSetting("summary_prompt");
+      if (customPrompt && customPrompt.value) {
+        systemPrompt = customPrompt.value;
+      }
+    } catch (err) {
+      console.warn("Could not retrieve custom summary prompt, using default:", err);
+    }
 
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: [
         {
           role: "system",
-          content: "You are an AI assistant that summarizes content. Provide a concise, informative summary of the given content in about 2-3 sentences."
+          content: systemPrompt
         },
         {
           role: "user",
