@@ -259,12 +259,16 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     if (nodes.length === 0) return;
     
     // For small sets of nodes (focus mode), ensure organic layout by modifying simulation
-    if (nodes.length <= 10 && simulationRef.current) {
+    if (nodes.length <= 15 && simulationRef.current) {
       // Get all nodes in the simulation
       const allNodes = simulationRef.current.nodes();
       
       // Create a Set of IDs for nodes in our focus set
       const focusNodeIds = new Set(nodes.map(n => n.id));
+      
+      // Count how many domain and tag nodes we have in the focus set for special handling
+      let domainNodesCount = 0;
+      let domainNodes: GraphNode[] = [];
       
       // Adjust forces for better focus view display
       allNodes.forEach(node => {
@@ -273,34 +277,110 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           // For focus nodes, remove any fixed positions to allow natural placement
           node.fx = null;
           node.fy = null;
+          
+          // Track domain nodes for special handling with higher repulsion
+          if (node.type === "domain") {
+            domainNodesCount++;
+            domainNodes.push(node);
+          }
         } else {
-          // For non-focus nodes, make them less influential (increase charge repulsion)
-          // This will push them away from our focus area
-          if (node.type === "bookmark") {
-            // Push other bookmarks far away
-            node.fx = node.x ? node.x + (Math.random() - 0.5) * 2000 : null;
-            node.fy = node.y ? node.y + (Math.random() - 0.5) * 2000 : null;
+          // For non-focus nodes, make them less influential by pushing them far away
+          if (node.type === "bookmark" || node.type === "domain") {
+            // Push other nodes very far away to not interfere with layout
+            node.fx = node.x ? node.x + (Math.random() - 0.5) * 3000 : null;
+            node.fy = node.y ? node.y + (Math.random() - 0.5) * 3000 : null;
           }
         }
       });
       
+      // If we have multiple domain nodes, apply initial positions to spread them apart
+      if (domainNodes.length > 1) {
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const spreadRadius = 150; // Larger initial spread for domains
+        
+        // Position domain nodes in an even circle around the center for better separation
+        domainNodes.forEach((node, i) => {
+          const angle = (i / domainNodes.length) * 2 * Math.PI;
+          // Don't fix them, but give them a good starting position
+          node.x = centerX + spreadRadius * Math.cos(angle);
+          node.y = centerY + spreadRadius * Math.sin(angle);
+          
+          // Give them a slight velocity in the outward direction to help separation
+          node.vx = Math.cos(angle) * 2;
+          node.vy = Math.sin(angle) * 2;
+        });
+      }
+      
+      // Prepare special domain-specific repulsion forces
+      const domainRepulsionStrength = -400; // Much stronger repulsion between domains
+      
+      // Create custom domain repulsion force function
+      const domainRepulsionForce = (alpha: number) => {
+        for (let i = 0; i < domainNodes.length; i++) {
+          for (let j = i + 1; j < domainNodes.length; j++) {
+            const nodeA = domainNodes[i];
+            const nodeB = domainNodes[j];
+            
+            if (!nodeA.x || !nodeA.y || !nodeB.x || !nodeB.y) continue;
+            
+            // Calculate distance between domains
+            const dx = nodeA.x - nodeB.x;
+            const dy = nodeA.y - nodeB.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Apply repulsive force
+            if (distance > 0) {
+              const force = (domainRepulsionStrength * alpha) / (distance * distance);
+              const forceX = dx * force;
+              const forceY = dy * force;
+              
+              // Apply the force to both nodes
+              nodeA.vx = (nodeA.vx || 0) + forceX;
+              nodeA.vy = (nodeA.vy || 0) + forceY;
+              nodeB.vx = (nodeB.vx || 0) - forceX;
+              nodeB.vy = (nodeB.vy || 0) - forceY;
+            }
+          }
+        }
+      };
+      
       // Update force parameters for more organic small-group layout
       simulationRef.current
-        .force("charge", d3.forceManyBody().strength(nodes.length <= 3 ? -150 : -200))
+        // Higher repulsion for all nodes to prevent grid-like formations
+        .force("charge", d3.forceManyBody().strength(nodes.length <= 5 ? -250 : -300))
+        
+        // Use a different link force approach for small sets
         .force("link", d3.forceLink<GraphNode, GraphLink>().id(d => d.id).distance(d => {
-          // Use smaller distances for small node sets
-          if (d.type === "domain") return 60; 
-          if (d.type === "tag") return 70;
-          if (d.type === "related") return 50;
-          return 60;
-        }).strength(0.7)) // Stronger links for more structure
+          // Modify distances to spread things out more organically
+          if (d.type === "domain") return 120; // Dramatically increased for better spread
+          if (d.type === "tag") return 90;
+          if (d.type === "related") return 70;
+          return 80;
+        }).strength(0.4)) // Weaker links to allow more organic movement
+        
+        // Add stronger center force to keep things balanced
+        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.05))
+        
+        // Add x/y forces for better distribution
+        .force("x", d3.forceX(width / 2).strength(0.01))
+        .force("y", d3.forceY(height / 2).strength(0.01))
+        
+        // Larger collision radius to prevent overlap
         .force("collision", d3.forceCollide().radius(d => {
-          // Slightly increased collision radius for better spacing
-          if (d.type === "bookmark") return 45;
-          if (d.type === "domain") return 35;
-          return 25;
-        }))
-        .alpha(0.3) // Partial reset of simulation
+          // Much larger collision radii to ensure separation
+          if (d.type === "bookmark") return 55;
+          if (d.type === "domain") return 70; // Increased dramatically for domains
+          if (d.type === "tag") return 45;
+          return 40;
+        }).strength(0.9).iterations(2)) // Higher strength and more iterations for better collision handling
+        
+        // Register our custom domain repulsion force
+        .force("domainRepulsion", domainRepulsionForce)
+        
+        .alpha(0.5) // Stronger reset of simulation
+        .alphaDecay(0.02) // Slower decay for more movement
+        .velocityDecay(0.3) // Lower decay to allow nodes to move more freely
         .restart(); // Restart simulation to apply new forces
     }
     
@@ -460,49 +540,91 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Adjust forces based on node count for better organic layout
     const isFewNodes = nodes.length <= 10;
     
-    // Create the force simulation with adaptive parameters
+    // Find domain nodes for special treatment in large graphs
+    const domainNodes = nodes.filter(node => node.type === "domain");
+    const domainCount = domainNodes.length;
+    
+    // Special domain repulsion force for large graphs (similar to focus mode)
+    const domainRepulsionForce = (alpha: number) => {
+      for (let i = 0; i < domainNodes.length; i++) {
+        for (let j = i + 1; j < domainNodes.length; j++) {
+          const nodeA = domainNodes[i];
+          const nodeB = domainNodes[j];
+          
+          if (!nodeA.x || !nodeA.y || !nodeB.x || !nodeB.y) continue;
+          
+          // Calculate distance between domains
+          const dx = nodeA.x - nodeB.x;
+          const dy = nodeA.y - nodeB.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // Apply repulsive force (weaker than in focus mode)
+          if (distance > 0) {
+            const force = (-250 * alpha) / (distance * distance);
+            const forceX = dx * force;
+            const forceY = dy * force;
+            
+            // Apply the force to both nodes
+            nodeA.vx = (nodeA.vx || 0) + forceX;
+            nodeA.vy = (nodeA.vy || 0) + forceY;
+            nodeB.vx = (nodeB.vx || 0) - forceX;
+            nodeB.vy = (nodeB.vy || 0) - forceY;
+          }
+        }
+      }
+    };
+    
+    // Create the force simulation with adaptive parameters for better organic layout
     const simulation = d3.forceSimulation<GraphNode>(nodes)
       .force("link", d3.forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(d => {
         // Adjust link distance by type and node count
         if (isFewNodes) {
-          // For smaller graphs, use shorter, more uniform distances for better organic layout
-          if (d.type === "domain") return 60; 
-          if (d.type === "tag") return 70;
-          if (d.type === "related") return 55;
-          return 65;
-        } else {
-          // For larger graphs, use diverse distances for better categorization
-          if (d.type === "domain") return 80;
-          if (d.type === "tag") return 100;
+          // For smaller graphs, use more uniform distances for better organic layout
+          if (d.type === "domain") return 100; // Increased for better domain separation
+          if (d.type === "tag") return 80;
           if (d.type === "related") return 60;
           return 70;
+        } else {
+          // For larger graphs, use diverse distances with still enough separation
+          if (d.type === "domain") return 90; // Increased to match the feel of focus mode
+          if (d.type === "tag") return 100;
+          if (d.type === "related") return 70;
+          return 80;
         }
-      }).strength(isFewNodes ? 0.7 : 0.2)) // Stronger links for small graphs
+      }).strength(isFewNodes ? 0.5 : 0.2)) // Stronger links for small graphs, but not too rigid
       
-      // More repulsion for small node sets to avoid clustering
-      .force("charge", d3.forceManyBody().strength(isFewNodes ? -200 : -150))
+      // Higher repulsion to prevent grid-like structures
+      .force("charge", d3.forceManyBody().strength(isFewNodes ? -250 : -180))
       
-      // Center force - stronger for small graphs to keep them centered
-      .force("center", d3.forceCenter(width / 2, height / 2).strength(isFewNodes ? 0.2 : 0.1))
+      // Center force - slightly stronger for small graphs
+      .force("center", d3.forceCenter(width / 2, height / 2).strength(isFewNodes ? 0.1 : 0.05))
       
-      // Additional forces for small groups to allow more natural organic layout
-      .force("x", d3.forceX(width / 2).strength(isFewNodes ? 0.03 : 0.01))
-      .force("y", d3.forceY(height / 2).strength(isFewNodes ? 0.03 : 0.01))
+      // Additional forces for all graphs to allow more natural organic layout
+      .force("x", d3.forceX(width / 2).strength(isFewNodes ? 0.02 : 0.01))
+      .force("y", d3.forceY(height / 2).strength(isFewNodes ? 0.02 : 0.01))
       
-      // Collision avoidance - more space for small graphs for better visibility
+      // Collision avoidance - larger radii to prevent overlapping
       .force("collision", d3.forceCollide().radius(d => {
         if (isFewNodes) {
           // More spacing in small graphs
-          if (d.type === "bookmark") return 45;
-          if (d.type === "domain") return 35;
-          return 30;
+          if (d.type === "bookmark") return 50;
+          if (d.type === "domain") return 60; // Much larger for domains
+          if (d.type === "tag") return 45;
+          return 35;
         } else {
-          // Normal spacing for large graphs
-          if (d.type === "bookmark") return 40;
-          if (d.type === "domain") return 30;
-          return 20;
+          // Enhanced spacing for large graphs too
+          if (d.type === "bookmark") return 45;
+          if (d.type === "domain") return 50; // Increased significantly
+          if (d.type === "tag") return 35;
+          return 25;
         }
-      }));
+      }).strength(0.8).iterations(2)) // Stronger collision and more iterations
+      
+      // Add the domain repulsion for both modes
+      .force("domainRepulsion", domainRepulsionForce)
+      
+      // Better simulation settings for organic movement
+      .alphaDecay(0.028); // Slightly slower decay for more natural movement
     
     // Store simulation reference for later updates
     simulationRef.current = simulation;
@@ -687,20 +809,61 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
       if (!event.active) simulation.alphaTarget(0);
       
+      // Get the node that was dragged
+      const draggedNode = event.subject;
+      
+      // Always release domains for better separation in any view
+      const isDomain = draggedNode.type === "domain";
+      
       // Check if we're in a focused view (small number of nodes)
       const isFocusedView = simulationRef.current && 
-                           simulationRef.current.nodes().length <= 10;
+                           simulationRef.current.nodes().length <= 15;
       
-      if (isFocusedView) {
-        // In focus mode, release the node to allow organic positioning
+      if (isFocusedView || isDomain) {
+        // In focus mode or for domain nodes, release to allow organic positioning
         event.subject.fx = null;
         event.subject.fy = null;
         
-        // Give the simulation a slight kick to adjust the layout
-        simulation.alpha(0.1).restart();
+        // Special handling for domain nodes - push them away from other domains
+        if (isDomain && simulationRef.current) {
+          // Find all domain nodes in the current simulation
+          const domains = simulationRef.current.nodes()
+            .filter(n => n.type === "domain" && n.id !== draggedNode.id);
+          
+          // If more than one domain, add extra repulsion from other domains
+          if (domains.length > 0) {
+            // Calculate average position of other domains
+            let avgX = 0, avgY = 0;
+            domains.forEach(d => {
+              avgX += d.x || 0;
+              avgY += d.y || 0;
+            });
+            avgX /= domains.length;
+            avgY /= domains.length;
+            
+            // Vector away from center of other domains
+            const dx = (draggedNode.x || 0) - avgX;
+            const dy = (draggedNode.y || 0) - avgY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Add velocity away from other domains
+            if (dist > 0) {
+              // Normalized direction vector * strength
+              const strength = isFocusedView ? 5 : 3;
+              draggedNode.vx = (dx / dist) * strength;
+              draggedNode.vy = (dy / dist) * strength;
+            }
+          }
+        }
+        
+        // Give the simulation a stronger kick to adjust the layout
+        simulation.alpha(0.2).restart();
       } else {
-        // In normal mode, maintain the position to avoid chaos with many nodes
+        // For non-domain nodes in normal mode, maintain the position
         // The node remains fixed where it was dropped
+        
+        // But give the simulation a tiny kick to adjust surrounding nodes
+        simulation.alpha(0.05).restart();
       }
     }
     
