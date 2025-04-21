@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { Bookmark } from "@shared/types";
 
@@ -34,6 +34,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const graphDataRef = useRef<GraphData | null>(null);
   const graphInitializedRef = useRef<boolean>(false);
@@ -48,244 +49,197 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       return url.split('/')[0];
     }
   };
-
-  // Generate nodes and links from bookmarks
-  const generateGraphData = useCallback((bookmarks: Bookmark[], insightLevel: number) => {
-    const nodes: GraphNode[] = [];
-    const links: GraphLink[] = [];
+  
+  // Generate graph data from bookmarks
+  const generateGraphData = useCallback((bookmarks: Bookmark[], insightLevel: number): GraphData => {
+    const data: GraphData = { nodes: [], links: [] };
+    const existingNodeIds = new Set<string>();
+    const existingLinkIds = new Set<string>();
     
-    // Create maps for lookups
-    const tagGroups: Record<string, number> = {};
-    const tagNodes: Record<string, boolean> = {}; // Track created tag nodes
-    const domainNodes: Record<string, boolean> = {}; // Track created domain nodes
-    let groupCounter = 1;
+    // Helper to generate a deterministic ID from two node IDs
+    const generateLinkId = (source: string, target: string, type: string): string => {
+      return source < target ? `${source}-${target}-${type}` : `${target}-${source}-${type}`;
+    };
     
-    // First pass: create bookmark nodes and collect metadata
-    bookmarks.forEach(bookmark => {
-      // Determine group based on primary tag or source if no tags
-      const primaryTag = bookmark.user_tags[0] || bookmark.system_tags[0] || bookmark.source;
+    // Add bookmark nodes
+    bookmarks.forEach((bookmark, index) => {
+      // Add the bookmark node
+      const bookmarkNode: GraphNode = {
+        id: `bookmark-${bookmark.id}`,
+        name: bookmark.title,
+        group: 1,
+        type: "bookmark",
+        bookmarkId: bookmark.id,
+        url: bookmark.url
+      };
       
-      if (!tagGroups[primaryTag]) {
-        tagGroups[primaryTag] = groupCounter++;
+      if (!existingNodeIds.has(bookmarkNode.id)) {
+        data.nodes.push(bookmarkNode);
+        existingNodeIds.add(bookmarkNode.id);
       }
       
-      const group = tagGroups[primaryTag];
-      
-      // Add the main bookmark node
-      nodes.push({
-        id: bookmark.id,
-        name: bookmark.title,
-        group,
-        bookmarkId: bookmark.id,
-        type: "bookmark",
-        url: bookmark.url
-      });
-      
-      // Create domain node if not exists
+      // Add domain node
       const domain = getDomain(bookmark.url);
-      if (!domainNodes[domain]) {
-        domainNodes[domain] = true;
-        nodes.push({
-          id: `domain-${domain}`,
+      const domainId = `domain-${domain}`;
+      
+      if (!existingNodeIds.has(domainId)) {
+        data.nodes.push({
+          id: domainId,
           name: domain,
-          group: group, // Keep domain in same group
+          group: 2,
           type: "domain"
         });
+        existingNodeIds.add(domainId);
       }
       
-      // Connect bookmark to its domain
-      links.push({
-        id: `link-${bookmark.id}-${domain}`,
-        source: bookmark.id,
-        target: `domain-${domain}`,
-        value: 2,
-        type: "domain"
-      });
+      // Link bookmark to domain
+      const domainLinkId = generateLinkId(bookmarkNode.id, domainId, "domain");
+      if (!existingLinkIds.has(domainLinkId)) {
+        data.links.push({
+          id: domainLinkId,
+          source: bookmarkNode.id,
+          target: domainId,
+          value: 1,
+          type: "domain"
+        });
+        existingLinkIds.add(domainLinkId);
+      }
       
-      // Create tag nodes and connect bookmark to its tags
-      const allTags = [...new Set([...bookmark.user_tags, ...bookmark.system_tags])];
-      allTags.forEach(tag => {
-        // Create tag node if not exists
-        if (!tagNodes[tag]) {
-          tagNodes[tag] = true;
-          nodes.push({
-            id: `tag-${tag}`,
+      // Add tags
+      const tags = [...(bookmark.user_tags || []), ...(bookmark.system_tags || [])];
+      tags.forEach(tag => {
+        const tagId = `tag-${tag}`;
+        
+        if (!existingNodeIds.has(tagId)) {
+          data.nodes.push({
+            id: tagId,
             name: tag,
-            group: tagGroups[tag] || group,
+            group: 3,
             type: "tag"
           });
+          existingNodeIds.add(tagId);
         }
         
-        // Connect bookmark to tag
-        links.push({
-          id: `link-${bookmark.id}-tag-${tag}`,
-          source: bookmark.id,
-          target: `tag-${tag}`,
-          value: 1,
-          type: "tag"
-        });
+        // Link bookmark to tag
+        const tagLinkId = generateLinkId(bookmarkNode.id, tagId, "tag");
+        if (!existingLinkIds.has(tagLinkId)) {
+          data.links.push({
+            id: tagLinkId,
+            source: bookmarkNode.id,
+            target: tagId,
+            value: 2,
+            type: "tag"
+          });
+          existingLinkIds.add(tagLinkId);
+        }
       });
       
-      // Add related content nodes based on insight level
-      if (bookmark.insights?.related_links && insightLevel > 0) {
-        const relatedCount = Math.min(bookmark.insights.related_links.length, insightLevel + 1);
+      // Add related links based on insight level
+      if (insightLevel > 0 && bookmark.insights && bookmark.insights.related_links) {
+        // Only add a subset of related links based on insight level
+        const relatedCount = Math.min(insightLevel * 2, bookmark.insights.related_links.length);
         
         for (let i = 0; i < relatedCount; i++) {
           const relatedUrl = bookmark.insights.related_links[i];
           if (!relatedUrl) continue;
           
-          // Create a more descriptive name
-          let relatedName = relatedUrl;
-          try {
-            const urlObj = new URL(relatedUrl);
-            relatedName = urlObj.pathname.substring(urlObj.pathname.lastIndexOf('/') + 1);
-            // Clean up the name
-            relatedName = relatedName.replace(/-|_/g, ' ').trim();
-            if (!relatedName) relatedName = urlObj.hostname;
-          } catch (e) {
-            // Keep original if URL parsing fails
+          // Try to find if this URL matches an existing bookmark
+          const existingBookmark = bookmarks.find(b => b.url === relatedUrl);
+          
+          if (existingBookmark) {
+            // If it's an existing bookmark, link to that
+            const existingBookmarkId = `bookmark-${existingBookmark.id}`;
+            const relatedLinkId = generateLinkId(bookmarkNode.id, existingBookmarkId, "content");
+            
+            if (!existingLinkIds.has(relatedLinkId)) {
+              data.links.push({
+                id: relatedLinkId,
+                source: bookmarkNode.id,
+                target: existingBookmarkId,
+                value: 1,
+                type: "content"
+              });
+              existingLinkIds.add(relatedLinkId);
+            }
+          } else {
+            // Add as a separate related node
+            // Use the URL as ID but add prefix to avoid collisions
+            const relatedId = `related-${encodeURIComponent(relatedUrl)}`;
+            
+            if (!existingNodeIds.has(relatedId)) {
+              // Try to extract a name from the URL
+              let name = relatedUrl;
+              try {
+                const urlObj = new URL(relatedUrl);
+                name = urlObj.pathname.split('/').pop() || urlObj.hostname;
+                // Clean up the name
+                name = name.replace(/[-_]/g, ' ').replace(/\.\w+$/, '');
+                // Capitalize first letter
+                name = name.charAt(0).toUpperCase() + name.slice(1);
+              } catch (e) {
+                // Use the URL as is
+              }
+              
+              data.nodes.push({
+                id: relatedId,
+                name: name,
+                group: 4,
+                type: "related",
+                url: relatedUrl
+              });
+              existingNodeIds.add(relatedId);
+            }
+            
+            // Link bookmark to related node
+            const relatedLinkId = generateLinkId(bookmarkNode.id, relatedId, "related");
+            if (!existingLinkIds.has(relatedLinkId)) {
+              data.links.push({
+                id: relatedLinkId,
+                source: bookmarkNode.id,
+                target: relatedId,
+                value: 1,
+                type: "related"
+              });
+              existingLinkIds.add(relatedLinkId);
+            }
           }
-          
-          const relatedId = `related-${bookmark.id}-${i}`;
-          
-          nodes.push({
-            id: relatedId,
-            name: relatedName || "Related Link",
-            group: group,
-            type: "related",
-            url: relatedUrl
-          });
-          
-          links.push({
-            id: `link-${bookmark.id}-${relatedId}`,
-            source: bookmark.id,
-            target: relatedId,
-            value: 2,
-            type: "related"
-          });
         }
       }
     });
     
-    // Second pass: content-based connections (semantic similarity)
-    // Connect bookmarks with similar content or from same source
-    for (let i = 0; i < bookmarks.length; i++) {
-      for (let j = i + 1; j < bookmarks.length; j++) {
-        const bookmarkA = bookmarks[i];
-        const bookmarkB = bookmarks[j];
-        
-        // Connect by common domain
-        const domainA = getDomain(bookmarkA.url);
-        const domainB = getDomain(bookmarkB.url);
-        
-        if (domainA === domainB) {
-          links.push({
-            id: `link-domain-${bookmarkA.id}-${bookmarkB.id}`,
-            source: bookmarkA.id,
-            target: bookmarkB.id,
-            value: 2,
-            type: "domain"
-          });
-        }
-        
-        // Connect by common tags with stronger connections for more matches
-        const tagsA = [...new Set([...bookmarkA.user_tags, ...bookmarkA.system_tags])];
-        const tagsB = [...new Set([...bookmarkB.user_tags, ...bookmarkB.system_tags])];
-        
-        const commonTags = tagsA.filter(tag => tagsB.includes(tag));
-        
-        if (commonTags.length > 0) {
-          links.push({
-            id: `link-tags-${bookmarkA.id}-${bookmarkB.id}`,
-            source: bookmarkA.id,
-            target: bookmarkB.id,
-            value: Math.min(1 + commonTags.length, 5), // Cap at 5 for line thickness
-            type: "tag"
-          });
-        }
-        
-        // Connect bookmarks if they reference each other in related links
-        if (bookmarkA.insights?.related_links?.some(link => link.includes(bookmarkB.url)) ||
-            bookmarkB.insights?.related_links?.some(link => link.includes(bookmarkA.url))) {
-          links.push({
-            id: `link-ref-${bookmarkA.id}-${bookmarkB.id}`,
-            source: bookmarkA.id,
-            target: bookmarkB.id,
-            value: 3,
-            type: "content"
-          });
-        }
-      }
-    }
-    
-    return { nodes, links };
+    return data;
   }, []);
-
-  // Determine link color based on type
-  const getLinkColor = useCallback((type: string) => {
-    switch (type) {
-      case "tag": return "#8B5CF6"; // Purple for tag connections
-      case "domain": return "#10B981"; // Green for domain connections
-      case "related": return "#F59E0B"; // Orange for related content
-      case "content": return "#EF4444"; // Red for content similarity
-      default: return "#d1d5db"; // Gray default
-    }
-  }, []);
-    
-  // Determine node color based on type and group
-  const getNodeColor = useCallback((type: string, group: number) => {
-    switch (type) {
-      case "bookmark": 
-        // Use a color scale based on group
-        return d3.schemeCategory10[group % 10];
-      case "related": return "#F59E0B"; // Orange
-      case "domain": return "#10B981"; // Green
-      case "tag": return "#8B5CF6"; // Purple
-      default: return "#4F46E5"; // Blue default
-    }
-  }, []);
-
-  // Handle the zoom behavior
-  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   
-  const initializeZoom = useCallback(() => {
-    if (!svgRef.current) return;
-    
-    const svg = d3.select(svgRef.current);
-    const zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.3, 3])
-      .on("zoom", (event) => {
-        const g = svg.select("g.zoom-container");
-        g.attr("transform", event.transform);
-      });
-    
-    svg.call(zoomBehavior);
-    zoomBehaviorRef.current = zoomBehavior;
+  // Get color for nodes
+  const getNodeColor = useCallback((type: string, group: number): string => {
+    switch (type) {
+      case "bookmark": return "#3B82F6"; // Blue
+      case "domain": return "#10B981";   // Green
+      case "tag": return "#F59E0B";      // Amber
+      case "related": return "#8B5CF6";  // Purple
+      default: return "#6B7280";         // Gray
+    }
   }, []);
-
-  // Store the last centered state to avoid unnecessary zooming
-  const lastCenteredStateRef = useRef<{
-    nodeCount: number;
-    centerX: number;
-    centerY: number;
-    scale: number;
-    timestamp: number;
-  } | null>(null);
   
-  // Function to center and zoom the graph based on visible nodes
+  // Get color for links
+  const getLinkColor = useCallback((type: string): string => {
+    switch (type) {
+      case "domain": return "#10B981";   // Green
+      case "tag": return "#F59E0B";      // Amber
+      case "related": return "#8B5CF6";  // Purple
+      case "content": return "#EC4899";  // Pink
+      default: return "#D1D5DB";         // Light Gray
+    }
+  }, []);
+  
+  // Center the graph to show all nodes
   const centerGraph = useCallback((nodes: GraphNode[]) => {
-    if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
+    if (!simulationRef.current || !svgRef.current || !zoomBehaviorRef.current) return;
     
-    // Get container dimensions
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
+    const width = containerRef.current!.clientWidth;
+    const height = containerRef.current!.clientHeight;
     
-    if (nodes.length === 0) return;
-    
-    // Special handling for very few nodes
-    const isFewNodes = nodes.length <= 10;
-    
-    // Calculate bounding box of all nodes
+    // Compute bounds of all nodes
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     
     nodes.forEach(node => {
@@ -297,131 +251,104 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       maxY = Math.max(maxY, node.y);
     });
     
-    // If we couldn't determine bounds, exit
     if (minX === Infinity || minY === Infinity) return;
     
-    // Add padding - adaptive based on node count
-    // More padding for fewer nodes to prevent them from appearing too spread out
-    const paddingScale = isFewNodes ? 0.25 : 0.1;
-    const padding = Math.min(width, height) * paddingScale;
-    
+    // Add padding
+    const padding = 50;
     minX -= padding;
     maxX += padding;
     minY -= padding;
     maxY += padding;
     
-    // Calculate center point of nodes
+    // Calculate center and scale
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
+    const boundWidth = maxX - minX;
+    const boundHeight = maxY - minY;
     
-    // Calculate required scale to fit all nodes
-    const boundsWidth = maxX - minX;
-    const boundsHeight = maxY - minY;
-    
-    // For few nodes, ensure the scale isn't too large or small
-    // by enforcing a minimum bounding box size
-    let effectiveBoundsWidth = boundsWidth;
-    let effectiveBoundsHeight = boundsHeight;
-    
-    if (isFewNodes) {
-      // For few nodes, ensure a reasonable minimum bounds to avoid excessive zoom
-      const minBoundSize = Math.min(width, height) * 0.4; // Minimum 40% of container
-      effectiveBoundsWidth = Math.max(boundsWidth, minBoundSize);
-      effectiveBoundsHeight = Math.max(boundsHeight, minBoundSize);
-    }
-    
-    // Determine scale to fit content (use the more constraining dimension)
-    let scale = Math.min(
-      width / effectiveBoundsWidth,
-      height / effectiveBoundsHeight
+    const scale = Math.min(
+      0.95 * width / boundWidth,
+      0.95 * height / boundHeight
     );
     
-    // Scale adjustment based on node count
-    if (nodes.length > 20) {
-      // Reduce scale for many nodes to fit them better
-      scale = Math.max(0.5, scale * (1 - Math.min(nodes.length / 150, 0.4)));
-    } else if (nodes.length < 5) {
-      // For very few nodes, use a moderate scale to avoid them appearing tiny
-      // But also avoid zooming in too much for better context
-      scale = Math.min(scale, 1.1);
-    } else if (nodes.length < 10) {
-      // For a moderate number of nodes, slightly reduce zoom
-      scale = Math.min(scale, 1.2);
-    }
-    
-    // Constrain scale to the allowed range
-    scale = Math.max(0.4, Math.min(scale, 1.8));
-    
-    // Check if this view is very similar to the last one
-    const now = Date.now();
-    const lastState = lastCenteredStateRef.current;
-    
-    if (lastState) {
-      // Don't re-center if we've recently centered and the change is minor
-      const timeSinceLastCenter = now - lastState.timestamp;
-      const centerXDiff = Math.abs(centerX - lastState.centerX);
-      const centerYDiff = Math.abs(centerY - lastState.centerY);
-      const scaleDiff = Math.abs(scale - lastState.scale);
-      const nodeCountDiff = Math.abs(nodes.length - lastState.nodeCount);
-      
-      // If it's been less than 1.5 seconds, the center point hasn't moved much, 
-      // scale is similar, and we're not showing dramatically different number of nodes, 
-      // then skip this update for smoother experience
-      if (timeSinceLastCenter < 1500 && 
-          centerXDiff < 50 && 
-          centerYDiff < 50 && 
-          scaleDiff < 0.2 &&
-          nodeCountDiff < 3) {
-        return;
-      }
-    }
-    
-    // Apply the transform with a longer duration for smoother transitions
-    const svg = d3.select(svgRef.current);
+    // Apply zoom transform
     const transform = d3.zoomIdentity
       .translate(width / 2, height / 2)
       .scale(scale)
       .translate(-centerX, -centerY);
     
-    svg.transition()
-      .duration(1000) // Smooth animation
-      .ease(d3.easeCubicOut) // Smoother easing function
+    d3.select(svgRef.current)
+      .transition()
+      .duration(750)
       .call(zoomBehaviorRef.current.transform, transform);
-    
-    // Store this state to avoid oscillation
-    lastCenteredStateRef.current = {
-      nodeCount: nodes.length,
-      centerX,
-      centerY,
-      scale,
-      timestamp: now
-    };
     
     console.log(`Graph centered: ${nodes.length} nodes, scale: ${scale.toFixed(2)}, center: (${Math.round(centerX)}, ${Math.round(centerY)})`);
   }, []);
 
-  // Functions for drag behavior
-  const dragstarted = useCallback((event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) => {
-    if (!simulationRef.current) return;
-    if (!event.active) simulationRef.current.alphaTarget(0.3).restart();
-    event.subject.fx = event.subject.x;
-    event.subject.fy = event.subject.y;
+  // Update node selection visually without re-rendering the graph
+  const updateSelectedNode = useCallback((nodeId: string | null) => {
+    if (!svgRef.current) return;
+    
+    const svg = d3.select(svgRef.current);
+    
+    // Reset all nodes to default size
+    svg.selectAll(".node circle")
+      .attr("r", d => {
+        const node = d as GraphNode;
+        switch (node.type) {
+          case "bookmark": return 8;
+          case "related": return 6;
+          case "domain": return 7;
+          case "tag": return 5;
+          default: return 6;
+        }
+      })
+      .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5)
+      .attr("stroke-opacity", 1);
+    
+    // Reset node opacity
+    svg.selectAll(".node").attr("opacity", 1);
+    svg.selectAll("line").attr("opacity", 0.6);
+    
+    if (!nodeId) return;
+    
+    // Highlight the selected node
+    const selectedElement = svg.select(`#node-${nodeId}`);
+    if (!selectedElement.empty()) {
+      // Highlight just this node
+      svg.select(`#node-${nodeId} circle`)
+        .attr("r", 12)
+        .attr("stroke-width", 3)
+        .attr("stroke-opacity", 1);
+        
+      // Dim other nodes slightly to make selected node stand out
+      svg.selectAll(".node").attr("opacity", 0.7);
+      svg.selectAll("line").attr("opacity", 0.4);
+      svg.select(`#node-${nodeId}`).attr("opacity", 1);
+      
+      // Find and highlight connected nodes/links
+      const graphData = graphDataRef.current;
+      if (graphData) {
+        const connectedLinks = graphData.links.filter(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+          return sourceId === nodeId || targetId === nodeId;
+        });
+        
+        // Highlight connected nodes
+        connectedLinks.forEach(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+          
+          const otherNodeId = sourceId === nodeId ? targetId : sourceId;
+          svg.select(`#node-${otherNodeId}`).attr("opacity", 1);
+          svg.select(`#link-${link.id}`).attr("opacity", 0.8);
+        });
+      }
+    }
   }, []);
   
-  const dragged = useCallback((event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) => {
-    event.subject.fx = event.x;
-    event.subject.fy = event.y;
-  }, []);
-  
-  const dragended = useCallback((event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) => {
-    if (!simulationRef.current) return;
-    if (!event.active) simulationRef.current.alphaTarget(0);
-    // Don't release nodes after drag to maintain layout
-    // event.subject.fx = null;
-    // event.subject.fy = null;
-  }, []);
-
-  // Center on specific node or node group
+  // Center on specific node 
   const centerOnNode = useCallback((nodeId: string) => {
     if (!simulationRef.current || !svgRef.current || !graphDataRef.current) return;
     
@@ -542,6 +469,59 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
   }, [updateSelectedNode]);
   
+  // Setup zoom behavior
+  const initializeZoom = useCallback(() => {
+    if (!svgRef.current || !containerRef.current) return;
+    
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight;
+    
+    const zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on("zoom", (event) => {
+        d3.select(svgRef.current)
+          .select(".zoom-container")
+          .attr("transform", event.transform.toString());
+      });
+    
+    d3.select(svgRef.current)
+      .call(zoomBehavior);
+    
+    // Store reference
+    zoomBehaviorRef.current = zoomBehavior;
+    
+    // Initial zoom level
+    const initialTransform = d3.zoomIdentity
+      .translate(width / 2, height / 2)
+      .scale(0.8)
+      .translate(-width / 2, -height / 2);
+    
+    d3.select(svgRef.current)
+      .call(zoomBehavior.transform, initialTransform);
+    
+  }, []);
+  
+  // Functions for drag behavior
+  const dragstarted = useCallback((event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) => {
+    if (!simulationRef.current) return;
+    if (!event.active) simulationRef.current.alphaTarget(0.3).restart();
+    event.subject.fx = event.subject.x;
+    event.subject.fy = event.subject.y;
+  }, []);
+  
+  const dragged = useCallback((event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) => {
+    event.subject.fx = event.x;
+    event.subject.fy = event.y;
+  }, []);
+  
+  const dragended = useCallback((event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) => {
+    if (!simulationRef.current) return;
+    if (!event.active) simulationRef.current.alphaTarget(0);
+    // Don't release nodes after drag to maintain layout
+    // event.subject.fx = null;
+    // event.subject.fy = null;
+  }, []);
+  
   // Handle node click events
   const handleNodeClick = useCallback((event: MouseEvent, d: GraphNode) => {
     event.stopPropagation();
@@ -562,7 +542,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     }
   }, [bookmarks, onNodeClick, centerOnNode]);
-
+  
   // Handle node hover effects
   const handleNodeHover = useCallback((event: MouseEvent, d: GraphNode, isEntering: boolean) => {
     if (!svgRef.current || !graphDataRef.current) return;
@@ -625,70 +605,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       d3.select("#tooltip").style("opacity", 0);
     }
   }, []);
-
-  // Update node selection visually without re-rendering the graph
-  const updateSelectedNode = useCallback((nodeId: string | null) => {
-    if (!svgRef.current) return;
-    
-    const svg = d3.select(svgRef.current);
-    
-    // Reset all nodes to default size
-    svg.selectAll(".node circle")
-      .attr("r", d => {
-        const node = d as GraphNode;
-        switch (node.type) {
-          case "bookmark": return 8;
-          case "related": return 6;
-          case "domain": return 7;
-          case "tag": return 5;
-          default: return 6;
-        }
-      })
-      .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5)
-      .attr("stroke-opacity", 1);
-    
-    // Reset node opacity
-    svg.selectAll(".node").attr("opacity", 1);
-    svg.selectAll("line").attr("opacity", 0.6);
-    
-    if (!nodeId) return;
-    
-    // Highlight the selected node
-    const selectedElement = svg.select(`#node-${nodeId}`);
-    if (!selectedElement.empty()) {
-      // Highlight just this node
-      svg.select(`#node-${nodeId} circle`)
-        .attr("r", 12)
-        .attr("stroke-width", 3)
-        .attr("stroke-opacity", 1);
-        
-      // Dim other nodes slightly to make selected node stand out
-      svg.selectAll(".node").attr("opacity", 0.7);
-      svg.selectAll("line").attr("opacity", 0.4);
-      svg.select(`#node-${nodeId}`).attr("opacity", 1);
-      
-      // Find and highlight connected nodes/links
-      const graphData = graphDataRef.current;
-      if (graphData) {
-        const connectedLinks = graphData.links.filter(link => {
-          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-          return sourceId === nodeId || targetId === nodeId;
-        });
-        
-        // Highlight connected nodes
-        connectedLinks.forEach(link => {
-          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-          
-          const otherNodeId = sourceId === nodeId ? targetId : sourceId;
-          svg.select(`#node-${otherNodeId}`).attr("opacity", 1);
-          svg.select(`#link-${link.id}`).attr("opacity", 0.8);
-        });
-      }
-    }
-  }, []);
-
+  
   // Initialize the graph
   const initializeGraph = useCallback(() => {
     if (!svgRef.current || !containerRef.current || !bookmarks.length) return;
@@ -913,8 +830,20 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         simulationRef.current.stop();
       }
     };
-  }, [bookmarks, insightLevel, generateGraphData, getLinkColor, getNodeColor, 
-      initializeZoom, centerGraph, handleNodeClick, handleNodeHover, dragstarted, dragged, dragended]);
+  }, [
+    bookmarks, 
+    insightLevel, 
+    generateGraphData, 
+    getLinkColor, 
+    getNodeColor, 
+    handleNodeClick, 
+    handleNodeHover, 
+    dragstarted, 
+    dragged, 
+    dragended, 
+    centerGraph, 
+    initializeZoom
+  ]);
   
   // Update graph data when bookmarks or insight level changes
   const updateGraphData = useCallback(() => {
@@ -949,68 +878,14 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     });
     
-    // Store the updated graph data
+    // Update the reference
     graphDataRef.current = newGraphData;
     
-    // Stop the simulation first
-    simulationRef.current.stop();
-    
-    // Create a fresh simulation with the same configuration
+    // Check if we need filtered layout
+    const nodeCount = newGraphData.nodes.length;
     const width = containerRef.current!.clientWidth;
     const height = containerRef.current!.clientHeight;
     
-    // Initialize positions for any new nodes with adaptive spacing
-    const nodeCount = newGraphData.nodes.length;
-    
-    // Adaptive layout based on node count
-    // For very few nodes, use a tighter, more centered layout
-    const useCompactLayout = nodeCount <= 10;
-    
-    // Calculate radius based on node count - smaller radius for fewer nodes
-    const radiusScale = useCompactLayout ? 
-      Math.max(0.15, Math.min(0.25, nodeCount / 30)) : // Small circle for few nodes
-      Math.max(0.25, Math.min(0.4, nodeCount / 50));   // Larger circle for many nodes
-    
-    const radius = Math.min(width, height) * radiusScale;
-    
-    // Reset fixed positions if we have very few nodes to allow better arrangement
-    if (useCompactLayout) {
-      newGraphData.nodes.forEach(node => {
-        // Keep some nodes fixed but let others float freely for better spacing with few nodes
-        if (node.type !== "tag" && node.type !== "domain") {
-          node.fx = null;
-          node.fy = null;
-        }
-      });
-    }
-    
-    // Now position any new nodes
-    newGraphData.nodes.forEach((node, i) => {
-      // If it's a new node without position
-      if (node.x === undefined || node.y === undefined) {
-        // Set initial positions in a circular layout
-        const angle = (i / nodeCount) * 2 * Math.PI;
-        node.x = width / 2 + radius * Math.cos(angle);
-        node.y = height / 2 + radius * Math.sin(angle);
-      }
-      
-      // Pin tag and domain nodes for stability
-      // If few nodes, pin fewer to allow more natural arrangement
-      if ((node.type === "tag" || node.type === "domain")) {
-        if (useCompactLayout) {
-          // For few nodes, don't pin everything, but use softer constraints
-          if (i % 2 === 0) { // Pin only some nodes when few
-            node.fx = node.x;
-            node.fy = node.y;
-          }
-        } else {
-          // For many nodes, pin all tags and domains for stability
-          node.fx = node.x;
-          node.fy = node.y;
-        }
-      }
-    });
-
     // If we have a small number of nodes (filtered view), use a completely different physics setup
     const isFilteredView = newGraphData.nodes.length <= 10;
     
@@ -1118,28 +993,21 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         .force("x", d3.forceX(width / 2).strength(0.05))
         .force("y", d3.forceY(height / 2).strength(0.05))
         .force("collision", d3.forceCollide().radius(d => {
-          // Normal collision radius for larger node counts
-          if (d.type === "bookmark") return 40;
-          if (d.type === "domain") return 30;
-          if (d.type === "tag") return 25;
-          return 20;
+          if (d.type === "bookmark") return 30;
+          if (d.type === "domain") return 25;
+          if (d.type === "tag") return 20;
+          return 15;
         }).strength(0.8));
     }
     
-    // Update visuals
-    if (!svgRef.current) return;
-    const svg = d3.select(svgRef.current);
-    const zoomContainer = svg.select("g.zoom-container");
+    // Update the link elements
+    const linkGroup = d3.select(svgRef.current).select(".links");
     
-    // Clear existing elements
-    zoomContainer.select("g.links").selectAll("*").remove();
-    zoomContainer.select("g.nodes").selectAll("*").remove();
+    // Remove old links
+    linkGroup.selectAll("line").remove();
     
-    // Create links with visual distinctions
-    const linkGroup = zoomContainer.select("g.links");
-    const nodeGroup = zoomContainer.select("g.nodes");
-    
-    const link = linkGroup
+    // Add new links
+    linkGroup
       .selectAll("line")
       .data(newGraphData.links)
       .enter()
@@ -1150,7 +1018,13 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .attr("stroke-opacity", 0.6)
       .attr("id", d => `link-${d.id}`);
     
-    // Create node groups
+    // Update the node elements
+    const nodeGroup = d3.select(svgRef.current).select(".nodes");
+    
+    // Remove old nodes
+    nodeGroup.selectAll(".node").remove();
+    
+    // Add new nodes
     const node = nodeGroup
       .selectAll(".node")
       .data(newGraphData.nodes)
@@ -1169,7 +1043,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
           .on("end", dragended)
       );
     
-    // Add circles to nodes
+    // Add circles to the new nodes
     node.append("circle")
       .attr("r", d => {
         switch (d.type) {
@@ -1187,7 +1061,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       })
       .attr("stroke-width", d => d.type === "bookmark" ? 2 : 1.5);
     
-    // Add labels to nodes selectively (to avoid crowding)
+    // Add labels for tags and domains
     node.filter(d => d.type === "tag" || d.type === "domain")
       .append("text")
       .attr("dx", 12)
@@ -1196,12 +1070,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .attr("font-size", d => d.type === "tag" ? 10 : 11)
       .attr("fill", "#4B5563");
     
-    // Add hover labels for bookmark nodes
+    // Add hover labels for bookmarks
     node.filter(d => d.type === "bookmark")
       .append("title")
       .text(d => d.name);
     
-    // Update positions on each tick
+    // Update the link positions immediately
+    const link = linkGroup.selectAll("line");
+    
+    // Update positions on simulation tick
     simulationRef.current.on("tick", () => {
       link
         .attr("x1", d => {
@@ -1236,9 +1113,21 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     }, 300);
     
-  }, [bookmarks, insightLevel, generateGraphData, centerGraph, getLinkColor, 
-      getNodeColor, handleNodeClick, handleNodeHover, dragstarted, dragged, dragended]);
-
+  }, [
+    bookmarks, 
+    insightLevel, 
+    generateGraphData, 
+    getLinkColor, 
+    getNodeColor, 
+    handleNodeClick, 
+    handleNodeHover, 
+    dragstarted, 
+    dragged, 
+    dragended, 
+    centerGraph,
+    selectedNode
+  ]);
+  
   // Listen for external node selection
   useEffect(() => {
     const handleSelectNode = (event: Event) => {

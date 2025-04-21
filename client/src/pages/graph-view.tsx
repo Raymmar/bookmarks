@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ForceDirectedGraph } from "@/components/force-directed-graph-new";
+import { ForceDirectedGraph } from "@/components/force-directed-graph-fixed";
 import { SidebarPanel } from "@/components/sidebar-panel";
 import { FilterControls } from "@/components/filter-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,9 +38,12 @@ export default function GraphView() {
     
     // Use a small delay to ensure the graph has updated
     setTimeout(() => {
+      // Format the node ID to match how it's stored in the graph component
+      const nodeId = `bookmark-${id}`;
+      
       // Use custom event to notify the graph component to select and center this node
       const event = new CustomEvent('selectGraphNode', { 
-        detail: { nodeId: id } 
+        detail: { nodeId: nodeId } 
       });
       document.dispatchEvent(event);
     }, 100);
