@@ -64,8 +64,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     
     // First pass: create bookmark nodes and collect metadata
     bookmarks.forEach(bookmark => {
-      // Determine group based on primary tag or source if no tags
-      const primaryTag = bookmark.user_tags[0] || bookmark.system_tags[0] || bookmark.source;
+      // Determine group based on system_tags or source if no tags
+      // Note: user_tags have been migrated to a normalized tag system
+      const primaryTag = bookmark.system_tags?.[0] || bookmark.source;
       
       if (!tagGroups[primaryTag]) {
         tagGroups[primaryTag] = groupCounter++;
@@ -105,7 +106,17 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       });
       
       // Create tag nodes and connect bookmark to its tags
-      const allTags = [...new Set([...bookmark.user_tags, ...bookmark.system_tags])];
+      // Tags come from bookmark.tags in the normalized system
+      const allTags = bookmark.tags ? bookmark.tags.map(tag => tag.name) : [];
+      // Also include system tags as a fallback
+      if (bookmark.system_tags) {
+        bookmark.system_tags.forEach(tag => {
+          if (!allTags.includes(tag)) {
+            allTags.push(tag);
+          }
+        });
+      }
+      
       allTags.forEach(tag => {
         // Create tag node if not exists
         if (!tagNodes[tag]) {
@@ -191,8 +202,30 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         }
         
         // Connect by common tags with stronger connections for more matches
-        const tagsA = [...new Set([...bookmarkA.user_tags, ...bookmarkA.system_tags])];
-        const tagsB = [...new Set([...bookmarkB.user_tags, ...bookmarkB.system_tags])];
+        // Extract tag names from normalized tag objects
+        const tagsA: string[] = [];
+        if (bookmarkA.tags) {
+          bookmarkA.tags.forEach(tag => tagsA.push(tag.name));
+        }
+        if (bookmarkA.system_tags) {
+          bookmarkA.system_tags.forEach(tag => {
+            if (!tagsA.includes(tag)) {
+              tagsA.push(tag);
+            }
+          });
+        }
+        
+        const tagsB: string[] = [];
+        if (bookmarkB.tags) {
+          bookmarkB.tags.forEach(tag => tagsB.push(tag.name));
+        }
+        if (bookmarkB.system_tags) {
+          bookmarkB.system_tags.forEach(tag => {
+            if (!tagsB.includes(tag)) {
+              tagsB.push(tag);
+            }
+          });
+        }
         
         const commonTags = tagsA.filter(tag => tagsB.includes(tag));
         
