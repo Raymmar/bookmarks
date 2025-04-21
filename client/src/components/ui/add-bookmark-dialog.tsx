@@ -145,6 +145,13 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       await queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
       
+      // Dispatch custom event to notify other components of the bookmark addition
+      // Include the bookmark ID in case components need it
+      const bookmarkAddedEvent = new CustomEvent('bookmarkAdded', { 
+        detail: { bookmarkId: bookmark.id } 
+      });
+      document.dispatchEvent(bookmarkAddedEvent);
+      
       toast({
         title: "Bookmark added",
         description: "Your bookmark was successfully added",

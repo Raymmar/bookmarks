@@ -309,14 +309,17 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   } | null>(null);
   
   // Function to center and zoom the graph based on visible nodes
-  const centerGraph = useCallback((nodes: GraphNode[]) => {
+  const centerGraph = useCallback((nodesList?: GraphNode[]) => {
     if (!svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
     
     // Get container dimensions
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     
-    if (nodes.length === 0) return;
+    // Use provided nodes or get them from the simulation
+    const nodes = nodesList || (simulationRef.current ? simulationRef.current.nodes() : []);
+    
+    if (!nodes || nodes.length === 0) return;
     
     // Special handling for very few nodes
     const isFewNodes = nodes.length <= 10;
@@ -709,34 +712,200 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   const updateGraphData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current || !containerRef.current) return;
     
-    // Generate new graph data
-    const newGraphData = generateGraphData(bookmarks, insightLevel);
-    graphDataRef.current = newGraphData;
+    console.log("Updating graph data with current bookmarks:", bookmarks.length);
     
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
+    // Ensure we have bookmarks data
+    if (!bookmarks || bookmarks.length === 0) {
+      console.log("No bookmarks data available for graph update");
+      return;
+    }
     
-    // First preserve existing node positions
-    const existingNodes = simulationRef.current.nodes();
-    const nodePositions = new Map();
-    
-    existingNodes.forEach(node => {
-      if (node.x !== undefined && node.y !== undefined) {
-        nodePositions.set(node.id, { x: node.x, y: node.y });
+    try {
+      // Generate new graph data
+      const newGraphData = generateGraphData(bookmarks, insightLevel);
+      graphDataRef.current = newGraphData;
+      
+      if (!newGraphData.nodes || newGraphData.nodes.length === 0) {
+        console.log("Generated graph data has no nodes");
+        return;
       }
-    });
-    
-    // Copy positions to new nodes
-    newGraphData.nodes.forEach(node => {
-      if (nodePositions.has(node.id)) {
-        const pos = nodePositions.get(node.id);
-        node.x = pos.x;
-        node.y = pos.y;
-      }
-    });
-    
-    // Determine node count
-    const nodeCount = newGraphData.nodes.length;
+      
+      const width = containerRef.current.clientWidth;
+      const height = containerRef.current.clientHeight;
+      
+      // First preserve existing node positions
+      const existingNodes = simulationRef.current.nodes();
+      const nodePositions = new Map();
+      
+      existingNodes.forEach(node => {
+        if (node.x !== undefined && node.y !== undefined) {
+          nodePositions.set(node.id, { x: node.x, y: node.y });
+        }
+      });
+      
+      // Copy positions to new nodes
+      newGraphData.nodes.forEach(node => {
+        if (nodePositions.has(node.id)) {
+          const pos = nodePositions.get(node.id);
+          node.x = pos.x;
+          node.y = pos.y;
+        }
+      });
+      
+      // Determine node count
+      const nodeCount = newGraphData.nodes.length;
+      
+      // Set initial positions for new nodes and reset fixed positions
+      newGraphData.nodes.forEach((node, i) => {
+        // If it's a new node without position
+        if (node.x === undefined || node.y === undefined) {
+          // Set initial positions in a simple circular arrangement
+          const angle = (i / nodeCount) * 2 * Math.PI;
+          const radius = Math.min(width, height) * 0.3;
+          node.x = width / 2 + radius * Math.cos(angle);
+          node.y = height / 2 + radius * Math.sin(angle);
+        }
+        
+        // Make sure all nodes are free to move
+        node.fx = null;
+        node.fy = null;
+      });
+      
+      // Update the simulation with new data
+      simulationRef.current
+        .nodes(newGraphData.nodes)
+        .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
+          .id(d => d.id)
+          .distance(d => {
+            if (d.type === "domain") return 80;
+            if (d.type === "tag") return 100;
+            if (d.type === "related") return 60;
+            return 70;
+          })
+          .strength(0.2))
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.1))
+        .force("x", d3.forceX(width / 2).strength(0.05))
+        .force("y", d3.forceY(height / 2).strength(0.05))
+        .force("collision", d3.forceCollide().radius(d => {
+          if (d.type === "bookmark") return 40;
+          if (d.type === "domain") return 30;
+          if (d.type === "tag") return 25;
+          return 20;
+        }).strength(0.8));
+      
+      // Update visuals
+      if (!svgRef.current) return;
+      const svg = d3.select(svgRef.current);
+      const zoomContainer = svg.select("g.zoom-container");
+      
+      // Clear existing elements
+      zoomContainer.select("g.links").selectAll("*").remove();
+      zoomContainer.select("g.nodes").selectAll("*").remove();
+      
+      // Create links with visual distinctions
+      const linkGroup = zoomContainer.select("g.links");
+      const nodeGroup = zoomContainer.select("g.nodes");
+      
+      const link = linkGroup
+        .selectAll("line")
+        .data(newGraphData.links)
+        .enter()
+        .append("line")
+        .attr("class", "link")
+        .attr("stroke", d => getLinkColor(d.type))
+        .attr("stroke-width", d => Math.sqrt(d.value))
+        .attr("stroke-opacity", 0.6)
+        .attr("id", d => `link-${d.id}`);
+      
+      // Create node groups
+      const node = nodeGroup
+        .selectAll(".node")
+        .data(newGraphData.nodes)
+        .enter()
+        .append("g")
+        .attr("class", d => `node node-${d.type}`)
+        .attr("id", d => `node-${d.id}`)
+        .style("cursor", "pointer")
+        .on("click", function(event, d) { handleNodeClick(event, d); })
+        .on("mouseover", function(event, d) { handleNodeHover(event, d, true); })
+        .on("mouseout", function(event, d) { handleNodeHover(event, d, false); })
+        .call(
+          d3.drag<SVGGElement, GraphNode>()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended)
+        );
+      
+      // Add circles to nodes
+      node.append("circle")
+        .attr("r", d => {
+          switch (d.type) {
+            case "bookmark": return 8;
+            case "related": return 6;
+            case "domain": return 7;
+            case "tag": return 5;
+            default: return 6;
+          }
+        })
+        .attr("fill", d => getNodeColor(d.type, d.group))
+        .attr("stroke", d => {
+          if (d.type === "bookmark") return d3.rgb(getNodeColor(d.type, d.group)).darker(0.8).toString();
+          return d3.rgb(getNodeColor(d.type, d.group)).darker(0.5).toString();
+        })
+        .attr("stroke-width", d => d.type === "bookmark" ? 2 : 1.5);
+      
+      // Add labels to nodes selectively (to avoid crowding)
+      node.filter(d => d.type === "tag" || d.type === "domain")
+        .append("text")
+        .attr("dx", 12)
+        .attr("dy", ".35em")
+        .text(d => d.name)
+        .attr("font-size", d => d.type === "tag" ? 10 : 11)
+        .attr("fill", "#4B5563");
+      
+      // Add hover labels for bookmark nodes
+      node.filter(d => d.type === "bookmark")
+        .append("title")
+        .text(d => d.name);
+      
+      // Update positions on each tick
+      simulationRef.current.on("tick", () => {
+        link
+          .attr("x1", d => {
+            const source = typeof d.source === 'string' ? null : d.source;
+            return source ? source.x : 0;
+          })
+          .attr("y1", d => {
+            const source = typeof d.source === 'string' ? null : d.source;
+            return source ? source.y : 0;
+          })
+          .attr("x2", d => {
+            const target = typeof d.target === 'string' ? null : d.target;
+            return target ? target.x : 0;
+          })
+          .attr("y2", d => {
+            const target = typeof d.target === 'string' ? null : d.target;
+            return target ? target.y : 0;
+          });
+        
+        node
+          .attr("transform", d => `translate(${d.x},${d.y})`);
+      });
+      
+      // Restart with a higher alpha for better stabilization
+      simulationRef.current.alpha(0.5).restart();
+      
+      // Only center the graph if no node is currently selected
+      setTimeout(() => {
+        if (!selectedNode) {
+          centerGraph(newGraphData.nodes);
+        }
+      }, 300);
+      
+    } catch (error) {
+      console.error("Error updating graph data:", error);
+    }
     
     // Set initial positions for new nodes and reset fixed positions
     // Now position any new nodes
