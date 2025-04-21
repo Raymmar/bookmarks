@@ -110,6 +110,12 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
       <AddBookmarkDialog
         open={addBookmarkOpen}
         onOpenChange={setAddBookmarkOpen}
+        onBookmarkAdded={() => {
+          // Dispatch a custom event to notify graph components to refresh
+          document.dispatchEvent(new CustomEvent('bookmarkAdded', { 
+            detail: { source: 'navigation' } 
+          }));
+        }}
       />
     </nav>
   );
