@@ -96,7 +96,8 @@ export async function generateEmbedding(text: string): Promise<{ embedding: numb
 export async function generateInsights(
   url: string,
   content?: string,
-  depthLevel: number = 1
+  depthLevel: number = 1,
+  customSystemPrompt?: string
 ): Promise<{ summary: string; sentiment: number; tags: string[]; relatedLinks: string[] }> {
   try {
     // Determine if we should use direct URL analysis or content analysis
@@ -104,7 +105,7 @@ export async function generateInsights(
     
     console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
-    // Get custom bookmark system prompt from settings if available
+    // Default system prompt
     let systemPrompt = `You are an AI assistant that analyzes web content and extracts insights. 
     ${useUrlDirectly 
       ? `Visit and analyze the content from the URL ${url}` 
@@ -120,20 +121,30 @@ export async function generateInsights(
       "relatedLinks": [] // Any related links if available
     }`;
     
-    try {
-      const customPrompt = await storage.getSetting("bookmark_system_prompt");
-      if (customPrompt && customPrompt.value) {
-        systemPrompt = customPrompt.value;
-        // Add URL and depth level context if not already in the custom prompt
-        if (!systemPrompt.includes("URL") && url) {
-          systemPrompt += `\n\nThe content is from URL: ${url}`;
+    // Use custom system prompt if provided directly to this function
+    if (customSystemPrompt) {
+      systemPrompt = customSystemPrompt;
+      console.log("Using provided custom system prompt for insights generation");
+    } 
+    // Otherwise try to get it from storage
+    else {
+      try {
+        const customPrompt = await storage.getSetting("bookmark_system_prompt");
+        if (customPrompt && customPrompt.value) {
+          systemPrompt = customPrompt.value;
+          console.log("Retrieved custom system prompt from storage for insights generation");
         }
-        if (!systemPrompt.includes("depth") && depthLevel > 1) {
-          systemPrompt += `\n\nAnalyze at depth level: ${depthLevel} (1-4 scale)`;
-        }
+      } catch (err) {
+        console.warn("Could not retrieve custom bookmark system prompt, using default:", err);
       }
-    } catch (err) {
-      console.warn("Could not retrieve custom bookmark system prompt, using default:", err);
+    }
+    
+    // Add URL and depth level context if not already in the custom prompt
+    if (!systemPrompt.includes("URL") && url) {
+      systemPrompt += `\n\nThe content is from URL: ${url}`;
+    }
+    if (!systemPrompt.includes("depth") && depthLevel > 1) {
+      systemPrompt += `\n\nAnalyze at depth level: ${depthLevel} (1-4 scale)`;
     }
 
     // Prepare messages for the API call
@@ -266,22 +277,31 @@ export async function generateInsights(
 /**
  * Generate tags from content or URL
  */
-export async function generateTags(content: string, url?: string): Promise<string[]> {
+export async function generateTags(content: string, url?: string, customSystemPrompt?: string): Promise<string[]> {
   try {
     // Determine if we should use URL directly
     const useUrlDirectly = url && (!content || content.length < 100);
     console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
-    // Fully respect the user's custom prompt from settings
+    // Default system prompt
     let systemPrompt = "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Always respond with a JSON object containing a tags array.";
-    // We prioritize the user's custom prompt but still ensure JSON output format
-    try {
-      const customPrompt = await storage.getSetting("auto_tagging_prompt");
-      if (customPrompt && customPrompt.value) {
-        systemPrompt = customPrompt.value;
+    
+    // Use custom system prompt if provided directly to this function
+    if (customSystemPrompt) {
+      systemPrompt = customSystemPrompt;
+      console.log("Using provided custom system prompt for tag generation");
+    } 
+    // Otherwise try to get it from storage
+    else {
+      try {
+        const customPrompt = await storage.getSetting("auto_tagging_prompt");
+        if (customPrompt && customPrompt.value) {
+          systemPrompt = customPrompt.value;
+          console.log("Retrieved custom tagging prompt from storage");
+        }
+      } catch (err) {
+        console.warn("Could not retrieve custom tagging prompt, using default:", err);
       }
-    } catch (err) {
-      console.warn("Could not retrieve custom tagging prompt, using default:", err);
     }
 
     // Prepare messages for the API call
@@ -362,19 +382,29 @@ export async function generateTags(content: string, url?: string): Promise<strin
 /**
  * Summarize content
  */
-export async function summarizeContent(content: string): Promise<string> {
+export async function summarizeContent(content: string, customSystemPrompt?: string): Promise<string> {
   try {
     const contentToSummarize = content.slice(0, 8000); // Limit content to avoid token limits
     
-    // Get custom summary prompt from settings if available
+    // Default system prompt
     let systemPrompt = "You are an AI assistant that summarizes content. Provide a concise, informative summary of the given content in about 2-3 sentences.";
-    try {
-      const customPrompt = await storage.getSetting("summary_prompt");
-      if (customPrompt && customPrompt.value) {
-        systemPrompt = customPrompt.value;
+    
+    // Use custom system prompt if provided directly to this function
+    if (customSystemPrompt) {
+      systemPrompt = customSystemPrompt;
+      console.log("Using provided custom system prompt for summarization");
+    } 
+    // Otherwise try to get it from storage
+    else {
+      try {
+        const customPrompt = await storage.getSetting("summary_prompt");
+        if (customPrompt && customPrompt.value) {
+          systemPrompt = customPrompt.value;
+          console.log("Retrieved custom summary prompt from storage");
+        }
+      } catch (err) {
+        console.warn("Could not retrieve custom summary prompt, using default:", err);
       }
-    } catch (err) {
-      console.warn("Could not retrieve custom summary prompt, using default:", err);
     }
 
     const response = await openai.chat.completions.create({

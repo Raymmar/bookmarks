@@ -91,22 +91,19 @@ export class BookmarkService {
    */
   private async getSystemPrompts() {
     try {
-      // Get all three system prompts at once
-      const [bookmarkPrompt, taggingPrompt, summaryPrompt] = await Promise.all([
-        this.storage.getSetting("bookmark_system_prompt"),
+      // Get only the two system prompts we need (for tags and summaries)
+      const [taggingPrompt, summaryPrompt] = await Promise.all([
         this.storage.getSetting("auto_tagging_prompt"),
         this.storage.getSetting("summary_prompt")
       ]);
       
       return {
-        bookmarkPrompt: bookmarkPrompt?.value,
         taggingPrompt: taggingPrompt?.value,
         summaryPrompt: summaryPrompt?.value
       };
     } catch (error) {
       console.error("Error retrieving system prompts:", error);
       return {
-        bookmarkPrompt: null,
         taggingPrompt: null,
         summaryPrompt: null
       };
@@ -192,7 +189,8 @@ export class BookmarkService {
               }
             }
             
-            const tags = await generateTags(processedText, url);
+            // Pass the custom tagging prompt to the generateTags function
+            const tags = await generateTags(processedText, url, systemPrompts.taggingPrompt);
             console.log(`Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(', ')}`);
             return tags;
           } catch (error) {
