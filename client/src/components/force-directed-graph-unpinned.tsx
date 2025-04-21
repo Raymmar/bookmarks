@@ -961,13 +961,72 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       // Center on the selected node and its connections
       centerGraph([selectedNode, ...connectedNodes]);
       
-      // Visually highlight the node
+      // Reset all nodes to default appearance first
+      d3.select(svgRef.current)
+        .selectAll('.node')
+        .style('opacity', 0.6) // Dim all nodes
+        .select('circle')
+        .attr('stroke-width', 1.5)
+        .attr('r', (d: any) => d.type === "bookmark" ? 7 : 5);
+        
+      // Highlight connected nodes with medium emphasis
+      d3.select(svgRef.current)
+        .selectAll('.node')
+        .filter((d: any) => {
+          // Check if this node is connected to the selected node
+          return connectedNodes.some(n => n.id === d.id);
+        })
+        .style('opacity', 0.9)
+        .select('circle')
+        .attr('stroke-width', 2)
+        .attr('r', (d: any) => d.type === "bookmark" ? 8 : 6);
+      
+      // Visually highlight the selected node with strong emphasis
       d3.select(svgRef.current)
         .select(`#node-${selectedBookmarkId}`)
+        .style('opacity', 1)
+        .raise() // Bring to front
         .select('circle')
-        .attr('stroke-width', 4)
-        .attr('r', (d: any) => d.type === "bookmark" ? 10 : 8);
+        .attr('stroke-width', 3)
+        .attr('stroke', '#3b82f6') // Blue highlight border
+        .attr('r', (d: any) => d.type === "bookmark" ? 12 : 10) // Make significantly larger
+        .style('filter', 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.5))'); // Add glow effect
+        
+      // Also highlight the directly connected links
+      d3.select(svgRef.current)
+        .selectAll('.link')
+        .style('opacity', 0.2); // Dim all links
+        
+      d3.select(svgRef.current)
+        .selectAll('.link')
+        .filter((d: any) => {
+          const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
+          const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+          return sourceId === selectedBookmarkId || targetId === selectedBookmarkId;
+        })
+        .style('opacity', 1)
+        .attr('stroke-width', (d: any) => d.value + 1) // Make connected links thicker
+        .raise(); // Bring links to front
     }
+    
+    // Create a cleanup function
+    return () => {
+      // If the component is still mounted and the svg ref exists
+      if (svgRef.current) {
+        // Reset all nodes and links to default appearance
+        d3.select(svgRef.current).selectAll('.node')
+          .style('opacity', 1)
+          .select('circle')
+          .attr('stroke-width', 1.5)
+          .attr('stroke', '#999')
+          .attr('r', (d: any) => d.type === "bookmark" ? 7 : 5)
+          .style('filter', null);
+          
+        d3.select(svgRef.current).selectAll('.link')
+          .style('opacity', 0.6)
+          .attr('stroke-width', (d: any) => d.value);
+      }
+    };
   }, [selectedBookmarkId, centerGraph]);
 
   return (
