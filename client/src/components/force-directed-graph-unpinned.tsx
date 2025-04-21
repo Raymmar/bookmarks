@@ -53,7 +53,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   };
 
   // Generate nodes and links from bookmarks
-  const generateGraphData = useCallback((bookmarks: Bookmark[], insightLevel: number) => {
+  const generateGraphData = useCallback((bookmarks: Bookmark[], insightLevel: number, focusBookmarkId?: string) => {
     const nodes: GraphNode[] = [];
     const links: GraphLink[] = [];
     
@@ -61,10 +61,37 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     const tagGroups: Record<string, number> = {};
     const tagNodes: Record<string, boolean> = {}; // Track created tag nodes
     const domainNodes: Record<string, boolean> = {}; // Track created domain nodes
+    const relatedBookmarkIds = new Set<string>(); // Track related bookmark IDs when focusing
     let groupCounter = 1;
+    
+    // If we're focusing on a specific bookmark, first identify its connections
+    if (focusBookmarkId) {
+      // Add the focus bookmark to the set
+      relatedBookmarkIds.add(focusBookmarkId);
+      
+      // Find the target bookmark
+      const focusBookmark = bookmarks.find(b => b.id === focusBookmarkId);
+      if (focusBookmark) {
+        // For each bookmark, check if it's connected to the focus bookmark
+        bookmarks.forEach(bookmark => {
+          if (bookmark.id === focusBookmarkId) return; // Skip the focus bookmark itself
+          
+          // Check for direct content relationships
+          if (focusBookmark.insights?.related_links?.some(link => link.includes(bookmark.url)) ||
+              bookmark.insights?.related_links?.some(link => link.includes(focusBookmark.url))) {
+            relatedBookmarkIds.add(bookmark.id);
+          }
+          
+          // For the focused bookmark, we'll add all its tag and domain connections later
+        });
+      }
+    }
     
     // First pass: create bookmark nodes and collect metadata
     bookmarks.forEach(bookmark => {
+      // If focusing on a bookmark and this isn't related, skip it
+      if (focusBookmarkId && !relatedBookmarkIds.has(bookmark.id)) return;
+      
       // Determine group based on system_tags or source if no tags
       // Note: user_tags have been migrated to a normalized tag system
       const primaryTag = bookmark.system_tags?.[0] || bookmark.source;
@@ -77,7 +104,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       
       // Add the main bookmark node
       nodes.push({
-        id: bookmark.id,
+        id: `bookmark-${bookmark.id}`, // Format ID to match selectNode event
         name: bookmark.title,
         group,
         bookmarkId: bookmark.id,
@@ -99,8 +126,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       
       // Connect bookmark to its domain
       links.push({
-        id: `link-${bookmark.id}-${domain}`,
-        source: bookmark.id,
+        id: `link-bookmark-${bookmark.id}-${domain}`,
+        source: `bookmark-${bookmark.id}`,
         target: `domain-${domain}`,
         value: 2,
         type: "domain"
@@ -132,8 +159,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         
         // Connect bookmark to tag
         links.push({
-          id: `link-${bookmark.id}-tag-${tag}`,
-          source: bookmark.id,
+          id: `link-bookmark-${bookmark.id}-tag-${tag}`,
+          source: `bookmark-${bookmark.id}`,
           target: `tag-${tag}`,
           value: 1,
           type: "tag"
@@ -171,8 +198,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           });
           
           links.push({
-            id: `link-${bookmark.id}-${relatedId}`,
-            source: bookmark.id,
+            id: `link-bookmark-${bookmark.id}-${relatedId}`,
+            source: `bookmark-${bookmark.id}`,
             target: relatedId,
             value: 2,
             type: "related"
@@ -184,21 +211,27 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     // Second pass: content-based connections (semantic similarity)
     // Only connect bookmarks if they reference each other in related links,
     // but don't connect based on common domains or tags (spoke and post style)
-    for (let i = 0; i < bookmarks.length; i++) {
-      for (let j = i + 1; j < bookmarks.length; j++) {
-        const bookmarkA = bookmarks[i];
-        const bookmarkB = bookmarks[j];
+    if (bookmarks.length > 1) {
+      const processedBookmarks = focusBookmarkId 
+        ? bookmarks.filter(b => relatedBookmarkIds.has(b.id)) 
+        : bookmarks;
         
-        // Connect bookmarks if they reference each other in related links
-        if (bookmarkA.insights?.related_links?.some(link => link.includes(bookmarkB.url)) ||
-            bookmarkB.insights?.related_links?.some(link => link.includes(bookmarkA.url))) {
-          links.push({
-            id: `link-ref-${bookmarkA.id}-${bookmarkB.id}`,
-            source: bookmarkA.id,
-            target: bookmarkB.id,
-            value: 3,
-            type: "content"
-          });
+      for (let i = 0; i < processedBookmarks.length; i++) {
+        for (let j = i + 1; j < processedBookmarks.length; j++) {
+          const bookmarkA = processedBookmarks[i];
+          const bookmarkB = processedBookmarks[j];
+          
+          // Connect bookmarks if they reference each other in related links
+          if (bookmarkA.insights?.related_links?.some(link => link.includes(bookmarkB.url)) ||
+              bookmarkB.insights?.related_links?.some(link => link.includes(bookmarkA.url))) {
+            links.push({
+              id: `link-ref-bookmark-${bookmarkA.id}-bookmark-${bookmarkB.id}`,
+              source: `bookmark-${bookmarkA.id}`,
+              target: `bookmark-${bookmarkB.id}`,
+              value: 3,
+              type: "content"
+            });
+          }
         }
       }
     }
@@ -657,8 +690,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   const updateGraphData = useCallback(() => {
     if (!simulationRef.current || !svgRef.current || !containerRef.current) return;
     
-    // Generate new graph data
-    const newGraphData = generateGraphData(bookmarks, insightLevel);
+    // Generate new graph data, passing selectedBookmarkId for focused view
+    const newGraphData = generateGraphData(bookmarks, insightLevel, selectedBookmarkId || undefined);
     graphDataRef.current = newGraphData;
     
     const width = containerRef.current.clientWidth;
@@ -986,161 +1019,100 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   
   // Effect for handling the selected bookmark
   useEffect(() => {
-    if (!selectedBookmarkId || !svgRef.current || !simulationRef.current || !zoomBehaviorRef.current) return;
+    if (!svgRef.current || !simulationRef.current || !zoomBehaviorRef.current) return;
     
-    // Format the node ID to match how it's stored in the graph component
-    // This is critical for consistent handling when clicked from the sidebar vs directly in the graph
-    const formattedNodeId = `bookmark-${selectedBookmarkId}`;
-    
-    // Set the selected node in state
-    setSelectedNode(formattedNodeId);
-    
-    // Log selected bookmark ID for debugging
-    console.log(`Selecting bookmark: ${selectedBookmarkId}`);
-    
-    // Highlight the selected node and center the graph on it and its connections
-    // Important: We need to find the exact node by ID that matches the selected bookmark
-    const selectedNode = simulationRef.current.nodes().find(n => n.id === formattedNodeId);
-    
-    if (selectedNode) {
-      console.log(`Found node in simulation: ${selectedNode.id}, type: ${selectedNode.type}`);
+    // When selectedBookmarkId changes, trigger updateGraphData to filter nodes
+    if (selectedBookmarkId) {
+      // Format the node ID to match how it's stored in the graph component
+      const formattedNodeId = `bookmark-${selectedBookmarkId}`;
       
-      // Find directly connected nodes for better focus context
-      const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
-      const connectedNodes = simulationRef.current.nodes().filter(n => {
-        return links.links().some(link => {
-          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-          return (sourceId === formattedNodeId && targetId === n.id) || 
-                 (sourceId === n.id && targetId === formattedNodeId);
+      // Set the selected node in state
+      setSelectedNode(formattedNodeId);
+      
+      // Log selected bookmark ID for debugging
+      console.log(`Selecting bookmark: ${selectedBookmarkId}`);
+      
+      // Trigger graph update with new data filtered for this bookmark
+      // The updateGraphData function now handles generating focused data
+      
+      // If the node is already in the simulation, we can enhance the visual focus
+      const selectedNode = simulationRef.current.nodes().find(n => n.id === formattedNodeId);
+      
+      if (selectedNode) {
+        console.log(`Found node in simulation: ${selectedNode.id}, type: ${selectedNode.type}`);
+        
+        // Find directly connected nodes for better focus context
+        const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+        const connectedNodes = simulationRef.current.nodes().filter(n => {
+          return links.links().some(link => {
+            const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+            const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+            return (sourceId === formattedNodeId && targetId === n.id) || 
+                   (sourceId === n.id && targetId === formattedNodeId);
+          });
         });
-      });
-      
-      console.log(`Found ${connectedNodes.length} connected nodes`);
-      
-      // Apply strong zoom effect to focus closely on the selected node
-      // We need to ensure the node has valid coordinates - some node types might not
-      if (selectedNode.x !== undefined && selectedNode.y !== undefined) {
-        // Get container dimensions
-        const width = containerRef.current?.clientWidth || 800;
-        const height = containerRef.current?.clientHeight || 600;
         
-        // Calculate zoom level - higher number means closer zoom
-        const zoomLevel = 2.0; 
+        console.log(`Found ${connectedNodes.length} connected nodes`);
         
-        // Calculate a small offset so the node isn't perfectly centered
-        // This helps to show more of its connected nodes in the visible area
-        const offsetX = width * 0.05; // 5% offset
-        const offsetY = height * 0.05;
-        
-        // Apply the zoom transformation
-        const svg = d3.select(svgRef.current);
-        
-        console.log(`Zooming to node at (${selectedNode.x.toFixed(2)}, ${selectedNode.y.toFixed(2)}) with level ${zoomLevel}`);
-        
-        // Create a transition for smoother zoom effect
-        svg.transition()
-          .duration(500) // Half-second transition
-          .call(
-            zoomBehaviorRef.current.transform,
-            d3.zoomIdentity
-              .translate(width / 2 - selectedNode.x * zoomLevel + offsetX, 
-                        height / 2 - selectedNode.y * zoomLevel + offsetY)
-              .scale(zoomLevel)
-          );
-      } else {
-        // Fallback to standard centering if coordinates aren't available
-        console.log("Node coordinates not defined, using centerGraph fallback");
-        centerGraph([selectedNode, ...connectedNodes]);
-      }
-      
-      // Reset all nodes to default appearance first
-      d3.select(svgRef.current)
-        .selectAll('.node')
-        .style('opacity', 0.4) // Dim all nodes more dramatically 
-        .select('circle')
-        .attr('stroke-width', 1.5)
-        .attr('r', (d: any) => d.type === "bookmark" ? 7 : 5);
-        
-      // Highlight connected nodes with medium emphasis
-      d3.select(svgRef.current)
-        .selectAll('.node')
-        .filter((d: any) => {
-          // Check if this node is connected to the selected node
-          return connectedNodes.some(n => n.id === d.id);
-        })
-        .style('opacity', 0.9)
-        .select('circle')
-        .attr('stroke-width', 2)
-        .attr('r', (d: any) => d.type === "bookmark" ? 9 : 7);
-      
-      // Visually highlight the selected node with very strong emphasis
-      const selectedNodeElement = d3.select(svgRef.current).select(`#node-${formattedNodeId}`);
-      
-      if (!selectedNodeElement.empty()) {
-        selectedNodeElement
-          .style('opacity', 1)
-          .raise() // Bring to front
-          .select('circle')
-          .attr('stroke-width', 4)
-          .attr('stroke', '#3b82f6') // Blue highlight border
-          .attr('r', (d: any) => d.type === "bookmark" ? 18 : 14) // Make MUCH larger (2x+)
-          .style('filter', 'drop-shadow(0 0 10px rgba(59, 130, 246, 0.8))'); // Stronger glow effect
+        // Apply strong zoom effect to focus closely on the selected node
+        // We need to ensure the node has valid coordinates - some node types might not
+        if (selectedNode.x !== undefined && selectedNode.y !== undefined) {
+          // Get container dimensions
+          const width = containerRef.current?.clientWidth || 800;
+          const height = containerRef.current?.clientHeight || 600;
           
-        // Also highlight the label - make it visible and larger
-        selectedNodeElement
-          .select('text')
-          .style('opacity', 1)
-          .style('font-weight', 'bold')
-          .style('font-size', '14px'); // Larger font
+          // Calculate zoom level - higher number means closer zoom
+          const zoomLevel = 2.0; 
+          
+          // Calculate a small offset so the node isn't perfectly centered
+          // This helps to show more of its connected nodes in the visible area
+          const offsetX = width * 0.05; // 5% offset
+          const offsetY = height * 0.05;
+          
+          // Apply the zoom transformation
+          const svg = d3.select(svgRef.current);
+          
+          console.log(`Zooming to node at (${selectedNode.x.toFixed(2)}, ${selectedNode.y.toFixed(2)}) with level ${zoomLevel}`);
+          
+          // Create a transition for smoother zoom effect
+          svg.transition()
+            .duration(500) // Half-second transition
+            .call(
+              zoomBehaviorRef.current.transform,
+              d3.zoomIdentity
+                .translate(width / 2 - selectedNode.x * zoomLevel + offsetX, 
+                          height / 2 - selectedNode.y * zoomLevel + offsetY)
+                .scale(zoomLevel)
+            );
+        } else {
+          // Fallback to standard centering if coordinates aren't available
+          console.log("Node coordinates not defined, using centerGraph fallback");
+          centerGraph([selectedNode, ...connectedNodes]);
+        }
+        
+        // Apply additional visual styling for emphasis
+        // Apply highlight effect to selected node
+        const selectedNodeElement = d3.select(svgRef.current).select(`#node-${formattedNodeId}`);
+        
+        if (!selectedNodeElement.empty()) {
+          selectedNodeElement
+            .style('opacity', 1)
+            .raise() // Bring to front
+            .select('circle')
+            .attr('stroke-width', 4)
+            .attr('stroke', '#3b82f6') // Blue highlight border
+            .attr('r', (d: any) => d.type === "bookmark" ? 12 : 9) // Make larger for emphasis
+            .style('filter', 'drop-shadow(0 0 5px rgba(59, 130, 246, 0.5))'); // Subtle glow
+        }
       } else {
-        console.warn(`Could not find node element with ID: node-${formattedNodeId}`);
+        console.warn(`Could not find node with ID: ${formattedNodeId}`);
       }
-        
-      // Also highlight the directly connected links
-      d3.select(svgRef.current)
-        .selectAll('.link')
-        .style('opacity', 0.1); // Dim all links more dramatically
-        
-      d3.select(svgRef.current)
-        .selectAll('.link')
-        .filter((d: any) => {
-          const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-          const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-          return sourceId === formattedNodeId || targetId === formattedNodeId;
-        })
-        .style('opacity', 1)
-        .attr('stroke-width', (d: any) => d.value + 2) // Make connected links much thicker
-        .raise(); // Bring links to front
     } else {
-      console.warn(`Could not find node with ID: ${formattedNodeId}`);
+      // If no bookmark is selected, reset the selected node state
+      setSelectedNode(null);
     }
     
-    // Create a cleanup function
-    return () => {
-      // If the component is still mounted and the svg ref exists
-      if (svgRef.current) {
-        // Reset all nodes and links to default appearance
-        d3.select(svgRef.current).selectAll('.node')
-          .style('opacity', 1)
-          .select('circle')
-          .attr('stroke-width', 1.5)
-          .attr('stroke', '#999')
-          .attr('r', (d: any) => d.type === "bookmark" ? 7 : 5)
-          .style('filter', null);
-          
-        // Reset text labels
-        d3.select(svgRef.current).selectAll('.node text')
-          .style('opacity', 0.9)
-          .style('font-weight', 'normal')
-          .style('font-size', '12px');
-          
-        d3.select(svgRef.current).selectAll('.link')
-          .style('opacity', 0.6)
-          .attr('stroke-width', (d: any) => d.value);
-      }
-    };
-  }, [selectedBookmarkId, centerGraph]);
+  }, [selectedBookmarkId, centerGraph, updateGraphData]);
 
   return (
     <div className="w-full h-full relative" ref={containerRef}>
