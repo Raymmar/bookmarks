@@ -499,9 +499,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         const screenX = transform.applyX(d.x) + svgRect.left;
         const screenY = transform.applyY(d.y) + svgRect.top;
         
-        // Position the tooltip slightly offset from the node
-        tooltipX = screenX + 15;
-        tooltipY = screenY - 15;
+        // Position the tooltip right at the node with minimal offset
+        // Just enough offset to not overlap the node itself
+        tooltipX = screenX;
+        tooltipY = screenY - 5;
       } else {
         // Fallback to cursor position if node position isn't available
         tooltipX = event.pageX + 10;
@@ -1303,7 +1304,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       {/* Tooltip container for hover info */}
       <div 
         id="tooltip" 
-        className="absolute bg-white p-2 rounded-md shadow-md text-sm pointer-events-none opacity-0 transition-opacity z-50 max-w-xs"
+        className="absolute bg-white p-2 rounded-md shadow-lg text-sm pointer-events-none opacity-0 transition-opacity z-50 max-w-xs border border-gray-200 transform -translate-x-1/2 text-center"
       />
       
       <svg 
