@@ -59,6 +59,15 @@ export function useBookmarkMutations() {
         return [optimisticBookmark, ...old];
       });
 
+      // Create optimistic tags to show in the UI
+      const optimisticTags = (newBookmarkData.tags || []).map(tagName => ({
+        id: `temp-tag-${Date.now()}-${tagName}`,
+        name: tagName,
+        type: "user" as const,
+        count: 1,
+        created_at: new Date().toISOString()
+      }));
+      
       // If we have bookmark-with-tags data, update that too
       const previousBookmarksWithTags = queryClient.getQueryData<any[]>(["/api/bookmarks-with-tags"]) || [];
       
@@ -66,17 +75,14 @@ export function useBookmarkMutations() {
         queryClient.setQueryData(["/api/bookmarks-with-tags"], (old: any[] = []) => {
           const optimisticBookmarkWithTags = {
             ...optimisticBookmark,
-            tags: (newBookmarkData.tags || []).map(tagName => ({
-              id: `temp-tag-${Date.now()}-${tagName}`,
-              name: tagName,
-              type: "user",
-              count: 1,
-              created_at: new Date().toISOString()
-            }))
+            tags: optimisticTags
           };
           return [optimisticBookmarkWithTags, ...old];
         });
       }
+      
+      // Set up per-bookmark tag cache for the temp bookmark
+      queryClient.setQueryData([`/api/bookmarks/${tempId}/tags`], optimisticTags);
 
       // Show toast notification
       toast({
@@ -103,12 +109,47 @@ export function useBookmarkMutations() {
         variant: "destructive",
       });
     },
-    onSuccess: (data, variables) => {
-      // Invalidate and refetch relevant queries
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+    onSuccess: (data, variables, context: any) => {
+      // Instead of immediately invalidating, let's update with the server response first
+      // This prevents the temporary bookmark from disappearing during the refetch
+      
+      // Update the bookmarks query with the server response, replacing our temp bookmark
+      queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], (oldBookmarks = []) => {
+        // Filter out the temporary bookmark
+        const filteredBookmarks = oldBookmarks.filter(b => b.id !== context?.tempId);
+        // Add the real bookmark at the beginning
+        return [data, ...filteredBookmarks];
+      });
+      
+      // Update bookmarks-with-tags if it exists
+      const bookmarksWithTags = queryClient.getQueryData<any[]>(["/api/bookmarks-with-tags"]);
+      if (bookmarksWithTags) {
+        // Get our optimistic tags and use them until real ones are fetched
+        const optimisticTags = queryClient.getQueryData<any[]>([`/api/bookmarks/${context?.tempId}/tags`]) || [];
+        
+        queryClient.setQueryData(["/api/bookmarks-with-tags"], (old: any[] = []) => {
+          // Remove the temporary bookmark
+          const filtered = old.filter(b => b.id !== context?.tempId);
+          // Add the real bookmark with our optimistic tags for now
+          return [{...data, tags: optimisticTags}, ...filtered];
+        });
+      }
+      
+      // Pre-populate tags for the real bookmark to avoid flickering
+      if (variables.tags && variables.tags.length > 0) {
+        const optimisticTags = queryClient.getQueryData<any[]>([`/api/bookmarks/${context?.tempId}/tags`]) || [];
+        queryClient.setQueryData([`/api/bookmarks/${data.id}/tags`], optimisticTags);
+      }
+      
+      // Now we can safely invalidate to get fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      
+      // Use a small delay before invalidating bookmarks to avoid flickering
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      }, 500);
 
       // Show success toast
       toast({
