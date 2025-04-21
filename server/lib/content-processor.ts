@@ -5,9 +5,12 @@ import { storage } from "../storage";
 const MODEL = "gpt-4o";
 
 // Initialize OpenAI
+// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "sk-dummy-key-for-development"
+  apiKey: process.env.OPENAI_API_KEY
 });
+
+console.log("OpenAI initialized with API key:", process.env.OPENAI_API_KEY ? "API key is present" : "API key is missing");
 
 interface ProcessedContent {
   text: string;

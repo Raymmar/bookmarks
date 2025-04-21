@@ -165,17 +165,19 @@ export class BookmarkService {
           // Continue without embedding
         }
         
-        // Generate auto tags if not provided
-        if (!options.tags || options.tags.length === 0) {
-          try {
-            console.log("Generating AI tags...");
-            const generatedTags = await generateTags(processedContent.text);
-            console.log(`Generated ${generatedTags.length} AI tags: ${generatedTags.join(', ')}`);
-            bookmarkData.system_tags = generatedTags;
-          } catch (tagError) {
-            console.error("Error generating tags:", tagError);
-            // Continue without AI tags
-          }
+        // Generate AI tags - we'll always attempt to generate these
+        let aiGeneratedTags: string[] = [];
+        try {
+          console.log("Generating AI tags...");
+          aiGeneratedTags = await generateTags(processedContent.text);
+          console.log(`Generated ${aiGeneratedTags.length} AI tags: ${aiGeneratedTags.join(', ')}`);
+          
+          // Store in system_tags for backward compatibility
+          bookmarkData.system_tags = aiGeneratedTags;
+        } catch (tagError) {
+          console.error("Error generating AI tags:", tagError);
+          // Continue without AI tags
+          aiGeneratedTags = [];
         }
         
         // Create bookmark with all the data we've collected
@@ -209,6 +211,53 @@ export class BookmarkService {
       type: "bookmark_added",
       timestamp: new Date()
     });
+    
+    // Save AI-generated tags as normalized tags
+    if (processedContent) {
+      try {
+        // Get the AI-generated tags (from the bookmarkData.system_tags)
+        const systemTags = bookmarkData.system_tags || [];
+        
+        if (systemTags.length > 0) {
+          console.log(`Adding ${systemTags.length} AI-generated tags as normalized tags`);
+          
+          for (const tagName of systemTags) {
+            try {
+              // Check if this tag is already associated with the bookmark
+              const existingTags = await this.storage.getTagsByBookmarkId(bookmark.id);
+              const tagExists = existingTags.some(t => t.name.toLowerCase() === tagName.toLowerCase());
+              
+              if (!tagExists) {
+                // First check if the tag already exists in the system
+                let tag = await this.storage.getTagByName(tagName);
+                
+                if (!tag) {
+                  // Create the tag if it doesn't exist
+                  tag = await this.storage.createTag({
+                    name: tagName,
+                    type: "system" // This is an AI-generated tag
+                  });
+                  console.log(`Created new system tag: ${tagName}`);
+                } else {
+                  console.log(`Using existing tag: ${tagName}`);
+                }
+                
+                // Associate tag with bookmark
+                await this.storage.addTagToBookmark(bookmark.id, tag.id);
+                
+                // Increment tag count
+                await this.storage.incrementTagCount(tag.id);
+                console.log(`Associated tag "${tagName}" with bookmark ${bookmark.id}`);
+              }
+            } catch (tagError) {
+              console.error(`Error adding system tag ${tagName}:`, tagError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error saving AI-generated tags as normalized tags:", error);
+      }
+    }
 
     // Process insights if requested and we have processed content
     if (options.insightDepth && processedContent) {
