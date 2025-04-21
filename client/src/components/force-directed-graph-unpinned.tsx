@@ -1009,9 +1009,16 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     // Set the selected node in state
     setSelectedNode(selectedBookmarkId);
     
+    // Log selected bookmark ID for debugging
+    console.log(`Selecting bookmark: ${selectedBookmarkId}`);
+    
     // Highlight the selected node and center the graph on it and its connections
+    // Important: We need to find the exact node by ID that matches the selected bookmark
     const selectedNode = simulationRef.current.nodes().find(n => n.id === selectedBookmarkId);
+    
     if (selectedNode) {
+      console.log(`Found node in simulation: ${selectedNode.id}, type: ${selectedNode.type}`);
+      
       // Find directly connected nodes for better focus context
       const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
       const connectedNodes = simulationRef.current.nodes().filter(n => {
@@ -1023,7 +1030,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         });
       });
       
+      console.log(`Found ${connectedNodes.length} connected nodes`);
+      
       // Apply strong zoom effect to focus closely on the selected node
+      // We need to ensure the node has valid coordinates - some node types might not
       if (selectedNode.x !== undefined && selectedNode.y !== undefined) {
         // Get container dimensions
         const width = containerRef.current?.clientWidth || 800;
@@ -1040,6 +1050,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         // Apply the zoom transformation
         const svg = d3.select(svgRef.current);
         
+        console.log(`Zooming to node at (${selectedNode.x.toFixed(2)}, ${selectedNode.y.toFixed(2)}) with level ${zoomLevel}`);
+        
         // Create a transition for smoother zoom effect
         svg.transition()
           .duration(500) // Half-second transition
@@ -1052,6 +1064,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           );
       } else {
         // Fallback to standard centering if coordinates aren't available
+        console.log("Node coordinates not defined, using centerGraph fallback");
         centerGraph([selectedNode, ...connectedNodes]);
       }
       
@@ -1076,23 +1089,27 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         .attr('r', (d: any) => d.type === "bookmark" ? 9 : 7);
       
       // Visually highlight the selected node with very strong emphasis
-      d3.select(svgRef.current)
-        .select(`#node-${selectedBookmarkId}`)
-        .style('opacity', 1)
-        .raise() // Bring to front
-        .select('circle')
-        .attr('stroke-width', 4)
-        .attr('stroke', '#3b82f6') // Blue highlight border
-        .attr('r', (d: any) => d.type === "bookmark" ? 18 : 14) // Make MUCH larger (2x+)
-        .style('filter', 'drop-shadow(0 0 10px rgba(59, 130, 246, 0.8))'); // Stronger glow effect
-        
-      // Also highlight the label - make it visible and larger
-      d3.select(svgRef.current)
-        .select(`#node-${selectedBookmarkId}`)
-        .select('text')
-        .style('opacity', 1)
-        .style('font-weight', 'bold')
-        .style('font-size', '14px'); // Larger font
+      const selectedNodeElement = d3.select(svgRef.current).select(`#node-${selectedBookmarkId}`);
+      
+      if (!selectedNodeElement.empty()) {
+        selectedNodeElement
+          .style('opacity', 1)
+          .raise() // Bring to front
+          .select('circle')
+          .attr('stroke-width', 4)
+          .attr('stroke', '#3b82f6') // Blue highlight border
+          .attr('r', (d: any) => d.type === "bookmark" ? 18 : 14) // Make MUCH larger (2x+)
+          .style('filter', 'drop-shadow(0 0 10px rgba(59, 130, 246, 0.8))'); // Stronger glow effect
+          
+        // Also highlight the label - make it visible and larger
+        selectedNodeElement
+          .select('text')
+          .style('opacity', 1)
+          .style('font-weight', 'bold')
+          .style('font-size', '14px'); // Larger font
+      } else {
+        console.warn(`Could not find node element with ID: node-${selectedBookmarkId}`);
+      }
         
       // Also highlight the directly connected links
       d3.select(svgRef.current)
@@ -1109,6 +1126,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         .style('opacity', 1)
         .attr('stroke-width', (d: any) => d.value + 2) // Make connected links much thicker
         .raise(); // Bring links to front
+    } else {
+      console.warn(`Could not find node with ID: ${selectedBookmarkId}`);
     }
     
     // Create a cleanup function
