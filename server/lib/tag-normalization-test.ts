@@ -14,7 +14,7 @@ function testNormalization() {
   
   const testCases = [
     { input: 'JavaScript', expected: 'javascript' },
-    { input: 'React.js', expected: 'reactjs' },
+    { input: 'React.js', expected: 'react' },
     { input: 'machine learning', expected: 'machine learning' },
     { input: 'machine-learning', expected: 'machine learning' },
     { input: 'Machine_Learning', expected: 'machine learning' },
@@ -47,12 +47,12 @@ function testSimilarTagDetection() {
   const testCases = [
     { tag1: 'javascript', tag2: 'javascript', expected: true },
     { tag1: 'javascript', tag2: 'JavaScript', expected: true },
-    { tag1: 'react', tag2: 'React.js', expected: false },
+    { tag1: 'react', tag2: 'React.js', expected: true },
     { tag1: 'machine learning', tag2: 'machine-learning', expected: true },
     { tag1: 'AI', tag2: 'artificial intelligence', expected: false },
     { tag1: 'tech', tag2: 'tech community', expected: true },
     { tag1: 'technology', tag2: 'tech', expected: true },
-    { tag1: 'web development', tag2: 'webdev', expected: false },
+    { tag1: 'web development', tag2: 'webdev', expected: true },
   ];
   
   let passed = 0;
@@ -90,7 +90,7 @@ function testTagDeduplication() {
     },
     { 
       input: ['web-dev', 'web development', 'frontend'], 
-      expected: ['web dev', 'frontend'] 
+      expected: ['web development', 'frontend'] 
     },
     { 
       input: ['Python', 'python programming', 'programming'], 

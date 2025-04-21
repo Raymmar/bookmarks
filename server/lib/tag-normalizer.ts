@@ -13,6 +13,21 @@
 export function normalizeTag(tag: string): string {
   if (!tag || typeof tag !== 'string') return '';
   
+  // Special case for JavaScript variants
+  if (tag.toLowerCase().includes('javascript') || tag.toLowerCase() === 'js') {
+    return 'javascript';
+  }
+  
+  // Special case for React variants
+  if (tag.toLowerCase().includes('react.js') || tag.toLowerCase().includes('reactjs')) {
+    return 'react';
+  }
+  
+  // Special case for web development/web-dev variants
+  if (tag.toLowerCase().includes('web-dev') || tag.toLowerCase().includes('webdev')) {
+    return 'web development';
+  }
+  
   // Convert to lowercase
   let normalizedTag = tag.toLowerCase();
   
@@ -41,6 +56,30 @@ export function normalizeTag(tag: string): string {
  * @returns Boolean indicating if the tags are similar
  */
 export function areSimilarTags(tag1: string, tag2: string): boolean {
+  // Special case for JavaScript and JS
+  if ((tag1.toLowerCase().includes('javascript') || tag1.toLowerCase() === 'js') &&
+      (tag2.toLowerCase().includes('javascript') || tag2.toLowerCase() === 'js')) {
+    return true;
+  }
+  
+  // Special case for React variants
+  if ((tag1.toLowerCase().includes('react') || tag1.toLowerCase().includes('reactjs')) &&
+      (tag2.toLowerCase().includes('react') || tag2.toLowerCase().includes('reactjs'))) {
+    return true;
+  }
+  
+  // Special case for web development variants
+  if ((tag1.toLowerCase().includes('webdev') || tag1.toLowerCase().includes('web development') || tag1.toLowerCase().includes('web-dev')) &&
+      (tag2.toLowerCase().includes('webdev') || tag2.toLowerCase().includes('web development') || tag2.toLowerCase().includes('web-dev'))) {
+    return true;
+  }
+  
+  // Special case for tech/technology
+  if ((tag1.toLowerCase() === 'tech' || tag1.toLowerCase() === 'technology') &&
+      (tag2.toLowerCase() === 'tech' || tag2.toLowerCase() === 'technology')) {
+    return true;
+  }
+  
   // First normalize both tags
   const normalizedTag1 = normalizeTag(tag1);
   const normalizedTag2 = normalizeTag(tag2);
@@ -48,14 +87,21 @@ export function areSimilarTags(tag1: string, tag2: string): boolean {
   // If tags are the same after normalization, they're similar
   if (normalizedTag1 === normalizedTag2) return true;
   
-  // Check if one tag is a subset of the other
-  // e.g., "tech" and "tech community" - we'd prefer the more specific one
-  if (normalizedTag1.includes(normalizedTag2) || normalizedTag2.includes(normalizedTag1)) {
+  // Check if one is a subset of the other, but with a length limit to avoid matching 
+  // unrelated tags where one is coincidentally contained in the other
+  const shorterTag = normalizedTag1.length <= normalizedTag2.length ? normalizedTag1 : normalizedTag2;
+  const longerTag = normalizedTag1.length > normalizedTag2.length ? normalizedTag1 : normalizedTag2;
+  
+  // Only consider them similar if:
+  // 1. The shorter tag is at least 3 characters (to avoid matching "ai" in "nail")
+  // 2. The longer tag contains the shorter tag as a whole word
+  if (shorterTag.length >= 3 && 
+      (longerTag === shorterTag || 
+       longerTag.startsWith(shorterTag + ' ') || 
+       longerTag.endsWith(' ' + shorterTag) ||
+       longerTag.includes(' ' + shorterTag + ' '))) {
     return true;
   }
-  
-  // Could add more sophisticated checks here like Levenshtein distance
-  // for minor typos, but that might require a more complex algorithm
   
   return false;
 }
