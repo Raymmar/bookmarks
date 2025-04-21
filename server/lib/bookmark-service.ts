@@ -407,8 +407,16 @@ export class BookmarkService {
     // Add user tags immediately (don't wait for AI processing)
     if (options.tags && options.tags.length > 0) {
       try {
-        console.log(`Adding ${options.tags.length} user tags to bookmark ${bookmark.id}`);
-        for (const tagName of options.tags) {
+        // Apply tag normalization to user tags
+        const { processAITags } = await import('./tag-normalizer');
+        
+        // Normalize the user-provided tags
+        console.log(`Normalizing ${options.tags.length} user tags for bookmark ${bookmark.id}`);
+        const normalizedTags = processAITags(options.tags);
+        console.log(`Normalized tags: ${normalizedTags.join(', ')}`);
+        
+        console.log(`Adding ${normalizedTags.length} normalized user tags to bookmark ${bookmark.id}`);
+        for (const tagName of normalizedTags) {
           // First check if the tag already exists
           let tag = await this.storage.getTagByName(tagName);
           
@@ -613,6 +621,14 @@ export class BookmarkService {
     
     // Update tags if provided
     if (updateData.tags) {
+      // Normalize the provided tags
+      const { processAITags } = await import('./tag-normalizer');
+      
+      // Normalize the user-provided tags
+      console.log(`Normalizing ${updateData.tags.length} user tags for bookmark ${bookmarkId}`);
+      const normalizedTags = processAITags(updateData.tags);
+      console.log(`Normalized tags: ${normalizedTags.join(', ')}`);
+      
       // Get current tags
       const currentTags = await this.storage.getTagsByBookmarkId(bookmarkId);
       
@@ -622,8 +638,8 @@ export class BookmarkService {
         await this.storage.decrementTagCount(tag.id);
       }
       
-      // Add new tags
-      for (const tagName of updateData.tags) {
+      // Add new normalized tags
+      for (const tagName of normalizedTags) {
         // First check if the tag already exists
         let tag = await this.storage.getTagByName(tagName);
         
