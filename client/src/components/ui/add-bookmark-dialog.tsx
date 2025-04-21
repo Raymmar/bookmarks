@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TagSelector } from "@/components/ui/tag-selector";
-import { v4 as uuidv4 } from "uuid";
 
 interface AddBookmarkDialogProps {
   open: boolean;
@@ -40,63 +39,6 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
     setIsSubmitting(true);
 
     try {
-      // Generate a temporary ID for optimistic update
-      const tempId = uuidv4();
-      const tempDate = new Date().toISOString();
-      const title = url.split("/").pop() || url; // Generate a simple title from URL for now
-      const description = notes ? notes.substring(0, 100) : ""; // Use part of notes as description
-      
-      // Create optimistic bookmark object for the cache
-      const optimisticBookmark = {
-        id: tempId,
-        url,
-        title,
-        description,
-        date_saved: tempDate,
-        user_tags: [],
-        system_tags: [],
-        source: "web",
-        // Add empty arrays for relationships
-        notes: [],
-        highlights: [],
-        screenshots: [],
-        // Add empty insight object
-        insights: {
-          id: uuidv4(),
-          bookmark_id: tempId,
-          summary: "",
-          depth_level: parseInt(insightDepth),
-          related_links: []
-        },
-        // Add optimistic tags
-        tags: selectedTags.map(tagName => ({
-          id: `temp-tag-${tagName}`,
-          name: tagName,
-          type: "user",
-          count: 1,
-          created_at: tempDate
-        }))
-      };
-
-      // Optimistically update the query cache
-      queryClient.setQueryData(["/api/bookmarks"], (oldData: any) => {
-        return [...(oldData || []), {
-          id: tempId,
-          url,
-          title,
-          description,
-          date_saved: tempDate,
-          user_tags: [],
-          system_tags: [],
-          source: "web"
-        }];
-      });
-
-      // Update the bookmarks-with-tags cache optimistically
-      queryClient.setQueryData(["/api/bookmarks-with-tags"], (oldData: any) => {
-        return [...(oldData || []), optimisticBookmark];
-      });
-      
       // First, create any new tags that don't already exist
       const tagPromises = selectedTags.map(async (tagName) => {
         try {
@@ -127,8 +69,8 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       // Create the bookmark
       const bookmark = await apiRequest("POST", "/api/bookmarks", {
         url,
-        title, 
-        description,
+        title: url.split("/").pop() || url, // Generate a simple title from URL for now
+        description: notes ? notes.substring(0, 100) : "", // Use part of notes as description
         user_tags: [], // Tags are now managed through the tag relation tables
         system_tags: [],
         source: "web"
@@ -139,18 +81,8 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {})
       ));
       
-      // Update all related queries
+      // Update tag counts
       await queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
-      
-      // Dispatch custom event to notify other components of the bookmark addition
-      // Include the bookmark ID in case components need it
-      const bookmarkAddedEvent = new CustomEvent('bookmarkAdded', { 
-        detail: { bookmarkId: bookmark.id } 
-      });
-      document.dispatchEvent(bookmarkAddedEvent);
       
       toast({
         title: "Bookmark added",
@@ -173,10 +105,6 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
         onBookmarkAdded();
       }
     } catch (error) {
-      // If there's an error, invalidate the queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
-      
       toast({
         title: "Error adding bookmark",
         description: error instanceof Error ? error.message : "An unknown error occurred",
