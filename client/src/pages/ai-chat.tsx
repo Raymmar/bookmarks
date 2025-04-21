@@ -101,12 +101,43 @@ export default function AiChat() {
         }
       }
       
-      // Call AI with context
-      const response = await chatWithBookmarks(input, {
+      // Prepare chat filters
+      const chatFilters = {
         tags: selectedTags.length > 0 ? selectedTags : undefined,
         startDate,
         source: sources.length > 0 ? sources : undefined
-      });
+      };
+      
+      console.log("Sending chat request with filters:", chatFilters);
+      
+      // Call AI with context (with direct fetch as a fallback if the chatWithBookmarks fails)
+      let response;
+      try {
+        response = await chatWithBookmarks(input, chatFilters);
+      } catch (innerError) {
+        console.error("Failed with chatWithBookmarks, trying direct fetch:", innerError);
+        
+        // Direct fetch fallback
+        const fetchResponse = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: input,
+            filters: chatFilters
+          })
+        });
+        
+        if (!fetchResponse.ok) {
+          throw new Error(`Fetch error: ${fetchResponse.status} ${fetchResponse.statusText}`);
+        }
+        
+        const data = await fetchResponse.json();
+        if (!data || !data.response) {
+          throw new Error("No response in data");
+        }
+        
+        response = data.response;
+      }
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -117,9 +148,10 @@ export default function AiChat() {
       
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
+      console.error("Failed to get AI response:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "Sorry, I encountered an error while processing your request. Please try again later.",
+        content: `Sorry, I encountered an error while processing your request: ${error.message || "Unknown error"}. Please try again later.`,
         sender: "ai",
         timestamp: new Date()
       };

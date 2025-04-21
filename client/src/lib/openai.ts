@@ -53,9 +53,16 @@ export async function chatWithBookmarks(
 ): Promise<string> {
   try {
     console.log("Sending chat request with query:", query, "and filters:", filters);
-    const response = await apiRequest("POST", "/api/chat", {
-      query,
-      filters
+    
+    // Use fetch directly instead of apiRequest to have more control
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        filters
+      }),
+      credentials: "include"
     });
     
     if (!response.ok) {
@@ -65,14 +72,14 @@ export async function chatWithBookmarks(
     
     const data = await response.json();
     
-    if (!data.response) {
-      console.error("No response data from chat API:", data);
-      throw new Error("No response received from API");
+    if (!data || !data.response) {
+      console.error("No valid response data from chat API:", data);
+      throw new Error("No valid response received from API");
     }
     
     return data.response;
   } catch (error) {
     console.error("Error in chatWithBookmarks:", error);
-    throw error;
+    throw new Error("Failed to get chat response: " + (error.message || "Unknown error"));
   }
 }
