@@ -303,6 +303,11 @@ export async function generateTags(content: string, url?: string, customSystemPr
         console.warn("Error retrieving tagging prompt, using minimal default:", err);
       }
     }
+    
+    // Add URL context to the system prompt if available
+    if (url) {
+      systemPrompt += `\n\nThe content is from URL: ${url}`;
+    }
 
     // Prepare messages for the API call
     const messages = [
