@@ -472,16 +472,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/chat", async (req, res) => {
     try {
+      console.log("Chat request received:", req.body);
       const { query, filters } = req.body;
       
       if (!query) {
+        console.error("Missing query in chat request");
         return res.status(400).json({ error: "Query is required" });
       }
       
+      // Validate that we have an API key
+      if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "sk-dummy-key-for-development") {
+        console.error("Missing or invalid OpenAI API key");
+        return res.status(500).json({ error: "OpenAI API key is not configured" });
+      }
+      
+      console.log("Processing chat request with filters:", filters);
       const response = await generateChatResponse(query, filters);
+      console.log("Chat response generated successfully");
       res.json({ response });
     } catch (error) {
-      res.status(500).json({ error: "Failed to generate chat response" });
+      console.error("Error processing chat request:", error);
+      res.status(500).json({ error: "Failed to generate chat response", details: error.message });
     }
   });
   

@@ -178,10 +178,37 @@ export async function generateChatResponse(
     // Apply filters if provided
     if (filters) {
       if (filters.tags && filters.tags.length > 0) {
-        bookmarks = bookmarks.filter(bookmark => {
-          const bookmarkTags = [...bookmark.user_tags, ...bookmark.system_tags];
-          return filters.tags!.some(tag => bookmarkTags.includes(tag));
-        });
+        // First get all bookmarks with their normalized tags
+        const bookmarksWithTags = await Promise.all(
+          bookmarks.map(async (bookmark) => {
+            try {
+              // Get normalized tags for this bookmark
+              const normalizedTags = await storage.getTagsByBookmarkId(bookmark.id);
+              // Extract tag names from normalized tags
+              const normalizedTagNames = normalizedTags.map(tag => tag.name);
+              // Combine with system tags
+              const allTagNames = [...(bookmark.system_tags || []), ...normalizedTagNames];
+              
+              return {
+                bookmark,
+                tags: allTagNames
+              };
+            } catch (error) {
+              console.error(`Error getting tags for bookmark ${bookmark.id}:`, error);
+              return {
+                bookmark,
+                tags: bookmark.system_tags || []
+              };
+            }
+          })
+        );
+        
+        // Filter bookmarks based on combined tags
+        bookmarks = bookmarksWithTags
+          .filter(item => {
+            return filters.tags!.some(tag => item.tags.includes(tag));
+          })
+          .map(item => item.bookmark);
       }
       
       if (filters.startDate) {

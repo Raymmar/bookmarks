@@ -51,10 +51,28 @@ export async function chatWithBookmarks(
     source?: string[]
   }
 ): Promise<string> {
-  const response = await apiRequest("POST", "/api/chat", {
-    query,
-    filters
-  });
-  const data = await response.json();
-  return data.response;
+  try {
+    console.log("Sending chat request with query:", query, "and filters:", filters);
+    const response = await apiRequest("POST", "/api/chat", {
+      query,
+      filters
+    });
+    
+    if (!response.ok) {
+      console.error("Chat API error:", response.status, response.statusText);
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.response) {
+      console.error("No response data from chat API:", data);
+      throw new Error("No response received from API");
+    }
+    
+    return data.response;
+  } catch (error) {
+    console.error("Error in chatWithBookmarks:", error);
+    throw error;
+  }
 }
