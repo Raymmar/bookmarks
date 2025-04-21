@@ -117,15 +117,31 @@ export default function GraphView() {
     
     // Update the tag selection first
     if (isCurrentlySelected) {
+      // Removing a tag
       setSelectedTags(selectedTags.filter(t => t !== tag));
+      
+      // Only clear focus if we're removing the last selected tag
+      if (selectedTags.length === 1 && viewMode === "graph") {
+        // Signal graph to zoom out to show all nodes
+        // Only do this when the last tag is removed
+        setSelectedBookmarkId(null);
+        setTimeout(() => {
+          const event = new CustomEvent('centerFullGraph', { 
+            detail: { source: 'tagFilter' } 
+          });
+          document.dispatchEvent(event);
+        }, 150);
+      }
     } else {
+      // Adding a new tag
       setSelectedTags([...selectedTags, tag]);
       
       // Only focus on tag node when it's newly selected and in graph view
       if (viewMode === "graph") {
         // Find the tag node ID format that matches our graph component
         const tagNodeId = `tag-${tag}`;
-        // Clear any selected bookmark
+        
+        // Clear any selected bookmark - important to do this first
         setSelectedBookmarkId(null);
         
         // Use a longer delay to ensure the graph has fully updated with filtered nodes
@@ -133,7 +149,7 @@ export default function GraphView() {
         setTimeout(() => {
           // Use custom event to notify the graph component to select this tag
           const event = new CustomEvent('selectGraphNode', { 
-            detail: { nodeId: tagNodeId } 
+            detail: { nodeId: tagNodeId, source: 'tagFilter' } 
           });
           document.dispatchEvent(event);
         }, 300); // Longer delay for smoother transitions

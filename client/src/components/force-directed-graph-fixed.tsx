@@ -1139,20 +1139,25 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       if (!customEvent.detail?.nodeId) return;
       
       const nodeId = customEvent.detail.nodeId;
+      const source = customEvent.detail.source || 'click';
       
       // Update visual selection
       setSelectedNode(nodeId);
       
       // Center the graph on the selected node
-      centerOnNode(nodeId);
+      // Use different animation speeds based on source
+      // Tag filtering should be smoother (slower)
+      const animationSpeed = source === 'tagFilter' ? 400 : 300;
+      centerOnNode(nodeId, animationSpeed);
     };
     
     const handleCenterFullGraph = (event: Event) => {
       const customEvent = event as CustomEvent;
       
-      // Only reset the graph if it's coming from closeDetail
-      // This prevents conflict with selection events
-      if (customEvent.detail?.source === 'closeDetail') {
+      // Reset the graph if it's coming from closeDetail or tagFilter
+      // This ensures proper zooming behavior for different user actions
+      const validSources = ['closeDetail', 'tagFilter'];
+      if (validSources.includes(customEvent.detail?.source)) {
         // Clear selection
         setSelectedNode(null);
         
@@ -1243,7 +1248,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
   // Using a ref to avoid re-recreating the entire graph
   useEffect(() => {
     if (graphInitializedRef.current) {
-      updateGraphData();
+      // By default, don't auto-center when bookmarks array changes
+      // This prevents competing with any active selections or user viewports
+      updateGraphData(false);
     }
   }, [bookmarks, insightLevel, updateGraphData]);
 
