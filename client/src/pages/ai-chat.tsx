@@ -4,9 +4,28 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Send, User, Bot } from "lucide-react";
-import { chatWithBookmarks } from "@/lib/openai";
+import { 
+  X, Send, User, Bot, 
+  Clock, Folder, FileText, 
+  Plus, MoreVertical, Trash, Edit
+} from "lucide-react";
+import { 
+  chatWithBookmarks, 
+  getChatSessions, 
+  getChatSessionWithMessages,
+  createChatSession,
+  type ChatMessage as ApiChatMessage,
+  type ChatSession,
+  type ChatFilters
+} from "@/lib/openai";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
+// Client-side message format
 interface Message {
   id: string;
   content: string;
@@ -15,12 +34,20 @@ interface Message {
 }
 
 export default function AiChat() {
+  // Chat UI state
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Filter state
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState("all");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  
+  // Session state
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [showSessions, setShowSessions] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
