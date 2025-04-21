@@ -17,7 +17,7 @@ interface ProcessedContent {
 /**
  * Processes HTML content to extract readable text
  */
-export async function processContent(contentHtml: string): Promise<ProcessedContent> {
+export async function processContent(contentHtml: string): Promise<{ text: string; html: string; readingTime: number }> {
   // Simple HTML to text conversion (in a real app you would use a proper HTML parser)
   let text = contentHtml
     .replace(/<[^>]*>/g, ' ') // Remove HTML tags
@@ -30,6 +30,7 @@ export async function processContent(contentHtml: string): Promise<ProcessedCont
 
   return {
     text,
+    html: contentHtml, // Return the original HTML as well
     readingTime
   };
 }
