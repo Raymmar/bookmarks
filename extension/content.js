@@ -41,7 +41,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
            request.action === "highlightSaved" || 
            request.action === "imageSaved" || 
            request.action === "noteSaved") {
-    showNotification(request.status, request.message);
+    // Enhanced notification with extra details if available
+    let message = request.message;
+    
+    // If the bookmark already exists (from URL normalization), show additional info
+    if (request.existingBookmarkId) {
+      message += " (using normalized URL)";
+    }
+    
+    showNotification(request.status, message);
   }
   
   else if (request.action === "highlightText") {

@@ -62,8 +62,15 @@ function saveBookmark() {
   // Send message to background script
   chrome.runtime.sendMessage(bookmarkData, (response) => {
     if (response && response.success) {
+      let statusMessage = 'Bookmark saved successfully!';
+      
+      // Check if this was an existing bookmark with same normalized URL
+      if (response.isExisting) {
+        statusMessage = response.message || 'URL already exists in bookmarks!';
+      }
+      
       // Show success message
-      showStatus('success', 'Bookmark saved successfully!');
+      showStatus('success', statusMessage);
       
       // Clear form
       tagsInput.value = '';

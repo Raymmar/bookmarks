@@ -58,8 +58,37 @@ function savePage(tab) {
     }
 
     try {
+      // First, check if the URL already exists in normalized form
+      const urlCheckResponse = await fetch(`${API_URL}/url/normalize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ url: tab.url })
+      });
+
+      if (!urlCheckResponse.ok) {
+        throw new Error(`Failed to normalize URL: ${urlCheckResponse.status}`);
+      }
+
+      const urlData = await urlCheckResponse.json();
+      console.log("URL check result:", urlData);
+
+      // If URL exists, just show success message without creating duplicate
+      if (urlData.exists) {
+        console.log(`URL already exists as bookmark: ${urlData.existingBookmarkId}`);
+        chrome.tabs.sendMessage(tab.id, { 
+          action: "bookmarkSaved",
+          status: "success",
+          message: "Page already saved to Universal Bookmarks",
+          existingBookmarkId: urlData.existingBookmarkId
+        });
+        return;
+      }
+
+      // If URL doesn't exist, create the bookmark with normalized URL
       const bookmarkData = {
-        url: tab.url,
+        url: urlData.normalized, // Use the normalized URL
         title: tab.title,
         description: response.description || "",
         content_html: response.content || "",
@@ -82,11 +111,14 @@ function savePage(tab) {
         throw new Error(`Failed to save bookmark: ${result.status}`);
       }
 
+      const bookmarkResult = await result.json();
+
       // Notify the content script that the bookmark was saved
       chrome.tabs.sendMessage(tab.id, { 
         action: "bookmarkSaved",
         status: "success",
-        message: "Page saved to Universal Bookmarks"
+        message: "Page saved to Universal Bookmarks",
+        bookmarkId: bookmarkResult.id
       });
     } catch (error) {
       console.error("Error saving bookmark:", error);
@@ -102,21 +134,32 @@ function savePage(tab) {
 // Save a text highlight
 async function saveHighlight(text, tab) {
   try {
-    // First check if the page is already bookmarked
-    const response = await fetch(`${API_URL}/bookmarks`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch bookmarks: ${response.status}`);
+    // First, check if the URL already exists in normalized form
+    const urlCheckResponse = await fetch(`${API_URL}/url/normalize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url: tab.url })
+    });
+
+    if (!urlCheckResponse.ok) {
+      throw new Error(`Failed to normalize URL: ${urlCheckResponse.status}`);
     }
-    
-    const bookmarks = await response.json();
-    const existingBookmark = bookmarks.find(b => b.url === tab.url);
+
+    const urlData = await urlCheckResponse.json();
+    console.log("URL check result for highlight:", urlData);
     
     let bookmarkId;
     
-    // If the page isn't bookmarked yet, save it first
-    if (!existingBookmark) {
+    // If URL exists, use that bookmark
+    if (urlData.exists) {
+      console.log(`URL already exists as bookmark: ${urlData.existingBookmarkId}`);
+      bookmarkId = urlData.existingBookmarkId;
+    } else {
+      // If URL doesn't exist, create a new bookmark with normalized URL
       const bookmarkData = {
-        url: tab.url,
+        url: urlData.normalized,
         title: tab.title,
         description: "",
         user_tags: [],
@@ -138,8 +181,6 @@ async function saveHighlight(text, tab) {
       
       const bookmarkResult = await bookmarkResponse.json();
       bookmarkId = bookmarkResult.id;
-    } else {
-      bookmarkId = existingBookmark.id;
     }
     
     // Now save the highlight
@@ -179,21 +220,32 @@ async function saveHighlight(text, tab) {
 // Save an image
 async function saveImage(imageUrl, tab) {
   try {
-    // First check if the page is already bookmarked
-    const response = await fetch(`${API_URL}/bookmarks`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch bookmarks: ${response.status}`);
+    // First, check if the URL already exists in normalized form
+    const urlCheckResponse = await fetch(`${API_URL}/url/normalize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url: tab.url })
+    });
+
+    if (!urlCheckResponse.ok) {
+      throw new Error(`Failed to normalize URL: ${urlCheckResponse.status}`);
     }
-    
-    const bookmarks = await response.json();
-    const existingBookmark = bookmarks.find(b => b.url === tab.url);
+
+    const urlData = await urlCheckResponse.json();
+    console.log("URL check result for image:", urlData);
     
     let bookmarkId;
     
-    // If the page isn't bookmarked yet, save it first
-    if (!existingBookmark) {
+    // If URL exists, use that bookmark
+    if (urlData.exists) {
+      console.log(`URL already exists as bookmark: ${urlData.existingBookmarkId}`);
+      bookmarkId = urlData.existingBookmarkId;
+    } else {
+      // If URL doesn't exist, create a new bookmark with normalized URL
       const bookmarkData = {
-        url: tab.url,
+        url: urlData.normalized,
         title: tab.title,
         description: "",
         user_tags: [],
@@ -215,8 +267,6 @@ async function saveImage(imageUrl, tab) {
       
       const bookmarkResult = await bookmarkResponse.json();
       bookmarkId = bookmarkResult.id;
-    } else {
-      bookmarkId = existingBookmark.id;
     }
     
     // Now save the screenshot
@@ -255,40 +305,77 @@ async function saveImage(imageUrl, tab) {
 // Listen for messages from popup or content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "saveBookmark") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (tabs.length > 0) {
-        const bookmarkData = {
-          url: tabs[0].url,
-          title: tabs[0].title || "No Title",
-          description: request.description || "",
-          user_tags: request.tags || [],
-          system_tags: [],
-          source: "extension",
-          notes: request.notes ? [{ text: request.notes }] : [],
-          autoExtract: request.autoExtract || false,
-          insightDepth: request.insightDepth || 1
-        };
+        try {
+          // First, check if the URL already exists in normalized form
+          const urlCheckResponse = await fetch(`${API_URL}/url/normalize`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ url: tabs[0].url })
+          });
 
-        fetch(`${API_URL}/bookmarks`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(bookmarkData)
-        })
-        .then(response => {
+          if (!urlCheckResponse.ok) {
+            throw new Error(`Failed to normalize URL: ${urlCheckResponse.status}`);
+          }
+
+          const urlData = await urlCheckResponse.json();
+          console.log("URL check result for saveBookmark:", urlData);
+          
+          // If URL exists, return the existing bookmark instead of creating a duplicate
+          if (urlData.exists) {
+            console.log(`URL already exists as bookmark: ${urlData.existingBookmarkId}`);
+            // Fetch the existing bookmark details to return
+            const existingBookmarkResponse = await fetch(`${API_URL}/bookmarks/${urlData.existingBookmarkId}`);
+            if (!existingBookmarkResponse.ok) {
+              throw new Error(`Failed to fetch existing bookmark: ${existingBookmarkResponse.status}`);
+            }
+            
+            const existingBookmark = await existingBookmarkResponse.json();
+            
+            // Return success with the existing bookmark
+            sendResponse({ 
+              success: true, 
+              bookmark: existingBookmark,
+              message: "URL already exists in bookmarks",
+              isExisting: true
+            });
+            return;
+          }
+          
+          // If URL doesn't exist, create a new bookmark with normalized URL
+          const bookmarkData = {
+            url: urlData.normalized, // Use the normalized URL
+            title: tabs[0].title || "No Title",
+            description: request.description || "",
+            user_tags: request.tags || [],
+            system_tags: [],
+            source: "extension",
+            notes: request.notes ? [{ text: request.notes }] : [],
+            autoExtract: request.autoExtract || false,
+            insightDepth: request.insightDepth || 1
+          };
+
+          const response = await fetch(`${API_URL}/bookmarks`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(bookmarkData)
+          });
+          
           if (!response.ok) {
             throw new Error(`Failed to save bookmark: ${response.status}`);
           }
-          return response.json();
-        })
-        .then(result => {
+          
+          const result = await response.json();
           sendResponse({ success: true, bookmark: result });
-        })
-        .catch(error => {
+        } catch (error) {
           console.error("Error saving bookmark:", error);
           sendResponse({ success: false, error: error.message });
-        });
+        }
       }
     });
     return true; // Keeps the message channel open for the async response
