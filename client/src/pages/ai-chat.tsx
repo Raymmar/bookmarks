@@ -56,6 +56,19 @@ export default function AiChat() {
     queryKey: ["/api/bookmarks"],
   });
   
+  // Get all chat sessions
+  const { data: chatSessions = [], isLoading: isSessionsLoading, refetch: refetchSessions } = useQuery({
+    queryKey: ["/api/chat/sessions"],
+    queryFn: async () => {
+      try {
+        return await getChatSessions();
+      } catch (error) {
+        console.error("Failed to fetch chat sessions:", error);
+        return [];
+      }
+    },
+  });
+  
   // Get all normalized tags from the database
   const { data: normalizedTags = [] } = useQuery({
     queryKey: ["/api/tags"],
@@ -95,6 +108,18 @@ export default function AiChat() {
   
   const sendMessage = async () => {
     if (!input.trim()) return;
+    
+    // Create a new chat session if none exists
+    if (!activeChatId) {
+      try {
+        await createNewChatSession();
+      } catch (error) {
+        console.error("Failed to create a new chat session:", error);
+        
+        // If we couldn't create a session, still try to send the message,
+        // but it won't be persisted
+      }
+    }
     
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -137,21 +162,27 @@ export default function AiChat() {
       
       console.log("Sending chat request with filters:", chatFilters);
       
-      // Call AI with context (with direct fetch as a fallback if the chatWithBookmarks fails)
+      // Call AI with context - use the session-aware version if we have an activeChatId
       let response;
       try {
-        response = await chatWithBookmarks(input, chatFilters);
+        if (activeChatId) {
+          response = await chatWithBookmarks(input, chatFilters, activeChatId);
+        } else {
+          response = await chatWithBookmarks(input, chatFilters);
+        }
       } catch (innerError) {
         console.error("Failed with chatWithBookmarks, trying direct fetch:", innerError);
         
         // Direct fetch fallback
-        const fetchResponse = await fetch("/api/chat", {
+        const endpoint = activeChatId ? "/api/chat/generate" : "/api/chat";
+        const requestBody = activeChatId 
+          ? { message: input, filters: chatFilters, sessionId: activeChatId }
+          : { query: input, filters: chatFilters };
+          
+        const fetchResponse = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: input,
-            filters: chatFilters
-          })
+          body: JSON.stringify(requestBody)
         });
         
         if (!fetchResponse.ok) {
@@ -174,6 +205,9 @@ export default function AiChat() {
       };
       
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Refresh chat sessions list
+      await refetchSessions();
     } catch (error) {
       console.error("Failed to get AI response:", error);
       const errorMessage: Message = {
@@ -189,13 +223,207 @@ export default function AiChat() {
     }
   };
   
+  // Function to load a chat session
+  const loadChatSession = async (sessionId: string) => {
+    try {
+      setSessionsLoading(true);
+      const { session, messages: sessionMessages } = await getChatSessionWithMessages(sessionId);
+      
+      // Set active chat ID
+      setActiveChatId(sessionId);
+      
+      // Convert API messages to client format
+      const clientMessages: Message[] = sessionMessages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.role === "user" ? "user" : "ai",
+        timestamp: new Date(msg.timestamp)
+      }));
+      
+      // Update messages state
+      setMessages(clientMessages);
+      
+      // Set filter states if session has filters
+      if (session.filters) {
+        if (session.filters.tags) {
+          setSelectedTags(session.filters.tags);
+        }
+        
+        if (session.filters.source) {
+          setSources(session.filters.source);
+        }
+        
+        // Set date range
+        if (session.filters.startDate) {
+          const now = new Date();
+          const startDate = new Date(session.filters.startDate);
+          const daysDiff = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysDiff <= 7) {
+            setDateRange("week");
+          } else if (daysDiff <= 30) {
+            setDateRange("month");
+          } else if (daysDiff <= 365) {
+            setDateRange("year");
+          } else {
+            setDateRange("all");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load chat session:", error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+  
+  // Function to create a new chat session
+  const createNewChatSession = async () => {
+    try {
+      setSessionsLoading(true);
+      
+      // Reset the UI first
+      setMessages([]);
+      setSelectedTags([]);
+      setDateRange("all");
+      setSources(["extension", "web", "import"]);
+      
+      // Create chat filters
+      const chatFilters = {
+        tags: selectedTags.length > 0 ? selectedTags : undefined,
+        source: sources.length > 0 ? sources : undefined
+      };
+      
+      // Create a new session (default title will be "New Chat")
+      const newSession = await createChatSession(undefined, chatFilters);
+      
+      // Set the active chat ID to the new session
+      setActiveChatId(newSession.id);
+      
+      // Refetch sessions to update the list
+      await refetchSessions();
+    } catch (error) {
+      console.error("Failed to create new chat session:", error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+  
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   
+  // Load the most recent chat session on initial load
+  useEffect(() => {
+    if (chatSessions.length > 0 && !activeChatId) {
+      // Sort sessions by updated_at and take the most recent one
+      const sortedSessions = [...chatSessions].sort((a, b) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+      
+      loadChatSession(sortedSessions[0].id);
+    }
+  }, [chatSessions, activeChatId]);
+  
   return (
     <div className="flex flex-1 h-full">
+      {/* Chat Sessions Sidebar */}
+      <div className="hidden lg:block w-64 border-r border-gray-200 bg-white overflow-y-auto">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="font-semibold text-gray-800">Chat History</h3>
+          <div className="flex mt-3">
+            <Button 
+              onClick={createNewChatSession} 
+              disabled={sessionsLoading}
+              className="flex items-center space-x-1 w-full justify-center"
+            >
+              <Plus className="h-4 w-4" />
+              <span>New Chat</span>
+            </Button>
+          </div>
+        </div>
+        
+        <div className="divide-y divide-gray-100">
+          {isSessionsLoading ? (
+            <div className="flex justify-center p-4">
+              <div className="h-5 w-5 border-2 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : chatSessions.length === 0 ? (
+            <div className="p-4 text-sm text-gray-500 text-center">
+              No chat sessions yet.
+            </div>
+          ) : (
+            chatSessions
+              .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+              .map(session => (
+                <div 
+                  key={session.id}
+                  className={`p-3 cursor-pointer transition-colors ${
+                    activeChatId === session.id 
+                      ? 'bg-gray-100' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => loadChatSession(session.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-medium truncate max-w-36">
+                        {session.title || "New Chat"}
+                      </span>
+                    </div>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-500">
+                          <Trash className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {new Date(session.updated_at).toLocaleDateString()}
+                  </div>
+                  
+                  {/* Show filters if they exist */}
+                  {session.filters && (session.filters.tags?.length || session.filters.source?.length) && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {session.filters.tags?.slice(0, 2).map(tag => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {session.filters.tags && session.filters.tags.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{session.filters.tags.length - 2} more
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+          )}
+        </div>
+      </div>
+      
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col h-full">
         {/* Chat Messages */}
