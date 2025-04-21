@@ -1011,85 +1011,64 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     });
 
-    // If we have a small number of nodes (filtered view), use a completely different physics setup
+    // Special handling for small number of nodes (filtered view)
     const isFilteredView = newGraphData.nodes.length <= 10;
     
     if (isFilteredView) {
-      // For filtered views, use a deterministic arrangement instead of physics simulation
-      // This completely bypasses the force layout for small node counts
-      
+      // For filtered views, we want to maintain physics but with adjusted parameters
+      // Set initial positions in roughly circular arrangement to help the layout
       const centerX = width / 2;
       const centerY = height / 2;
       const nodeCount = newGraphData.nodes.length;
+      const radius = 100; // Initial radius for node placement
       
-      if (nodeCount <= 7) {
-        // Circular arrangement for very small node sets
-        const radius = 100; // Increased radius for better node separation
+      // For filtered views, set better initial positions to help the physics layout
+      newGraphData.nodes.forEach((node, i) => {
+        // Remove any fixed positions to allow nodes to move naturally
+        if ('fx' in node) node.fx = null;
+        if ('fy' in node) node.fy = null;
         
-        newGraphData.nodes.forEach((node, i) => {
-          // First node goes at the center
-          if (i === 0) {
-            node.x = centerX;
-            node.y = centerY;
-            // Fix this node in place
-            node.fx = centerX;
-            node.fy = centerY;
-          } else {
-            // Arrange other nodes in a perfect circle
-            const angle = 2 * Math.PI * (i - 1) / (nodeCount - 1);
-            node.x = centerX + radius * Math.cos(angle);
-            node.y = centerY + radius * Math.sin(angle);
-            // Fix these nodes in place too
-            node.fx = node.x;
-            node.fy = node.y;
-          }
-        });
+        // Set initial positions in a rough circular arrangement
+        // First node goes near the center, but not exactly at center
+        if (i === 0) {
+          node.x = centerX + (Math.random() * 20 - 10);
+          node.y = centerY + (Math.random() * 20 - 10);
+        } else {
+          // Other nodes start in a rough circle with some randomness
+          const angle = 2 * Math.PI * (i - 1) / (nodeCount - 1) + (Math.random() * 0.2 - 0.1);
+          const distance = radius * (0.9 + Math.random() * 0.3); // Variable distance
+          node.x = centerX + distance * Math.cos(angle);
+          node.y = centerY + distance * Math.sin(angle);
+        }
+      });
+      
+      // Use organic physics but with parameters adjusted for small node sets
+      simulationRef.current
+        .nodes(newGraphData.nodes)
+        .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
+          .id(d => d.id)
+          .distance(d => {
+            // Increased distances for small node sets to spread them out more
+            if (d.type === "domain") return 120;
+            if (d.type === "tag") return 140;
+            if (d.type === "related") return 100;
+            return 110;
+          })
+          .strength(0.4)) // Stronger link forces for smaller sets
+        .force("charge", d3.forceManyBody().strength(-500)) // Stronger repulsion
+        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.15)) // Stronger centering
+        .force("x", d3.forceX(width / 2).strength(0.07)) // Slightly stronger x-positioning
+        .force("y", d3.forceY(height / 2).strength(0.07)) // Slightly stronger y-positioning
+        .force("collision", d3.forceCollide().radius(d => {
+          // Increased collision radius for more spacing in small node sets
+          if (d.type === "bookmark") return 55;
+          if (d.type === "domain") return 45;
+          if (d.type === "tag") return 40;
+          return 35;
+        }).strength(0.9));
         
-        // Use minimal forces just to maintain the fixed positions
-        simulationRef.current
-          .nodes(newGraphData.nodes)
-          .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
-            .id(d => d.id)
-            .distance(10)
-            .strength(0)) // Zero strength as positions are fixed
-          .force("charge", null) // No charge forces
-          .force("center", null) // No centering force
-          .force("x", null) // No X force
-          .force("y", null) // No Y force
-          .force("collision", null); // No collision force
-      } else {
-        // Grid arrangement for larger filtered sets
-        // Calculate grid dimensions
-        const gridSize = Math.ceil(Math.sqrt(nodeCount));
-        const cellSize = 80; // Increased space between nodes for better visibility
-        const gridWidth = gridSize * cellSize;
-        const startX = centerX - gridWidth / 2 + cellSize / 2;
-        const startY = centerY - gridWidth / 2 + cellSize / 2;
-        
-        // Position nodes in a grid
-        newGraphData.nodes.forEach((node, i) => {
-          const row = Math.floor(i / gridSize);
-          const col = i % gridSize;
-          node.x = startX + col * cellSize;
-          node.y = startY + row * cellSize;
-          // Fix all nodes in place
-          node.fx = node.x;
-          node.fy = node.y;
-        });
-        
-        // Use minimal forces just to maintain the fixed positions
-        simulationRef.current
-          .nodes(newGraphData.nodes)
-          .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
-            .id(d => d.id)
-            .distance(10)
-            .strength(0)) // Zero strength as positions are fixed
-          .force("charge", null) // No charge forces
-          .force("center", null) // No centering force
-          .force("x", null) // No X force
-          .force("y", null) // No Y force
-          .force("collision", null); // No collision force
-      }
+      // Use higher alpha (more "energy") to ensure nodes spread out well
+      simulationRef.current.alpha(1).alphaDecay(0.02);
     } else {
       // NORMAL (UNFILTERED) VIEW PHYSICS - Standard force configuration
       
