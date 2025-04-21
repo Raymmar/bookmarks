@@ -1,9 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Maximize } from "lucide-react";
+import { X } from "lucide-react";
 import { Bookmark, Highlight, Note } from "@shared/types";
 import { formatDate } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,20 +18,6 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  
-  // Focus the graph on this bookmark when it's opened in the detail panel
-  useEffect(() => {
-    if (bookmark) {
-      // Find the bookmark node ID format that matches our graph component
-      const bookmarkNodeId = `bookmark-${bookmark.id}`;
-      
-      // Use custom event to notify the graph component to select and center this node
-      const event = new CustomEvent('selectGraphNode', { 
-        detail: { nodeId: bookmarkNodeId } 
-      });
-      document.dispatchEvent(event);
-    }
-  }, [bookmark]);
 
   if (!bookmark) {
     return (

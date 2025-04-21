@@ -504,7 +504,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
 
   // Update node selection visually without re-rendering the graph
   const updateSelectedNode = useCallback((nodeId: string | null) => {
-    if (!svgRef.current || !graphDataRef.current) return;
+    if (!svgRef.current) return;
     
     const svg = d3.select(svgRef.current);
     
@@ -523,45 +523,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .attr("stroke-width", d => (d as GraphNode).type === "bookmark" ? 2 : 1.5)
       .attr("stroke-opacity", 1);
     
-    // If no node is selected, show all nodes and links
-    if (!nodeId) {
-      svg.selectAll(".node").attr("opacity", 1);
-      svg.selectAll("line").attr("opacity", 0.6);
-      return;
-    }
+    // Reset node opacity
+    svg.selectAll(".node").attr("opacity", 1);
+    svg.selectAll("line").attr("opacity", 0.6);
     
-    // Get the selected node's connected nodes
-    const { links } = graphDataRef.current;
-    
-    // Find all connected links to the selected node
-    const connectedLinks = links.filter(link => {
-      const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-      const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-      return sourceId === nodeId || targetId === nodeId;
-    });
-    
-    // Create a set of connected node IDs
-    const connectedNodeIds = new Set<string>([nodeId]);
-    connectedLinks.forEach(link => {
-      const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-      const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-      if (sourceId === nodeId) connectedNodeIds.add(targetId);
-      else connectedNodeIds.add(sourceId);
-    });
-    
-    // Hide all nodes initially
-    svg.selectAll(".node").attr("opacity", 0.15);
-    svg.selectAll("line").attr("opacity", 0.1);
-    
-    // Show only connected nodes
-    connectedNodeIds.forEach(id => {
-      svg.select(`#node-${id}`).attr("opacity", 1);
-    });
-    
-    // Show only connected links
-    connectedLinks.forEach(link => {
-      svg.select(`#link-${link.id}`).attr("opacity", 0.8);
-    });
+    if (!nodeId) return;
     
     // Highlight the selected node
     const selectedElement = svg.select(`#node-${nodeId}`);
@@ -618,55 +584,35 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       
       // Get nodes to include in view
       let nodesToCenter = [nodeData];
-      let connectedLinks: GraphLink[] = [];
       
       // For tag nodes, include connected bookmarks
       if (nodeData.type === "tag") {
         const tagId = nodeData.id;
-        const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
-        
-        // Get all links connected to this tag
-        connectedLinks = links.links().filter(link => {
-          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-          return sourceId === tagId || targetId === tagId;
-        });
-        
-        // Get all connected bookmark nodes
         const relatedNodes = simulationRef.current.nodes().filter(n => {
           if (n.type !== "bookmark") return false;
           
           // Check if there's a link between this bookmark and the tag
-          return connectedLinks.some(link => {
+          const links = simulationRef.current?.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+          const connection = links.links().some(link => {
             const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
             const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
             return (sourceId === n.id && targetId === tagId) || (sourceId === tagId && targetId === n.id);
           });
+          
+          return connection;
         });
         
         if (relatedNodes.length > 0) {
           nodesToCenter = [nodeData, ...relatedNodes];
         }
       } else {
-        // For non-tag nodes (like bookmarks), include directly connected nodes
+        // For non-tag nodes, include directly connected nodes
         const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
-        
-        // Get all links connected to this node
-        connectedLinks = links.links().filter(link => {
-          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-          return sourceId === nodeId || targetId === nodeId;
-        });
-        
-        // Get all connected nodes
         const connectedNodes = simulationRef.current.nodes().filter(n => {
-          // Skip the node itself
-          if (n.id === nodeId) return false;
-          
-          return connectedLinks.some(link => {
+          return links.links().some(link => {
             const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
             const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-            return (sourceId === n.id && targetId === nodeId) || (sourceId === nodeId && targetId === n.id);
+            return (sourceId === nodeData.id && targetId === n.id) || (sourceId === n.id && targetId === nodeData.id);
           });
         });
         
