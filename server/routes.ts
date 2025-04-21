@@ -11,6 +11,7 @@ import {
   insertChatSessionSchema, insertChatMessageSchema, insertSettingSchema
 } from "@shared/schema";
 import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
+import { bookmarkService } from "./lib/bookmark-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server

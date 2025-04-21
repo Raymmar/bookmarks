@@ -1,0 +1,425 @@
+/**
+ * Centralized Bookmark Service
+ * 
+ * This service handles all bookmark-related operations, ensuring a single entry point
+ * for bookmark processing with consistent handling of URL normalization, deduplication,
+ * metadata extraction, and AI-powered features.
+ */
+
+import { IStorage, storage } from '../storage';
+import { 
+  InsertBookmark, 
+  InsertInsight, 
+  InsertNote,
+  InsertScreenshot,
+  InsertHighlight,
+  InsertTag,
+  Tag
+} from '../../shared/schema';
+import { normalizeUrl, areUrlsEquivalent } from '../../shared/url-service';
+import { 
+  extractMetadata, 
+  processContent, 
+  generateEmbedding,
+  generateTags, 
+  generateInsights
+} from './content-processor';
+
+export interface BookmarkCreationOptions {
+  url: string;
+  title?: string;
+  description?: string;
+  content_html?: string;
+  notes?: string;
+  tags?: string[];
+  autoExtract?: boolean;
+  insightDepth?: number;
+  screenshotUrl?: string;
+  highlights?: { quote: string; noteText?: string }[];
+  source: string;
+}
+
+export interface ProcessedUrlResult {
+  original: string;
+  normalized: string;
+  exists: boolean;
+  existingBookmarkId?: string;
+}
+
+export class BookmarkService {
+  private storage: IStorage;
+
+  constructor(storage: IStorage) {
+    this.storage = storage;
+  }
+
+  /**
+   * Processes a URL to normalize it and check for duplicates
+   */
+  async processUrl(url: string): Promise<ProcessedUrlResult> {
+    if (!url) {
+      throw new Error("URL is required");
+    }
+
+    // Normalize the URL (with tracking param removal)
+    const normalizedUrl = normalizeUrl(url, true);
+    
+    // Check if a bookmark with this normalized URL already exists
+    const bookmarks = await this.storage.getBookmarks();
+    const existingBookmark = bookmarks.find(bookmark => 
+      areUrlsEquivalent(bookmark.url, normalizedUrl)
+    );
+    
+    if (existingBookmark) {
+      return {
+        original: url,
+        normalized: normalizedUrl,
+        exists: true,
+        existingBookmarkId: existingBookmark.id
+      };
+    } else {
+      return {
+        original: url,
+        normalized: normalizedUrl,
+        exists: false
+      };
+    }
+  }
+
+  /**
+   * Creates a new bookmark with comprehensive processing
+   */
+  async createBookmark(options: BookmarkCreationOptions) {
+    // Validate required fields
+    if (!options.url) {
+      throw new Error("URL is required");
+    }
+
+    // Process URL normalization
+    const urlResult = await this.processUrl(options.url);
+    
+    // Check for duplicates
+    if (urlResult.exists && urlResult.existingBookmarkId) {
+      // Return existing bookmark instead of creating a duplicate
+      const existingBookmark = await this.storage.getBookmark(urlResult.existingBookmarkId);
+      console.log(`URL already exists as bookmark: ${urlResult.existingBookmarkId}`);
+      
+      if (!existingBookmark) {
+        throw new Error("Error retrieving existing bookmark");
+      }
+      
+      return {
+        bookmark: existingBookmark,
+        isExisting: true
+      };
+    }
+
+    // Create a basic bookmark data object
+    const bookmarkData: InsertBookmark = {
+      url: urlResult.normalized, // Use the normalized URL
+      title: options.title || urlResult.normalized.split("/").pop() || "Untitled",
+      description: options.description || "",
+      content_html: options.content_html || null,
+      system_tags: [],
+      source: options.source,
+      vector_embedding: null
+    };
+
+    // Extract metadata if not provided
+    if (bookmarkData.url && (!options.title || !options.description)) {
+      try {
+        console.log(`Extracting metadata for URL: ${bookmarkData.url}`);
+        const metadata = await extractMetadata(bookmarkData.url);
+        bookmarkData.title = options.title || metadata.title || bookmarkData.title;
+        bookmarkData.description = options.description || metadata.description || bookmarkData.description;
+        bookmarkData.content_html = metadata.content || bookmarkData.content_html;
+      } catch (error) {
+        console.error("Error extracting metadata:", error);
+        // Continue with available data
+      }
+    }
+
+    let bookmark;
+    let processedContent: { text: string; html: string } | null = null;
+
+    // Process content if auto-extract is enabled and we have content
+    if (options.autoExtract && bookmarkData.content_html) {
+      try {
+        console.log(`Processing content for URL: ${bookmarkData.url}`);
+        processedContent = await processContent(bookmarkData.content_html);
+        
+        // Generate embedding for search
+        const embedding = await generateEmbedding(processedContent.text);
+        
+        // Generate auto tags if not provided
+        if (!options.tags || options.tags.length === 0) {
+          const generatedTags = await generateTags(processedContent.text);
+          bookmarkData.system_tags = generatedTags;
+        }
+        
+        // Create bookmark with embedding
+        bookmark = await this.storage.createBookmark({
+          ...bookmarkData,
+          vector_embedding: embedding.embedding,
+          date_saved: new Date()
+        });
+      } catch (error) {
+        console.error("Error processing content:", error);
+        // Fall back to basic bookmark creation if content processing fails
+        bookmark = await this.storage.createBookmark({
+          ...bookmarkData,
+          date_saved: new Date()
+        });
+      }
+    } else {
+      // Basic bookmark creation without processing
+      bookmark = await this.storage.createBookmark({
+        ...bookmarkData,
+        date_saved: new Date()
+      });
+    }
+
+    // Create activity for bookmark creation
+    await this.storage.createActivity({
+      bookmark_id: bookmark.id,
+      bookmark_title: bookmark.title,
+      type: "bookmark_added",
+      timestamp: new Date()
+    });
+
+    // Process insights if requested and we have processed content
+    if (options.insightDepth && processedContent) {
+      try {
+        const insightDepth = typeof options.insightDepth === 'string' 
+          ? parseInt(options.insightDepth) 
+          : options.insightDepth;
+        
+        console.log(`Generating insights with depth ${insightDepth} for bookmark: ${bookmark.id}`);
+        const insights = await generateInsights(
+          bookmarkData.url,
+          processedContent.text,
+          insightDepth
+        );
+        
+        // Store insights
+        await this.storage.createInsight({
+          bookmark_id: bookmark.id,
+          summary: insights.summary,
+          sentiment: insights.sentiment,
+          depth_level: insightDepth,
+          related_links: insights.relatedLinks || []
+        });
+        
+        // Create activity for insight generation
+        await this.storage.createActivity({
+          bookmark_id: bookmark.id,
+          bookmark_title: bookmark.title,
+          type: "insight_generated",
+          tags: insights.tags,
+          timestamp: new Date()
+        });
+      } catch (error) {
+        console.error("Error generating insights:", error);
+      }
+    }
+
+    // Add user tags
+    if (options.tags && options.tags.length > 0) {
+      try {
+        for (const tagName of options.tags) {
+          // First check if the tag already exists
+          let tag = await this.storage.getTagByName(tagName);
+          
+          if (!tag) {
+            // Create the tag if it doesn't exist
+            tag = await this.storage.createTag({
+              name: tagName,
+              type: "user",
+              count: 0
+            });
+          }
+          
+          // Associate tag with bookmark
+          await this.storage.addTagToBookmark(bookmark.id, tag.id);
+          
+          // Increment tag count
+          await this.storage.incrementTagCount(tag.id);
+        }
+      } catch (error) {
+        console.error("Error adding tags:", error);
+      }
+    }
+
+    // Add notes if provided
+    if (options.notes) {
+      try {
+        const note = await this.storage.createNote({
+          bookmark_id: bookmark.id,
+          text: options.notes,
+          timestamp: new Date()
+        });
+        
+        // Create activity for note
+        await this.storage.createActivity({
+          bookmark_id: bookmark.id,
+          bookmark_title: bookmark.title,
+          type: "note_added",
+          content: options.notes,
+          timestamp: new Date()
+        });
+      } catch (error) {
+        console.error("Error adding notes:", error);
+      }
+    }
+
+    // Add screenshot if provided
+    if (options.screenshotUrl) {
+      try {
+        await this.storage.createScreenshot({
+          bookmark_id: bookmark.id,
+          url: options.screenshotUrl,
+          timestamp: new Date()
+        });
+        
+        // Create activity for screenshot
+        await this.storage.createActivity({
+          bookmark_id: bookmark.id,
+          bookmark_title: bookmark.title,
+          type: "screenshot_added",
+          timestamp: new Date()
+        });
+      } catch (error) {
+        console.error("Error adding screenshot:", error);
+      }
+    }
+
+    // Add highlights if provided
+    if (options.highlights && options.highlights.length > 0) {
+      try {
+        for (const highlight of options.highlights) {
+          await this.storage.createHighlight({
+            bookmark_id: bookmark.id,
+            quote: highlight.quote,
+            note: highlight.noteText || null,
+            timestamp: new Date()
+          });
+          
+          // Create activity for highlight
+          await this.storage.createActivity({
+            bookmark_id: bookmark.id,
+            bookmark_title: bookmark.title,
+            type: "highlight_added",
+            content: highlight.quote,
+            timestamp: new Date()
+          });
+        }
+      } catch (error) {
+        console.error("Error adding highlights:", error);
+      }
+    }
+
+    return {
+      bookmark,
+      isExisting: false
+    };
+  }
+
+  /**
+   * Deletes a bookmark and all its associated data
+   */
+  async deleteBookmark(bookmarkId: string) {
+    // Check if bookmark exists
+    const bookmark = await this.storage.getBookmark(bookmarkId);
+    if (!bookmark) {
+      throw new Error("Bookmark not found");
+    }
+
+    // Get all tags associated with this bookmark
+    const tags = await this.storage.getTagsByBookmarkId(bookmarkId);
+    
+    // Remove tag associations and decrement counts
+    for (const tag of tags) {
+      await this.storage.removeTagFromBookmark(bookmarkId, tag.id);
+      await this.storage.decrementTagCount(tag.id);
+    }
+
+    // Delete the bookmark
+    await this.storage.deleteBookmark(bookmarkId);
+    
+    return true;
+  }
+
+  /**
+   * Updates a bookmark with new data
+   */
+  async updateBookmark(bookmarkId: string, updateData: Partial<BookmarkCreationOptions>) {
+    // Check if bookmark exists
+    const bookmark = await this.storage.getBookmark(bookmarkId);
+    if (!bookmark) {
+      throw new Error("Bookmark not found");
+    }
+
+    // Prepare update data for database
+    const bookmarkUpdateData: Partial<InsertBookmark> = {};
+    
+    // Update basic properties
+    if (updateData.title) bookmarkUpdateData.title = updateData.title;
+    if (updateData.description) bookmarkUpdateData.description = updateData.description;
+    
+    // Update URL if provided (with normalization)
+    if (updateData.url) {
+      const urlResult = await this.processUrl(updateData.url);
+      bookmarkUpdateData.url = urlResult.normalized;
+    }
+
+    // Update bookmark record
+    const updatedBookmark = await this.storage.updateBookmark(bookmarkId, bookmarkUpdateData);
+    
+    // Update tags if provided
+    if (updateData.tags) {
+      // Get current tags
+      const currentTags = await this.storage.getTagsByBookmarkId(bookmarkId);
+      
+      // Remove existing tag associations
+      for (const tag of currentTags) {
+        await this.storage.removeTagFromBookmark(bookmarkId, tag.id);
+        await this.storage.decrementTagCount(tag.id);
+      }
+      
+      // Add new tags
+      for (const tagName of updateData.tags) {
+        // First check if the tag already exists
+        let tag = await this.storage.getTagByName(tagName);
+        
+        if (!tag) {
+          // Create the tag if it doesn't exist
+          tag = await this.storage.createTag({
+            name: tagName,
+            type: "user",
+            count: 0
+          });
+        }
+        
+        // Associate tag with bookmark
+        await this.storage.addTagToBookmark(bookmarkId, tag.id);
+        
+        // Increment tag count
+        await this.storage.incrementTagCount(tag.id);
+      }
+    }
+    
+    // If notes are provided, add them as a new note
+    if (updateData.notes) {
+      await this.storage.createNote({
+        bookmark_id: bookmarkId,
+        text: updateData.notes,
+        timestamp: new Date()
+      });
+    }
+
+    return updatedBookmark;
+  }
+}
+
+// Export a singleton instance
+export const bookmarkService = new BookmarkService(storage);
