@@ -275,11 +275,16 @@ export default function GraphView() {
           onSelectBookmark={handleSelectBookmark}
           onCloseDetail={() => {
             setSelectedBookmarkId(null);
-            // Immediately center the full graph when focus is cleared
+            
+            // Only trigger zoom-out when explicitly closing detail view
+            // with no new selection being made
             setTimeout(() => {
-              const event = new CustomEvent('centerFullGraph');
+              // This event will be handled by the graph component to reset view
+              const event = new CustomEvent('centerFullGraph', { 
+                detail: { source: 'closeDetail' } 
+              });
               document.dispatchEvent(event);
-            }, 10);
+            }, 50);
           }}
           isLoading={isLoading}
         />
