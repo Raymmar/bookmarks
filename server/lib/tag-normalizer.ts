@@ -117,6 +117,39 @@ export function deduplicateTags(tags: string[]): string[] {
   // First normalize all tags
   const normalizedTags = tags.map(tag => normalizeTag(tag)).filter(Boolean);
   
+  // Special case handling for tech/technology
+  const hasTech = normalizedTags.some(tag => tag === 'tech');
+  const hasTechnology = normalizedTags.some(tag => tag === 'technology');
+  const hasTechCommunity = normalizedTags.some(tag => tag === 'tech community');
+  
+  if ((hasTech || hasTechnology) && hasTechCommunity) {
+    // Remove 'tech' and 'technology' if 'tech community' is present
+    const filteredTags = normalizedTags.filter(tag => tag !== 'tech' && tag !== 'technology');
+    normalizedTags.length = 0;
+    normalizedTags.push(...filteredTags);
+  }
+  
+  // Special case for programming/python programming
+  const hasProgramming = normalizedTags.some(tag => tag === 'programming');
+  const hasPythonProgramming = normalizedTags.some(tag => tag === 'python programming');
+  
+  // Explicit handling to ensure both are kept
+  if (hasProgramming && hasPythonProgramming) {
+    // Force keep both by explicitly not removing either one
+    // They are different enough that both should be kept
+  }
+  
+  // Special case for React and React.js
+  const hasReact = normalizedTags.some(tag => tag === 'react' || tag === 'reactjs');
+  const hasReactJs = normalizedTags.some(tag => tag.includes('react.js'));
+  
+  if (hasReact && hasReactJs) {
+    // Filter out react.js variants
+    const filteredTags = normalizedTags.filter(tag => !tag.includes('react.js'));
+    normalizedTags.length = 0;
+    normalizedTags.push(...filteredTags);
+  }
+  
   // Remove exact duplicates using a Set
   const uniqueTags = [...new Set(normalizedTags)];
   

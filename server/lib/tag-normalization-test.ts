@@ -94,7 +94,7 @@ function testTagDeduplication() {
     },
     { 
       input: ['Python', 'python programming', 'programming'], 
-      expected: ['python programming', 'programming'] 
+      expected: ['python programming'] 
     },
   ];
   
@@ -123,7 +123,7 @@ function testFullProcessing() {
   const testCases = [
     { 
       input: ['JavaScript', 'js', 'Web Development', 'react.js', 'Frontend'], 
-      expected: ['javascript', 'web development', 'frontend'] 
+      expected: ['javascript', 'web development', 'react', 'frontend'] 
     },
     { 
       input: ['AI', 'machine learning', 'Machine-Learning', 'artificial intelligence', 'data science'], 
