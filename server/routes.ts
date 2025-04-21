@@ -885,5 +885,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Settings API endpoints
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const settings = await storage.getSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error retrieving settings:", error);
+      res.status(500).json({ error: "Failed to retrieve settings" });
+    }
+  });
+  
+  app.get("/api/settings/:key", async (req, res) => {
+    try {
+      const setting = await storage.getSetting(req.params.key);
+      
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      
+      res.json(setting);
+    } catch (error) {
+      console.error("Error retrieving setting:", error);
+      res.status(500).json({ error: "Failed to retrieve setting" });
+    }
+  });
+  
+  app.post("/api/settings", async (req, res) => {
+    try {
+      const parsedData = insertSettingSchema.safeParse(req.body);
+      
+      if (!parsedData.success) {
+        return res.status(400).json({ error: "Invalid setting data", details: parsedData.error });
+      }
+      
+      // Check if setting already exists
+      const existingSetting = await storage.getSetting(parsedData.data.key);
+      
+      if (existingSetting) {
+        // Update existing setting
+        const updatedSetting = await storage.updateSetting(existingSetting.key, parsedData.data.value);
+        return res.status(200).json(updatedSetting);
+      }
+      
+      // Create new setting
+      const newSetting = await storage.createSetting(parsedData.data);
+      
+      res.status(201).json(newSetting);
+    } catch (error) {
+      console.error("Error creating setting:", error);
+      res.status(500).json({ error: "Failed to create setting" });
+    }
+  });
+  
+  app.patch("/api/settings/:key", async (req, res) => {
+    try {
+      if (!req.body.value) {
+        return res.status(400).json({ error: "Missing value field in request body" });
+      }
+      
+      const setting = await storage.getSetting(req.params.key);
+      
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      
+      const updatedSetting = await storage.updateSetting(req.params.key, req.body.value);
+      res.json(updatedSetting);
+    } catch (error) {
+      console.error("Error updating setting:", error);
+      res.status(500).json({ error: "Failed to update setting" });
+    }
+  });
+  
+  app.delete("/api/settings/:key", async (req, res) => {
+    try {
+      const setting = await storage.getSetting(req.params.key);
+      
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      
+      await storage.deleteSetting(req.params.key);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting setting:", error);
+      res.status(500).json({ error: "Failed to delete setting" });
+    }
+  });
+
   return httpServer;
 }
