@@ -258,6 +258,52 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     
     if (nodes.length === 0) return;
     
+    // For small sets of nodes (focus mode), ensure organic layout by modifying simulation
+    if (nodes.length <= 10 && simulationRef.current) {
+      // Get all nodes in the simulation
+      const allNodes = simulationRef.current.nodes();
+      
+      // Create a Set of IDs for nodes in our focus set
+      const focusNodeIds = new Set(nodes.map(n => n.id));
+      
+      // Adjust forces for better focus view display
+      allNodes.forEach(node => {
+        // If this node is in our focus set
+        if (focusNodeIds.has(node.id)) {
+          // For focus nodes, remove any fixed positions to allow natural placement
+          node.fx = null;
+          node.fy = null;
+        } else {
+          // For non-focus nodes, make them less influential (increase charge repulsion)
+          // This will push them away from our focus area
+          if (node.type === "bookmark") {
+            // Push other bookmarks far away
+            node.fx = node.x ? node.x + (Math.random() - 0.5) * 2000 : null;
+            node.fy = node.y ? node.y + (Math.random() - 0.5) * 2000 : null;
+          }
+        }
+      });
+      
+      // Update force parameters for more organic small-group layout
+      simulationRef.current
+        .force("charge", d3.forceManyBody().strength(nodes.length <= 3 ? -150 : -200))
+        .force("link", d3.forceLink<GraphNode, GraphLink>().id(d => d.id).distance(d => {
+          // Use smaller distances for small node sets
+          if (d.type === "domain") return 60; 
+          if (d.type === "tag") return 70;
+          if (d.type === "related") return 50;
+          return 60;
+        }).strength(0.7)) // Stronger links for more structure
+        .force("collision", d3.forceCollide().radius(d => {
+          // Slightly increased collision radius for better spacing
+          if (d.type === "bookmark") return 45;
+          if (d.type === "domain") return 35;
+          return 25;
+        }))
+        .alpha(0.3) // Partial reset of simulation
+        .restart(); // Restart simulation to apply new forces
+    }
+    
     // Calculate bounding box of all nodes
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     
@@ -274,7 +320,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     if (minX === Infinity || minY === Infinity) return;
     
     // Add padding - use more padding for fewer nodes to make the view more comfortable
-    const padding = Math.max(30, Math.min(100, 100 - nodes.length * 2));
+    const padding = Math.max(40, Math.min(120, 100 - nodes.length * 2));
     minX -= padding;
     maxX += padding;
     minY -= padding;
@@ -411,22 +457,51 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     };
     
-    // Create the force simulation
+    // Adjust forces based on node count for better organic layout
+    const isFewNodes = nodes.length <= 10;
+    
+    // Create the force simulation with adaptive parameters
     const simulation = d3.forceSimulation<GraphNode>(nodes)
       .force("link", d3.forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(d => {
-        // Adjust link distance by type
-        if (d.type === "domain") return 80;
-        if (d.type === "tag") return 100;
-        if (d.type === "related") return 60;
-        return 70;
-      }))
-      .force("charge", d3.forceManyBody().strength(-150))
-      .force("center", d3.forceCenter(width / 2, height / 2))
+        // Adjust link distance by type and node count
+        if (isFewNodes) {
+          // For smaller graphs, use shorter, more uniform distances for better organic layout
+          if (d.type === "domain") return 60; 
+          if (d.type === "tag") return 70;
+          if (d.type === "related") return 55;
+          return 65;
+        } else {
+          // For larger graphs, use diverse distances for better categorization
+          if (d.type === "domain") return 80;
+          if (d.type === "tag") return 100;
+          if (d.type === "related") return 60;
+          return 70;
+        }
+      }).strength(isFewNodes ? 0.7 : 0.2)) // Stronger links for small graphs
+      
+      // More repulsion for small node sets to avoid clustering
+      .force("charge", d3.forceManyBody().strength(isFewNodes ? -200 : -150))
+      
+      // Center force - stronger for small graphs to keep them centered
+      .force("center", d3.forceCenter(width / 2, height / 2).strength(isFewNodes ? 0.2 : 0.1))
+      
+      // Additional forces for small groups to allow more natural organic layout
+      .force("x", d3.forceX(width / 2).strength(isFewNodes ? 0.03 : 0.01))
+      .force("y", d3.forceY(height / 2).strength(isFewNodes ? 0.03 : 0.01))
+      
+      // Collision avoidance - more space for small graphs for better visibility
       .force("collision", d3.forceCollide().radius(d => {
-        // Adjust node size based on type
-        if (d.type === "bookmark") return 40;
-        if (d.type === "domain") return 30;
-        return 20;
+        if (isFewNodes) {
+          // More spacing in small graphs
+          if (d.type === "bookmark") return 45;
+          if (d.type === "domain") return 35;
+          return 30;
+        } else {
+          // Normal spacing for large graphs
+          if (d.type === "bookmark") return 40;
+          if (d.type === "domain") return 30;
+          return 20;
+        }
       }));
     
     // Store simulation reference for later updates
@@ -598,20 +673,35 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     // Implement drag behavior
     function dragstarted(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
+      // Temporarily fix position during drag
       event.subject.fx = event.subject.x;
       event.subject.fy = event.subject.y;
     }
     
     function dragged(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
+      // Update position during drag
       event.subject.fx = event.x;
       event.subject.fy = event.y;
     }
     
     function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>) {
       if (!event.active) simulation.alphaTarget(0);
-      // Don't release nodes after drag to maintain layout
-      // event.subject.fx = null;
-      // event.subject.fy = null;
+      
+      // Check if we're in a focused view (small number of nodes)
+      const isFocusedView = simulationRef.current && 
+                           simulationRef.current.nodes().length <= 10;
+      
+      if (isFocusedView) {
+        // In focus mode, release the node to allow organic positioning
+        event.subject.fx = null;
+        event.subject.fy = null;
+        
+        // Give the simulation a slight kick to adjust the layout
+        simulation.alpha(0.1).restart();
+      } else {
+        // In normal mode, maintain the position to avoid chaos with many nodes
+        // The node remains fixed where it was dropped
+      }
     }
     
     // Setup zoom functionality
