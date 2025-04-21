@@ -1005,12 +1005,13 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
 
     // Adjust force parameters based on node count - much gentler for small node counts
     const linkDistance = (d: any) => {
-      // For small node counts, use much smaller distances to prevent stretching
+      // For small node counts, use extremely tight distances to prevent stretching
       if (newGraphData.nodes.length <= 10) {
-        if (d.type === "domain") return 30;
-        if (d.type === "tag") return 40;
-        if (d.type === "related") return 25;
-        return 35;
+        // Extremely short distances for few nodes to keep them tightly clustered
+        if (d.type === "domain") return 10;
+        if (d.type === "tag") return 12;
+        if (d.type === "related") return 10;
+        return 10;
       } else {
         // Normal distances for larger node counts
         if (d.type === "domain") return 80;
@@ -1021,11 +1022,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     };
     
     // Calculate appropriate repulsion force based on node count
-    // Less repulsion for fewer nodes to prevent them from flying apart
-    const repulsionStrength = newGraphData.nodes.length <= 10 ? -100 : -300;
+    // Dramatically reduce repulsion for fewer nodes to prevent them from flying apart
+    const repulsionStrength = newGraphData.nodes.length <= 10 ? -30 : -300;
     
-    // Stronger centering force for small node counts to keep them more centered
-    const centeringForceStrength = newGraphData.nodes.length <= 10 ? 0.3 : 0.05;
+    // Much stronger centering force for small node counts to keep them tightly clustered
+    const centeringForceStrength = newGraphData.nodes.length <= 10 ? 0.7 : 0.05;
     
     // Update the simulation with the appropriate forces
     simulationRef.current
@@ -1033,9 +1034,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
         .id(d => d.id)
         .distance(linkDistance)
-        .strength(newGraphData.nodes.length <= 10 ? 0.5 : 0.2)) // Stronger link forces for small node sets
+        .strength(newGraphData.nodes.length <= 10 ? 0.8 : 0.2)) // Much stronger link forces for small node sets
       .force("charge", d3.forceManyBody().strength(repulsionStrength))
-      .force("center", d3.forceCenter(width / 2, height / 2).strength(newGraphData.nodes.length <= 10 ? 0.2 : 0.1))
+      .force("center", d3.forceCenter(width / 2, height / 2).strength(newGraphData.nodes.length <= 10 ? 0.6 : 0.1)) // Stronger center force
       .force("x", d3.forceX(width / 2).strength(centeringForceStrength))
       .force("y", d3.forceY(height / 2).strength(centeringForceStrength))
       .force("collision", d3.forceCollide().radius(d => {
