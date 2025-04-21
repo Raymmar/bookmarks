@@ -24,8 +24,13 @@ interface GraphData {
   links: GraphLink[];
 }
 
+// Add interface for bookmarks with tags
+interface BookmarkWithTags extends Bookmark {
+  tags?: { id: string; name: string; type: string; count: number }[];
+}
+
 interface ForceDirectedGraphProps {
-  bookmarks: Bookmark[];
+  bookmarks: (Bookmark | BookmarkWithTags)[];
   insightLevel: number;
   onNodeClick: (bookmarkId: string) => void;
   onTagClick?: (tag: string) => void;
@@ -107,8 +112,21 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         existingLinkIds.add(domainLinkId);
       }
       
-      // Add tags
-      const tags = [...(bookmark.user_tags || []), ...(bookmark.system_tags || [])];
+      // Add tags from bookmarksWithTags if available
+      // Since bookmarks in the props don't include the normalized tags directly,
+      // we need to extract tags from system_tags and fetch normalized tags separately
+      
+      // First, add system tags
+      const systemTags = bookmark.system_tags || [];
+      
+      // Then check if the bookmark has a 'tags' property (from bookmarksWithTags)
+      const normalizedTags = (bookmark as BookmarkWithTags).tags ? 
+        (bookmark as BookmarkWithTags).tags.map(tag => tag.name) : [];
+      
+      // Combine all tags
+      const tags = [...normalizedTags, ...systemTags];
+      
+      // Add each tag to the graph
       tags.forEach(tag => {
         const tagId = `tag-${tag}`;
         
