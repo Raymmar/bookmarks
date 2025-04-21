@@ -76,9 +76,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       const group = tagGroups[primaryTag];
       
       // Add the main bookmark node
-      // Use consistent prefixed ID format for bookmark nodes (bookmark-id)
       nodes.push({
-        id: `bookmark-${bookmark.id}`,
+        id: bookmark.id,
         name: bookmark.title,
         group,
         bookmarkId: bookmark.id,
@@ -98,10 +97,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         });
       }
       
-      // Connect bookmark to its domain - use the prefixed IDs for consistency
+      // Connect bookmark to its domain
       links.push({
         id: `link-${bookmark.id}-${domain}`,
-        source: `bookmark-${bookmark.id}`,
+        source: bookmark.id,
         target: `domain-${domain}`,
         value: 2,
         type: "domain"
@@ -131,10 +130,10 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           });
         }
         
-        // Connect bookmark to tag - use prefixed IDs
+        // Connect bookmark to tag
         links.push({
           id: `link-${bookmark.id}-tag-${tag}`,
-          source: `bookmark-${bookmark.id}`,
+          source: bookmark.id,
           target: `tag-${tag}`,
           value: 1,
           type: "tag"
@@ -173,7 +172,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           
           links.push({
             id: `link-${bookmark.id}-${relatedId}`,
-            source: `bookmark-${bookmark.id}`,
+            source: bookmark.id,
             target: relatedId,
             value: 2,
             type: "related"
@@ -195,8 +194,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
             bookmarkB.insights?.related_links?.some(link => link.includes(bookmarkA.url))) {
           links.push({
             id: `link-ref-${bookmarkA.id}-${bookmarkB.id}`,
-            source: `bookmark-${bookmarkA.id}`,
-            target: `bookmark-${bookmarkB.id}`,
+            source: bookmarkA.id,
+            target: bookmarkB.id,
             value: 3,
             type: "content"
           });
@@ -411,20 +410,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   const centerOnNode = useCallback((nodeId: string) => {
     if (!simulationRef.current || !svgRef.current || !graphDataRef.current) return;
     
-    // First, try to find the node with the exact ID
-    let nodeData = simulationRef.current.nodes().find(n => n.id === nodeId);
-    
-    // If not found and it's a bookmark ID without prefix, try with the prefix
-    if (!nodeData && !nodeId.includes('-')) {
-      const prefixedId = `bookmark-${nodeId}`;
-      nodeData = simulationRef.current.nodes().find(n => n.id === prefixedId);
-      console.log(`Found node in simulation: ${prefixedId}, type: ${nodeData?.type}`);
-    }
-    
-    if (!nodeData) {
-      console.warn(`Could not find node to center: ${nodeId}`);
-      return;
-    }
+    const nodeData = simulationRef.current.nodes().find(n => n.id === nodeId);
+    if (!nodeData) return;
     
     // Check if we need to redraw the graph or just pan to the node
     // Find the node's position
@@ -879,19 +866,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       // Update visual selection
       setSelectedNode(nodeId);
       
-      // IMPORTANT: For all node selections, whether from graph click or bookmark card,
-      // use a unified approach to ensure consistent behavior
-      
-      // If it's a bookmark node, extract the ID and use it for the selectedBookmarkId effect
-      if (nodeId.startsWith('bookmark-')) {
-        const bookmarkId = nodeId.replace('bookmark-', '');
-        // Using onNodeClick will update the selectedBookmarkId prop which triggers
-        // the rich zoom/focus effect in the useEffect for selectedBookmarkId
-        onNodeClick(bookmarkId);
-      } else {
-        // Only for non-bookmark nodes (tags, domains), use centerOnNode
-        centerOnNode(nodeId);
-      }
+      // Center the graph on the selected node
+      centerOnNode(nodeId);
     };
     
     // Handle tag changed events from other components
@@ -987,7 +963,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       document.removeEventListener('centerFullGraph', handleCenterFullGraph);
       document.removeEventListener('tagChanged', handleTagChanged);
     };
-  }, [centerOnNode, getNodeColor, centerGraph, updateGraphData, onNodeClick, selectedBookmarkId]);
+  }, [centerOnNode, getNodeColor, centerGraph, updateGraphData]);
   
   // Update selected node visually without redrawing graph
   useEffect(() => {
