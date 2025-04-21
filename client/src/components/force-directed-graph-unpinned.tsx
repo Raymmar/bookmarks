@@ -879,7 +879,19 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       // Update visual selection
       setSelectedNode(nodeId);
       
-      // Center the graph on the selected node
+      // If this is a bookmark node and coming from a sidebar selection,
+      // extract the bookmark ID and set the selectedBookmarkId prop
+      // This will trigger the same zoom behavior used when clicking directly in the graph
+      if (nodeId.startsWith('bookmark-') && customEvent.detail.source === 'bookmarkSelection') {
+        const bookmarkId = nodeId.replace('bookmark-', '');
+        // Check if this is different from the current selection to avoid double zooming
+        if (selectedBookmarkId !== bookmarkId) {
+          onNodeClick(bookmarkId);
+          return; // Let the selectedBookmarkId effect handle the centering
+        }
+      }
+      
+      // For other node types or sources (tags, domains), use centerOnNode
       centerOnNode(nodeId);
     };
     
@@ -976,7 +988,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       document.removeEventListener('centerFullGraph', handleCenterFullGraph);
       document.removeEventListener('tagChanged', handleTagChanged);
     };
-  }, [centerOnNode, getNodeColor, centerGraph, updateGraphData]);
+  }, [centerOnNode, getNodeColor, centerGraph, updateGraphData, onNodeClick, selectedBookmarkId]);
   
   // Update selected node visually without redrawing graph
   useEffect(() => {
