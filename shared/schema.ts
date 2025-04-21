@@ -5,7 +5,7 @@ import { z } from "zod";
 // Chat Sessions table for persistent chat
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
-  title: text("title").notNull().default("New Chat"),
+  title: text("title").default("New Chat"), // Making this nullable to fix the type error
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
   filters: jsonb("filters") // Stores the filter settings for this chat session

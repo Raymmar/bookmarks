@@ -666,5 +666,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Chat Sessions API endpoints
+  app.get("/api/chat/sessions", async (req, res) => {
+    try {
+      const sessions = await storage.getChatSessions();
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve chat sessions" });
+    }
+  });
+
+  app.get("/api/chat/sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getChatSession(req.params.id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve chat session" });
+    }
+  });
+
+  app.post("/api/chat/sessions", async (req, res) => {
+    try {
+      const parsedData = insertChatSessionSchema.safeParse(req.body);
+      
+      if (!parsedData.success) {
+        return res.status(400).json({ 
+          error: "Invalid chat session data", 
+          details: parsedData.error 
+        });
+      }
+      
+      const session = await storage.createChatSession(parsedData.data);
+      res.status(201).json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create chat session" });
+    }
+  });
+
+  app.patch("/api/chat/sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getChatSession(req.params.id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      const updatedSession = await storage.updateChatSession(req.params.id, req.body);
+      res.json(updatedSession);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update chat session" });
+    }
+  });
+
+  app.delete("/api/chat/sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getChatSession(req.params.id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      await storage.deleteChatSession(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete chat session" });
+    }
+  });
+
+  // Chat Messages API endpoints
+  app.get("/api/chat/sessions/:sessionId/messages", async (req, res) => {
+    try {
+      const messages = await storage.getChatMessagesBySessionId(req.params.sessionId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve chat messages" });
+    }
+  });
+
+  app.post("/api/chat/sessions/:sessionId/messages", async (req, res) => {
+    try {
+      // First verify the session exists
+      const session = await storage.getChatSession(req.params.sessionId);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      const parsedData = insertChatMessageSchema.safeParse({
+        ...req.body,
+        session_id: req.params.sessionId
+      });
+      
+      if (!parsedData.success) {
+        return res.status(400).json({ 
+          error: "Invalid chat message data", 
+          details: parsedData.error 
+        });
+      }
+      
+      const message = await storage.createChatMessage(parsedData.data);
+      res.status(201).json(message);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create chat message" });
+    }
+  });
+
+  // AI Chat route for generating responses
+  app.post("/api/chat/generate", async (req, res) => {
+    try {
+      const { message, filters, sessionId } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      
+      // Generate a response from the AI
+      const response = await generateChatResponse(message, filters);
+      
+      // If a session ID is provided, save the conversation
+      if (sessionId) {
+        // Save the user message
+        await storage.createChatMessage({
+          session_id: sessionId,
+          content: message,
+          role: "user"
+        });
+        
+        // Save the AI response
+        await storage.createChatMessage({
+          session_id: sessionId,
+          content: response,
+          role: "assistant"
+        });
+        
+        // Update session with filters if they were provided
+        if (filters) {
+          await storage.updateChatSession(sessionId, { filters });
+        }
+      }
+      
+      res.json({ response });
+    } catch (error) {
+      console.error("Error generating chat response:", error);
+      res.status(500).json({ error: "Failed to generate chat response" });
+    }
+  });
+
   return httpServer;
 }
