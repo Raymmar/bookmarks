@@ -91,7 +91,7 @@ export function SidebarPanel({
               <BookmarkCard
                 key={bookmark.id}
                 bookmark={bookmark}
-                isSelected={false}
+                isSelected={selectedBookmark ? selectedBookmark.id === bookmark.id : false}
                 onClick={() => onSelectBookmark(bookmark.id)}
               />
             ))}
