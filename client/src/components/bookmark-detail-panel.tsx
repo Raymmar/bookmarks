@@ -189,6 +189,22 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 
                 // Log that we've updated everything optimistically
                 console.log("Optimistically updated bookmark with insights and tags from AI processing");
+                
+                // Notify the graph about the new tags for immediate visual updates
+                if (tagsData && Array.isArray(tagsData)) {
+                  tagsData.forEach(tag => {
+                    // Dispatch a custom event for each tag to update the graph
+                    const event = new CustomEvent('tagChanged', { 
+                      detail: { 
+                        bookmarkId: bookmark.id,
+                        tagId: tag.id,
+                        tagName: tag.name,
+                        action: 'add'
+                      } 
+                    });
+                    document.dispatchEvent(event);
+                  });
+                }
               } catch (error) {
                 console.error("Error fetching insights or tags after processing:", error);
               }
