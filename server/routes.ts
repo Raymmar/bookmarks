@@ -10,6 +10,7 @@ import {
   insertTagSchema, insertBookmarkTagSchema, 
   insertChatSessionSchema, insertChatMessageSchema
 } from "@shared/schema";
+import { normalizeUrl, areUrlsEquivalent, removeTrackingParameters } from "@shared/url-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -67,6 +68,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const bookmarkData = parsedData.data;
+      
+      // Clean and normalize the URL to prevent duplicates
+      if (bookmarkData.url) {
+        // First remove any tracking parameters
+        const cleanUrl = removeTrackingParameters(bookmarkData.url);
+        // Then normalize the URL (remove www, standardize protocol, etc)
+        const normalizedUrl = normalizeUrl(cleanUrl);
+        
+        console.log(`URL normalization: Original: ${bookmarkData.url}, Normalized: ${normalizedUrl}`);
+        
+        // Check if a bookmark with this normalized URL already exists
+        const bookmarks = await storage.getBookmarks();
+        const existingBookmark = bookmarks.find(bookmark => 
+          areUrlsEquivalent(bookmark.url, normalizedUrl)
+        );
+        
+        if (existingBookmark) {
+          console.log(`Found existing bookmark with equivalent URL: ${existingBookmark.id}`);
+          // Return the existing bookmark instead of creating a duplicate
+          return res.status(200).json({
+            ...existingBookmark,
+            message: "URL already exists in bookmarks",
+            existingBookmarkId: existingBookmark.id
+          });
+        }
+        
+        // Update the URL to the normalized version
+        bookmarkData.url = normalizedUrl;
+      }
       
       // Extract metadata if URL is provided but no title/description
       if (bookmarkData.url && (!bookmarkData.title || !bookmarkData.description)) {
@@ -407,6 +437,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(activities);
     } catch (error) {
       res.status(500).json({ error: "Failed to retrieve activities" });
+    }
+  });
+
+  // URL Processing endpoint for checking duplicates
+  app.post("/api/url/normalize", async (req, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+      
+      // Remove tracking parameters
+      const cleanUrl = removeTrackingParameters(url);
+      // Normalize the URL
+      const normalizedUrl = normalizeUrl(cleanUrl);
+      
+      // Check if a bookmark with this normalized URL already exists
+      const bookmarks = await storage.getBookmarks();
+      const existingBookmark = bookmarks.find(bookmark => 
+        areUrlsEquivalent(bookmark.url, normalizedUrl)
+      );
+      
+      if (existingBookmark) {
+        // Return existence info along with normalized URL
+        return res.json({
+          original: url,
+          normalized: normalizedUrl,
+          exists: true,
+          existingBookmarkId: existingBookmark.id
+        });
+      } else {
+        // Just return the normalized URL
+        return res.json({
+          original: url,
+          normalized: normalizedUrl,
+          exists: false
+        });
+      }
+    } catch (error) {
+      console.error("Error normalizing URL:", error);
+      res.status(500).json({ error: "Failed to normalize URL" });
     }
   });
 
