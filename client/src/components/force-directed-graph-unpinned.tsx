@@ -92,9 +92,11 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       // If focusing on a bookmark and this isn't related, skip it
       if (focusBookmarkId && !relatedBookmarkIds.has(bookmark.id)) return;
       
-      // Determine group based on system_tags or source if no tags
-      // Note: user_tags have been migrated to a normalized tag system
-      const primaryTag = bookmark.system_tags?.[0] || bookmark.source;
+      // Determine group based on normalized tags or source if no tags
+      // Get the first tag or use the source as a fallback
+      const primaryTag = bookmark.tags && bookmark.tags.length > 0 
+        ? bookmark.tags[0].name 
+        : bookmark.source;
       
       if (!tagGroups[primaryTag]) {
         tagGroups[primaryTag] = groupCounter++;
@@ -136,14 +138,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       // Create tag nodes and connect bookmark to its tags
       // Tags come from bookmark.tags in the normalized system
       const allTags = bookmark.tags ? bookmark.tags.map(tag => tag.name) : [];
-      // Also include system tags as a fallback
-      if (bookmark.system_tags) {
-        bookmark.system_tags.forEach(tag => {
-          if (!allTags.includes(tag)) {
-            allTags.push(tag);
-          }
-        });
-      }
+      // Only use normalized tags from the tags table
       
       allTags.forEach(tag => {
         // Create tag node if not exists
