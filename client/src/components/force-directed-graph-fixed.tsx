@@ -28,9 +28,11 @@ interface ForceDirectedGraphProps {
   bookmarks: Bookmark[];
   insightLevel: number;
   onNodeClick: (bookmarkId: string) => void;
+  onTagClick?: (tag: string) => void;
+  onDomainClick?: (domain: string) => void;
 }
 
-export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: ForceDirectedGraphProps): JSX.Element {
+export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTagClick, onDomainClick }: ForceDirectedGraphProps): JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
@@ -540,8 +542,16 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       if (matchingBookmark) {
         onNodeClick(matchingBookmark.id);
       }
+    } else if (d.type === "tag" && onTagClick) {
+      // Extract tag name from the node ID (format is "tag-{tagName}")
+      const tagName = d.name;
+      onTagClick(tagName);
+    } else if (d.type === "domain" && onDomainClick) {
+      // Extract domain name from the node ID (format is "domain-{domainName}")
+      const domainName = d.name;
+      onDomainClick(domainName);
     }
-  }, [bookmarks, onNodeClick, centerOnNode]);
+  }, [bookmarks, onNodeClick, onTagClick, onDomainClick, centerOnNode]);
   
   // Handle node hover effects
   const handleNodeHover = useCallback((event: MouseEvent, d: GraphNode, isEntering: boolean) => {
