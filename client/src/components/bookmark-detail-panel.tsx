@@ -220,8 +220,17 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
     setTags(prev => prev.filter(tag => tag.id !== tagId));
     
     try {
-      // Make the API request
-      await apiRequest("DELETE", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {});
+      // Make the API request using fetch directly to better handle empty responses
+      const response = await fetch(`/api/bookmarks/${bookmark.id}/tags/${tagId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
       
       toast({
         title: "Tag removed",
@@ -233,37 +242,23 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
-      queryClient.invalidateQueries(); // Force a complete refresh of all queries
-      
-      // Force a refresh of the tags for this bookmark
-      const refreshTags = async () => {
-        try {
-          const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
-          if (response.ok) {
-            const bookmarkTags = await response.json();
-            setTags(bookmarkTags);
-          }
-        } catch (error) {
-          console.error("Error refreshing tags for bookmark:", error);
-        }
-      };
-      
-      // Refresh tags after a short delay to ensure the server has processed the deletion
-      setTimeout(() => {
-        refreshTags();
-      }, 100);
       
       // Dispatch a custom event to notify the graph of the tag change
       const event = new CustomEvent('tagChanged', { 
         detail: { 
           bookmarkId: bookmark.id,
           tagId: tagId,
-          action: 'remove'
+          action: 'remove',
+          tagName: tagToRemove.name
         } 
       });
       document.dispatchEvent(event);
       
+      console.log(`Tag ${tagToRemove.name} (${tagId}) successfully removed from bookmark ${bookmark.id}`);
+      
     } catch (error) {
+      console.error("Error removing tag:", error);
+      
       // Revert the optimistic update on error
       if (tagToRemove) {
         setTags(prev => [...prev, tagToRemove]);
@@ -312,10 +307,28 @@ export function BookmarkDetailPanel({ bookmark, onClose }: BookmarkDetailPanelPr
         description: "Your note was successfully added to the bookmark",
       });
       
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/notes`] });
+      
+      // Dispatch a custom event for potential event listeners
+      const event = new CustomEvent('noteAdded', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          noteId: createdNote.id,
+          text: createdNote.text
+        } 
+      });
+      document.dispatchEvent(event);
+      
+      console.log(`Note "${createdNote.text.substring(0, 30)}..." successfully added to bookmark ${bookmark.id}`);
+      
       setNewNote("");
       setIsAddingNote(false);
       
     } catch (error) {
+      console.error("Error adding note:", error);
+      
       // Remove the optimistic note on error
       setOptimisticNotes(prev => prev.filter(note => note.id !== tempId));
       
