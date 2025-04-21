@@ -36,14 +36,11 @@ export default function GraphView() {
   const handleSelectBookmark = (id: string) => {
     setSelectedBookmarkId(id);
     
-    // Find the bookmark node ID format that matches our graph component
-    const bookmarkNodeId = `bookmark-${id}`;
-    
     // Use a small delay to ensure the graph has updated
     setTimeout(() => {
       // Use custom event to notify the graph component to select and center this node
       const event = new CustomEvent('selectGraphNode', { 
-        detail: { nodeId: bookmarkNodeId } 
+        detail: { nodeId: id } 
       });
       document.dispatchEvent(event);
     }, 100);
