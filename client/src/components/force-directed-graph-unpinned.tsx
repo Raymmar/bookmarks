@@ -182,63 +182,12 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
     });
     
     // Second pass: content-based connections (semantic similarity)
-    // Connect bookmarks with similar content or from same source
+    // Only connect bookmarks if they reference each other in related links,
+    // but don't connect based on common domains or tags (spoke and post style)
     for (let i = 0; i < bookmarks.length; i++) {
       for (let j = i + 1; j < bookmarks.length; j++) {
         const bookmarkA = bookmarks[i];
         const bookmarkB = bookmarks[j];
-        
-        // Connect by common domain
-        const domainA = getDomain(bookmarkA.url);
-        const domainB = getDomain(bookmarkB.url);
-        
-        if (domainA === domainB) {
-          links.push({
-            id: `link-domain-${bookmarkA.id}-${bookmarkB.id}`,
-            source: bookmarkA.id,
-            target: bookmarkB.id,
-            value: 2,
-            type: "domain"
-          });
-        }
-        
-        // Connect by common tags with stronger connections for more matches
-        // Extract tag names from normalized tag objects
-        const tagsA: string[] = [];
-        if (bookmarkA.tags) {
-          bookmarkA.tags.forEach(tag => tagsA.push(tag.name));
-        }
-        if (bookmarkA.system_tags) {
-          bookmarkA.system_tags.forEach(tag => {
-            if (!tagsA.includes(tag)) {
-              tagsA.push(tag);
-            }
-          });
-        }
-        
-        const tagsB: string[] = [];
-        if (bookmarkB.tags) {
-          bookmarkB.tags.forEach(tag => tagsB.push(tag.name));
-        }
-        if (bookmarkB.system_tags) {
-          bookmarkB.system_tags.forEach(tag => {
-            if (!tagsB.includes(tag)) {
-              tagsB.push(tag);
-            }
-          });
-        }
-        
-        const commonTags = tagsA.filter(tag => tagsB.includes(tag));
-        
-        if (commonTags.length > 0) {
-          links.push({
-            id: `link-tags-${bookmarkA.id}-${bookmarkB.id}`,
-            source: bookmarkA.id,
-            target: bookmarkB.id,
-            value: Math.min(1 + commonTags.length, 5), // Cap at 5 for line thickness
-            type: "tag"
-          });
-        }
         
         // Connect bookmarks if they reference each other in related links
         if (bookmarkA.insights?.related_links?.some(link => link.includes(bookmarkB.url)) ||
