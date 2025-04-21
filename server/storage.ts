@@ -8,7 +8,8 @@ import {
   tags, Tag, InsertTag,
   bookmarkTags, BookmarkTag, InsertBookmarkTag,
   chatSessions, ChatSession, InsertChatSession,
-  chatMessages, ChatMessage, InsertChatMessage
+  chatMessages, ChatMessage, InsertChatMessage,
+  settings, Setting, InsertSetting
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -73,6 +74,13 @@ export interface IStorage {
   getChatMessagesBySessionId(sessionId: string): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   deleteChatMessagesBySessionId(sessionId: string): Promise<boolean>;
+  
+  // Settings
+  getSettings(): Promise<Setting[]>;
+  getSetting(key: string): Promise<Setting | undefined>;
+  createSetting(setting: InsertSetting): Promise<Setting>;
+  updateSetting(key: string, value: string): Promise<Setting | undefined>;
+  deleteSetting(key: string): Promise<boolean>;
 }
 
 // In-memory storage implementation as a fallback
@@ -91,6 +99,9 @@ export class MemStorage implements IStorage {
   private chatSessions: Map<string, ChatSession>;
   private chatMessages: Map<string, ChatMessage>;
   
+  // Settings
+  private settings: Map<string, Setting>;
+  
   constructor() {
     this.bookmarks = new Map();
     this.notes = new Map();
@@ -102,6 +113,7 @@ export class MemStorage implements IStorage {
     this.bookmarkTags = new Map();
     this.chatSessions = new Map();
     this.chatMessages = new Map();
+    this.settings = new Map();
   }
 
   // Bookmarks

@@ -98,6 +98,15 @@ export const bookmarkTags = pgTable("bookmark_tags", {
   tag_id: uuid("tag_id").references(() => tags.id, { onDelete: "cascade" }).notNull(),
 });
 
+// Settings table for user-configurable settings
+export const settings = pgTable("settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert Schemas
 export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
   id: true,
@@ -147,6 +156,12 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
   timestamp: true,
 });
 
+// Settings Schema
+export const insertSettingSchema = createInsertSchema(settings).omit({
+  id: true,
+  updated_at: true,
+});
+
 // Types
 export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
 export type Bookmark = typeof bookmarks.$inferSelect;
@@ -177,3 +192,6 @@ export type ChatSession = typeof chatSessions.$inferSelect;
 
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+export type InsertSetting = z.infer<typeof insertSettingSchema>;
+export type Setting = typeof settings.$inferSelect;
