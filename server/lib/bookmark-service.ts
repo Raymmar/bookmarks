@@ -116,6 +116,7 @@ export class BookmarkService {
   /**
    * Process AI-related data for a bookmark asynchronously
    * This is meant to be run after a bookmark is created
+   * Uses a simplified URL-direct approach to AI analysis
    */
   async processAiBookmarkData(
     bookmarkId: string, 
@@ -133,46 +134,65 @@ export class BookmarkService {
         return;
       }
       
-      // Skip if no content HTML
-      if (!content_html) {
-        console.log(`No content HTML available for bookmark ${bookmarkId}, skipping AI processing`);
+      // We'll process the URL directly even if no content HTML is available
+      // This is one of the key improvements in this version
+      if (!url) {
+        console.error(`No URL available for bookmark ${bookmarkId}, skipping AI processing`);
         return;
       }
       
-      // Process content to get clean text
-      console.log(`Processing HTML content for bookmark ${bookmarkId}`);
-      const processedContent = await processContent(content_html);
+      console.log(`Processing bookmark ${bookmarkId} for URL: ${url}`);
       
-      if (!processedContent || !processedContent.text) {
-        console.error(`Failed to process content for bookmark ${bookmarkId}`);
-        return;
-      }
-      
-      console.log(`Content processed successfully for ${bookmarkId}. Text length: ${processedContent.text.length}`);
-      
-      // Get system prompts
+      // Get system prompts to include in AI requests
       const systemPrompts = await this.getSystemPrompts();
+      console.log(`Retrieved system prompts for AI processing: ${JSON.stringify(systemPrompts, null, 2)}`);
       
+      // We use the URL directly for both insights and tag generation
       // Process tasks in parallel for efficiency
       const [embedding, aiTags, insights] = await Promise.all([
-        // 1. Generate embedding
+        // 1. Generate embedding (for processed content if available)
         (async () => {
           try {
-            console.log(`Generating embedding for bookmark ${bookmarkId}`);
-            const result = await generateEmbedding(processedContent.text);
-            console.log(`Embedding generated for bookmark ${bookmarkId}: ${result.embedding.length} dimensions`);
-            return result.embedding;
+            if (content_html) {
+              console.log(`Generating embedding for bookmark ${bookmarkId}`);
+              // Process content to get clean text if we have HTML content
+              const processedContent = await processContent(content_html);
+              
+              if (processedContent && processedContent.text) {
+                const result = await generateEmbedding(processedContent.text);
+                console.log(`Embedding generated for bookmark ${bookmarkId}: ${result.embedding.length} dimensions`);
+                return result.embedding;
+              }
+            }
+            
+            // If we don't have content or couldn't process it
+            console.log(`No content available for embedding generation, skipping for bookmark ${bookmarkId}`);
+            return null;
           } catch (error) {
             console.error(`Error generating embedding for bookmark ${bookmarkId}:`, error);
             return null;
           }
         })(),
         
-        // 2. Generate AI tags
+        // 2. Generate AI tags directly from URL
         (async () => {
           try {
-            console.log(`Generating AI tags for bookmark ${bookmarkId}`);
-            const tags = await generateTags(processedContent.text);
+            console.log(`Generating AI tags for bookmark ${bookmarkId} using URL: ${url}`);
+            // Using the URL-based tag generation with content as fallback
+            let processedText = "";
+            
+            if (content_html) {
+              try {
+                const processedContent = await processContent(content_html);
+                if (processedContent && processedContent.text) {
+                  processedText = processedContent.text;
+                }
+              } catch (contentError) {
+                console.warn(`Error processing content for tag generation: ${contentError.message}`);
+              }
+            }
+            
+            const tags = await generateTags(processedText, url);
             console.log(`Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(', ')}`);
             return tags;
           } catch (error) {
@@ -181,11 +201,24 @@ export class BookmarkService {
           }
         })(),
         
-        // 3. Generate insights
+        // 3. Generate insights directly from URL
         (async () => {
           try {
-            console.log(`Generating insights for bookmark ${bookmarkId} with depth ${insightDepth}`);
-            const result = await generateInsights(url, processedContent.text, insightDepth);
+            console.log(`Generating insights for bookmark ${bookmarkId} with depth ${insightDepth} using URL: ${url}`);
+            let processedText = "";
+            
+            if (content_html) {
+              try {
+                const processedContent = await processContent(content_html);
+                if (processedContent && processedContent.text) {
+                  processedText = processedContent.text;
+                }
+              } catch (contentError) {
+                console.warn(`Error processing content for insight generation: ${contentError.message}`);
+              }
+            }
+            
+            const result = await generateInsights(url, processedText, insightDepth);
             console.log(`Insights generated for bookmark ${bookmarkId}. Summary length: ${result.summary.length}`);
             return result;
           } catch (error) {
@@ -197,7 +230,7 @@ export class BookmarkService {
       
       // Now update the bookmark with all the processed data
       
-      // 1. Update bookmark with embedding
+      // 1. Update bookmark with embedding if available
       if (embedding && embedding.length > 0) {
         try {
           await this.storage.updateBookmark(bookmarkId, {

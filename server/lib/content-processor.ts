@@ -90,20 +90,26 @@ export async function generateEmbedding(text: string): Promise<{ embedding: numb
 
 /**
  * Generate insights from content
+ * This function supports two modes: URL-based or content-based analysis
  */
 export async function generateInsights(
   url: string,
-  content: string,
-  depthLevel: number
+  content?: string,
+  depthLevel: number = 1
 ): Promise<{ summary: string; sentiment: number; tags: string[]; relatedLinks: string[] }> {
   try {
-    const contentToAnalyze = content.slice(0, 8000); // Limit content to avoid token limits
+    // Determine if we should use direct URL analysis or content analysis
+    const useUrlDirectly = url && (!content || content.length < 100);
+    
+    console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
     // Get custom bookmark system prompt from settings if available
     let systemPrompt = `You are an AI assistant that analyzes web content and extracts insights. 
-    Analyze the content from the URL ${url} based on a depth level of ${depthLevel} (1-4, where 1 is on-page content only, 
+    ${useUrlDirectly 
+      ? `Visit and analyze the content from the URL ${url}` 
+      : `Analyze the provided content from URL ${url}`} based on a depth level of ${depthLevel} (1-4, where 1 is on-page content only, 
     4 is in-depth research sweep). Generate a concise summary, sentiment score (0-10), relevant tags (at least 3), 
-    and related links that might be valuable. Respond in JSON format.`;
+    and related links that might be valuable. Respond in JSON format with keys: summary, sentiment, tags, relatedLinks.`;
     
     try {
       const customPrompt = await storage.getSetting("bookmark_system_prompt");
@@ -121,18 +127,34 @@ export async function generateInsights(
       console.warn("Could not retrieve custom bookmark system prompt, using default:", err);
     }
 
+    // Prepare messages for the API call
+    const messages = [
+      {
+        role: "system",
+        content: systemPrompt
+      }
+    ];
+    
+    // Add either URL-based instruction or content-based instruction
+    if (useUrlDirectly) {
+      messages.push({
+        role: "user",
+        content: `Please analyze the content at ${url} and provide insights according to the instructions.`
+      });
+    } else {
+      // Use provided content (with length limit)
+      const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
+      messages.push({
+        role: "user",
+        content: contentToAnalyze
+      });
+    }
+
+    console.log(`Sending request to OpenAI for insights on ${url}`);
+    
     const response = await openai.chat.completions.create({
       model: MODEL,
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: contentToAnalyze
-        }
-      ],
+      messages: messages,
       response_format: { type: "json_object" }
     });
 
@@ -230,14 +252,16 @@ export async function generateInsights(
 }
 
 /**
- * Generate tags from content
+ * Generate tags from content or URL
  */
-export async function generateTags(content: string): Promise<string[]> {
+export async function generateTags(content: string, url?: string): Promise<string[]> {
   try {
-    const contentToAnalyze = content.slice(0, 8000); // Limit content to avoid token limits
+    // Determine if we should use URL directly
+    const useUrlDirectly = url && (!content || content.length < 100);
+    console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
     // Get custom tag generation prompt from settings if available
-    let systemPrompt = "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Return the tags as a JSON array.";
+    let systemPrompt = "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Return the tags as a JSON array of strings.";
     try {
       const customPrompt = await storage.getSetting("auto_tagging_prompt");
       if (customPrompt && customPrompt.value) {
@@ -247,25 +271,41 @@ export async function generateTags(content: string): Promise<string[]> {
       console.warn("Could not retrieve custom tagging prompt, using default:", err);
     }
 
+    // Prepare messages for the API call
+    const messages = [
+      {
+        role: "system",
+        content: systemPrompt
+      }
+    ];
+    
+    // Add either URL-based instruction or content-based instruction
+    if (useUrlDirectly && url) {
+      messages.push({
+        role: "user",
+        content: `Please visit the URL ${url} and extract relevant tags from its content. Return the tags as a JSON array of strings.`
+      });
+    } else {
+      // Use provided content (with length limit)
+      const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
+      messages.push({
+        role: "user",
+        content: contentToAnalyze
+      });
+    }
+
+    console.log(`Sending request to OpenAI for tag generation${url ? ` for URL: ${url}` : ''}`);
+
     const response = await openai.chat.completions.create({
       model: MODEL,
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: contentToAnalyze
-        }
-      ],
+      messages: messages,
       response_format: { type: "json_object" }
     });
 
     const resultText = response.choices[0].message.content || "{}";
     console.log("Raw tag generation result:", resultText);
     
-    let tags = [];
+    let tags: string[] = [];
     try {
       const result = JSON.parse(resultText);
       // Handle different possible formats the AI might respond with
@@ -291,7 +331,7 @@ export async function generateTags(content: string): Promise<string[]> {
     // Clean and normalize tags
     tags = tags
       .filter(tag => tag && typeof tag === 'string')
-      .map(tag => tag.trim())
+      .map((tag: string) => tag.trim())
       .filter(tag => tag.length > 0);
     
     console.log("Processed tags:", tags);
