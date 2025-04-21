@@ -158,24 +158,39 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}`] });
               queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
               
-              // Also fetch insights directly to update the UI without a page refresh
+              // Also fetch insights and tags directly to update the UI without a page refresh
               try {
+                // Fetch the updated insights
                 const insightsResponse = await fetch(`/api/bookmarks/${bookmark.id}/insights`);
+                let insightsData = null;
                 if (insightsResponse.ok) {
-                  const insightsData = await insightsResponse.json();
-                  // Update the bookmark with new insights
-                  if (bookmark) {
-                    // Create a new bookmark object with the updated insights
-                    const updatedBookmark = {
-                      ...bookmark,
-                      insights: insightsData
-                    };
-                    // Update the bookmark ref
-                    setBookmark(updatedBookmark);
-                  }
+                  insightsData = await insightsResponse.json();
                 }
+                
+                // Fetch the updated tags
+                const tagsResponse = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+                let tagsData = null;
+                if (tagsResponse.ok) {
+                  tagsData = await tagsResponse.json();
+                  // Update the tags directly in state
+                  setTags(tagsData);
+                }
+                
+                // Update the bookmark with new insights
+                if (bookmark && insightsData) {
+                  // Create a new bookmark object with the updated insights
+                  const updatedBookmark = {
+                    ...bookmark,
+                    insights: insightsData
+                  };
+                  // Update the bookmark ref
+                  setBookmark(updatedBookmark);
+                }
+                
+                // Log that we've updated everything optimistically
+                console.log("Optimistically updated bookmark with insights and tags from AI processing");
               } catch (error) {
-                console.error("Error fetching insights after processing:", error);
+                console.error("Error fetching insights or tags after processing:", error);
               }
               
               toast({
