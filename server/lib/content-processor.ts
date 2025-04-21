@@ -132,6 +132,14 @@ export async function generateInsights(
         console.warn("Error retrieving summary prompt, using minimal default for insights:", err);
       }
     }
+    
+    // Add URL and depth level context to the system prompt
+    if (url) {
+      systemPrompt += `\n\nThe content is from URL: ${url}`;
+    }
+    if (depthLevel > 1) {
+      systemPrompt += `\n\nAnalyze at depth level: ${depthLevel} (1-4 scale)`;
+    }
 
     // Prepare messages for the API call
     const messages = [
