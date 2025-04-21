@@ -25,8 +25,6 @@ import {
 } from './content-processor';
 import { extractMetadata } from './metadata-extractor';
 
-import { InsertBookmark } from '@shared/schema';
-
 export interface BookmarkCreationOptions {
   url: string;
   title?: string;
@@ -213,15 +211,19 @@ export class BookmarkService {
       }
       
       // 2. Add all AI-generated tags
-      const allTags = new Set<string>([
+      // Use Array.from instead of Set for better compatibility
+      const allTagsArray = [
         ...(aiTags || []),                // Tags from tag generation
         ...(insights?.tags || [])         // Tags from insights
-      ]);
+      ].filter((value, index, self) => 
+        // Remove duplicates
+        self.indexOf(value) === index
+      );
       
-      if (allTags.size > 0) {
-        console.log(`Adding ${allTags.size} AI-generated tags to bookmark ${bookmarkId}`);
+      if (allTagsArray.length > 0) {
+        console.log(`Adding ${allTagsArray.length} AI-generated tags to bookmark ${bookmarkId}`);
         
-        for (const tagName of allTags) {
+        for (const tagName of allTagsArray) {
           try {
             // Check if this tag is already associated with the bookmark
             const existingTags = await this.storage.getTagsByBookmarkId(bookmarkId);
@@ -465,18 +467,56 @@ export class BookmarkService {
     }
 
     // Launch AI processing in the background if autoExtract is enabled
-    if (options.autoExtract && bookmarkData.content_html) {
-      // Process asynchronously - don't await this!
-      this.processAiBookmarkData(
-        bookmark.id,
-        bookmarkData.url,
-        bookmarkData.content_html,
-        options.insightDepth ? (typeof options.insightDepth === 'string' ? parseInt(options.insightDepth) : options.insightDepth) : 1
-      ).catch(error => {
-        console.error(`Background AI processing failed for bookmark ${bookmark.id}:`, error);
-      });
+    if (options.autoExtract) {
+      const contentHtml = bookmarkData.content_html;
       
-      console.log(`Started background AI processing for bookmark ${bookmark.id}`);
+      if (!contentHtml || contentHtml.length === 0) {
+        console.warn(`No content HTML available for bookmark ${bookmark.id}, fetching content now`);
+        
+        try {
+          // Try to fetch the content directly if we don't have it
+          const metadata = await extractMetadata(bookmarkData.url);
+          
+          if (metadata.content && metadata.content.length > 0) {
+            console.log(`Successfully fetched content for ${bookmark.id}, length: ${metadata.content.length}`);
+            
+            // Update the bookmark with the content
+            await this.storage.updateBookmark(bookmark.id, {
+              content_html: metadata.content
+            });
+            
+            // Process asynchronously - don't await this!
+            this.processAiBookmarkData(
+              bookmark.id,
+              bookmarkData.url,
+              metadata.content,
+              options.insightDepth ? (typeof options.insightDepth === 'string' ? parseInt(options.insightDepth) : options.insightDepth) : 1
+            ).catch(error => {
+              console.error(`Background AI processing failed for bookmark ${bookmark.id}:`, error);
+            });
+            
+            console.log(`Started background AI processing for bookmark ${bookmark.id}`);
+          } else {
+            console.warn(`Failed to fetch content for ${bookmark.id}`);
+          }
+        } catch (error) {
+          console.error(`Error fetching content for AI processing of bookmark ${bookmark.id}:`, error);
+        }
+      } else {
+        // Process asynchronously with the content we already have
+        console.log(`Processing bookmark ${bookmark.id} with existing HTML content (${contentHtml.length} chars)`);
+        
+        this.processAiBookmarkData(
+          bookmark.id,
+          bookmarkData.url,
+          contentHtml,
+          options.insightDepth ? (typeof options.insightDepth === 'string' ? parseInt(options.insightDepth) : options.insightDepth) : 1
+        ).catch(error => {
+          console.error(`Background AI processing failed for bookmark ${bookmark.id}:`, error);
+        });
+        
+        console.log(`Started background AI processing for bookmark ${bookmark.id}`);
+      }
     } else {
       console.log(`Skipping AI processing for bookmark ${bookmark.id} (autoExtract: ${options.autoExtract})`);
     }

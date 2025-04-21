@@ -21,21 +21,52 @@ interface ProcessedContent {
  * Processes HTML content to extract readable text
  */
 export async function processContent(contentHtml: string): Promise<{ text: string; html: string; readingTime: number }> {
-  // Simple HTML to text conversion (in a real app you would use a proper HTML parser)
-  let text = contentHtml
-    .replace(/<[^>]*>/g, ' ') // Remove HTML tags
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim();
-
-  // Calculate approximate reading time (average reading speed: 200-250 words per minute)
-  const wordCount = text.split(/\s+/).length;
-  const readingTime = Math.ceil(wordCount / 225);
-
-  return {
-    text,
-    html: contentHtml, // Return the original HTML as well
-    readingTime
-  };
+  console.log("Starting content processing...");
+  
+  if (!contentHtml) {
+    console.error("Content HTML is null, empty, or undefined");
+    return {
+      text: "",
+      html: "",
+      readingTime: 0
+    };
+  }
+  
+  console.log("Content HTML length:", contentHtml.length);
+  
+  // Check if content looks like valid HTML
+  if (!contentHtml.includes("<") || !contentHtml.includes(">")) {
+    console.warn("Content doesn't appear to contain HTML tags");
+  }
+  
+  try {
+    // Simple HTML to text conversion (in a real app you would use a proper HTML parser)
+    let text = contentHtml
+      .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+    
+    // Calculate approximate reading time (average reading speed: 200-250 words per minute)
+    const wordCount = text.split(/\s+/).length;
+    const readingTime = Math.ceil(wordCount / 225);
+    
+    console.log(`Processed content: ${wordCount} words, ${readingTime} min reading time`);
+    
+    return {
+      text,
+      html: contentHtml, // Return the original HTML as well
+      readingTime
+    };
+  } catch (error) {
+    console.error("Error processing content:", error);
+    
+    // Return empty results rather than failing completely
+    return {
+      text: "",
+      html: contentHtml || "",
+      readingTime: 0
+    };
+  }
 }
 
 /**
@@ -105,14 +136,88 @@ export async function generateInsights(
       response_format: { type: "json_object" }
     });
 
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-
-    return {
-      summary: result.summary || "No summary generated",
-      sentiment: result.sentiment || 5,
-      tags: result.tags || [],
-      relatedLinks: result.relatedLinks || []
-    };
+    const resultText = response.choices[0].message.content || "{}";
+    console.log("Raw insights result:", resultText);
+    
+    try {
+      // Attempt to parse JSON result
+      const result = JSON.parse(resultText);
+      
+      // Extract values with various fallbacks and format conversions
+      let summary = "No summary generated";
+      if (typeof result.summary === 'string') {
+        summary = result.summary;
+      } else if (typeof result.Summary === 'string') {
+        summary = result.Summary;
+      } else if (typeof result.content === 'string') {
+        summary = result.content;
+      }
+      
+      // Extract sentiment with fallbacks
+      let sentiment = 5;
+      if (typeof result.sentiment === 'number') {
+        sentiment = result.sentiment;
+      } else if (typeof result.sentiment === 'string' && !isNaN(Number(result.sentiment))) {
+        sentiment = Number(result.sentiment);
+      } else if (typeof result.Sentiment === 'number') {
+        sentiment = result.Sentiment;
+      } else if (typeof result.score === 'number') {
+        sentiment = result.score;
+      }
+      
+      // Ensure sentiment is in the range 0-10
+      sentiment = Math.max(0, Math.min(10, sentiment));
+      
+      // Extract tags with fallbacks
+      let tags = [];
+      if (Array.isArray(result.tags)) {
+        tags = result.tags;
+      } else if (Array.isArray(result.Tags)) {
+        tags = result.Tags;
+      } else if (typeof result.tags === 'string') {
+        tags = result.tags.split(',').map(tag => tag.trim());
+      }
+      
+      // Filter and clean tags
+      tags = tags
+        .filter(tag => tag && typeof tag === 'string')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+      
+      // Extract related links with fallbacks
+      let relatedLinks = [];
+      if (Array.isArray(result.relatedLinks)) {
+        relatedLinks = result.relatedLinks;
+      } else if (Array.isArray(result.related_links)) {
+        relatedLinks = result.related_links;
+      } else if (Array.isArray(result.links)) {
+        relatedLinks = result.links;
+      } else if (typeof result.relatedLinks === 'string') {
+        relatedLinks = [result.relatedLinks];
+      }
+      
+      // Filter and clean related links
+      relatedLinks = relatedLinks
+        .filter(link => link && typeof link === 'string')
+        .map(link => link.trim())
+        .filter(link => link.length > 0);
+      
+      return {
+        summary,
+        sentiment,
+        tags,
+        relatedLinks
+      };
+    } catch (parseError) {
+      console.error("Error parsing insights result:", parseError);
+      // If JSON parsing fails, try to extract a summary from the raw text
+      return {
+        summary: resultText.length > 1000 ? resultText.slice(0, 1000) + "..." : resultText,
+        sentiment: 5,
+        tags: [],
+        relatedLinks: []
+      };
+    }
   } catch (error) {
     console.error("Error generating insights:", error);
     return {
@@ -157,8 +262,40 @@ export async function generateTags(content: string): Promise<string[]> {
       response_format: { type: "json_object" }
     });
 
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    return result.tags || [];
+    const resultText = response.choices[0].message.content || "{}";
+    console.log("Raw tag generation result:", resultText);
+    
+    let tags = [];
+    try {
+      const result = JSON.parse(resultText);
+      // Handle different possible formats the AI might respond with
+      if (Array.isArray(result)) {
+        // The AI returned an array directly
+        tags = result;
+      } else if (result.tags && Array.isArray(result.tags)) {
+        // The AI returned an object with a tags array
+        tags = result.tags;
+      } else if (typeof result === 'object') {
+        // The AI returned some other object, try to extract string values
+        tags = Object.values(result).filter(value => typeof value === 'string');
+      }
+    } catch (parseError) {
+      console.error("Error parsing tag generation result:", parseError);
+      // If JSON parsing fails, try to extract tags using regex
+      const tagMatches = resultText.match(/["']([^"']+)["']/g);
+      if (tagMatches) {
+        tags = tagMatches.map(match => match.replace(/["']/g, ''));
+      }
+    }
+    
+    // Clean and normalize tags
+    tags = tags
+      .filter(tag => tag && typeof tag === 'string')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+    
+    console.log("Processed tags:", tags);
+    return tags;
   } catch (error) {
     console.error("Error generating tags:", error);
     return [];
