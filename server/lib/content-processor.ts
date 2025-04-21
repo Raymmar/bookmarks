@@ -105,21 +105,8 @@ export async function generateInsights(
     
     console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
-    // Default system prompt
-    let systemPrompt = `You are an AI assistant that analyzes web content and extracts insights. 
-    ${useUrlDirectly 
-      ? `Visit and analyze the content from the URL ${url}` 
-      : `Analyze the provided content from URL ${url}`} based on a depth level of ${depthLevel} (1-4, where 1 is on-page content only, 
-    4 is in-depth research sweep). Generate a concise summary, sentiment score (0-10), relevant tags (at least 3), 
-    and related links that might be valuable. 
-    
-    You must respond in JSON format with the following structure:
-    {
-      "summary": "A concise summary of the content",
-      "sentiment": 5, // A number from 0-10 representing the sentiment
-      "tags": ["tag1", "tag2", "tag3"], // At least 3 relevant tags
-      "relatedLinks": [] // Any related links if available
-    }`;
+    // Get custom system prompt
+    let systemPrompt;
     
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
@@ -129,23 +116,21 @@ export async function generateInsights(
     // Otherwise try to get it from storage
     else {
       try {
-        // Use the summary prompt instead of the bookmark system prompt
+        // Use the summary prompt for insights generation
         const customPrompt = await storage.getSetting("summary_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
           console.log("Retrieved custom summary prompt from storage for insights generation");
+        } else {
+          // If no custom prompt is available, use a minimal default
+          systemPrompt = "Analyze the content and provide insights.";
+          console.log("No custom summary prompt found, using minimal default for insights");
         }
       } catch (err) {
-        console.warn("Could not retrieve custom summary prompt, using default:", err);
+        // If error retrieving, use a minimal default
+        systemPrompt = "Analyze the content and provide insights.";
+        console.warn("Error retrieving summary prompt, using minimal default for insights:", err);
       }
-    }
-    
-    // Add URL and depth level context if not already in the custom prompt
-    if (!systemPrompt.includes("URL") && url) {
-      systemPrompt += `\n\nThe content is from URL: ${url}`;
-    }
-    if (!systemPrompt.includes("depth") && depthLevel > 1) {
-      systemPrompt += `\n\nAnalyze at depth level: ${depthLevel} (1-4 scale)`;
     }
 
     // Prepare messages for the API call
@@ -156,11 +141,11 @@ export async function generateInsights(
       }
     ];
     
-    // Add either URL-based instruction or content-based instruction
+    // Add content or URL as user message with NO additional instructions
     if (useUrlDirectly) {
       messages.push({
         role: "user",
-        content: `Please analyze the content at ${url} and provide insights in JSON format according to the instructions.`
+        content: url
       });
     } else {
       // Use provided content (with length limit)
@@ -284,8 +269,8 @@ export async function generateTags(content: string, url?: string, customSystemPr
     const useUrlDirectly = url && (!content || content.length < 100);
     console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
-    // Default system prompt
-    let systemPrompt = "You are an AI assistant that extracts relevant tags from content. Generate 3-7 tags that accurately represent the main topics and themes of the given content. Always respond with a JSON object containing a tags array.";
+    // Get custom system prompt
+    let systemPrompt;
     
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
@@ -299,9 +284,15 @@ export async function generateTags(content: string, url?: string, customSystemPr
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
           console.log("Retrieved custom tagging prompt from storage");
+        } else {
+          // If no custom prompt is available, use a minimal default
+          systemPrompt = "Extract tags from the content.";
+          console.log("No custom tagging prompt found, using minimal default");
         }
       } catch (err) {
-        console.warn("Could not retrieve custom tagging prompt, using default:", err);
+        // If error retrieving, use a minimal default
+        systemPrompt = "Extract tags from the content.";
+        console.warn("Error retrieving tagging prompt, using minimal default:", err);
       }
     }
 
@@ -313,11 +304,11 @@ export async function generateTags(content: string, url?: string, customSystemPr
       }
     ];
     
-    // Add either URL-based instruction or content-based instruction
+    // Add content or URL as user message with NO additional instructions
     if (useUrlDirectly && url) {
       messages.push({
         role: "user",
-        content: `Please visit the URL ${url} and extract relevant tags from its content. Return a JSON object with a "tags" property containing an array of tag strings.`
+        content: url
       });
     } else {
       // Use provided content (with length limit)
@@ -387,8 +378,8 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
   try {
     const contentToSummarize = content.slice(0, 8000); // Limit content to avoid token limits
     
-    // Default system prompt
-    let systemPrompt = "You are an AI assistant that summarizes content. Provide a concise, informative summary of the given content in about 2-3 sentences.";
+    // Get custom system prompt
+    let systemPrompt;
     
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
@@ -402,9 +393,15 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
           console.log("Retrieved custom summary prompt from storage");
+        } else {
+          // If no custom prompt is available, use a minimal default
+          systemPrompt = "Summarize the content.";
+          console.log("No custom summary prompt found, using minimal default");
         }
       } catch (err) {
-        console.warn("Could not retrieve custom summary prompt, using default:", err);
+        // If error retrieving, use a minimal default
+        systemPrompt = "Summarize the content.";
+        console.warn("Error retrieving summary prompt, using minimal default:", err);
       }
     }
 
