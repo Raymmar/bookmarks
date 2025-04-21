@@ -187,10 +187,10 @@ export default function GraphView() {
       <div className="flex-1 flex flex-col h-full w-full">
         {/* Header section removed as it's no longer necessary */}
         
-        {/* Search, filters and tags section */}
+        {/* Search and filters section - without tags */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 w-full">
           {/* Search input and filter row */}
-          <div className="flex items-center mb-3 gap-2">
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Input
                 type="text"
@@ -221,29 +221,6 @@ export default function GraphView() {
               sortOrder={sortOrder}
               onSortOrderChange={setSortOrder}
             />
-          </div>
-          
-          {/* Tags display */}
-          <div className="flex flex-wrap gap-1 mt-2">
-            {allTags.map(tag => (
-              <Badge 
-                key={tag}
-                variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleTagSelection(tag)}
-              >
-                {tag}
-                {selectedTags.includes(tag) && (
-                  <X 
-                    className="h-3 w-3 ml-1" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTagSelection(tag);
-                    }}
-                  />
-                )}
-              </Badge>
-            ))}
           </div>
         </div>
         
@@ -280,6 +257,29 @@ export default function GraphView() {
               />
             </div>
           )}
+        </div>
+        
+        {/* Tags display at the bottom of the graph area */}
+        <div className="flex flex-wrap gap-1 w-full bg-white border-t border-gray-200 px-4 py-2">
+          {allTags.map(tag => (
+            <Badge 
+              key={tag}
+              variant={selectedTags.includes(tag) ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleTagSelection(tag)}
+            >
+              {tag}
+              {selectedTags.includes(tag) && (
+                <X 
+                  className="h-3 w-3 ml-1" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTagSelection(tag);
+                  }}
+                />
+              )}
+            </Badge>
+          ))}
         </div>
       </div>
       
