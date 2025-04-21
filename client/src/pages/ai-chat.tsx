@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,20 +24,31 @@ export default function AiChat() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // Get all bookmarks
   const { data: bookmarks = [] } = useQuery({
     queryKey: ["/api/bookmarks"],
   });
   
-  // Extract all unique tags from bookmarks
-  const allTags = Array.from(
-    new Set(
-      bookmarks.flatMap(bookmark => {
-        // Handle case where user_tags might not exist
-        const systemTags = bookmark.system_tags || [];
-        return systemTags;
-      })
-    )
-  ).sort();
+  // Get all normalized tags from the database
+  const { data: normalizedTags = [] } = useQuery({
+    queryKey: ["/api/tags"],
+  });
+  
+  // Extract all unique tags from system_tags and normalized tags table
+  const allTags = useMemo(() => {
+    // Get system tags from bookmarks if they exist
+    const systemTags = new Set(
+      bookmarks.flatMap((bookmark: any) => bookmark.system_tags || [])
+    );
+    
+    // Get normalized tags from the tags table
+    const normalizedTagNames = new Set(
+      normalizedTags.map((tag: any) => tag.name)
+    );
+    
+    // Combine both sets and convert to sorted array
+    return Array.from(new Set([...systemTags, ...normalizedTagNames])).sort();
+  }, [bookmarks, normalizedTags]);
   
   const toggleTagSelection = (tag: string) => {
     if (selectedTags.includes(tag)) {
