@@ -353,17 +353,24 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         }
       };
       
+      // Ensure we're working with the correct set of links for the focused view
+      const focusedLinks = simulationRef.current.force("link") 
+        ? (simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>).links()
+        : links;
+        
+      // Filter to only include links between nodes that are in focus
+      const relevantLinks = focusedLinks.filter(link => {
+        const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+        const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+        return focusNodeIds.has(sourceId) && focusNodeIds.has(targetId);
+      });
+      
       // Add special forces just for this focused view
       focusSimulation
-        // Use longer distances for links
+        // Use longer distances for links with randomization for organic layout
         .force("link", d3.forceLink<GraphNode, GraphLink>()
           .id(d => d.id)
-          .links(links.filter(link => {
-            // Only include links where both nodes are in focus
-            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-            return focusNodeIds.has(sourceId) && focusNodeIds.has(targetId);
-          }))
+          .links(relevantLinks)
           .distance(() => 120 + Math.random() * 80) // Varied distances for organic look
           .strength(0.15) // Very weak link strength
         )
@@ -852,71 +859,77 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       .attr("font-size", d => d.type === "bookmark" ? "11px" : "10px")
       .attr("fill", "#1F2937");
     
-    // Update positions during simulation with curved paths for better readability
-    simulation.on("tick", () => {
-      // Function to get node position since it could be string ID or object reference
+    // Create a reusable curved path generator function that we can use in both normal and focus mode
+    const generateCurvedPath = (d: GraphLink, allNodes: GraphNode[]) => {
+      // Helper to get node position from either a string ID or node reference
       const getNodePos = (nodeRef: string | GraphNode, key: 'x' | 'y'): number => {
         if (typeof nodeRef === 'string') {
-          return nodes.find(n => n.id === nodeRef)?.[key] || 0;
+          return allNodes.find(n => n.id === nodeRef)?.[key] || 0;
         } else {
           return (nodeRef as GraphNode)[key] || 0;
         }
       };
       
-      // Advanced edge routing to minimize crossings and generate more aesthetically pleasing curves
-      link.attr("d", (d) => {
-        // Get source and target coordinates
-        const sourceX = getNodePos(d.source, 'x');
-        const sourceY = getNodePos(d.source, 'y');
-        const targetX = getNodePos(d.target, 'x');
-        const targetY = getNodePos(d.target, 'y');
-        
-        // Calculate midpoint
-        const midX = (sourceX + targetX) / 2;
-        const midY = (sourceY + targetY) / 2;
-        
-        // Calculate normal vector (perpendicular to the line connecting source and target)
-        const dx = targetX - sourceX;
-        const dy = targetY - sourceY;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        
-        // Default for very short links to avoid division by zero
-        if (len < 1) {
-          return `M${sourceX},${sourceY} L${targetX},${targetY}`;
-        }
-        
-        // Normalize the perpendicular vector
-        const nx = -dy / len;
-        const ny = dx / len;
-        
-        // Special curving for different link types to create visual distinction
-        // and avoid edge crossing with other links of same type
-        let curveFactor = 0;
-        
-        // Adjust curve based on link type for better visual separation
-        switch (d.type) {
-          case "domain":
-            curveFactor = 0.3; // Gentle curve for domain links
-            break;
-          case "tag":
-            curveFactor = 0.2; // Slight curve for tag links
-            break;
-          case "related":
-            curveFactor = 0.15; // Very subtle curve
-            break;
-          default:
-            curveFactor = 0.1; // Almost straight for other links
-        }
-        
-        // Calculate control point offset (perpendicular to the line)
-        // This creates a quadratic curve that helps avoid edge crossings
-        const offsetDistance = len * curveFactor;
-        const controlX = midX + nx * offsetDistance;
-        const controlY = midY + ny * offsetDistance;
-        
-        // Draw a quadratic Bezier curve
-        return `M${sourceX},${sourceY} Q${controlX},${controlY} ${targetX},${targetY}`;
-      });
+      // Get source and target coordinates
+      const sourceX = getNodePos(d.source, 'x');
+      const sourceY = getNodePos(d.source, 'y');
+      const targetX = getNodePos(d.target, 'x');
+      const targetY = getNodePos(d.target, 'y');
+      
+      // Calculate midpoint
+      const midX = (sourceX + targetX) / 2;
+      const midY = (sourceY + targetY) / 2;
+      
+      // Calculate normal vector (perpendicular to the line connecting source and target)
+      const dx = targetX - sourceX;
+      const dy = targetY - sourceY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      
+      // Default for very short links to avoid division by zero
+      if (len < 1) {
+        return `M${sourceX},${sourceY} L${targetX},${targetY}`;
+      }
+      
+      // Normalize the perpendicular vector
+      const nx = -dy / len;
+      const ny = dx / len;
+      
+      // Special curving for different link types to create visual distinction
+      // and avoid edge crossing with other links of same type
+      let curveFactor = 0;
+      
+      // Adjust curve based on link type for better visual separation
+      switch (d.type) {
+        case "domain":
+          curveFactor = 0.3; // Gentle curve for domain links
+          break;
+        case "tag":
+          curveFactor = 0.2; // Slight curve for tag links
+          break;
+        case "related":
+          curveFactor = 0.15; // Very subtle curve
+          break;
+        default:
+          curveFactor = 0.1; // Almost straight for other links
+      }
+      
+      // Calculate control point offset (perpendicular to the line)
+      // This creates a quadratic curve that helps avoid edge crossings
+      const offsetDistance = len * curveFactor;
+      const controlX = midX + nx * offsetDistance;
+      const controlY = midY + ny * offsetDistance;
+      
+      // Draw a quadratic Bezier curve
+      return `M${sourceX},${sourceY} Q${controlX},${controlY} ${targetX},${targetY}`;
+    };
+    
+    // Share the curve generator with other parts of the code via ref for consistent rendering
+    curveGeneratorRef.current = generateCurvedPath;
+    
+    // Update positions during simulation with curved paths for better readability
+    simulation.on("tick", () => {
+      // Use our reusable curved path generator for all links
+      link.attr("d", d => generateCurvedPath(d, nodes));
       
       // Update node positions normally
       node.attr("transform", d => `translate(${d.x},${d.y})`);
@@ -942,58 +955,93 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       // Get the node that was dragged
       const draggedNode = event.subject;
       
-      // Always release domains for better separation in any view
-      const isDomain = draggedNode.type === "domain";
-      
       // Check if we're in a focused view (small number of nodes)
       const isFocusedView = simulationRef.current && 
                            simulationRef.current.nodes().length <= 15;
       
-      if (isFocusedView || isDomain) {
-        // In focus mode or for domain nodes, release to allow organic positioning
+      // CRITICAL CHANGE: In focus mode, ALWAYS release nodes
+      // This ensures our organic layout can take effect
+      if (isFocusedView) {
+        // In focus mode, ALWAYS release ALL nodes to allow organic positioning
+        // This is the key to breaking grid patterns
+        
+        // Release the dragged node
         event.subject.fx = null;
         event.subject.fy = null;
         
-        // Special handling for domain nodes - push them away from other domains
-        if (isDomain && simulationRef.current) {
-          // Find all domain nodes in the current simulation
-          const domains = simulationRef.current.nodes()
-            .filter(n => n.type === "domain" && n.id !== draggedNode.id);
+        // Release ALL other nodes too to ensure they're free to move
+        if (simulationRef.current) {
+          simulationRef.current.nodes().forEach(node => {
+            node.fx = null;
+            node.fy = null;
+          });
           
-          // If more than one domain, add extra repulsion from other domains
-          if (domains.length > 0) {
-            // Calculate average position of other domains
-            let avgX = 0, avgY = 0;
-            domains.forEach(d => {
-              avgX += d.x || 0;
-              avgY += d.y || 0;
-            });
-            avgX /= domains.length;
-            avgY /= domains.length;
-            
-            // Vector away from center of other domains
-            const dx = (draggedNode.x || 0) - avgX;
-            const dy = (draggedNode.y || 0) - avgY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            // Add velocity away from other domains
-            if (dist > 0) {
-              // Normalized direction vector * strength
-              const strength = isFocusedView ? 5 : 3;
-              draggedNode.vx = (dx / dist) * strength;
-              draggedNode.vy = (dy / dist) * strength;
-            }
-          }
+          // Add random velocities to all nodes to break any existing grid patterns
+          simulationRef.current.nodes().forEach(node => {
+            // Add random velocity to completely disrupt any existing formation
+            node.vx = (node.vx || 0) + (Math.random() - 0.5) * 5;
+            node.vy = (node.vy || 0) + (Math.random() - 0.5) * 5;
+          });
         }
         
-        // Give the simulation a stronger kick to adjust the layout
-        simulation.alpha(0.2).restart();
-      } else {
-        // For non-domain nodes in normal mode, maintain the position
-        // The node remains fixed where it was dropped
+        // Extra velocity for the dragged node in random direction
+        const randomAngle = Math.random() * Math.PI * 2;
+        const randomStrength = 2 + Math.random() * 3;
+        draggedNode.vx = Math.cos(randomAngle) * randomStrength;
+        draggedNode.vy = Math.sin(randomAngle) * randomStrength;
         
-        // But give the simulation a tiny kick to adjust surrounding nodes
-        simulation.alpha(0.05).restart();
+        // Give the simulation a strong kick to adjust the layout
+        simulation.alpha(0.5).restart();
+      } 
+      else {
+        // In normal mode (not focused view)
+        const isDomain = draggedNode.type === "domain";
+        
+        if (isDomain) {
+          // Always release domain nodes
+          event.subject.fx = null;
+          event.subject.fy = null;
+          
+          // Special handling for domain nodes - push them away from other domains
+          if (simulationRef.current) {
+            // Find all domain nodes in the current simulation
+            const domains = simulationRef.current.nodes()
+              .filter(n => n.type === "domain" && n.id !== draggedNode.id);
+            
+            // If more than one domain, add extra repulsion from other domains
+            if (domains.length > 0) {
+              // Calculate average position of other domains
+              let avgX = 0, avgY = 0;
+              domains.forEach(d => {
+                avgX += d.x || 0;
+                avgY += d.y || 0;
+              });
+              avgX /= domains.length;
+              avgY /= domains.length;
+              
+              // Vector away from center of other domains
+              const dx = (draggedNode.x || 0) - avgX;
+              const dy = (draggedNode.y || 0) - avgY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              
+              // Add velocity away from other domains
+              if (dist > 0) {
+                // Normalized direction vector * strength
+                draggedNode.vx = (dx / dist) * 3;
+                draggedNode.vy = (dy / dist) * 3;
+              }
+            }
+          }
+          
+          // Give the simulation a moderate kick to adjust layout
+          simulation.alpha(0.2).restart();
+        } else {
+          // Non-domain nodes in normal mode can remain fixed
+          // (We keep this behavior because it works well for large graphs)
+          
+          // Give the simulation a tiny kick to adjust surrounding nodes
+          simulation.alpha(0.05).restart();
+        }
       }
     }
     
