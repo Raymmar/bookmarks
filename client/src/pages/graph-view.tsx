@@ -59,7 +59,7 @@ export default function GraphView() {
     )
   ).sort();
   
-  // Filter bookmarks based on search query and selected tags
+  // Filter bookmarks based on search query, selected tags, and domain
   const filteredBookmarks = bookmarks.filter(bookmark => {
     // Search query filter
     if (searchQuery) {
@@ -89,6 +89,21 @@ export default function GraphView() {
       if (dateRange === "week" && daysDiff > 7) return false;
       if (dateRange === "month" && daysDiff > 30) return false;
       if (dateRange === "quarter" && daysDiff > 90) return false;
+    }
+    
+    // Domain filter
+    if (selectedDomain) {
+      try {
+        const url = new URL(bookmark.url);
+        if (url.hostname !== selectedDomain) {
+          return false;
+        }
+      } catch (e) {
+        // If URL parsing fails, just check if the domain appears in the URL
+        if (!bookmark.url.includes(selectedDomain)) {
+          return false;
+        }
+      }
     }
     
     // Tag filter
@@ -156,6 +171,45 @@ export default function GraphView() {
         }, 300); // Longer delay for smoother transitions
       }
     }
+  };
+  
+  const handleDomainSelection = (domain: string) => {
+    const isDomainSelected = selectedDomain === domain;
+    
+    if (isDomainSelected) {
+      // Remove the domain filter
+      setSelectedDomain(null);
+      
+      // Zoom out to show all nodes
+      setTimeout(() => {
+        const event = new CustomEvent('centerFullGraph', { 
+          detail: { source: 'domainFilter' } 
+        });
+        document.dispatchEvent(event);
+      }, 150);
+    } else {
+      // Set the domain filter
+      setSelectedDomain(domain);
+      
+      // Focus on the domain node
+      if (viewMode === "graph") {
+        const domainNodeId = `domain-${domain}`;
+        
+        // Clear any selected bookmark
+        setSelectedBookmarkId(null);
+        
+        setTimeout(() => {
+          const event = new CustomEvent('selectGraphNode', { 
+            detail: { nodeId: domainNodeId, source: 'domainFilter' } 
+          });
+          document.dispatchEvent(event);
+        }, 300);
+      }
+    }
+  };
+  
+  const handleTagClick = (tag: string) => {
+    toggleTagSelection(tag);
   };
   
   const handleDeleteBookmark = async (id: string) => {
@@ -242,8 +296,8 @@ export default function GraphView() {
                 <p className="text-gray-500">
                   {searchQuery
                     ? "Try using different search terms or filters"
-                    : selectedTags.length > 0
-                      ? "Try selecting different tags or changing the match mode"
+                    : selectedTags.length > 0 || selectedDomain
+                      ? `Try ${selectedTags.length > 0 && selectedDomain ? "removing some filters" : selectedTags.length > 0 ? "selecting different tags" : "choosing a different domain"}`
                       : "Add some bookmarks to see them in the explorer"}
                 </p>
               </div>
@@ -255,32 +309,58 @@ export default function GraphView() {
                 bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
                 onNodeClick={handleSelectBookmark}
+                onTagClick={handleTagClick}
+                onDomainClick={handleDomainSelection}
               />
             </div>
           )}
         </div>
         
-        {/* Tags display at the bottom of the graph area */}
-        <div className="flex flex-wrap gap-1 w-full bg-white border-t border-gray-200 px-4 py-2">
-          {allTags.map(tag => (
-            <Badge 
-              key={tag}
-              variant={selectedTags.includes(tag) ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => toggleTagSelection(tag)}
-            >
-              {tag}
-              {selectedTags.includes(tag) && (
+        {/* Filters display at the bottom of the graph area */}
+        <div className="flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
+          {/* Domain filter indicator if selected */}
+          {selectedDomain && (
+            <div className="mb-2 flex items-center">
+              <span className="text-sm text-gray-600 mr-2">Domain:</span>
+              <Badge 
+                variant="default"
+                className="cursor-pointer bg-green-600 hover:bg-green-700"
+                onClick={() => handleDomainSelection(selectedDomain)}
+              >
+                {selectedDomain}
                 <X 
                   className="h-3 w-3 ml-1" 
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleTagSelection(tag);
+                    handleDomainSelection(selectedDomain);
                   }}
                 />
-              )}
-            </Badge>
-          ))}
+              </Badge>
+            </div>
+          )}
+          
+          {/* Tags display */}
+          <div className="flex flex-wrap gap-1">
+            {allTags.map(tag => (
+              <Badge 
+                key={tag}
+                variant={selectedTags.includes(tag) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggleTagSelection(tag)}
+              >
+                {tag}
+                {selectedTags.includes(tag) && (
+                  <X 
+                    className="h-3 w-3 ml-1" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTagSelection(tag);
+                    }}
+                  />
+                )}
+              </Badge>
+            ))}
+          </div>
         </div>
       </div>
       
