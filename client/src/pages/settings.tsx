@@ -29,7 +29,7 @@ type Setting = {
 
 const SettingsPage: React.FC = () => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("bookmark");
+  const [activeTab, setActiveTab] = useState("tagging");
 
   // Fetch all settings
   const { data: settings, isLoading, error } = useQuery({
@@ -148,58 +148,14 @@ const SettingsPage: React.FC = () => {
       <div className="mx-auto max-w-[1280px]">
         <h1 className="text-3xl font-bold mb-6">Settings</h1>
         <p className="text-muted-foreground mb-8">
-          Customize the system prompts used for bookmark analysis, tagging and summarization.
+          Customize the system prompts used for auto-tagging and summarization of your bookmarks.
         </p>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
-            <TabsTrigger value="bookmark">Bookmark Analysis</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="tagging">Auto-Tagging</TabsTrigger>
             <TabsTrigger value="summary">Summarization</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="bookmark">
-            <Card>
-              <CardHeader>
-                <CardTitle>Bookmark Analysis Prompt</CardTitle>
-                <CardDescription>
-                  Configure the system prompt used when analyzing bookmarks. This controls how the AI interprets and extracts information from your saved pages.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...bookmarkSystemPromptForm}>
-                  <form onSubmit={bookmarkSystemPromptForm.handleSubmit(onBookmarkSystemPromptSubmit)} className="space-y-4">
-                    <FormField
-                      control={bookmarkSystemPromptForm.control}
-                      name="value"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>System Prompt</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Enter bookmark analysis prompt..." 
-                              className="h-60 font-mono text-sm"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Use {"{url}"} as a placeholder for the bookmark URL, if needed.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button 
-                      type="submit" 
-                      disabled={updateSettingMutation.isPending}
-                    >
-                      {updateSettingMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="tagging">
             <Card>
@@ -303,9 +259,8 @@ const SettingsPage: React.FC = () => {
               By modifying the system prompts, you can control:
             </p>
             <ul className="list-disc pl-6 space-y-2 mb-4">
-              <li><strong>Bookmark Analysis:</strong> How the AI examines content, identifies key entities and determines sentiment.</li>
               <li><strong>Auto-Tagging:</strong> How tags are generated and what aspects of the content are prioritized for categorization.</li>
-              <li><strong>Summarization:</strong> How detailed summaries are and what information is highlighted.</li>
+              <li><strong>Summarization:</strong> How detailed summaries are and what information is highlighted. This prompt is also used for generating insights and related information.</li>
             </ul>
             <p>
               Making changes to these prompts will affect how new bookmarks are processed. Existing bookmark data won't be updated automatically.
