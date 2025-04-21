@@ -481,11 +481,38 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         svg.select(`#link-${l.id}`).attr("opacity", 1);
       });
       
+      // Get node's actual SVG position for tooltip placement
+      // This positions the tooltip near the actual node instead of at the cursor
+      let tooltipX, tooltipY;
+      
+      // If we have the node position, use it for the tooltip
+      if (d.x !== undefined && d.y !== undefined) {
+        // Get the SVG's position on the page
+        const svgRect = svgRef.current.getBoundingClientRect();
+        
+        // Calculate tooltip position based on node's coordinates within the SVG
+        // and adjust for current zoom level and any transform
+        const zoomContainer = d3.select(svgRef.current).select("g.zoom-container");
+        let transform = d3.zoomTransform(zoomContainer.node() as Element);
+        
+        // Apply the zoom transform to get the actual screen coordinates
+        const screenX = transform.applyX(d.x) + svgRect.left;
+        const screenY = transform.applyY(d.y) + svgRect.top;
+        
+        // Position the tooltip slightly offset from the node
+        tooltipX = screenX + 15;
+        tooltipY = screenY - 15;
+      } else {
+        // Fallback to cursor position if node position isn't available
+        tooltipX = event.pageX + 10;
+        tooltipY = event.pageY - 10;
+      }
+      
       // Show tooltip with name
       d3.select("#tooltip")
         .style("opacity", 1)
-        .style("left", (event.pageX + 10) + "px")
-        .style("top", (event.pageY - 10) + "px")
+        .style("left", tooltipX + "px")
+        .style("top", tooltipY + "px")
         .html(`<div class="font-medium">${d.name}</div><div class="text-gray-600 text-xs">${d.type}</div>`);
     } else {
       // Reset all opacities on mouseout
