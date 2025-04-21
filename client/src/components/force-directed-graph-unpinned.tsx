@@ -988,15 +988,19 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
   useEffect(() => {
     if (!selectedBookmarkId || !svgRef.current || !simulationRef.current || !zoomBehaviorRef.current) return;
     
+    // Format the node ID to match how it's stored in the graph component
+    // This is critical for consistent handling when clicked from the sidebar vs directly in the graph
+    const formattedNodeId = `bookmark-${selectedBookmarkId}`;
+    
     // Set the selected node in state
-    setSelectedNode(selectedBookmarkId);
+    setSelectedNode(formattedNodeId);
     
     // Log selected bookmark ID for debugging
     console.log(`Selecting bookmark: ${selectedBookmarkId}`);
     
     // Highlight the selected node and center the graph on it and its connections
     // Important: We need to find the exact node by ID that matches the selected bookmark
-    const selectedNode = simulationRef.current.nodes().find(n => n.id === selectedBookmarkId);
+    const selectedNode = simulationRef.current.nodes().find(n => n.id === formattedNodeId);
     
     if (selectedNode) {
       console.log(`Found node in simulation: ${selectedNode.id}, type: ${selectedNode.type}`);
@@ -1007,8 +1011,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         return links.links().some(link => {
           const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
           const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-          return (sourceId === selectedBookmarkId && targetId === n.id) || 
-                 (sourceId === n.id && targetId === selectedBookmarkId);
+          return (sourceId === formattedNodeId && targetId === n.id) || 
+                 (sourceId === n.id && targetId === formattedNodeId);
         });
       });
       
@@ -1071,7 +1075,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         .attr('r', (d: any) => d.type === "bookmark" ? 9 : 7);
       
       // Visually highlight the selected node with very strong emphasis
-      const selectedNodeElement = d3.select(svgRef.current).select(`#node-${selectedBookmarkId}`);
+      const selectedNodeElement = d3.select(svgRef.current).select(`#node-${formattedNodeId}`);
       
       if (!selectedNodeElement.empty()) {
         selectedNodeElement
@@ -1090,7 +1094,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
           .style('font-weight', 'bold')
           .style('font-size', '14px'); // Larger font
       } else {
-        console.warn(`Could not find node element with ID: node-${selectedBookmarkId}`);
+        console.warn(`Could not find node element with ID: node-${formattedNodeId}`);
       }
         
       // Also highlight the directly connected links
@@ -1103,13 +1107,13 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         .filter((d: any) => {
           const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
           const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-          return sourceId === selectedBookmarkId || targetId === selectedBookmarkId;
+          return sourceId === formattedNodeId || targetId === formattedNodeId;
         })
         .style('opacity', 1)
         .attr('stroke-width', (d: any) => d.value + 2) // Make connected links much thicker
         .raise(); // Bring links to front
     } else {
-      console.warn(`Could not find node with ID: ${selectedBookmarkId}`);
+      console.warn(`Could not find node with ID: ${formattedNodeId}`);
     }
     
     // Create a cleanup function
