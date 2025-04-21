@@ -1016,7 +1016,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       
       if (nodeCount <= 7) {
         // Circular arrangement for very small node sets
-        const radius = 50; // Small fixed radius
+        const radius = 100; // Increased radius for better node separation
         
         newGraphData.nodes.forEach((node, i) => {
           // First node goes at the center
@@ -1053,7 +1053,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         // Grid arrangement for larger filtered sets
         // Calculate grid dimensions
         const gridSize = Math.ceil(Math.sqrt(nodeCount));
-        const cellSize = 40; // Space between nodes
+        const cellSize = 80; // Increased space between nodes for better visibility
         const gridWidth = gridSize * cellSize;
         const startX = centerX - gridWidth / 2 + cellSize / 2;
         const startY = centerY - gridWidth / 2 + cellSize / 2;
@@ -1084,6 +1084,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     } else {
       // NORMAL (UNFILTERED) VIEW PHYSICS - Standard force configuration
+      
+      // IMPORTANT: Remove all fixed positions (fx/fy) from nodes when filters are removed
+      // This allows them to rejoin the natural layout pattern
+      newGraphData.nodes.forEach(node => {
+        // Release any fixed positions to allow nodes to naturally position in the layout
+        if ('fx' in node) node.fx = null;
+        if ('fy' in node) node.fy = null;
+      });
+      
       simulationRef.current
         .nodes(newGraphData.nodes)
         .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
