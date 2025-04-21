@@ -174,10 +174,13 @@ export async function generateChatResponse(
   try {
     // Get all bookmarks first
     let bookmarks = await storage.getBookmarks();
+    console.log(`Starting with ${bookmarks.length} total bookmarks`);
     
     // Apply filters if provided
     if (filters) {
       if (filters.tags && filters.tags.length > 0) {
+        console.log(`Filtering by tags: ${filters.tags.join(', ')}`);
+        
         // First get all bookmarks with their normalized tags
         const bookmarksWithTags = await Promise.all(
           bookmarks.map(async (bookmark) => {
@@ -188,6 +191,8 @@ export async function generateChatResponse(
               const normalizedTagNames = normalizedTags.map(tag => tag.name);
               // Combine with system tags
               const allTagNames = [...(bookmark.system_tags || []), ...normalizedTagNames];
+              
+              console.log(`Bookmark "${bookmark.title}" has tags: ${allTagNames.join(', ') || 'none'}`);
               
               return {
                 bookmark,
@@ -206,31 +211,52 @@ export async function generateChatResponse(
         // Filter bookmarks based on combined tags
         bookmarks = bookmarksWithTags
           .filter(item => {
-            return filters.tags!.some(tag => item.tags.includes(tag));
+            const matches = filters.tags!.some(tag => item.tags.includes(tag));
+            if (matches) {
+              console.log(`Bookmark "${item.bookmark.title}" matched tag filter`);
+            }
+            return matches;
           })
           .map(item => item.bookmark);
+          
+        console.log(`After tag filtering: ${bookmarks.length} bookmarks remain`);
       }
       
       if (filters.startDate) {
+        console.log(`Filtering by start date: ${filters.startDate}`);
         const startDate = new Date(filters.startDate);
+        const beforeCount = bookmarks.length;
+        
         bookmarks = bookmarks.filter(bookmark => {
           const bookmarkDate = new Date(bookmark.date_saved);
           return bookmarkDate >= startDate;
         });
+        
+        console.log(`After start date filtering: ${bookmarks.length} of ${beforeCount} bookmarks remain`);
       }
       
       if (filters.endDate) {
+        console.log(`Filtering by end date: ${filters.endDate}`);
         const endDate = new Date(filters.endDate);
+        const beforeCount = bookmarks.length;
+        
         bookmarks = bookmarks.filter(bookmark => {
           const bookmarkDate = new Date(bookmark.date_saved);
           return bookmarkDate <= endDate;
         });
+        
+        console.log(`After end date filtering: ${bookmarks.length} of ${beforeCount} bookmarks remain`);
       }
       
       if (filters.source && filters.source.length > 0) {
+        console.log(`Filtering by sources: ${filters.source.join(', ')}`);
+        const beforeCount = bookmarks.length;
+        
         bookmarks = bookmarks.filter(bookmark => 
           filters.source!.includes(bookmark.source)
         );
+        
+        console.log(`After source filtering: ${bookmarks.length} of ${beforeCount} bookmarks remain`);
       }
     }
     
@@ -260,6 +286,16 @@ export async function generateChatResponse(
        ${bookmark.summary}
        ${bookmark.highlights}`
     ).join("\n\n");
+    
+    console.log(`Sending ${bookmarkContent.length} bookmarks to AI for context`);
+    if (bookmarkContent.length > 0) {
+      console.log(`First bookmark in context: "${bookmarkContent[0].title}"`);
+      if (bookmarkContent.length > 1) {
+        console.log(`Last bookmark in context: "${bookmarkContent[bookmarkContent.length - 1].title}"`);
+      }
+    } else {
+      console.log("Warning: No bookmarks in context!");
+    }
     
     // Send query to OpenAI
     const response = await openai.chat.completions.create({
