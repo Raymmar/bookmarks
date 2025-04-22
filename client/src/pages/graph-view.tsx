@@ -536,8 +536,12 @@ export default function GraphView() {
           
           {/* Tags drawer - minimal version */}
           <div className="flex flex-wrap gap-1 items-center">
-            {/* Tags display - either popular tags or all tags */}
-            {(tagDrawerOpen ? allTags : popularTags).map(tag => (
+            {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
+            {(tagDrawerOpen 
+              ? allTags 
+              // When drawer is closed, filter out selected tags from the popular tags
+              : popularTags.filter(tag => !selectedTags.includes(tag))
+            ).map(tag => (
               <Badge 
                 key={tag}
                 variant={selectedTags.includes(tag) ? "default" : "outline"}
@@ -558,14 +562,25 @@ export default function GraphView() {
             ))}
             
             {/* Show "more" badge when drawer is closed */}
-            {!tagDrawerOpen && allTags.length > popularTags.length && (
-              <Badge 
-                variant="secondary"
-                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                onClick={toggleTagDrawer}
-              >
-                +{allTags.length - popularTags.length} <ChevronUp className="h-3 w-3 ml-1" />
-              </Badge>
+            {!tagDrawerOpen && (
+              (() => {
+                // Calculate remaining non-selected tags for display
+                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
+                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
+                
+                if (remainingTagsCount > 0) {
+                  return (
+                    <Badge 
+                      variant="secondary"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                      onClick={toggleTagDrawer}
+                    >
+                      +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
+                    </Badge>
+                  );
+                }
+                return null;
+              })()
             )}
           </div>
         </div>
