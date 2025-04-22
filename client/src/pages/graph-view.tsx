@@ -495,59 +495,49 @@ export default function GraphView() {
             </div>
           )}
           
-          {/* Tags drawer with toggle */}
-          <div className="relative border-t mt-1 pt-2">
-            {/* Drawer header with toggle button */}
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-medium text-gray-700">
-                {tagDrawerOpen ? "All Tags" : "Popular Tags"}
-              </h3>
-              <button 
-                onClick={toggleTagDrawer}
-                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                aria-label={tagDrawerOpen ? "Collapse tag drawer" : "Expand tag drawer"}
-              >
-                {tagDrawerOpen ? (
-                  <ChevronUp className="h-4 w-4 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                )}
-              </button>
-            </div>
-            
+          {/* Tags drawer - minimal version */}
+          <div className="relative flex flex-wrap gap-1 items-center">
             {/* Tags display - either popular tags or all tags */}
-            <div className="flex flex-wrap gap-1 pb-1">
-              {(tagDrawerOpen ? allTags : popularTags).map(tag => (
-                <Badge 
-                  key={tag}
-                  variant={selectedTags.includes(tag) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleTagSelection(tag)}
-                >
-                  {tag}
-                  {selectedTags.includes(tag) && (
-                    <X 
-                      className="h-3 w-3 ml-1" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTagSelection(tag);
-                      }}
-                    />
-                  )}
-                </Badge>
-              ))}
-              
-              {/* Show count of hidden tags when drawer is closed */}
-              {!tagDrawerOpen && allTags.length > popularTags.length && (
+            {(tagDrawerOpen ? allTags : popularTags).map(tag => (
+              <Badge 
+                key={tag}
+                variant={selectedTags.includes(tag) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggleTagSelection(tag)}
+              >
+                {tag}
+                {selectedTags.includes(tag) && (
+                  <X 
+                    className="h-3 w-3 ml-1" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTagSelection(tag);
+                    }}
+                  />
+                )}
+              </Badge>
+            ))}
+            
+            {/* Show "more" badge or collapse button */}
+            {!tagDrawerOpen && allTags.length > popularTags.length ? (
+              <Badge 
+                variant="secondary"
+                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                onClick={toggleTagDrawer}
+              >
+                +{allTags.length - popularTags.length} <ChevronDown className="h-3 w-3 ml-1" />
+              </Badge>
+            ) : (
+              tagDrawerOpen && (
                 <Badge 
                   variant="secondary"
-                  className="cursor-pointer bg-gray-100 hover:bg-gray-200"
+                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
                   onClick={toggleTagDrawer}
                 >
-                  +{allTags.length - popularTags.length} more
+                  <ChevronUp className="h-3 w-3" />
                 </Badge>
-              )}
-            </div>
+              )
+            )}
           </div>
         </div>
       </div>
