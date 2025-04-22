@@ -347,8 +347,29 @@ export default function Home() {
                 {/* Graph View */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800">Knowledge Graph</h2>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      {selectedCollectionId 
+                        ? 'Collection Graph: ' + (collections.find(c => c.id === selectedCollectionId)?.name || 'Loading...')
+                        : 'Knowledge Graph'}
+                    </h2>
                     <div className="flex items-center space-x-3">
+                      {/* Show clear filter button when a collection is selected */}
+                      {selectedCollectionId && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCollectionId(null);
+                            // Dispatch event to clear the selection in sidebar
+                            window.dispatchEvent(new CustomEvent('filterByCollection', { 
+                              detail: { collectionId: null } 
+                            }));
+                          }}
+                          className="text-xs"
+                        >
+                          Show All Bookmarks
+                        </Button>
+                      )}
                       <Select value={String(insightLevel)} onValueChange={(value) => setInsightLevel(parseInt(value))}>
                         <SelectTrigger className="w-48">
                           <SelectValue placeholder="Insight depth" />
@@ -362,6 +383,21 @@ export default function Home() {
                       </Select>
                     </div>
                   </div>
+                  
+                  {selectedCollectionId && (
+                    <div className="mb-4">
+                      <Badge 
+                        variant="outline" 
+                        className="flex items-center gap-1 bg-primary/10 text-primary border-primary/30"
+                      >
+                        <FolderOpen className="h-3 w-3" />
+                        {collections.find(c => c.id === selectedCollectionId)?.name || 'Collection'}
+                        {collections.find(c => c.id === selectedCollectionId)?.is_public === false && 
+                          <span className="text-xs text-gray-500">(Private)</span>
+                        }
+                      </Badge>
+                    </div>
+                  )}
                   
                   <div className="h-80 border border-gray-200 rounded-lg overflow-hidden bg-white">
                     <ForceDirectedGraph 
