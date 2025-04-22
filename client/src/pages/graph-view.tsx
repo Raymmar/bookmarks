@@ -434,7 +434,18 @@ export default function GraphView() {
         </div>
         
         {/* Filters display at the bottom of the graph area */}
-        <div className="flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
+        <div className="relative flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
+          {/* Absolute positioned close button when drawer is open - positioned relative to parent with padding */}
+          {tagDrawerOpen && (
+            <button
+              onClick={toggleTagDrawer}
+              aria-label="Close tag drawer"
+              className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
+            >
+              <ChevronUp className="h-4 w-4 text-gray-700" />
+            </button>
+          )}
+          
           {/* Bookmark filter indicator if a bookmark is selected */}
           {selectedBookmarkId && (
             <div className="mb-2 flex items-center">
@@ -495,8 +506,8 @@ export default function GraphView() {
             </div>
           )}
           
-          {/* Tags drawer - minimal version with container overflow visible for button */}
-          <div className="relative flex flex-wrap gap-1 items-center pb-1">
+          {/* Tags drawer - minimal version */}
+          <div className="flex flex-wrap gap-1 items-center">
             {/* Tags display - either popular tags or all tags */}
             {(tagDrawerOpen ? allTags : popularTags).map(tag => (
               <Badge 
@@ -527,19 +538,6 @@ export default function GraphView() {
               >
                 +{allTags.length - popularTags.length} <ChevronDown className="h-3 w-3 ml-1" />
               </Badge>
-            )}
-            
-            {/* Absolute positioned close button when drawer is open - with no spacing from corner */}
-            {tagDrawerOpen && (
-              <div className="absolute top-0 right-0 p-0 m-0 z-10">
-                <button
-                  onClick={toggleTagDrawer}
-                  aria-label="Close tag drawer"
-                  className="bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1"
-                >
-                  <ChevronUp className="h-4 w-4 text-gray-700" />
-                </button>
-              </div>
             )}
           </div>
         </div>
