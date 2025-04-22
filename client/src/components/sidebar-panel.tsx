@@ -122,12 +122,12 @@ export function SidebarPanel({
     <>
       <div className="border-b border-gray-200">
         {/* Sorting controls in the nav area, replacing the heading for consistent height */}
-        <div className="p-4">
+        <div className="px-3 py-2">
           <Select
             value={sortOrder}
             onValueChange={(value) => onSortChange?.(value)}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full h-10">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
