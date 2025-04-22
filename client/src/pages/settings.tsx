@@ -183,8 +183,8 @@ const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="container py-10 px-6">
-      <div className="mx-auto max-w-[1280px]">
+    <div className="container px-6 overflow-y-auto h-full">
+      <div className="mx-auto max-w-[1280px] py-6">
         <h1 className="text-3xl font-bold mb-6">Settings</h1>
         <p className="text-muted-foreground mb-8">
           Customize the system prompts used for auto-tagging and summarization of your bookmarks.
@@ -307,9 +307,7 @@ const SettingsPage: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        <Separator className="my-8" />
-
-        <Card className="bg-muted/40">
+        <Card className="bg-muted/40 mt-6">
           <CardHeader>
             <CardTitle>About System Prompts</CardTitle>
             <CardDescription>
