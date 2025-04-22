@@ -2,13 +2,17 @@ import { Activity } from "@shared/types";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { Bookmark, Pencil, FileText, Lightbulb } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Bookmark, Pencil, FileText, Lightbulb, LogIn } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface ActivityFeedProps {
   activities: Activity[];
 }
 
 export function ActivityFeed({ activities }: ActivityFeedProps) {
+  const { user } = useAuth();
+  
   if (!activities || activities.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
@@ -39,9 +43,13 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                   <p className="text-sm font-medium">
                     {getActivityTitle(activity)}
                     {" "}
-                    <Link href={`/bookmark/${activity.bookmarkId}`} className="text-primary hover:underline">
-                      {activity.bookmarkTitle}
-                    </Link>
+                    {activity.bookmark_id && activity.bookmark_title ? (
+                      <Link href={`/bookmark/${activity.bookmark_id}`} className="text-primary hover:underline">
+                        {activity.bookmark_title}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-600">Unknown bookmark</span>
+                    )}
                   </p>
                   
                   {activity.content && (
@@ -64,6 +72,25 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                 </div>
               </div>
             ))}
+            
+            {/* Login prompt for non-authenticated users */}
+            {!user && (
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-50 rounded-lg">
+                  <LogIn className="h-10 w-10 text-primary mb-2" />
+                  <h3 className="text-lg font-semibold mb-2">See Your Personal Activity</h3>
+                  <p className="text-gray-600 mb-4">
+                    Log in to view your personal network activity and see all history.
+                  </p>
+                  <Link href="/auth">
+                    <Button className="font-medium">
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Log In or Register
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

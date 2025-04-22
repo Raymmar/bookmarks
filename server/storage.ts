@@ -1002,15 +1002,24 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Activities
-  async getActivities(userId?: string): Promise<Activity[]> {
+  async getActivities(userId?: string, limit?: number): Promise<Activity[]> {
     if (userId) {
+      // If a user is authenticated, return all their activities
       return await db
         .select()
         .from(activities)
         .where(eq(activities.user_id, userId))
         .orderBy(desc(activities.timestamp));
     }
-    return await db.select().from(activities).orderBy(desc(activities.timestamp));
+    
+    // For non-authenticated users, optionally limit the number of activities returned
+    let query = db.select().from(activities).orderBy(desc(activities.timestamp));
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
   }
   
   async createActivity(activity: InsertActivity): Promise<Activity> {

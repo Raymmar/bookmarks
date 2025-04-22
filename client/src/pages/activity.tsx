@@ -4,6 +4,7 @@ import { ActivityFeed } from "@/components/activity-feed";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchX } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Activity() {
   const [searchQuery, setSearchQuery] = useState("");

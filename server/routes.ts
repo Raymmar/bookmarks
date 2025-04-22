@@ -386,8 +386,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Retrieved ${activities.length} activities for user: ${userId}`);
         res.json(activities);
       } else {
-        const activities = await storage.getActivities();
-        console.log(`Retrieved ${activities.length} public activities`);
+        // For non-authenticated users, limit to the last 50 activities
+        const activities = await storage.getActivities(undefined, 50);
+        console.log(`Retrieved ${activities.length} public activities (limited to 50)`);
         res.json(activities);
       }
     } catch (error) {
