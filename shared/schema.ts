@@ -60,13 +60,22 @@ export const bookmarks = pgTable("bookmarks", {
   vector_embedding: text("vector_embedding").array(),
   date_saved: timestamp("date_saved").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
-  source: text("source", { enum: ["extension", "web", "import"] }).notNull(),
+  source: text("source", { enum: ["extension", "web", "import", "x"] }).notNull(),
   // AI processing status to track the workflow
   ai_processing_status: text("ai_processing_status", { 
     enum: ["pending", "processing", "completed", "failed"] 
   }).default("pending"),
   // Reference to the user who owns this bookmark
   user_id: uuid("user_id").references(() => users.id),
+  // X.com specific fields
+  external_id: text("external_id"),  // Tweet ID or other external identifier
+  author_username: text("author_username"),  // X.com username of the author
+  author_name: text("author_name"),  // Display name of the author
+  like_count: integer("like_count"),  // Number of likes
+  repost_count: integer("repost_count"),  // Number of reposts/retweets
+  reply_count: integer("reply_count"),  // Number of replies
+  quote_count: integer("quote_count"),  // Number of quote tweets
+  media_urls: text("media_urls").array(),  // URLs of media in the tweet
 });
 
 // Collections table
@@ -333,3 +342,68 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+// X.com integration tables
+export const xCredentials = pgTable("x_credentials", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  user_id: uuid("user_id").references(() => users.id).notNull(),
+  access_token: text("access_token").notNull(),
+  refresh_token: text("refresh_token"),
+  token_expires_at: timestamp("token_expires_at"),
+  x_user_id: text("x_user_id").notNull(),
+  x_username: text("x_username").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+  last_sync_at: timestamp("last_sync_at"),
+});
+
+// X.com folders and their mapping to collections
+export const xFolders = pgTable("x_folders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  user_id: uuid("user_id").references(() => users.id).notNull(),
+  x_folder_id: text("x_folder_id").notNull(),
+  x_folder_name: text("x_folder_name").notNull(),
+  collection_id: uuid("collection_id").references(() => collections.id),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+  last_sync_at: timestamp("last_sync_at"),
+});
+
+// Relations for X tables
+export const xCredentialsRelations = relations(xCredentials, ({ one }) => ({
+  user: one(users, {
+    fields: [xCredentials.user_id],
+    references: [users.id],
+  }),
+}));
+
+export const xFoldersRelations = relations(xFolders, ({ one }) => ({
+  user: one(users, {
+    fields: [xFolders.user_id],
+    references: [users.id],
+  }),
+  collection: one(collections, {
+    fields: [xFolders.collection_id],
+    references: [collections.id],
+  }),
+}));
+
+// Insert schemas for X tables
+export const insertXCredentialsSchema = createInsertSchema(xCredentials).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export const insertXFoldersSchema = createInsertSchema(xFolders).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+// Types for X tables
+export type InsertXCredentials = z.infer<typeof insertXCredentialsSchema>;
+export type XCredentials = typeof xCredentials.$inferSelect;
+
+export type InsertXFolder = z.infer<typeof insertXFoldersSchema>;
+export type XFolder = typeof xFolders.$inferSelect;
