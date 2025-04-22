@@ -468,22 +468,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       
       // Check if we need to reorder (only for "recently_updated" sort)
       if (sortOrder === 'recently_updated') {
-        // Create optimistically updated bookmarks list
-        const updatedBookmarks = currentBookmarks.map(b => 
-          b.id === bookmark.id ? optimisticBookmark : b
-        );
+        // For recently_updated sort, create a new sorted list with the updated bookmark at the top
+        const filteredBookmarks = currentBookmarks.filter(b => b.id !== bookmark.id);
+        const sortedBookmarks = [optimisticBookmark, ...filteredBookmarks];
         
-        // Sort with the updated bookmark at the top if recently_updated sort is active
-        const sortedBookmarks = [...updatedBookmarks].sort((a, b) => {
-          const aUpdated = a.updated_at ? new Date(a.updated_at).getTime() : new Date(a.date_saved).getTime();
-          const bUpdated = b.updated_at ? new Date(b.updated_at).getTime() : new Date(b.date_saved).getTime();
-          return bUpdated - aUpdated;
-        });
-        
-        // Update the cache with the optimistically sorted bookmarks
+        // Update the cache with the reordered list in a single operation
         queryClient.setQueryData(["/api/bookmarks"], sortedBookmarks);
       } else {
-        // For other sort orders, just update the bookmark in the current list
+        // For other sort orders, just update the bookmark in the current list without resorting
         queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], 
           (oldBookmarks = []) => oldBookmarks.map(b => 
             b.id === bookmark.id ? optimisticBookmark : b
@@ -501,10 +493,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       // Update the local state with server response
       setBookmark(updatedBookmark);
       
-      // Invalidate queries to refresh the data after server confirms (but with lower priority)
+      // Invalidate queries to refresh the data after server confirms (with lower priority and longer delay)
+      // This ensures our optimistic update has time to complete any animations or transitions
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      }, 500);
+      }, 1000);
       
       // Dispatch a custom event to inform other components about the update
       const event = new CustomEvent('bookmarkUpdated', { 
