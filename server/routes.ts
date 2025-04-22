@@ -590,8 +590,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user ID if authenticated or undefined for non-authenticated users
       const userId = req.isAuthenticated() ? (req.user as Express.User).id : undefined;
       
-      // Pass user ID to filter tags by user's bookmarks
+      console.log(`Getting tags for ${userId ? `user ${userId}` : 'non-authenticated user'}`);
+      
+      // When not authenticated, we include tags from all available bookmarks 
+      // This ensures we always show relevant tags based on what's visible on screen
       const tags = await storage.getTags(userId);
+      
+      console.log(`Retrieved ${tags.length} tags`);
       res.json(tags);
     } catch (error) {
       console.error("Error retrieving tags:", error);
