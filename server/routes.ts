@@ -1153,19 +1153,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all bookmark_ids in this collection
       const bookmarkRefs = await storage.getBookmarksInCollection(collectionId);
       
-      // Return full bookmark objects for each bookmark in the collection
-      const bookmarks = [];
-      for (const ref of bookmarkRefs) {
-        const bookmark = await storage.getBookmark(ref.bookmark_id);
-        if (bookmark) {
-          bookmarks.push({
-            bookmark_id: ref.bookmark_id,
-            added_at: ref.created_at
-          });
-        }
-      }
-      
-      res.json(bookmarks);
+      // Return the collection bookmark references
+      // We'll let the client map these to full bookmark objects
+      // This matches the expected format in the client's useCollectionBookmarks query
+      res.json(bookmarkRefs);
     } catch (error) {
       console.error("Error getting bookmarks in collection:", error);
       res.status(500).json({ error: "Failed to retrieve bookmarks in collection" });
