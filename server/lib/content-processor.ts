@@ -111,9 +111,10 @@ export async function generateInsights(
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
       systemPrompt = customSystemPrompt;
-      // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+      // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
+      // But we want to be minimal and not override the user's intent
       if (!systemPrompt.toLowerCase().includes("json")) {
-        systemPrompt += "\n\nPlease format your response as JSON.";
+        systemPrompt += "\n\nNote: Please include your response in JSON format.";
       }
       console.log("Using provided custom system prompt for insights generation");
     } 
@@ -124,9 +125,10 @@ export async function generateInsights(
         const customPrompt = await storage.getSetting("summary_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
-          // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+          // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
+          // But we want to be minimal and not override the user's intent
           if (!systemPrompt.toLowerCase().includes("json")) {
-            systemPrompt += "\n\nPlease format your response as JSON.";
+            systemPrompt += "\n\nNote: Please include your response in JSON format.";
           }
           console.log("Retrieved custom summary prompt from storage for insights generation");
         } else {
@@ -291,9 +293,10 @@ export async function generateTags(content: string, url?: string, customSystemPr
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
       systemPrompt = customSystemPrompt;
-      // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+      // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
+      // But we want to be minimal and not override the user's intent
       if (!systemPrompt.toLowerCase().includes("json")) {
-        systemPrompt += "\n\nPlease format your response as JSON.";
+        systemPrompt += "\n\nNote: Please include your response in JSON format.";
       }
       console.log("Using provided custom system prompt for tag generation");
     } 
@@ -303,9 +306,10 @@ export async function generateTags(content: string, url?: string, customSystemPr
         const customPrompt = await storage.getSetting("auto_tagging_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
-          // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+          // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
+          // But we want to be minimal and not override the user's intent
           if (!systemPrompt.toLowerCase().includes("json")) {
-            systemPrompt += "\n\nPlease format your response as JSON.";
+            systemPrompt += "\n\nNote: Please include your response in JSON format.";
           }
           console.log("Retrieved custom tagging prompt from storage");
         } else {
