@@ -906,6 +906,31 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => r.collection);
   }
   
+  async getBookmarksInCollection(collectionId: string): Promise<CollectionBookmark[]> {
+    const result = await db
+      .select()
+      .from(collectionBookmarks)
+      .where(eq(collectionBookmarks.collection_id, collectionId))
+      .orderBy(desc(collectionBookmarks.created_at));
+    
+    return result;
+  }
+  
+  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
+    const bookmarkRefs = await this.getBookmarksInCollection(collectionId);
+    
+    if (!bookmarkRefs.length) return [];
+    
+    const bookmarkIds = bookmarkRefs.map(ref => ref.bookmark_id);
+    
+    const result = await db
+      .select()
+      .from(bookmarks)
+      .where(inArray(bookmarks.id, bookmarkIds));
+    
+    return result;
+  }
+  
   async addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark> {
     const [newCollectionBookmark] = await db
       .insert(collectionBookmarks)
