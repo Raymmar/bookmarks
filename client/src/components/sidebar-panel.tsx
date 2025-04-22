@@ -121,17 +121,13 @@ export function SidebarPanel({
   return (
     <>
       <div className="border-b border-gray-200">
-        <div className="p-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Bookmarks</h2>
-        </div>
-        
-        {/* Sorting controls */}
-        <div className="pb-3 px-4">
+        {/* Sorting controls in the nav area, replacing the heading for consistent height */}
+        <div className="p-4">
           <Select
             value={sortOrder}
             onValueChange={(value) => onSortChange?.(value)}
           >
-            <SelectTrigger className="w-full h-8 text-xs">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
