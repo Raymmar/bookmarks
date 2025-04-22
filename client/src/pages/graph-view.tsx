@@ -599,9 +599,9 @@ export default function GraphView() {
           {!tagDrawerOpen && selectedTags.length > 0 && (
             <div className="mb-2 flex items-center flex-wrap gap-1">
               <span className="text-sm text-gray-600 mr-1">Tags:</span>
-              {selectedTags.map(tag => (
+              {selectedTags.map((tag, index) => (
                 <Badge 
-                  key={`selected-${tag}`}
+                  key={`selected-${tag}-${index}`}
                   variant="default"
                   className="cursor-pointer bg-primary hover:bg-primary/90"
                   onClick={() => toggleTagSelection(tag)}
@@ -637,9 +637,9 @@ export default function GraphView() {
               ? allTags 
               // When drawer is closed, filter out selected tags from the popular tags
               : popularTags.filter(tag => !selectedTags.includes(tag))
-            ).map(tag => (
+            ).map((tag, index) => (
               <Badge 
-                key={tag}
+                key={`tag-${tag}-${index}`} // Using index to ensure unique keys
                 variant={selectedTags.includes(tag) ? "default" : "outline"}
                 className="cursor-pointer"
                 onClick={() => toggleTagSelection(tag)}

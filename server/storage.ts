@@ -1087,7 +1087,8 @@ export class DatabaseStorage implements IStorage {
         .from(tags)
         .innerJoin(bookmarkTags, eq(bookmarkTags.tag_id, tags.id))
         .innerJoin(bookmarks, eq(bookmarkTags.bookmark_id, bookmarks.id))
-        .where(eq(bookmarks.user_id, userId));
+        .where(eq(bookmarks.user_id, userId))
+        .groupBy(tags.id); // Group by tag ID to eliminate duplicates
       
       // If no results, return empty array
       if (userTags.length === 0) {
@@ -1098,14 +1099,16 @@ export class DatabaseStorage implements IStorage {
       return userTags.map(result => result.tag);
     }
     
-    // If no userId provided (user not logged in), return tags for all bookmarks
+    // If no userId provided (user not logged in), return distinct tags for all bookmarks
     // This ensures non-authenticated users still see relevant tags for filtering
+    // Using SQL GROUP BY to ensure we only get unique tags
     const allTags = await db
       .select({
         tag: tags
       })
       .from(tags)
-      .innerJoin(bookmarkTags, eq(bookmarkTags.tag_id, tags.id));
+      .innerJoin(bookmarkTags, eq(bookmarkTags.tag_id, tags.id))
+      .groupBy(tags.id); // Group by tag ID to eliminate duplicates
     
     // Extract tag objects from the join result
     return allTags.map(result => result.tag);
