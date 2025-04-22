@@ -352,6 +352,47 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     !tags.some(existingTag => existingTag.id === tag.id)
   );
   
+  // Handle collection selection changes
+  const handleCollectionChange = async (collectionId: string) => {
+    if (!bookmark) return;
+    
+    // Check if bookmark is already in the selected collection
+    const isInCollection = bookmarkCollections.some(c => c.id === collectionId);
+    
+    try {
+      if (isInCollection) {
+        // Remove bookmark from collection
+        await removeBookmarkFromCollection.mutateAsync({
+          collectionId,
+          bookmarkId: bookmark.id
+        });
+        
+        toast({
+          title: "Removed from collection",
+          description: "Bookmark has been removed from the collection",
+        });
+      } else {
+        // Add bookmark to collection
+        await addBookmarkToCollection.mutateAsync({
+          collectionId,
+          bookmarkId: bookmark.id
+        });
+        
+        toast({
+          title: "Added to collection",
+          description: "Bookmark has been added to the collection",
+        });
+      }
+    } catch (error) {
+      console.error("Error managing collection:", error);
+      toast({
+        title: "Collection update failed",
+        description: "There was an error updating collections. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   // Adding a tag to the bookmark
   const handleAddTag = async (tagId: string) => {
     if (!bookmark) return;
