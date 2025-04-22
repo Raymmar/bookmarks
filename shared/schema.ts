@@ -1,6 +1,46 @@
-import { pgTable, text, serial, integer, boolean, timestamp, uuid, json, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uuid, json, jsonb, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
+
+// Users table for authentication
+export const users = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Collections table for organizing bookmarks
+export const collections = pgTable("collections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  is_public: boolean("is_public").default(false).notNull(),
+  is_default: boolean("is_default").default(false).notNull(),
+  owner_id: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Collection Memberships for shared collections
+export const collectionMemberships = pgTable("collection_memberships", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  collection_id: uuid("collection_id").references(() => collections.id, { onDelete: "cascade" }).notNull(),
+  user_id: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  role: text("role", { enum: ["viewer", "editor", "admin"] }).default("viewer").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Bookmark-Collection relationships (many-to-many)
+export const bookmarkCollections = pgTable("bookmark_collections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }).notNull(),
+  collection_id: uuid("collection_id").references(() => collections.id, { onDelete: "cascade" }).notNull(),
+  added_at: timestamp("added_at").defaultNow().notNull(),
+});
 
 // Chat Sessions table for persistent chat
 export const chatSessions = pgTable("chat_sessions", {
@@ -109,7 +149,89 @@ export const settings = pgTable("settings", {
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Define relations
+export const usersRelations = relations(users, ({ many }) => ({
+  collections: many(collections, { relationName: "user_collections" }),
+  collectionMemberships: many(collectionMemberships, { relationName: "user_memberships" }),
+}));
+
+export const collectionsRelations = relations(collections, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [collections.owner_id],
+    references: [users.id],
+    relationName: "user_collections"
+  }),
+  memberships: many(collectionMemberships, { relationName: "collection_memberships" }),
+  bookmarks: many(bookmarkCollections, { relationName: "collection_bookmarks" }),
+}));
+
+export const collectionMembershipsRelations = relations(collectionMemberships, ({ one }) => ({
+  collection: one(collections, {
+    fields: [collectionMemberships.collection_id],
+    references: [collections.id],
+    relationName: "collection_memberships"
+  }),
+  user: one(users, {
+    fields: [collectionMemberships.user_id],
+    references: [users.id],
+    relationName: "user_memberships"
+  }),
+}));
+
+export const bookmarkCollectionsRelations = relations(bookmarkCollections, ({ one }) => ({
+  bookmark: one(bookmarks, {
+    fields: [bookmarkCollections.bookmark_id],
+    references: [bookmarks.id]
+  }),
+  collection: one(collections, {
+    fields: [bookmarkCollections.collection_id],
+    references: [collections.id],
+    relationName: "collection_bookmarks"
+  }),
+}));
+
+export const bookmarksRelations = relations(bookmarks, ({ many }) => ({
+  notes: many(notes),
+  screenshots: many(screenshots),
+  highlights: many(highlights),
+  collections: many(bookmarkCollections),
+  tags: many(bookmarkTags),
+}));
+
+export const bookmarkTagsRelations = relations(bookmarkTags, ({ one }) => ({
+  bookmark: one(bookmarks, {
+    fields: [bookmarkTags.bookmark_id],
+    references: [bookmarks.id]
+  }),
+  tag: one(tags, {
+    fields: [bookmarkTags.tag_id],
+    references: [tags.id]
+  }),
+}));
+
 // Insert Schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export const insertCollectionSchema = createInsertSchema(collections).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export const insertCollectionMembershipSchema = createInsertSchema(collectionMemberships).omit({
+  id: true,
+  created_at: true,
+});
+
+export const insertBookmarkCollectionSchema = createInsertSchema(bookmarkCollections).omit({
+  id: true,
+  added_at: true,
+});
+
 export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
   id: true,
   vector_embedding: true,
@@ -165,6 +287,18 @@ export const insertSettingSchema = createInsertSchema(settings).omit({
 });
 
 // Types
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+export type InsertCollection = z.infer<typeof insertCollectionSchema>;
+export type Collection = typeof collections.$inferSelect;
+
+export type InsertCollectionMembership = z.infer<typeof insertCollectionMembershipSchema>;
+export type CollectionMembership = typeof collectionMemberships.$inferSelect;
+
+export type InsertBookmarkCollection = z.infer<typeof insertBookmarkCollectionSchema>;
+export type BookmarkCollection = typeof bookmarkCollections.$inferSelect;
+
 export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
 export type Bookmark = typeof bookmarks.$inferSelect;
 
