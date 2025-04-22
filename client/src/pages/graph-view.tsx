@@ -745,14 +745,24 @@ export default function GraphView() {
             } hover:bg-gray-200 z-10`}
           >
             {(() => {
-              // Calculate remaining non-selected tags count if drawer is closed
+              // Calculate hidden tags count if drawer is closed
               if (!tagDrawerOpen) {
-                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
-                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
-                if (remainingTagsCount > 0) {
+                // Filter out selected tags from available tags
+                const availableTags = allTags.filter(tag => !selectedTags.includes(tag));
+                // Calculate how many tags are visible when drawer is closed
+                const visibleTagLimit = visibleTagsCount;
+                // Get only the visible tags (excluding selected tags)
+                const visibleNonSelectedTags = popularTags
+                  .filter(tag => !selectedTags.includes(tag))
+                  .slice(0, visibleTagLimit);
+                
+                // Calculate how many tags are hidden
+                const hiddenTagsCount = availableTags.length - visibleNonSelectedTags.length;
+                
+                if (hiddenTagsCount > 0) {
                   return (
                     <div className="flex items-center">
-                      <span className="text-xs mr-1 font-medium">+{remainingTagsCount}</span>
+                      <span className="text-xs mr-1 font-medium">+{hiddenTagsCount}</span>
                       <ChevronUp className="h-4 w-4 text-gray-700" />
                     </div>
                   );
