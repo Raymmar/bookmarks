@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { X, LayoutGrid, Network, Search, ChevronUp, ChevronDown, BookmarkPlus, SearchX } from "lucide-react";
-import { useCollectionBookmarks, useCollections } from "@/hooks/use-collection-queries";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,7 +34,6 @@ export default function GraphView() {
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -66,12 +64,6 @@ export default function GraphView() {
   const { data: tags = [], isLoading: isLoadingTags } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
   });
-  
-  // Fetch collections for displaying names in filter UI
-  const { data: collections = [], isLoading: isLoadingCollections } = useCollections();
-  
-  // Fetch collection bookmarks if a collection is selected
-  const { data: collectionBookmarkIds = [], isLoading: isLoadingCollectionBookmarks } = useCollectionBookmarks(selectedCollectionId);
 
   // Fetch bookmark-tag associations for each bookmark
   const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags, refetch: refetchBookmarkTags } = useQuery<BookmarkWithTags[]>({
@@ -185,10 +177,9 @@ export default function GraphView() {
     }
     
     // If there are any filters applied, reset them on authentication change
-    if ((selectedTags.length > 0 || selectedDomain || selectedCollectionId) && (isLogin || isLogout)) {
+    if ((selectedTags.length > 0 || selectedDomain) && (isLogin || isLogout)) {
       setSelectedTags([]);
       setSelectedDomain(null);
-      setSelectedCollectionId(null);
     }
     
     // When a logout occurs, we need to completely reset the graph state
@@ -231,10 +222,10 @@ export default function GraphView() {
     
     // Update the previous user reference for the next render
     prevUserRef.current = user;
-  }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, selectedCollectionId, isLoadingBookmarks, isLoadingTags]);
+  }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, isLoadingBookmarks, isLoadingTags]);
   
   // Combined loading state
-  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || isLoadingCollectionBookmarks || isLoadingCollections;
+  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags;
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
@@ -276,29 +267,13 @@ export default function GraphView() {
     bookmarksWithTagsMap.set(bookmark.id, bookmark);
   });
   
-  // Debug logs for collection filtering
-  if (selectedCollectionId) {
-    console.log(`Collection filter active: ${selectedCollectionId}`);
-    console.log(`Collection bookmark IDs: ${JSON.stringify(collectionBookmarkIds)}`);
-    console.log(`Total bookmarks before filtering: ${bookmarks.length}`);
-  }
-
-  // Filter bookmarks based on search query, selected tags, domain, and collection
+  // Filter bookmarks based on search query, selected tags, and domain
   const filteredBookmarkIds = bookmarks.filter(bookmark => {
     // Get this bookmark's tags from our map
     const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
     // Note: system_tags is being phased out in favor of the normalized tag system
     const bookmarkSystemTags: string[] = [];
     const allBookmarkTags = [...bookmarkTags, ...bookmarkSystemTags];
-    
-    // Collection filter - this is critically important for graph filtering
-    if (selectedCollectionId && collectionBookmarkIds && collectionBookmarkIds.length > 0) {
-      // If this bookmark is not in the selected collection, filter it out
-      const isInCollection = collectionBookmarkIds.includes(bookmark.id);
-      if (!isInCollection) {
-        return false; // Exclude this bookmark from filtered results
-      }
-    }
     
     // Search query filter
     if (searchQuery) {
@@ -358,18 +333,6 @@ export default function GraphView() {
   const filteredBookmarks = bookmarksWithTags.filter(bookmark => 
     filteredBookmarkIds.includes(bookmark.id)
   );
-  
-  // Debug logs for filtered bookmarks
-  if (selectedCollectionId) {
-    console.log(`[Graph View] Collection filter active: ${selectedCollectionId}`);
-    console.log(`[Graph View] Collection bookmark IDs count: ${collectionBookmarkIds.length}`);
-    console.log(`[Graph View] Total bookmarks after filtering: ${filteredBookmarks.length}`);
-    console.log(`[Graph View] Filtered bookmarks IDs: ${JSON.stringify(filteredBookmarks.map(b => b.id))}`);
-    
-    // Create a hash to help track when the filtered list changes
-    const bookmarksHash = JSON.stringify(filteredBookmarks.map(b => b.id).sort());
-    console.log(`[Graph View] Bookmarks hash: ${bookmarksHash.slice(0, 40)}...`);
-  }
   
   // Sort bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
@@ -543,8 +506,6 @@ export default function GraphView() {
               onSortOrderChange={setSortOrder}
               visibleNodeTypes={visibleNodeTypes}
               onVisibleNodeTypesChange={setVisibleNodeTypes}
-              selectedCollectionId={selectedCollectionId}
-              onCollectionChange={setSelectedCollectionId}
             />
           </div>
         </div>
@@ -687,27 +648,6 @@ export default function GraphView() {
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDomainSelection(selectedDomain);
-                  }}
-                />
-              </Badge>
-            </div>
-          )}
-          
-          {/* Collection filter indicator if selected */}
-          {selectedCollectionId && (
-            <div className="mb-2 flex items-center">
-              <span className="text-sm text-gray-600 mr-2">Collection:</span>
-              <Badge 
-                variant="default"
-                className="cursor-pointer bg-purple-600 hover:bg-purple-700"
-                onClick={() => setSelectedCollectionId(null)}
-              >
-                {collections && collections.find(c => c.id === selectedCollectionId)?.name || selectedCollectionId}
-                <X 
-                  className="h-3 w-3 ml-1" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedCollectionId(null);
                   }}
                 />
               </Badge>

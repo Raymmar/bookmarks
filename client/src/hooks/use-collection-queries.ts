@@ -38,19 +38,6 @@ export function useCollection(id: string): UseQueryResult<CollectionWithBookmark
   });
 }
 
-// Hook for fetching bookmarks in a collection
-export function useCollectionBookmarks(collectionId: string | null): UseQueryResult<string[], Error> {
-  return useQuery({
-    queryKey: ['/api/collections', collectionId, 'bookmarks'],
-    queryFn: async () => {
-      if (!collectionId) return [];
-      const result = await apiRequest('GET', `/api/collections/${collectionId}/bookmarks`);
-      return result.map((bookmark: any) => bookmark.bookmark_id);
-    },
-    enabled: !!collectionId // Only run query if collectionId is provided
-  });
-}
-
 // Hook for collection mutations (create, update, delete)
 export function useCollectionMutations() {
   // Create a new collection

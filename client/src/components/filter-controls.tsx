@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCollections } from "@/hooks/use-collection-queries";
 
 interface FilterControlsProps {
   tags: string[];
@@ -20,8 +19,6 @@ interface FilterControlsProps {
   onTagModeChange: (mode: "any" | "all") => void;
   sortOrder: string;
   onSortOrderChange: (sortOrder: string) => void;
-  selectedCollectionId?: string | null;
-  onCollectionChange?: (collectionId: string | null) => void;
   visibleNodeTypes?: string[];
   onVisibleNodeTypesChange?: (nodeTypes: string[]) => void;
   className?: string;
@@ -39,14 +36,11 @@ export function FilterControls({
   onTagModeChange,
   sortOrder,
   onSortOrderChange,
-  selectedCollectionId,
-  onCollectionChange,
   visibleNodeTypes = ["bookmark", "domain", "tag"],
   onVisibleNodeTypesChange,
   className
 }: FilterControlsProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: collections = [], isLoading: collectionsLoading } = useCollections();
   
   const handleTagToggle = (tag: string) => {
     if (selectedTags.includes(tag)) {
@@ -76,12 +70,10 @@ export function FilterControls({
   
   // Count non-tag filters for the filter badge count, including node type filters
   const nodeTypesFiltered = visibleNodeTypes.length < 3; // Less than all 3 node types are visible
-  const collectionFiltered = !!selectedCollectionId;
-  const filtersActive = dateRange !== "all" || sources.length < 3 || nodeTypesFiltered || collectionFiltered;
+  const filtersActive = dateRange !== "all" || sources.length < 3 || nodeTypesFiltered;
   const filterCount = (dateRange !== "all" ? 1 : 0) + 
                      (sources.length < 3 ? 1 : 0) + 
-                     (nodeTypesFiltered ? 1 : 0) +
-                     (collectionFiltered ? 1 : 0);
+                     (nodeTypesFiltered ? 1 : 0);
   
   return (
     <div className={cn("flex items-center", className)}>
@@ -106,34 +98,6 @@ export function FilterControls({
         </PopoverTrigger>
         <PopoverContent className="w-64 p-4" align="start">
           <div className="space-y-4">
-            {collections.length > 0 && (
-              <div>
-                <h3 className="text-xs font-medium text-gray-700 mb-2">Collection</h3>
-                <Select 
-                  value={selectedCollectionId || "all"} 
-                  onValueChange={(value) => {
-                    if (onCollectionChange) {
-                      const collectionId = value === "all" ? null : value;
-                      console.log(`[Filter Controls] Collection changed to: ${collectionId || 'All Collections'}`);
-                      onCollectionChange(collectionId);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full text-xs h-8">
-                    <SelectValue placeholder="Select collection" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Collections</SelectItem>
-                    {collections.map((collection) => (
-                      <SelectItem key={collection.id} value={collection.id}>
-                        {collection.name} {!collection.is_public && "(Private)"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div>
               <h3 className="text-xs font-medium text-gray-700 mb-2">Sort By</h3>
               <Select value={sortOrder} onValueChange={onSortOrderChange}>
@@ -262,9 +226,6 @@ export function FilterControls({
                   onSourcesChange(["extension", "web", "import"]);
                   if (onVisibleNodeTypesChange) {
                     onVisibleNodeTypesChange(["bookmark", "domain", "tag"]);
-                  }
-                  if (onCollectionChange) {
-                    onCollectionChange(null);
                   }
                 }}
               >
