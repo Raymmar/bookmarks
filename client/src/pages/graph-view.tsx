@@ -361,8 +361,14 @@ export default function GraphView() {
   
   // Debug logs for filtered bookmarks
   if (selectedCollectionId) {
-    console.log(`Total bookmarks after filtering: ${filteredBookmarks.length}`);
-    console.log(`Filtered bookmarks IDs: ${JSON.stringify(filteredBookmarks.map(b => b.id))}`);
+    console.log(`[Graph View] Collection filter active: ${selectedCollectionId}`);
+    console.log(`[Graph View] Collection bookmark IDs count: ${collectionBookmarkIds.length}`);
+    console.log(`[Graph View] Total bookmarks after filtering: ${filteredBookmarks.length}`);
+    console.log(`[Graph View] Filtered bookmarks IDs: ${JSON.stringify(filteredBookmarks.map(b => b.id))}`);
+    
+    // Create a hash to help track when the filtered list changes
+    const bookmarksHash = JSON.stringify(filteredBookmarks.map(b => b.id).sort());
+    console.log(`[Graph View] Bookmarks hash: ${bookmarksHash.slice(0, 40)}...`);
   }
   
   // Sort bookmarks
