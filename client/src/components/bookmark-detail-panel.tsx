@@ -1095,6 +1095,37 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           )}
         </div>
         
+        {/* Collections Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-700">Collection</h4>
+            <div className="flex items-center">
+              <FolderIcon className="h-3.5 w-3.5 mr-2 text-gray-500" />
+            </div>
+          </div>
+          <div className="mb-2">
+            <Select onValueChange={handleCollectionChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={bookmarkCollections.length > 0 
+                  ? `${bookmarkCollections.length} collection${bookmarkCollections.length !== 1 ? 's' : ''}` 
+                  : "Select a collection"} 
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {allCollections.map((collection) => (
+                  <SelectItem 
+                    key={collection.id} 
+                    value={collection.id}
+                    className={bookmarkCollections.some(c => c.id === collection.id) ? "bg-primary/10" : ""}
+                  >
+                    {collection.name} {bookmarkCollections.some(c => c.id === collection.id) && "✓"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
         {bookmark.insights?.related_links && bookmark.insights.related_links.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
