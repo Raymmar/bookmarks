@@ -528,7 +528,7 @@ export default function GraphView() {
           <button
             onClick={toggleTagDrawer}
             aria-label={tagDrawerOpen ? "Close tag drawer" : "Open tag drawer"}
-            className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
+            className={`absolute top-0 right-0 ${tagDrawerOpen ? 'bg-gray-100' : 'bg-transparent'} hover:bg-gray-200 flex items-center justify-center p-1 z-10`}
           >
             {(() => {
               // Calculate remaining non-selected tags count if drawer is closed
