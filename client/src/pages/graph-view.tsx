@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph-unpinned";
 import { SidebarPanel } from "@/components/sidebar-panel";
@@ -117,26 +117,35 @@ export default function GraphView() {
     };
   }, [queryClient, refetchBookmarkTags]);
   
+  // Track previous auth state to detect login vs logout
+  const prevUserRef = useRef<{ id: string } | null>(null);
+  
   // Listen for user authentication changes and refresh bookmarks
   useEffect(() => {
-    // Refresh bookmark data when the user changes (login/logout)
+    // Determine if this is a login or logout event
+    const isLogin = !prevUserRef.current && user;
+    const isLogout = prevUserRef.current && !user;
+    
     console.log("User authentication state changed, refreshing bookmark data");
     
-    // Invalidate and refetch all related queries
+    // Always invalidate and refetch all related queries
     queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
     queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
     queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
     
-    // If a bookmark was selected, reset the selection as it might not belong to the current user
-    if (selectedBookmarkId && user) {
+    // If a bookmark was selected, reset the selection on authentication change
+    if (selectedBookmarkId && (isLogin || isLogout)) {
       setSelectedBookmarkId(null);
     }
     
-    // If there are any filters applied, reset them when user changes
-    if ((selectedTags.length > 0 || selectedDomain) && user) {
+    // If there are any filters applied, reset them on authentication change
+    if ((selectedTags.length > 0 || selectedDomain) && (isLogin || isLogout)) {
       setSelectedTags([]);
       setSelectedDomain(null);
-      
+    }
+    
+    // When auth state changes, trigger a full graph refresh and center
+    if (isLogin || isLogout) {
       // Trigger a zoom-out to show the full graph
       setTimeout(() => {
         const event = new CustomEvent('centerFullGraph', { 
@@ -150,6 +159,9 @@ export default function GraphView() {
     if (!isLoadingBookmarks && !isLoadingTags) {
       refetchBookmarkTags();
     }
+    
+    // Update the previous user reference for the next render
+    prevUserRef.current = user;
   }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, isLoadingBookmarks, isLoadingTags]);
   
   // Combined loading state
