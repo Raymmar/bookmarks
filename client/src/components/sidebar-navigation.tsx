@@ -47,16 +47,22 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
 
   // Handle collection selection
   const handleCollectionClick = (collectionId: string) => {
+    console.log(`Collection clicked: ${collectionId}`);
+    
     if (selectedCollectionId === collectionId) {
       // If clicking the same collection, deselect it
+      console.log(`Deselecting collection: ${collectionId}`);
       setSelectedCollectionId(null);
       // Clear the collection filter by dispatching an event
       window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId: null } }));
+      console.log('Dispatched event with null collectionId');
     } else {
       // Select the collection
+      console.log(`Selecting collection: ${collectionId}`);
       setSelectedCollectionId(collectionId);
       // Filter bookmarks by collection by dispatching an event
       window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId } }));
+      console.log('Dispatched event with collectionId:', collectionId);
     }
   };
 

@@ -31,11 +31,19 @@ export default function Home() {
   // Listen for collection filter events from the sidebar
   useEffect(() => {
     const handleFilterByCollection = (event: any) => {
+      console.log('HOME: filterByCollection event received:', event.detail);
       if (event.detail && 'collectionId' in event.detail) {
+        console.log('HOME: Setting selectedCollectionId to:', event.detail.collectionId);
         setSelectedCollectionId(event.detail.collectionId);
+        
+        // Log state after setting
+        setTimeout(() => {
+          console.log('HOME: selectedCollectionId is now:', selectedCollectionId);
+        }, 100);
       }
     };
     
+    console.log('HOME: Adding filterByCollection event listener');
     window.addEventListener('filterByCollection', handleFilterByCollection);
     return () => {
       window.removeEventListener('filterByCollection', handleFilterByCollection);
