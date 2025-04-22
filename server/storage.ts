@@ -15,7 +15,7 @@ import {
   collectionBookmarks, CollectionBookmark, InsertCollectionBookmark
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray, and } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
@@ -923,14 +923,20 @@ export class DatabaseStorage implements IStorage {
   }
   
   async removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean> {
-    const result = await db
-      .delete(collectionBookmarks)
-      .where(
-        sql`${collectionBookmarks.collection_id} = ${collectionId} AND ${collectionBookmarks.bookmark_id} = ${bookmarkId}`
-      )
-      .returning();
-    
-    return result.length > 0;
+    try {
+      // Use separate eq conditions for simpler and more reliable querying
+      const result = await db
+        .delete(collectionBookmarks)
+        .where(eq(collectionBookmarks.collection_id, collectionId))
+        .where(eq(collectionBookmarks.bookmark_id, bookmarkId))
+        .returning();
+      
+      console.log(`Removed bookmark ${bookmarkId} from collection ${collectionId}: ${result.length > 0}`);
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Database error removing bookmark ${bookmarkId} from collection ${collectionId}:`, error);
+      throw error;
+    }
   }
   
   // Bookmarks
@@ -1247,21 +1253,25 @@ export class DatabaseStorage implements IStorage {
   }
   
   async removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean> {
-    const result = await db
-      .delete(bookmarkTags)
-      .where(
-        eq(bookmarkTags.bookmark_id, bookmarkId) && 
-        eq(bookmarkTags.tag_id, tagId)
-      )
-      .returning({ id: bookmarkTags.id });
-    
-    if (result.length > 0) {
-      // Decrement the tag count
-      await this.decrementTagCount(tagId);
-      return true;
+    try {
+      // Use the same improved approach as in removeBookmarkFromCollection
+      const result = await db
+        .delete(bookmarkTags)
+        .where(eq(bookmarkTags.bookmark_id, bookmarkId))
+        .where(eq(bookmarkTags.tag_id, tagId))
+        .returning({ id: bookmarkTags.id });
+      
+      if (result.length > 0) {
+        // Decrement the tag count
+        await this.decrementTagCount(tagId);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error(`Database error removing tag ${tagId} from bookmark ${bookmarkId}:`, error);
+      throw error;
     }
-    
-    return false;
   }
 
   // Chat Sessions
