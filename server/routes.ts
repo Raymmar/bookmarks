@@ -127,6 +127,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tags: req.body.tags || req.body.user_tags || [], // Check tags first, then legacy user_tags
           source: req.body.source
         });
+        
+        // Create activity log for bookmark update
+        const userId = (req.user as any)?.id || null;
+        
+        // Prepare update activity details
+        let activityContent = "Bookmark updated";
+        let updatedTags: string[] = [];
+        
+        // Check what was updated
+        if (req.body.description) {
+          activityContent += " with new description";
+        }
+        if (req.body.notes) {
+          activityContent += " with new notes";
+        }
+        if (req.body.tags && req.body.tags.length > 0) {
+          activityContent += " with tags";
+          updatedTags = Array.isArray(req.body.tags) 
+            ? req.body.tags 
+            : [req.body.tags];
+        }
+        
+        // Create activity entry
+        await storage.createActivity({
+          bookmark_id: updatedBookmark.id,
+          bookmark_title: updatedBookmark.title,
+          user_id: userId,
+          type: "bookmark_updated",
+          content: activityContent,
+          tags: updatedTags
+        });
+        
         res.json(updatedBookmark);
       } catch (error) {
         if (error.message === "Bookmark not found") {
