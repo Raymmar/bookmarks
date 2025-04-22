@@ -99,19 +99,6 @@ export function FilterControls({
         <PopoverContent className="w-64 p-4" align="start">
           <div className="space-y-4">
             <div>
-              <h3 className="text-xs font-medium text-gray-700 mb-2">Sort By</h3>
-              <Select value={sortOrder} onValueChange={onSortOrderChange}>
-                <SelectTrigger className="w-full text-xs h-8">
-                  <SelectValue placeholder="Sort order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest first</SelectItem>
-                  <SelectItem value="oldest">Oldest first</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          
-            <div>
               <h3 className="text-xs font-medium text-gray-700 mb-2">Date Range</h3>
               <Select
                 value={dateRange}
