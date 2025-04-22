@@ -6,15 +6,7 @@ import { Bookmark } from "@shared/types";
 import { formatDate, truncateText } from "@/lib/utils";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
-
-// Tag interface
-interface Tag {
-  id: string;
-  name: string;
-  type: string;
-  count: number;
-  created_at: string;
-}
+import { Tag as TagType } from "@shared/types";
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
@@ -22,8 +14,14 @@ interface BookmarkCardProps {
   onDelete?: (id: string) => void;
 }
 
-export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) {
-  const [tags, setTags] = useState<Tag[]>([]);
+export function BookmarkCard({ bookmark: initialBookmark, onEdit, onDelete }: BookmarkCardProps) {
+  const [bookmark, setBookmark] = useState<Bookmark>(initialBookmark);
+  const [tags, setTags] = useState<TagType[]>([]);
+  
+  // Update internal bookmark state when props change
+  useEffect(() => {
+    setBookmark(initialBookmark);
+  }, [initialBookmark]);
   
   // Fetch tags for this bookmark
   useEffect(() => {
@@ -40,6 +38,34 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
     };
     
     fetchTags();
+  }, [bookmark.id]);
+  
+  // Listen for custom bookmark update events
+  useEffect(() => {
+    const handleBookmarkUpdate = (e: Event) => {
+      try {
+        const event = e as CustomEvent<{bookmarkId: string, updatedFields: Partial<Bookmark>, updatedBookmark: Bookmark}>;
+        const { bookmarkId, updatedFields, updatedBookmark } = event.detail;
+        
+        // Only update if this is the bookmark we're displaying
+        if (bookmarkId === bookmark.id) {
+          console.log(`BookmarkCard: Received update for bookmark ${bookmarkId}:`, updatedFields);
+          
+          // Update the local bookmark state with the changes
+          setBookmark(updatedBookmark);
+        }
+      } catch (error) {
+        console.error("Error handling bookmark update event:", error);
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('bookmarkUpdated', handleBookmarkUpdate);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('bookmarkUpdated', handleBookmarkUpdate);
+    };
   }, [bookmark.id]);
   return (
     <Card className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
@@ -76,15 +102,15 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
         </div>
         
         <div className="flex flex-wrap gap-1 mb-3">
-          {/* Get tag names from normalized tags and combine with system_tags */}
-          {[...tags.map(tag => tag.name), ...(bookmark.system_tags || [])].slice(0, 3).map((tag, index) => (
+          {/* Get tag names from normalized tags */}
+          {tags.slice(0, 3).map((tag, index) => (
             <Badge key={index} variant="outline" className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200">
-              {tag}
+              {tag.name}
             </Badge>
           ))}
-          {tags.length + (bookmark.system_tags?.length || 0) > 3 && (
+          {tags.length > 3 && (
             <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">
-              +{tags.length + (bookmark.system_tags?.length || 0) - 3} more
+              +{tags.length - 3} more
             </Badge>
           )}
         </div>

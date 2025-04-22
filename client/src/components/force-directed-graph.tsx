@@ -643,8 +643,9 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
     };
   }, [bookmarks, insightLevel, generateGraphData, initializeZoom, onNodeClick, centerGraph]);
   
-  // Listen for external node selection events (like from tag selection in parent component)
+  // Listen for external node selection events and bookmark updates
   useEffect(() => {
+    // Handle node selection from other components
     const handleSelectNode = (event: Event) => {
       const customEvent = event as CustomEvent;
       if (customEvent.detail?.nodeId) {
@@ -652,12 +653,48 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       }
     };
     
-    // Add event listener
+    // Handle bookmark updates from other components
+    const handleBookmarkUpdate = (event: Event) => {
+      try {
+        const customEvent = event as CustomEvent<{bookmarkId: string, updatedFields: Partial<Bookmark>, updatedBookmark: Bookmark}>;
+        const { bookmarkId, updatedFields, updatedBookmark } = customEvent.detail;
+        
+        console.log(`Graph: Received bookmark update event for ${bookmarkId}:`, updatedFields);
+        
+        // If we have a title update, we need to update the graph node
+        if (updatedFields.title && simulationRef.current) {
+          // Find the bookmark node in the graph
+          const nodeId = `bookmark-${bookmarkId}`;
+          const nodeElement = d3.select(`#node-${nodeId} text`);
+          
+          if (!nodeElement.empty()) {
+            // Update the node text
+            nodeElement.text(updatedBookmark.title.slice(0, 20) + (updatedBookmark.title.length > 20 ? '...' : ''));
+            
+            // Update the node in the simulation data
+            const nodes = simulationRef.current.nodes();
+            const nodeIndex = nodes.findIndex(n => n.id === nodeId);
+            
+            if (nodeIndex !== -1) {
+              // Update the node name
+              nodes[nodeIndex].name = updatedBookmark.title;
+              console.log(`Graph: Updated node with new title: ${updatedBookmark.title}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error handling bookmark update event in graph:", error);
+      }
+    };
+    
+    // Add event listeners
     document.addEventListener('selectGraphNode', handleSelectNode);
+    document.addEventListener('bookmarkUpdated', handleBookmarkUpdate);
     
     // Clean up on unmount
     return () => {
       document.removeEventListener('selectGraphNode', handleSelectNode);
+      document.removeEventListener('bookmarkUpdated', handleBookmarkUpdate);
     };
   }, []);
 

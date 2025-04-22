@@ -460,6 +460,19 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       // Invalidate queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       
+      // Dispatch a custom event to notify other components of the bookmark update
+      // This allows real-time updates in the graph and other components
+      const bookmarkUpdateEvent = new CustomEvent('bookmarkUpdated', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          updatedFields: updateData,
+          updatedBookmark
+        } 
+      });
+      document.dispatchEvent(bookmarkUpdateEvent);
+      
+      console.log(`Bookmark ${bookmark.id} updated with fields:`, updateData);
+      
       // Show success toast
       toast({
         title: "Bookmark updated",
