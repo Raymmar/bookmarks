@@ -146,14 +146,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
       <div className="p-4 border-t border-gray-200">
         {user ? (
           <div className="flex flex-col gap-3">
-            <Button 
-              className="w-full flex items-center justify-center"
-              onClick={() => setAddBookmarkOpen(true)}
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Add New Bookmark
-            </Button>
-            
             <div className="flex items-center justify-between">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -180,6 +172,14 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            
+            <Button 
+              className="w-full flex items-center justify-center"
+              onClick={() => setAddBookmarkOpen(true)}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Add New Bookmark
+            </Button>
           </div>
         ) : (
           <Link href="/auth">
