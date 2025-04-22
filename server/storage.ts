@@ -461,6 +461,7 @@ export class MemStorage implements IStorage {
     const newActivity: Activity = {
       ...activity,
       id,
+      user_id: activity.user_id || null, // Make sure user_id is included
       timestamp: activity.timestamp || new Date().toISOString(),
       tags: activity.tags || [],
     };
@@ -698,6 +699,7 @@ export class MemStorage implements IStorage {
       key: setting.key,
       value: setting.value,
       description: setting.description || null,
+      user_id: setting.user_id || null, // Make sure user_id is included
       updated_at: now
     };
     
@@ -998,6 +1000,7 @@ export class DatabaseStorage implements IStorage {
     // Ensure timestamp is a Date object
     const activityData = {
       ...activity,
+      user_id: activity.user_id || null, // Make sure user_id is included
       timestamp: new Date()
     };
     
@@ -1313,6 +1316,7 @@ export class DatabaseStorage implements IStorage {
       .insert(settings)
       .values({
         ...setting,
+        user_id: setting.user_id || null, // Make sure user_id is included
         updated_at: new Date()
       })
       .returning();
