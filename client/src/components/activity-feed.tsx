@@ -24,6 +24,25 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="p-4">
+        {/* Login prompt at the top for non-authenticated users */}
+        {!user && (
+          <div className="mb-6 pb-4 border-b border-gray-200">
+            <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-50 rounded-lg">
+              <LogIn className="h-10 w-10 text-primary mb-2" />
+              <h3 className="text-lg font-semibold mb-2">See Your Personal Activity</h3>
+              <p className="text-gray-600 mb-4">
+                Log in to view your personal network activity and see all history.
+              </p>
+              <Link href="/auth">
+                <Button className="font-medium">
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Log In or Register
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+        
         <div className="relative">
           {/* Timeline line */}
           <div className="absolute top-0 left-4 w-0.5 h-full bg-gray-200"></div>
@@ -72,25 +91,6 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                 </div>
               </div>
             ))}
-            
-            {/* Login prompt for non-authenticated users */}
-            {!user && (
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-50 rounded-lg">
-                  <LogIn className="h-10 w-10 text-primary mb-2" />
-                  <h3 className="text-lg font-semibold mb-2">See Your Personal Activity</h3>
-                  <p className="text-gray-600 mb-4">
-                    Log in to view your personal network activity and see all history.
-                  </p>
-                  <Link href="/auth">
-                    <Button className="font-medium">
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Log In or Register
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

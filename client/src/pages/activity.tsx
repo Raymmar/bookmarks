@@ -20,7 +20,7 @@ export default function Activity() {
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = 
-        activity.bookmarkTitle.toLowerCase().includes(searchLower) ||
+        (activity.bookmark_title && activity.bookmark_title.toLowerCase().includes(searchLower)) ||
         (activity.content && activity.content.toLowerCase().includes(searchLower)) ||
         (activity.tags && activity.tags.some(tag => tag.toLowerCase().includes(searchLower)));
       
