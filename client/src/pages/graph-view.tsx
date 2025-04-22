@@ -34,6 +34,7 @@ export default function GraphView() {
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
   const [sortOrder, setSortOrder] = useState("newest");
