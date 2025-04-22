@@ -472,9 +472,10 @@ export class MemStorage implements IStorage {
   
   // Tags
   async getTags(userId?: string): Promise<Tag[]> {
+    // For the main tag filtering in the UI, we want to return tags that are
+    // associated with bookmarks visible to the user
     if (userId) {
-      // Get visible bookmarks: both user's own bookmarks and shared/public bookmarks
-      // For now, we only have the concept of user-owned bookmarks, so we just get those
+      // First get all user's bookmarks 
       const userBookmarks = Array.from(this.bookmarks.values())
         .filter(bookmark => bookmark.user_id === userId);
       
@@ -483,22 +484,22 @@ export class MemStorage implements IStorage {
         return [];
       }
       
-      // Get bookmark IDs for the visible bookmarks
-      const visibleBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
+      // Get bookmark IDs
+      const userBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
       
-      // Get bookmark-tag relationships for user's bookmarks
+      // Get all bookmark-tag relationships for these bookmarks
       const bookmarkTagEntries = Array.from(this.bookmarkTags.values())
-        .filter(bt => visibleBookmarkIds.includes(bt.bookmark_id));
+        .filter(bt => userBookmarkIds.includes(bt.bookmark_id));
       
       if (bookmarkTagEntries.length === 0) {
-        // No tag relationships found for visible bookmarks
+        // No tag relationships found for user's bookmarks
         return [];
       }
       
-      // Get tag IDs
-      const tagIds = bookmarkTagEntries.map(bt => bt.tag_id);
+      // Get the unique tag IDs
+      const tagIds = [...new Set(bookmarkTagEntries.map(bt => bt.tag_id))];
       
-      // Return tags associated with visible bookmarks
+      // Return only tags associated with user's bookmarks
       return Array.from(this.tags.values())
         .filter(tag => tagIds.includes(tag.id));
     }
@@ -1070,37 +1071,26 @@ export class DatabaseStorage implements IStorage {
   // Tags
   async getTags(userId?: string): Promise<Tag[]> {
     // For the main tag filtering in the UI, we want to return tags that are
-    // associated with bookmarks visible to the user, not just the user's bookmarks
+    // associated with bookmarks visible to the user
     if (userId) {
-      // Get visible bookmarks: both user's own bookmarks and shared/public bookmarks
-      // For now, we only have the concept of user-owned bookmarks, so we just get those
-      const userBookmarks = await db.select().from(bookmarks)
+      // Use direct SQL join to get tags associated with user's bookmarks
+      // This is more efficient than the previous implementation
+      const userTags = await db
+        .select({
+          tag: tags
+        })
+        .from(tags)
+        .innerJoin(bookmarkTags, eq(bookmarkTags.tag_id, tags.id))
+        .innerJoin(bookmarks, eq(bookmarkTags.bookmark_id, bookmarks.id))
         .where(eq(bookmarks.user_id, userId));
       
-      if (userBookmarks.length === 0) {
-        // User has no bookmarks, return empty array of tags
+      // If no results, return empty array
+      if (userTags.length === 0) {
         return [];
       }
       
-      // Get bookmark IDs for the visible bookmarks
-      const visibleBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
-      
-      // Get all bookmark-tag relationships for these bookmarks
-      const bookmarkTagRelations = await db
-        .select().from(bookmarkTags)
-        .where(inArray(bookmarkTags.bookmark_id, visibleBookmarkIds));
-      
-      if (bookmarkTagRelations.length === 0) {
-        // No tag relationships found for visible bookmarks
-        return [];
-      }
-      
-      // Get the tag IDs
-      const tagIds = bookmarkTagRelations.map(relation => relation.tag_id);
-      
-      // Fetch the actual tag objects
-      return db.select().from(tags)
-        .where(inArray(tags.id, tagIds));
+      // Extract tag objects from the join result
+      return userTags.map(result => result.tag);
     }
     
     // If no userId provided (user not logged in), only return tags for public bookmarks
