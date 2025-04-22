@@ -631,10 +631,7 @@ export default function GraphView() {
           )}
           
           {/* Tags drawer - minimal version */}
-          <div className={tagDrawerOpen 
-            ? "flex flex-wrap gap-1 items-center py-1" // Allow wrapping when drawer is open
-            : "flex items-center overflow-x-auto whitespace-nowrap py-1 max-h-9" // Single row when closed
-          }>
+          <div className="flex flex-wrap gap-1 items-center">
             {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
             {(tagDrawerOpen 
               ? allTags 
@@ -644,7 +641,7 @@ export default function GraphView() {
               <Badge 
                 key={`tag-${tag}-${index}`} // Using index to ensure unique keys
                 variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className={`cursor-pointer ${tagDrawerOpen ? "" : "whitespace-nowrap flex-shrink-0"}`}
+                className="cursor-pointer"
                 onClick={() => toggleTagSelection(tag)}
               >
                 {tag}
@@ -664,7 +661,7 @@ export default function GraphView() {
             {tagDrawerOpen && selectedTags.length > 0 && (
               <Badge 
                 variant="secondary"
-                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center flex-shrink-0"
+                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
                 onClick={() => setSelectedTags([])}
               >
                 Clear All <X className="h-3 w-3 ml-1" />
@@ -682,7 +679,7 @@ export default function GraphView() {
                   return (
                     <Badge 
                       variant="secondary"
-                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center flex-shrink-0"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
                       onClick={toggleTagDrawer}
                     >
                       +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
