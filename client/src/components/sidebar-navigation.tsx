@@ -11,7 +11,8 @@ import {
   User, 
   LogOut,
   Plus,
-  FolderOpen
+  FolderOpen,
+  Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface SidebarNavigationProps {
   className?: string;
@@ -57,61 +59,41 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
     }
   }, [selectedCollectionId]);
   
-  // Handle collection selection
-  const handleCollectionClick = (collectionId: string, isCtrlPressed = false) => {
-    if (isCtrlPressed) {
-      // Multi-select mode (Ctrl key pressed)
-      let newSelection: string[];
-      
-      if (selectedCollections.includes(collectionId)) {
-        // Remove from selection if already selected
-        newSelection = selectedCollections.filter(id => id !== collectionId);
-      } else {
-        // Add to selection
-        newSelection = [...selectedCollections, collectionId];
-      }
-      
-      setSelectedCollections(newSelection);
-      
-      if (newSelection.length === 0) {
-        // Clear all filters if nothing selected
-        setSelectedCollectionId(null);
-        window.dispatchEvent(new CustomEvent('filterByCollection', { 
-          detail: { collectionId: null, collectionIds: [] } 
-        }));
-      } else if (newSelection.length === 1) {
-        // Single collection selected
-        const singleId = newSelection[0];
-        setSelectedCollectionId(singleId);
-        window.dispatchEvent(new CustomEvent('filterByCollection', { 
-          detail: { collectionId: singleId, collectionIds: newSelection } 
-        }));
-      } else {
-        // Multiple collections selected
-        setSelectedCollectionId(null); // Clear single selection
-        window.dispatchEvent(new CustomEvent('filterByCollection', { 
-          detail: { collectionId: null, collectionIds: newSelection } 
-        }));
-      }
+  // Handle collection selection with improved multi-select
+  const handleCollectionClick = (collectionId: string) => {
+    // Check if collection is already selected
+    const isSelected = selectedCollections.includes(collectionId);
+    let newSelection: string[];
+    
+    if (isSelected) {
+      // Remove from selection if already selected
+      newSelection = selectedCollections.filter(id => id !== collectionId);
     } else {
-      // Single selection mode (no Ctrl key)
-      if (selectedCollectionId === collectionId) {
-        // If clicking the same collection, deselect it
-        setSelectedCollectionId(null);
-        setSelectedCollections([]);
-        // Clear the collection filter by dispatching an event
-        window.dispatchEvent(new CustomEvent('filterByCollection', { 
-          detail: { collectionId: null, collectionIds: [] } 
-        }));
-      } else {
-        // Select the collection
-        setSelectedCollectionId(collectionId);
-        setSelectedCollections([collectionId]);
-        // Filter bookmarks by collection by dispatching an event
-        window.dispatchEvent(new CustomEvent('filterByCollection', { 
-          detail: { collectionId, collectionIds: [collectionId] } 
-        }));
-      }
+      // Add to selection
+      newSelection = [...selectedCollections, collectionId];
+    }
+    
+    setSelectedCollections(newSelection);
+    
+    if (newSelection.length === 0) {
+      // Clear all filters if nothing selected
+      setSelectedCollectionId(null);
+      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+        detail: { collectionId: null, collectionIds: [] } 
+      }));
+    } else if (newSelection.length === 1) {
+      // Single collection selected
+      const singleId = newSelection[0];
+      setSelectedCollectionId(singleId);
+      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+        detail: { collectionId: singleId, collectionIds: newSelection } 
+      }));
+    } else {
+      // Multiple collections selected
+      setSelectedCollectionId(null); // Clear single selection
+      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+        detail: { collectionId: null, collectionIds: newSelection } 
+      }));
     }
   };
 
@@ -273,17 +255,30 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       <div 
                         className={cn(
                           "flex items-center px-2 py-2 text-sm rounded-lg cursor-pointer",
-                          selectedCollectionId === collection.id 
+                          selectedCollections.includes(collection.id) 
                             ? "bg-primary/10 text-primary font-medium" 
-                            : selectedCollections.includes(collection.id)
-                              ? "bg-primary/5 text-primary/90 font-medium" 
-                              : "text-gray-700 hover:bg-gray-100"
+                            : "text-gray-700 hover:bg-gray-100"
                         )}
-                        onClick={(e) => handleCollectionClick(collection.id, e.ctrlKey || e.metaKey)}
-                        title="Click to select. Hold Ctrl/Cmd to select multiple collections."
+                        onClick={() => handleCollectionClick(collection.id)}
+                        title="Click to select or deselect. You can select multiple collections."
                       >
-                        <Circle className={cn("h-4 w-4 mr-2", getCollectionColor(collection.id))} />
-                        <span className="truncate">{collection.name}</span>
+                        <div className="flex h-4 w-4 items-center justify-center mr-2">
+                          {selectedCollections.includes(collection.id) ? (
+                            <Checkbox 
+                              id={`collection-${collection.id}`} 
+                              checked={true}
+                              className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                            />
+                          ) : (
+                            <Checkbox 
+                              id={`collection-${collection.id}`} 
+                              checked={false}
+                            />
+                          )}
+                        </div>
+                        <span className={cn("truncate", selectedCollections.includes(collection.id) && "font-medium")}>
+                          {collection.name}
+                        </span>
                         {!collection.is_public && (
                           <span className="ml-1 text-xs text-gray-500">(Private)</span>
                         )}
