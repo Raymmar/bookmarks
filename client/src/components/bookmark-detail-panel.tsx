@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2 } from "lucide-react";
-import { Bookmark, Highlight, Note } from "@shared/types";
+import { Bookmark, Highlight, Note, Tag as TagType } from "@shared/types";
 import { formatDate } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,14 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 
-// Tag interface
-interface Tag {
-  id: string;
-  name: string;
-  type: string;
-  count: number;
-  created_at: string;
-}
+// Use the imported Tag type
 
 interface BookmarkDetailPanelProps {
   bookmark?: Bookmark;
@@ -30,8 +23,8 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<TagType[]>([]);
+  const [allTags, setAllTags] = useState<TagType[]>([]);
   const [newTagText, setNewTagText] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isSubmittingTag, setIsSubmittingTag] = useState(false);
@@ -41,7 +34,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const { toast } = useToast();
   
   // Fetch all available tags for selection
-  const { data: availableTags = [] } = useQuery<Tag[]>({
+  const { data: availableTags = [] } = useQuery<TagType[]>({
     queryKey: ["/api/tags"],
     staleTime: 10000, // 10 seconds before considering data stale
   });
@@ -401,7 +394,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     
     try {
       // Create the new tag
-      const newTag = await apiRequest<Tag>("POST", "/api/tags", {
+      const newTag = await apiRequest<TagType>("POST", "/api/tags", {
         name: newTagText.trim(),
         type: "user"
       });
@@ -449,6 +442,47 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   };
   
+  // Handle updating bookmark fields
+  const handleUpdateBookmark = async (updateData: Partial<Bookmark>) => {
+    if (!bookmark) return;
+    
+    try {
+      // Make API request to update the bookmark
+      const updatedBookmark = await apiRequest(
+        "PATCH", 
+        `/api/bookmarks/${bookmark.id}`, 
+        updateData
+      );
+      
+      // Update the local state
+      setBookmark(updatedBookmark);
+      
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      
+      // Show success toast
+      toast({
+        title: "Bookmark updated",
+        description: "Your bookmark has been updated successfully",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error updating bookmark:", error);
+      
+      // Show error toast
+      toast({
+        title: "Update failed",
+        description: "There was a problem updating your bookmark. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Revert to original data if it exists
+      if (initialBookmark) {
+        setBookmark(initialBookmark);
+      }
+    }
+  };
+
   // Remove a tag from the bookmark
   const handleRemoveTag = async (tagId: string) => {
     if (!bookmark) return;
@@ -526,7 +560,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       id: tempId,
       bookmark_id: bookmark.id,
       text: newNote.trim(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString() as any // Type cast to handle expected Date type
     };
     
     // Optimistically update the UI
@@ -614,7 +648,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 setBookmark(prev => prev ? { ...prev, title: e.target.value } : prev);
               }}
               onBlur={(e) => {
-                if (e.target.value !== initialBookmark.title) {
+                if (initialBookmark && e.target.value !== initialBookmark.title) {
                   // Only make API call if title has changed
                   handleUpdateBookmark({ title: e.target.value });
                 }
