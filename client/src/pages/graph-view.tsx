@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { X, LayoutGrid, Network, Search, ChevronUp, ChevronDown, BookmarkPlus } from "lucide-react";
+import { X, LayoutGrid, Network, Search, ChevronUp, ChevronDown, BookmarkPlus, SearchX } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -50,6 +50,12 @@ export default function GraphView() {
   });
   // Number of popular tags to show when drawer is closed
   const [popularTagCount] = useState<number>(10);
+  // Reference for tag container to measure available width
+  const tagContainerRef = useRef<HTMLDivElement | null>(null);
+  // State to track visible tags when drawer is closed
+  const [visibleTags, setVisibleTags] = useState<string[]>([]);
+  // Reference for tag element widths
+  const tagWidthsRef = useRef<Map<string, number>>(new Map());
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -440,6 +446,64 @@ export default function GraphView() {
   const popularTags = tagsByCount
     .slice(0, popularTagCount)
     .map(tag => tag.name);
+    
+  // Calculate visible tags based on container width when drawer is closed
+  useEffect(() => {
+    // Function to calculate visible tags
+    const calculateVisibleTags = () => {
+      if (tagDrawerOpen || !tagContainerRef.current) {
+        // When drawer is open, we show all tags
+        setVisibleTags(popularTags.filter(tag => !selectedTags.includes(tag)));
+        return;
+      }
+      
+      // Get container width
+      const containerWidth = tagContainerRef.current.clientWidth;
+      // Reserve space for toggle button and padding (approximately 60px)
+      const availableWidth = containerWidth - 60;
+      
+      // Calculate average tag width if we don't have precise measurements
+      // Default tag width estimate: 100px
+      const defaultTagWidth = 100;
+      
+      // Track total width used so far
+      let usedWidth = 0;
+      const tagsToShow: string[] = [];
+      
+      // Only process tags that aren't already selected
+      const availableTags = popularTags.filter(tag => !selectedTags.includes(tag));
+      
+      // Add tags until we run out of space
+      for (const tag of availableTags) {
+        // Use known width or estimate
+        const tagWidth = tagWidthsRef.current.get(tag) || defaultTagWidth;
+        
+        // Add 8px for gap between tags
+        if (usedWidth + tagWidth > availableWidth) {
+          break;
+        }
+        
+        tagsToShow.push(tag);
+        usedWidth += tagWidth + 8; // 8px for gap
+      }
+      
+      setVisibleTags(tagsToShow);
+    };
+    
+    // Run calculation immediately
+    calculateVisibleTags();
+    
+    // Also recalculate when window is resized
+    const handleResize = () => {
+      calculateVisibleTags();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [tagDrawerOpen, popularTags, selectedTags]);
   
   const handleDeleteBookmark = async (id: string) => {
     try {
@@ -573,14 +637,20 @@ export default function GraphView() {
             } hover:bg-gray-200 z-10`}
           >
             {(() => {
-              // Calculate remaining non-selected tags count if drawer is closed
+              // Only show tag count in toggle button for "all tags" beyond popular tags
               if (!tagDrawerOpen) {
-                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
-                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
-                if (remainingTagsCount > 0) {
+                // Calculate all available tags vs. popular tags (not including selected tags)
+                const availableTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length;
+                const visibleTagsCount = visibleTags.length;
+                const popularTagsCount = popularTags.filter(tag => !selectedTags.includes(tag)).length;
+                
+                // Show count of additional tags beyond popular tags
+                const remainingBeyondPopular = availableTagsCount - popularTagsCount;
+                
+                if (remainingBeyondPopular > 0) {
                   return (
                     <div className="flex items-center">
-                      <span className="text-xs mr-1 font-medium">+{remainingTagsCount}</span>
+                      <span className="text-xs mr-1 font-medium">+{remainingBeyondPopular}</span>
                       <ChevronUp className="h-4 w-4 text-gray-700" />
                     </div>
                   );
@@ -690,31 +760,52 @@ export default function GraphView() {
           )}
           
           {/* Tags drawer - minimal version */}
-          <div className="flex flex-wrap gap-1 items-center">
-            {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
+          <div 
+            ref={tagContainerRef} 
+            className={`flex ${tagDrawerOpen ? 'flex-wrap' : 'flex-nowrap overflow-hidden'} gap-1 items-center`}
+          >
+            {/* Tags display - either all tags when open, or only visible tags when closed */}
             {(tagDrawerOpen 
               ? allTags 
-              // When drawer is closed, filter out selected tags from the popular tags
-              : popularTags.filter(tag => !selectedTags.includes(tag))
-            ).map((tag, index) => (
-              <Badge 
-                key={`tag-${tag}-${index}`} // Using index to ensure unique keys
-                variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleTagSelection(tag)}
-              >
-                {tag}
-                {selectedTags.includes(tag) && (
-                  <X 
-                    className="h-3 w-3 ml-1" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTagSelection(tag);
-                    }}
-                  />
-                )}
-              </Badge>
-            ))}
+              // When drawer is closed, only show calculated visible tags
+              : visibleTags
+            ).map((tag, index) => {
+              return (
+                <span 
+                  key={`tag-${tag}-${index}`}
+                  ref={(node) => {
+                    if (node) {
+                      // Store the actual width of this tag element
+                      tagWidthsRef.current.set(tag, node.getBoundingClientRect().width);
+                    }
+                  }}
+                >
+                  <Badge 
+                    variant={selectedTags.includes(tag) ? "default" : "outline"}
+                    className="cursor-pointer whitespace-nowrap"
+                    onClick={() => toggleTagSelection(tag)}
+                  >
+                    {tag}
+                    {selectedTags.includes(tag) && (
+                      <X 
+                        className="h-3 w-3 ml-1" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTagSelection(tag);
+                        }}
+                      />
+                    )}
+                  </Badge>
+                </span>
+              );
+            })}
+            
+            {/* If drawer is closed and we have more tags available, show the count in the container */}
+            {!tagDrawerOpen && popularTags.filter(tag => !selectedTags.includes(tag)).length > visibleTags.length && (
+              <div className="text-xs text-gray-500 ml-1">
+                +{popularTags.filter(tag => !selectedTags.includes(tag)).length - visibleTags.length} more
+              </div>
+            )}
             
             {/* Clear All button when drawer is open and tags are selected */}
             {tagDrawerOpen && selectedTags.length > 0 && (
@@ -726,8 +817,6 @@ export default function GraphView() {
                 Clear All <X className="h-3 w-3 ml-1" />
               </Badge>
             )}
-            
-            {/* Tag count badge has been moved to the toggle button */}
           </div>
         </div>
       </div>
