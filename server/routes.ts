@@ -1013,6 +1013,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.patch("/api/settings/:key", async (req, res) => {
     try {
+      // Require authentication for updating settings
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
       if (!req.body.value) {
         return res.status(400).json({ error: "Missing value field in request body" });
       }
@@ -1021,6 +1026,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!setting) {
         return res.status(404).json({ error: "Setting not found" });
+      }
+      
+      // If the setting has a user_id, make sure it belongs to the current user
+      if (setting.user_id && setting.user_id !== req.user.id) {
+        return res.status(403).json({ error: "Cannot update another user's setting" });
       }
       
       const updatedSetting = await storage.updateSetting(req.params.key, req.body.value);
@@ -1033,10 +1043,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.delete("/api/settings/:key", async (req, res) => {
     try {
+      // Require authentication for deleting settings
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
       const setting = await storage.getSetting(req.params.key);
       
       if (!setting) {
         return res.status(404).json({ error: "Setting not found" });
+      }
+      
+      // If the setting has a user_id, make sure it belongs to the current user
+      if (setting.user_id && setting.user_id !== req.user.id) {
+        return res.status(403).json({ error: "Cannot delete another user's setting" });
       }
       
       await storage.deleteSetting(req.params.key);
