@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 
 // Form validation schema
 const settingSchema = z.object({
@@ -30,16 +29,13 @@ type Setting = {
 
 const SettingsPage: React.FC = () => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("tagging");
 
   // Fetch all settings
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ["/api/settings"],
     retry: 1,
   });
-  
-  // State for auto-extract toggle
-  const [autoExtractOnPaste, setAutoExtractOnPaste] = useState(true);
 
   // Prepare form for each setting
   const bookmarkSystemPromptForm = useForm({
@@ -70,7 +66,6 @@ const SettingsPage: React.FC = () => {
       const bookmarkPrompt = settings.find((s: Setting) => s.key === "bookmark_system_prompt");
       const autoTagPrompt = settings.find((s: Setting) => s.key === "auto_tagging_prompt");
       const summaryPrompt = settings.find((s: Setting) => s.key === "summary_prompt");
-      const autoExtractSetting = settings.find((s: Setting) => s.key === "auto_extract_on_paste");
 
       if (bookmarkPrompt) {
         bookmarkSystemPromptForm.reset({ value: bookmarkPrompt.value });
@@ -82,10 +77,6 @@ const SettingsPage: React.FC = () => {
 
       if (summaryPrompt) {
         summaryPromptForm.reset({ value: summaryPrompt.value });
-      }
-      
-      if (autoExtractSetting) {
-        setAutoExtractOnPaste(autoExtractSetting.value === "true");
       }
     }
   }, [settings, bookmarkSystemPromptForm, autoTaggingPromptForm, summaryPromptForm]);
@@ -135,15 +126,6 @@ const SettingsPage: React.FC = () => {
   const onSummaryPromptSubmit = (data: { value: string }) => {
     updateSettingMutation.mutate({ key: "summary_prompt", value: data.value });
   };
-  
-  // Handle auto-extract toggle change
-  const handleAutoExtractToggle = (checked: boolean) => {
-    updateSettingMutation.mutate({ 
-      key: "auto_extract_on_paste", 
-      value: String(checked) 
-    });
-    setAutoExtractOnPaste(checked);
-  };
 
   if (isLoading) {
     return <div className="container py-10">Loading settings...</div>;
@@ -170,39 +152,11 @@ const SettingsPage: React.FC = () => {
         </p>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
-            <TabsTrigger value="general">General</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="tagging">Auto-Tagging</TabsTrigger>
             <TabsTrigger value="summary">Summarization</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle>General Settings</CardTitle>
-                <CardDescription>
-                  Configure general application settings and behaviors
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <h4 className="text-sm font-medium text-foreground">Auto-extract AI insights on paste</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically generate tags and summaries when you paste a URL
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={autoExtractOnPaste}
-                      onCheckedChange={handleAutoExtractToggle}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
           <TabsContent value="tagging">
             <Card>
               <CardHeader>

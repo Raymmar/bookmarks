@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph-unpinned";
 import { SidebarPanel } from "@/components/sidebar-panel";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { X, LayoutGrid, Network, SearchX, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { X, LayoutGrid, Network, SearchX, ChevronUp, ChevronDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bookmark } from "@shared/types";
@@ -116,87 +116,6 @@ export default function GraphView() {
   const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags;
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
-  
-  // Paste event handler for URLs
-  const handlePasteEvent = useCallback(async (event: ClipboardEvent) => {
-    // Get clipboard text content
-    const clipboardText = event.clipboardData?.getData('text/plain');
-    
-    if (!clipboardText) return;
-    
-    // Simple URL validation - check if it looks like a URL
-    const urlRegex = /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i;
-    if (!urlRegex.test(clipboardText)) return;
-    
-    // Get the auto-extract setting
-    let autoExtract = true; // Default to true if setting doesn't exist
-    
-    try {
-      const response = await fetch('/api/settings/auto_extract_on_paste');
-      if (response.ok) {
-        const setting = await response.json();
-        autoExtract = setting.value === 'true';
-      }
-    } catch (error) {
-      console.error('Error fetching auto-extract setting:', error);
-    }
-    
-    // Prepare the bookmark data
-    const bookmarkData = {
-      url: clipboardText,
-      title: clipboardText, // Will be replaced by server-side extraction
-      description: '',
-      source: 'web',
-      autoExtract: autoExtract,
-      insightDepth: 1
-    };
-    
-    try {
-      toast({
-        title: "Creating bookmark",
-        description: "Processing URL pasted from clipboard...",
-      });
-      
-      // Create the bookmark
-      const response = await apiRequest('POST', '/api/bookmarks', bookmarkData);
-      
-      // Refresh the bookmarks list
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
-      
-      // Select the newly created bookmark
-      setTimeout(() => {
-        setSelectedBookmarkId(response.id);
-        
-        // Center on the new bookmark node
-        const nodeId = `bookmark-${response.id}`;
-        const event = new CustomEvent('selectGraphNode', { 
-          detail: { nodeId: nodeId, source: 'clipboardPaste' } 
-        });
-        document.dispatchEvent(event);
-      }, 500); // Give time for the query cache to update
-      
-      toast({
-        title: "Bookmark created",
-        description: "URL from clipboard has been added to your bookmarks.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error creating bookmark",
-        description: error instanceof Error ? error.message : "Failed to add URL from clipboard",
-        variant: "destructive",
-      });
-    }
-  }, [queryClient, toast]);
-  
-  // Add event listener for paste events
-  useEffect(() => {
-    document.addEventListener('paste', handlePasteEvent);
-    
-    return () => {
-      document.removeEventListener('paste', handlePasteEvent);
-    };
-  }, [handlePasteEvent]);
   
   // When a bookmark is selected, center it in the graph
   const handleSelectBookmark = (id: string) => {
@@ -483,198 +402,233 @@ export default function GraphView() {
         <div className="flex-1 bg-gray-50 p-4 overflow-hidden w-full">
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
-              <p className="text-lg font-semibold text-gray-500">Loading bookmarks...</p>
+              <div className="text-center">
+                <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                <p className="mt-2 text-gray-600">Loading graph data...</p>
+              </div>
+            </div>
+          ) : filteredBookmarks.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="bg-white p-8 rounded-lg shadow text-center max-w-md">
+                <SearchX className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 mb-1">No bookmarks found</h3>
+                <p className="text-gray-500">
+                  {searchQuery
+                    ? "Try using different search terms or filters"
+                    : selectedTags.length > 0 || selectedDomain
+                      ? `Try ${selectedTags.length > 0 && selectedDomain ? "removing some filters" : selectedTags.length > 0 ? "selecting different tags" : "choosing a different domain"}`
+                      : "Add some bookmarks to see them in the explorer"}
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="h-full flex">
-              {/* Left side - visualization or grid */}
-              <div className="flex-1 mr-2 relative overflow-hidden h-full">
-                {/* View toggle buttons */}
-                <div className="absolute top-0 right-0 z-10 bg-white rounded-bl-lg shadow-md p-1">
-                  <div className="inline-flex items-center border border-gray-200 rounded-md">
-                    <button
-                      className={`px-3 py-1.5 flex items-center gap-2 transition ${
-                        viewMode === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                      }`}
-                      onClick={() => setViewMode("grid")}
-                    >
-                      <LayoutGrid className="h-4 w-4" />
-                      <span className="text-xs">Grid</span>
-                    </button>
-                    <button
-                      className={`px-3 py-1.5 flex items-center gap-2 transition ${
-                        viewMode === "graph" ? "bg-primary text-primary-foreground" : "hover:bg-gray-50"
-                      }`}
-                      onClick={() => setViewMode("graph")}
-                    >
-                      <Network className="h-4 w-4" />
-                      <span className="text-xs">Graph</span>
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Show graph or grid based on current viewMode */}
-                {viewMode === "graph" ? (
-                  <ForceDirectedGraph
-                    bookmarks={bookmarks}
-                    tags={tags}
-                    bookmarksByTagMap={bookmarkTagsMap}
-                    selectedTags={selectedTags}
-                    selectedBookmarkId={selectedBookmarkId}
-                    onSelectBookmark={handleSelectBookmark}
-                    onSelectTag={toggleTagSelection}
-                    onSelectDomain={handleDomainSelection}
-                    selectedDomain={selectedDomain}
-                    visibleNodeTypes={visibleNodeTypes}
-                  />
-                ) : (
-                  <div className="h-full overflow-y-auto p-2">
-                    {filteredBookmarkIds.length === 0 ? (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <p className="text-lg font-semibold text-gray-500">No bookmarks found</p>
-                          <p className="text-sm text-gray-400 mt-2">Try adjusting your search or filters</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {sortedBookmarks.map(bookmark => (
-                          <div 
-                            key={bookmark.id}
-                            className={`bg-white border rounded-lg shadow-sm p-4 cursor-pointer hover:shadow-md transition ${
-                              selectedBookmarkId === bookmark.id ? "ring-2 ring-primary" : ""
-                            }`}
-                            onClick={() => setSelectedBookmarkId(bookmark.id)}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <h3 className="font-medium text-sm line-clamp-2">{bookmark.title}</h3>
-                            </div>
-                            <p className="text-xs text-gray-500 mb-3 line-clamp-2">{bookmark.url}</p>
-                            
-                            {bookmark.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {bookmark.tags.slice(0, 3).map(tag => (
-                                  <Badge 
-                                    key={tag.id} 
-                                    variant={selectedTags.includes(tag.name) ? "default" : "outline"}
-                                    className="text-xs cursor-pointer"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleTagClick(tag.name);
-                                    }}
-                                  >
-                                    {tag.name}
-                                  </Badge>
-                                ))}
-                                {bookmark.tags.length > 3 && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    +{bookmark.tags.length - 3}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              {/* Right side - detail panel */}
-              <SidebarPanel
+            // Always show graph in the main content area - removed the viewMode === "graph" conditional
+            <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
+              <ForceDirectedGraph
+                bookmarks={filteredBookmarks}
+                insightLevel={insightLevel}
+                onNodeClick={handleSelectBookmark}
+                onTagClick={handleTagClick}
+                onDomainClick={handleDomainSelection}
                 selectedBookmarkId={selectedBookmarkId}
-                onClose={() => setSelectedBookmarkId(null)}
-                onDeleteBookmark={handleDeleteBookmark}
+                visibleNodeTypes={visibleNodeTypes}
               />
             </div>
           )}
         </div>
-      </div>
-      
-      {/* Side panel for tags */}
-      <div 
-        className={`border-l shadow-inner bg-white transition-all duration-200 overflow-y-auto ${
-          tagDrawerOpen ? "w-80" : "w-12"
-        }`}
-      >
-        {/* Toggle button */}
-        <button
-          className="flex w-full items-center py-3 px-2 border-b hover:bg-gray-50/80"
-          onClick={toggleTagDrawer}
-        >
-          <span className={`flex-1 font-medium ml-2 ${tagDrawerOpen ? "" : "sr-only"}`}>Tags</span>
-          {tagDrawerOpen ? (
-            <ChevronRight className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronLeft className="h-5 w-5 text-gray-400" />
-          )}
-        </button>
         
-        {/* Tag list */}
-        <div className={`p-3 ${tagDrawerOpen ? "" : "sr-only"}`}>
-          {/* Filter input */}
-          <div className="relative mb-3">
-            <Input
-              type="text"
-              placeholder="Filter tags..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-4 py-1 text-sm h-8"
-            />
-            <Search className="h-4 w-4 text-gray-400 absolute left-2 top-2" />
-          </div>
+        {/* Filters display at the bottom of the graph area */}
+        <div className="relative flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
+          {/* Absolute positioned close button when drawer is open - positioned relative to parent with padding */}
+          {tagDrawerOpen && (
+            <button
+              onClick={toggleTagDrawer}
+              aria-label="Close tag drawer"
+              className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
+            >
+              <ChevronDown className="h-4 w-4 text-gray-700" />
+            </button>
+          )}
           
-          {/* Tag list */}
-          <div className="space-y-1.5">
-            {tags
-              .filter(tag => searchQuery === "" || tag.name.toLowerCase().includes(searchQuery.toLowerCase()))
-              .sort((a, b) => {
-                // Prioritize selected tags
-                const aSelected = selectedTags.includes(a.name);
-                const bSelected = selectedTags.includes(b.name);
-                
-                if (aSelected && !bSelected) return -1;
-                if (!aSelected && bSelected) return 1;
-                
-                // Then sort by count
-                return b.count - a.count;
-              })
-              .map(tag => (
-                <div 
-                  key={tag.id} 
-                  className={`flex items-center justify-between py-1 px-2 text-sm rounded-md cursor-pointer ${
-                    selectedTags.includes(tag.name) ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
-                  }`} 
-                  onClick={() => toggleTagSelection(tag.name)}
+          {/* Bookmark filter indicator if a bookmark is selected */}
+          {selectedBookmarkId && (
+            <div className="mb-2 flex items-center">
+              <span className="text-sm text-gray-600 mr-2">Focused on:</span>
+              <Badge 
+                variant="default"
+                className="cursor-pointer bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  setSelectedBookmarkId(null);
+                  
+                  // Trigger zoom-out when clicking the badge
+                  setTimeout(() => {
+                    const event = new CustomEvent('centerFullGraph', { 
+                      detail: { source: 'closeBookmarkFilter' } 
+                    });
+                    document.dispatchEvent(event);
+                  }, 50);
+                }}
+              >
+                {selectedBookmark?.title || 'Bookmark'}
+                <X 
+                  className="h-3 w-3 ml-1" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBookmarkId(null);
+                    
+                    // Trigger zoom-out when clicking the X
+                    setTimeout(() => {
+                      const event = new CustomEvent('centerFullGraph', { 
+                        detail: { source: 'closeBookmarkFilter' } 
+                      });
+                      document.dispatchEvent(event);
+                    }, 50);
+                  }}
+                />
+              </Badge>
+            </div>
+          )}
+          
+          {/* Domain filter indicator if selected */}
+          {selectedDomain && (
+            <div className="mb-2 flex items-center">
+              <span className="text-sm text-gray-600 mr-2">Domain:</span>
+              <Badge 
+                variant="default"
+                className="cursor-pointer bg-green-600 hover:bg-green-700"
+                onClick={() => handleDomainSelection(selectedDomain)}
+              >
+                {selectedDomain}
+                <X 
+                  className="h-3 w-3 ml-1" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDomainSelection(selectedDomain);
+                  }}
+                />
+              </Badge>
+            </div>
+          )}
+          
+          {/* Selected tag filters indicator when drawer is closed */}
+          {!tagDrawerOpen && selectedTags.length > 0 && (
+            <div className="mb-2 flex items-center flex-wrap gap-1">
+              <span className="text-sm text-gray-600 mr-1">Tags:</span>
+              {selectedTags.map(tag => (
+                <Badge 
+                  key={`selected-${tag}`}
+                  variant="default"
+                  className="cursor-pointer bg-primary hover:bg-primary/90"
+                  onClick={() => toggleTagSelection(tag)}
                 >
-                  <span className="truncate">{tag.name}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {tag.count}
-                  </Badge>
-                </div>
+                  {tag}
+                  <X 
+                    className="h-3 w-3 ml-1" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTagSelection(tag);
+                    }}
+                  />
+                </Badge>
               ))}
+              
+              {/* Clear All button when multiple tags are selected */}
+              {selectedTags.length > 1 && (
+                <Badge 
+                  variant="secondary"
+                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center ml-1"
+                  onClick={() => setSelectedTags([])}
+                >
+                  Clear All <X className="h-3 w-3 ml-1" />
+                </Badge>
+              )}
+            </div>
+          )}
+          
+          {/* Tags drawer - minimal version */}
+          <div className="flex flex-wrap gap-1 items-center">
+            {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
+            {(tagDrawerOpen 
+              ? allTags 
+              // When drawer is closed, filter out selected tags from the popular tags
+              : popularTags.filter(tag => !selectedTags.includes(tag))
+            ).map(tag => (
+              <Badge 
+                key={tag}
+                variant={selectedTags.includes(tag) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggleTagSelection(tag)}
+              >
+                {tag}
+                {selectedTags.includes(tag) && (
+                  <X 
+                    className="h-3 w-3 ml-1" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTagSelection(tag);
+                    }}
+                  />
+                )}
+              </Badge>
+            ))}
+            
+            {/* Clear All button when drawer is open and tags are selected */}
+            {tagDrawerOpen && selectedTags.length > 0 && (
+              <Badge 
+                variant="secondary"
+                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                onClick={() => setSelectedTags([])}
+              >
+                Clear All <X className="h-3 w-3 ml-1" />
+              </Badge>
+            )}
+            
+            {/* Show "more" badge when drawer is closed */}
+            {!tagDrawerOpen && (
+              (() => {
+                // Calculate remaining non-selected tags for display
+                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
+                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
+                
+                if (remainingTagsCount > 0) {
+                  return (
+                    <Badge 
+                      variant="secondary"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                      onClick={toggleTagDrawer}
+                    >
+                      +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
+                    </Badge>
+                  );
+                }
+                return null;
+              })()
+            )}
           </div>
         </div>
-        
-        {/* Collapsed view - only show when drawer is collapsed */}
-        {!tagDrawerOpen && (
-          <div className="p-0.5">
-            {/* Show only popular tags in vertical list */}
-            {popularTags.map(tag => (
-              <div 
-                key={tag} 
-                className={`mb-1 p-1 text-xs rounded-sm cursor-pointer text-center truncate ${
-                  selectedTags.includes(tag) ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
-                }`}
-                onClick={() => toggleTagSelection(tag)}
-                title={tag}
-              >
-                {tag.substring(0, 1).toUpperCase()}
-              </div>
-            ))}
-          </div>
-        )}
+      </div>
+      
+      {/* Right Sidebar Panel - Now always show it on larger screens */}
+      <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
+        <SidebarPanel
+          bookmarks={sortedBookmarks}
+          selectedBookmark={selectedBookmark}
+          onSelectBookmark={handleSelectBookmark}
+          onCloseDetail={() => {
+            setSelectedBookmarkId(null);
+            
+            // Only trigger zoom-out when explicitly closing detail view
+            // with no new selection being made
+            setTimeout(() => {
+              // This event will be handled by the graph component to reset view
+              const event = new CustomEvent('centerFullGraph', { 
+                detail: { source: 'closeDetail' } 
+              });
+              document.dispatchEvent(event);
+            }, 50);
+          }}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );
