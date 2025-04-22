@@ -447,6 +447,50 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     if (!bookmark) return;
     
     try {
+      // Immediately set the updated_at timestamp to the current time for optimistic updates
+      const now = new Date().toISOString();
+      
+      // Create the optimistically updated bookmark with current timestamp
+      const optimisticBookmark = {
+        ...bookmark,
+        ...updateData,
+        updated_at: now
+      };
+      
+      // Update the local state
+      setBookmark(optimisticBookmark);
+      
+      // Get current bookmarks from the cache
+      const currentBookmarks = queryClient.getQueryData<Bookmark[]>(["/api/bookmarks"]) || [];
+      
+      // Get current localStorage sort setting
+      const sortOrder = localStorage.getItem('bookmarkSortOrder') || 'newest';
+      
+      // Check if we need to reorder (only for "recently_updated" sort)
+      if (sortOrder === 'recently_updated') {
+        // Create optimistically updated bookmarks list
+        const updatedBookmarks = currentBookmarks.map(b => 
+          b.id === bookmark.id ? optimisticBookmark : b
+        );
+        
+        // Sort with the updated bookmark at the top if recently_updated sort is active
+        const sortedBookmarks = [...updatedBookmarks].sort((a, b) => {
+          const aUpdated = a.updated_at ? new Date(a.updated_at).getTime() : new Date(a.date_saved).getTime();
+          const bUpdated = b.updated_at ? new Date(b.updated_at).getTime() : new Date(b.date_saved).getTime();
+          return bUpdated - aUpdated;
+        });
+        
+        // Update the cache with the optimistically sorted bookmarks
+        queryClient.setQueryData(["/api/bookmarks"], sortedBookmarks);
+      } else {
+        // For other sort orders, just update the bookmark in the current list
+        queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], 
+          (oldBookmarks = []) => oldBookmarks.map(b => 
+            b.id === bookmark.id ? optimisticBookmark : b
+          )
+        );
+      }
+      
       // Make API request to update the bookmark
       const updatedBookmark = await apiRequest(
         "PATCH", 
@@ -454,11 +498,22 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         updateData
       );
       
-      // Update the local state
+      // Update the local state with server response
       setBookmark(updatedBookmark);
       
-      // Invalidate queries to refresh the data
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      // Invalidate queries to refresh the data after server confirms (but with lower priority)
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      }, 500);
+      
+      // Dispatch a custom event to inform other components about the update
+      const event = new CustomEvent('bookmarkUpdated', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          updatedBookmark
+        } 
+      });
+      document.dispatchEvent(event);
       
       // Show success toast
       toast({
@@ -480,6 +535,9 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       if (initialBookmark) {
         setBookmark(initialBookmark);
       }
+      
+      // Invalidate queries to refresh the data from server
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
     }
   };
 

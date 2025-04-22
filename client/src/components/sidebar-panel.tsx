@@ -87,6 +87,26 @@ export function SidebarPanel({
   onSortChange
 }: SidebarPanelProps) {
   
+  // Listen for bookmark update events
+  useEffect(() => {
+    const handleBookmarkUpdated = (e: Event) => {
+      // Cast to CustomEvent with the expected detail type
+      const event = e as CustomEvent<{bookmarkId: string; updatedBookmark: Bookmark}>;
+      
+      // If we're using "recently_updated" sort, the bookmark list will be 
+      // automatically updated through the optimistic update in the parent component
+      console.log(`Bookmark updated event received in sidebar for bookmark: ${event.detail?.bookmarkId}`);
+    };
+    
+    // Add event listener for the custom event
+    window.addEventListener('bookmarkUpdated', handleBookmarkUpdated);
+    
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.removeEventListener('bookmarkUpdated', handleBookmarkUpdated);
+    };
+  }, []);
+
   // If a bookmark is selected, show the detail panel
   if (selectedBookmark) {
     return (
