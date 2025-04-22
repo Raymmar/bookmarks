@@ -627,21 +627,19 @@ export default function GraphView() {
           
           {/* Tags display area */}
           <div className="relative">
-            {/* Consistent drawer toggle button - always in the same position */}
-            <button
-              onClick={toggleTagDrawer}
-              aria-label={tagDrawerOpen ? "Close tag drawer" : "Open tag drawer"}
-              className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
-            >
-              {tagDrawerOpen ? (
+            {/* Drawer toggle button - keeping original positioning */}
+            {tagDrawerOpen && (
+              <button
+                onClick={toggleTagDrawer}
+                aria-label="Close tag drawer"
+                className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
+              >
                 <ChevronDown className="h-4 w-4 text-gray-700" />
-              ) : (
-                <ChevronUp className="h-4 w-4 text-gray-700" />
-              )}
-            </button>
+              </button>
+            )}
             
             {/* Single-row tag display when drawer is closed, multi-row when open */}
-            <div className={`flex ${tagDrawerOpen ? 'flex-wrap' : 'flex-nowrap overflow-x-hidden'} gap-1 items-center pr-8`}>
+            <div className={`flex ${tagDrawerOpen ? 'flex-wrap' : 'flex-nowrap overflow-x-hidden'} gap-1 items-center`}>
               {/* Tags display - either all tags (drawer open) or popular tags (drawer closed) */}
               {(tagDrawerOpen 
                 ? allTags 
@@ -678,7 +676,7 @@ export default function GraphView() {
                 </Badge>
               )}
               
-              {/* Show tag count indicator when drawer is closed */}
+              {/* Show "more" badge when drawer is closed */}
               {!tagDrawerOpen && (
                 (() => {
                   // Calculate remaining non-selected tags for display
@@ -690,8 +688,9 @@ export default function GraphView() {
                       <Badge 
                         variant="secondary"
                         className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center whitespace-nowrap"
+                        onClick={toggleTagDrawer}
                       >
-                        +{remainingTagsCount} more
+                        +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
                       </Badge>
                     );
                   }
