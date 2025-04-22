@@ -124,6 +124,228 @@ export interface IStorage {
   sessionStore: any;
 }
 
+// Database storage implementation
+export class DatabaseStorage implements IStorage {
+  sessionStore: any;
+
+  constructor() {
+    // Initialize session store with PostgreSQL
+    const PostgresSessionStore = connectPg(session);
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
+    });
+  }
+
+  // Users
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Collections
+  async getCollections(): Promise<Collection[]> {
+    return await db.select().from(collections);
+  }
+
+  async getPublicCollections(): Promise<Collection[]> {
+    return await db.select().from(collections).where(eq(collections.is_public, true));
+  }
+
+  async getUserCollections(userId: string): Promise<Collection[]> {
+    return await db.select().from(collections).where(eq(collections.owner_id, userId));
+  }
+
+  async getCollection(id: string): Promise<Collection | undefined> {
+    const [collection] = await db.select().from(collections).where(eq(collections.id, id));
+    return collection;
+  }
+
+  async getDefaultCollection(userId: string): Promise<Collection | undefined> {
+    const [defaultCollection] = await db
+      .select()
+      .from(collections)
+      .where(eq(collections.owner_id, userId))
+      .where(eq(collections.is_default, true));
+    return defaultCollection;
+  }
+
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const [newCollection] = await db.insert(collections).values(collection).returning();
+    return newCollection;
+  }
+
+  async updateCollection(id: string, updates: Partial<InsertCollection>): Promise<Collection | undefined> {
+    const [updatedCollection] = await db
+      .update(collections)
+      .set(updates)
+      .where(eq(collections.id, id))
+      .returning();
+    return updatedCollection;
+  }
+
+  async deleteCollection(id: string): Promise<boolean> {
+    const result = await db.delete(collections).where(eq(collections.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Collection Memberships
+  async getCollectionMembers(collectionId: string): Promise<User[]> {
+    const memberships = await db
+      .select()
+      .from(collectionMemberships)
+      .where(eq(collectionMemberships.collection_id, collectionId));
+    
+    const userIds = memberships.map(membership => membership.user_id);
+    
+    if (userIds.length === 0) {
+      return [];
+    }
+    
+    return await db
+      .select()
+      .from(users)
+      .where(sql`${users.id} IN (${userIds.join(',')})`);
+  }
+
+  async getUserCollectionMemberships(userId: string): Promise<CollectionMembership[]> {
+    return await db
+      .select()
+      .from(collectionMemberships)
+      .where(eq(collectionMemberships.user_id, userId));
+  }
+
+  async addUserToCollection(
+    collectionId: string, 
+    userId: string, 
+    role: "viewer" | "editor" | "admin" = "viewer"
+  ): Promise<CollectionMembership> {
+    const [membership] = await db
+      .insert(collectionMemberships)
+      .values({
+        id: crypto.randomUUID(),
+        collection_id: collectionId,
+        user_id: userId,
+        role,
+        created_at: new Date()
+      })
+      .returning();
+    return membership;
+  }
+
+  async updateCollectionMembership(
+    collectionId: string, 
+    userId: string, 
+    role: "viewer" | "editor" | "admin"
+  ): Promise<CollectionMembership | undefined> {
+    const [updatedMembership] = await db
+      .update(collectionMemberships)
+      .set({ role })
+      .where(eq(collectionMemberships.collection_id, collectionId))
+      .where(eq(collectionMemberships.user_id, userId))
+      .returning();
+    return updatedMembership;
+  }
+
+  async removeUserFromCollection(collectionId: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(collectionMemberships)
+      .where(eq(collectionMemberships.collection_id, collectionId))
+      .where(eq(collectionMemberships.user_id, userId));
+    return result.rowCount > 0;
+  }
+
+  // Bookmark-Collection relationships
+  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
+    const bookmarkCollectionEntries = await db
+      .select()
+      .from(bookmarkCollections)
+      .where(eq(bookmarkCollections.collection_id, collectionId));
+    
+    const bookmarkIds = bookmarkCollectionEntries.map(entry => entry.bookmark_id);
+    
+    if (bookmarkIds.length === 0) {
+      return [];
+    }
+    
+    return await db
+      .select()
+      .from(bookmarks)
+      .where(sql`${bookmarks.id} IN (${bookmarkIds.join(',')})`);
+  }
+
+  async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
+    const bookmarkCollectionEntries = await db
+      .select()
+      .from(bookmarkCollections)
+      .where(eq(bookmarkCollections.bookmark_id, bookmarkId));
+    
+    const collectionIds = bookmarkCollectionEntries.map(entry => entry.collection_id);
+    
+    if (collectionIds.length === 0) {
+      return [];
+    }
+    
+    return await db
+      .select()
+      .from(collections)
+      .where(sql`${collections.id} IN (${collectionIds.join(',')})`);
+  }
+
+  async addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<BookmarkCollection> {
+    const [entry] = await db
+      .insert(bookmarkCollections)
+      .values({
+        id: crypto.randomUUID(),
+        bookmark_id: bookmarkId,
+        collection_id: collectionId,
+        added_at: new Date()
+      })
+      .returning();
+    return entry;
+  }
+
+  async removeBookmarkFromCollection(bookmarkId: string, collectionId: string): Promise<boolean> {
+    const result = await db
+      .delete(bookmarkCollections)
+      .where(eq(bookmarkCollections.bookmark_id, bookmarkId))
+      .where(eq(bookmarkCollections.collection_id, collectionId));
+    return result.rowCount > 0;
+  }
+
 // In-memory storage implementation as a fallback
 export class MemStorage implements IStorage {
   private bookmarks: Map<string, Bookmark>;
