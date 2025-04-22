@@ -19,6 +19,8 @@ interface FilterControlsProps {
   onTagModeChange: (mode: "any" | "all") => void;
   sortOrder: string;
   onSortOrderChange: (sortOrder: string) => void;
+  visibleNodeTypes?: string[];
+  onVisibleNodeTypesChange?: (nodeTypes: string[]) => void;
   className?: string;
 }
 
@@ -34,6 +36,8 @@ export function FilterControls({
   onTagModeChange,
   sortOrder,
   onSortOrderChange,
+  visibleNodeTypes = ["bookmark", "domain", "tag"],
+  onVisibleNodeTypesChange,
   className
 }: FilterControlsProps) {
   const [isOpen, setIsOpen] = useState(false);
