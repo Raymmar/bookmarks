@@ -107,6 +107,7 @@ export const activities = pgTable("activities", {
   id: uuid("id").defaultRandom().primaryKey(),
   bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }),
   bookmark_title: text("bookmark_title"),
+  user_id: uuid("user_id").references(() => users.id),
   type: text("type", { 
     enum: ["bookmark_added", "note_added", "highlight_added", "insight_generated"] 
   }).notNull(),
@@ -134,9 +135,10 @@ export const bookmarkTags = pgTable("bookmark_tags", {
 // Settings table for user-configurable settings
 export const settings = pgTable("settings", {
   id: uuid("id").defaultRandom().primaryKey(),
-  key: text("key").notNull().unique(),
+  key: text("key").notNull(),
   value: text("value").notNull(),
   description: text("description"),
+  user_id: uuid("user_id").references(() => users.id),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -144,6 +146,26 @@ export const settings = pgTable("settings", {
 export const usersRelations = relations(users, ({ many }) => ({
   bookmarks: many(bookmarks),
   collections: many(collections),
+  activities: many(activities),
+  settings: many(settings),
+}));
+
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  user: one(users, {
+    fields: [activities.user_id],
+    references: [users.id],
+  }),
+  bookmark: one(bookmarks, {
+    fields: [activities.bookmark_id],
+    references: [bookmarks.id],
+  }),
+}));
+
+export const settingsRelations = relations(settings, ({ one }) => ({
+  user: one(users, {
+    fields: [settings.user_id],
+    references: [users.id],
+  }),
 }));
 
 export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
