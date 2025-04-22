@@ -9,6 +9,7 @@ import Activity from "@/pages/activity";
 import GraphView from "@/pages/graph-view";
 import AiChat from "@/pages/ai-chat";
 import Settings from "@/pages/settings";
+import XIntegration from "@/pages/x-integration";
 import AuthPage from "@/pages/auth-page";
 import MainLayout from "@/layouts/main-layout";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />
       <ProtectedRoute path="/settings" component={Settings} />
+      <ProtectedRoute path="/x-integration" component={XIntegration} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

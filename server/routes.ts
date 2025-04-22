@@ -8,11 +8,13 @@ import {
   insertBookmarkSchema, insertNoteSchema, insertHighlightSchema, 
   insertScreenshotSchema, insertInsightSchema, insertActivitySchema,
   insertTagSchema, insertBookmarkTagSchema, 
-  insertChatSessionSchema, insertChatMessageSchema, insertSettingSchema
+  insertChatSessionSchema, insertChatMessageSchema, insertSettingSchema,
+  insertXFoldersSchema
 } from "@shared/schema";
 import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 import { bookmarkService } from "./lib/bookmark-service";
 import { setupAuth } from "./auth";
+import { xService } from "./lib/x-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -1502,6 +1504,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error retrieving bookmark collections:", error);
       res.status(500).json({ error: "Failed to retrieve bookmark collections" });
+    }
+  });
+
+  // X.com (Twitter) Integration Routes
+  
+  // Start X.com OAuth flow
+  app.get("/api/x/auth", (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      // Generate authorization URL
+      const authUrl = xService.getAuthorizationUrl();
+      
+      // Return the auth URL for frontend to redirect
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting X.com OAuth flow:", error);
+      res.status(500).json({ error: "Failed to start X.com authentication" });
+    }
+  });
+  
+  // X.com OAuth callback handling
+  app.post("/api/x/auth/callback", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const { code, codeVerifier } = req.body;
+      
+      if (!code || !codeVerifier) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+      
+      // Exchange code for token
+      const userId = (req.user as Express.User).id;
+      const credentials = await xService.exchangeCodeForToken(code, codeVerifier);
+      
+      // Save credentials to database
+      const savedCredentials = await storage.createXCredentials({
+        ...credentials,
+        user_id: userId
+      });
+      
+      res.json({ success: true, username: savedCredentials.x_username });
+    } catch (error) {
+      console.error("Error handling X.com OAuth callback:", error);
+      res.status(500).json({ error: "Failed to complete X.com authentication" });
+    }
+  });
+  
+  // Check X.com connection status
+  app.get("/api/x/status", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userId = (req.user as Express.User).id;
+      const credentials = await storage.getXCredentialsByUserId(userId);
+      
+      if (!credentials) {
+        return res.json({ connected: false });
+      }
+      
+      // Return connection status with some user info
+      res.json({
+        connected: true,
+        username: credentials.x_username,
+        lastSync: credentials.last_sync_at
+      });
+    } catch (error) {
+      console.error("Error checking X.com connection status:", error);
+      res.status(500).json({ error: "Failed to check X.com connection status" });
+    }
+  });
+  
+  // Sync bookmarks from X.com
+  app.post("/api/x/sync", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userId = (req.user as Express.User).id;
+      
+      // Sync bookmarks using X service
+      const syncResult = await xService.syncBookmarks(userId);
+      
+      res.json({
+        success: true,
+        ...syncResult
+      });
+    } catch (error) {
+      console.error("Error syncing X.com bookmarks:", error);
+      res.status(500).json({ error: "Failed to sync X.com bookmarks" });
+    }
+  });
+  
+  // Get X.com folders
+  app.get("/api/x/folders", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userId = (req.user as Express.User).id;
+      
+      // Get user credentials first
+      const credentials = await storage.getXCredentialsByUserId(userId);
+      
+      if (!credentials) {
+        return res.status(404).json({ error: "X.com connection not found" });
+      }
+      
+      // Get folders from X.com
+      const folders = await xService.getFolders(credentials.access_token, credentials.x_user_id);
+      
+      // Get existing folder mappings
+      const existingMappings = await storage.getXFoldersByUserId(userId);
+      
+      // Combine data for response
+      const foldersWithMappings = folders.map(folder => {
+        const mapping = existingMappings.find(m => m.x_folder_id === folder.id);
+        return {
+          ...folder,
+          collection_id: mapping?.collection_id || null,
+          mapped: !!mapping
+        };
+      });
+      
+      res.json(foldersWithMappings);
+    } catch (error) {
+      console.error("Error retrieving X.com folders:", error);
+      res.status(500).json({ error: "Failed to retrieve X.com folders" });
+    }
+  });
+  
+  // Map X.com folder to a collection
+  app.post("/api/x/folders/map", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userId = (req.user as Express.User).id;
+      const { folderId, folderName, collectionId, createNew } = req.body;
+      
+      if (!folderId || !folderName) {
+        return res.status(400).json({ error: "Missing required folder information" });
+      }
+      
+      let result;
+      
+      // Create a new collection for this folder or map to existing one
+      if (createNew) {
+        result = await xService.createCollectionFromFolder(
+          userId,
+          { id: folderId, name: folderName }
+        );
+      } else {
+        if (!collectionId) {
+          return res.status(400).json({ error: "Collection ID is required when mapping to existing collection" });
+        }
+        
+        result = await xService.mapFolderToCollection(
+          userId,
+          { id: folderId, name: folderName },
+          collectionId
+        );
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error mapping X.com folder:", error);
+      res.status(500).json({ error: "Failed to map X.com folder" });
     }
   });
 
