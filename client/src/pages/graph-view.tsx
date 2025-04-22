@@ -560,11 +560,11 @@ export default function GraphView() {
     // Get container width
     const containerWidth = tagContainerRef.current.clientWidth;
     
-    // Account for other elements (padding, toggle button, etc.)
-    const adjustedWidth = containerWidth - 40; // Subtract padding and button width
+    // Account for other elements (padding, toggle button, tag count indicator, etc.)
+    const adjustedWidth = containerWidth - 70; // Add extra space (70px instead of 40px) to prevent overlap with tag count
     
     // Estimate average tag width (this is an approximation)
-    const avgTagWidth = 90; // Average tag width in pixels, including gap
+    const avgTagWidth = 100; // Increased average tag width to be more conservative
     
     // Calculate how many tags can fit in one row
     const fitCount = Math.floor(adjustedWidth / avgTagWidth);
