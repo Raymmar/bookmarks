@@ -56,8 +56,12 @@ export class BookmarkService {
 
   /**
    * Processes a URL to normalize it and check for duplicates
+   * 
+   * @param url The URL to process
+   * @param userId Optional user ID to check for URL duplicates only for the same user
+   * @returns Processed URL result with normalization and existence information
    */
-  async processUrl(url: string): Promise<ProcessedUrlResult> {
+  async processUrl(url: string, userId?: string | null): Promise<ProcessedUrlResult> {
     if (!url) {
       throw new Error("URL is required");
     }
@@ -65,10 +69,13 @@ export class BookmarkService {
     // Normalize the URL (with tracking param removal)
     const normalizedUrl = normalizeUrl(url, true);
     
-    // Check if a bookmark with this normalized URL already exists
+    // Check if a bookmark with this normalized URL already exists for this user
     const bookmarks = await this.storage.getBookmarks();
+    
+    // If userId is provided, only check for duplicates for that user
     const existingBookmark = bookmarks.find(bookmark => 
-      areUrlsEquivalent(bookmark.url, normalizedUrl)
+      areUrlsEquivalent(bookmark.url, normalizedUrl) && 
+      (userId ? bookmark.user_id === userId : false)
     );
     
     if (existingBookmark) {
@@ -345,13 +352,14 @@ export class BookmarkService {
     }
 
     // Process URL normalization
-    const urlResult = await this.processUrl(options.url);
+    // Pass the user_id to only check for duplicates for this specific user
+    const urlResult = await this.processUrl(options.url, options.user_id);
     
-    // Check for duplicates
+    // Check for duplicates for this user only
     if (urlResult.exists && urlResult.existingBookmarkId) {
-      // Return existing bookmark instead of creating a duplicate
+      // Return existing bookmark instead of creating a duplicate for the same user
       const existingBookmark = await this.storage.getBookmark(urlResult.existingBookmarkId);
-      console.log(`URL already exists as bookmark: ${urlResult.existingBookmarkId}`);
+      console.log(`URL already exists as bookmark for this user: ${urlResult.existingBookmarkId}`);
       
       if (!existingBookmark) {
         throw new Error("Error retrieving existing bookmark");
@@ -618,7 +626,8 @@ export class BookmarkService {
     
     // Update URL if provided (with normalization)
     if (updateData.url) {
-      const urlResult = await this.processUrl(updateData.url);
+      // Use the bookmark's user_id for URL duplication check
+      const urlResult = await this.processUrl(updateData.url, bookmark.user_id);
       bookmarkUpdateData.url = urlResult.normalized;
     }
 
