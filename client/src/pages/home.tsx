@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
@@ -21,6 +21,7 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState("newest");
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [insightLevel, setInsightLevel] = useState(1);
+  const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState<string[]>([]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -34,6 +35,36 @@ export default function Home() {
 
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
 
+  // Listen for bookmark update events and track recently updated bookmarks
+  useEffect(() => {
+    const handleBookmarkUpdate = (event: Event) => {
+      try {
+        const customEvent = event as CustomEvent<{bookmarkId: string, updatedFields: Partial<Bookmark>, updatedBookmark: Bookmark}>;
+        const { bookmarkId } = customEvent.detail;
+        
+        console.log(`Home: Received bookmark update event for ${bookmarkId}`);
+        
+        // Add this bookmark to the recently updated list (at the beginning)
+        setRecentlyUpdatedIds(prev => {
+          // Remove the id if it already exists in the list to avoid duplicates
+          const filteredIds = prev.filter(id => id !== bookmarkId);
+          // Add the id to the beginning of the list
+          return [bookmarkId, ...filteredIds];
+        });
+      } catch (error) {
+        console.error("Error handling bookmark update event in home:", error);
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('bookmarkUpdated', handleBookmarkUpdate);
+    
+    // Clean up on unmount
+    return () => {
+      document.removeEventListener('bookmarkUpdated', handleBookmarkUpdate);
+    };
+  }, []);
+
   const filteredBookmarks = bookmarks.filter(bookmark => {
     if (!searchQuery) return true;
     
@@ -42,12 +73,27 @@ export default function Home() {
       bookmark.title.toLowerCase().includes(searchLower) ||
       bookmark.description?.toLowerCase().includes(searchLower) ||
       bookmark.url.toLowerCase().includes(searchLower) ||
-      bookmark.user_tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
-      bookmark.system_tags.some(tag => tag.toLowerCase().includes(searchLower))
+      (bookmark.user_tags?.some(tag => tag.toLowerCase().includes(searchLower)) || false) ||
+      (bookmark.system_tags?.some(tag => tag.toLowerCase().includes(searchLower)) || false)
     );
   });
 
+  // Create a sorting function that prioritizes recently updated bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
+    // First, prioritize recently updated bookmarks
+    const aRecentIndex = recentlyUpdatedIds.indexOf(a.id);
+    const bRecentIndex = recentlyUpdatedIds.indexOf(b.id);
+    
+    // If both are in the recently updated list, sort by their position in that list
+    if (aRecentIndex !== -1 && bRecentIndex !== -1) {
+      return aRecentIndex - bRecentIndex;
+    }
+    
+    // If only one is in the recently updated list, it comes first
+    if (aRecentIndex !== -1) return -1;
+    if (bRecentIndex !== -1) return 1;
+    
+    // Otherwise, fall back to the selected sort order
     if (sortOrder === "newest") {
       return new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime();
     } else if (sortOrder === "oldest") {

@@ -17,6 +17,7 @@ interface BookmarkCardProps {
 export function BookmarkCard({ bookmark: initialBookmark, onEdit, onDelete }: BookmarkCardProps) {
   const [bookmark, setBookmark] = useState<Bookmark>(initialBookmark);
   const [tags, setTags] = useState<TagType[]>([]);
+  const [isRecentlyUpdated, setIsRecentlyUpdated] = useState(false);
   
   // Update internal bookmark state when props change
   useEffect(() => {
@@ -53,6 +54,14 @@ export function BookmarkCard({ bookmark: initialBookmark, onEdit, onDelete }: Bo
           
           // Update the local bookmark state with the changes
           setBookmark(updatedBookmark);
+          
+          // Show visual feedback for recent update
+          setIsRecentlyUpdated(true);
+          
+          // Reset the highlight after a few seconds
+          setTimeout(() => {
+            setIsRecentlyUpdated(false);
+          }, 5000);
         }
       } catch (error) {
         console.error("Error handling bookmark update event:", error);
@@ -68,10 +77,23 @@ export function BookmarkCard({ bookmark: initialBookmark, onEdit, onDelete }: Bo
     };
   }, [bookmark.id]);
   return (
-    <Card className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
+    <Card className={`bg-white rounded-lg overflow-hidden hover:shadow-md transition-all duration-500 ${
+      isRecentlyUpdated 
+        ? 'shadow-md border-2 border-blue-300' 
+        : 'shadow-sm border border-gray-200'
+    }`}>
+      <CardContent className={`p-4 ${isRecentlyUpdated ? 'bg-blue-50' : ''} transition-colors duration-500`}>
         <div className="flex justify-between items-start mb-3">
-          <h3 className="font-medium text-base line-clamp-1">{bookmark.title}</h3>
+          <h3 className={`font-medium text-base line-clamp-1 transition-colors duration-500 ${
+            isRecentlyUpdated ? 'text-blue-700' : ''
+          }`}>
+            {bookmark.title}
+            {isRecentlyUpdated && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                Updated
+              </span>
+            )}
+          </h3>
           <div className="flex space-x-1">
             <Button 
               variant="ghost" 
