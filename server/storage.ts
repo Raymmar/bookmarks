@@ -9,13 +9,51 @@ import {
   bookmarkTags, BookmarkTag, InsertBookmarkTag,
   chatSessions, ChatSession, InsertChatSession,
   chatMessages, ChatMessage, InsertChatMessage,
-  settings, Setting, InsertSetting
+  settings, Setting, InsertSetting,
+  users, User, InsertUser,
+  collections, Collection, InsertCollection,
+  collectionMemberships, CollectionMembership, InsertCollectionMembership,
+  bookmarkCollections, BookmarkCollection, InsertBookmarkCollection
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
+import createMemoryStore from "memorystore";
+import session from "express-session";
 
 // Storage interface
 export interface IStorage {
+  // Users
+  getUsers(): Promise<User[]>;
+  getUser(id: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+  
+  // Collections
+  getCollections(): Promise<Collection[]>;
+  getPublicCollections(): Promise<Collection[]>;
+  getUserCollections(userId: string): Promise<Collection[]>;
+  getCollection(id: string): Promise<Collection | undefined>;
+  getDefaultCollection(userId: string): Promise<Collection | undefined>;
+  createCollection(collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: string, collection: Partial<InsertCollection>): Promise<Collection | undefined>;
+  deleteCollection(id: string): Promise<boolean>;
+  
+  // Collection Memberships
+  getCollectionMembers(collectionId: string): Promise<User[]>;
+  getUserCollectionMemberships(userId: string): Promise<CollectionMembership[]>;
+  addUserToCollection(collectionId: string, userId: string, role?: "viewer" | "editor" | "admin"): Promise<CollectionMembership>;
+  updateCollectionMembership(collectionId: string, userId: string, role: "viewer" | "editor" | "admin"): Promise<CollectionMembership | undefined>;
+  removeUserFromCollection(collectionId: string, userId: string): Promise<boolean>;
+  
+  // Bookmark-Collection relationships
+  getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]>;
+  getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]>;
+  addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<BookmarkCollection>;
+  removeBookmarkFromCollection(bookmarkId: string, collectionId: string): Promise<boolean>;
+  
   // Bookmarks
   getBookmarks(): Promise<Bookmark[]>;
   getBookmark(id: string): Promise<Bookmark | undefined>;
@@ -81,6 +119,9 @@ export interface IStorage {
   createSetting(setting: InsertSetting): Promise<Setting>;
   updateSetting(key: string, value: string): Promise<Setting | undefined>;
   deleteSetting(key: string): Promise<boolean>;
+  
+  // Session store for auth
+  sessionStore: any;
 }
 
 // In-memory storage implementation as a fallback
@@ -102,6 +143,17 @@ export class MemStorage implements IStorage {
   // Settings
   private settings: Map<string, Setting>;
   
+  // User persistence
+  private users: Map<string, User>;
+  
+  // Collections persistence
+  private collections: Map<string, Collection>;
+  private collectionMemberships: Map<string, CollectionMembership>;
+  private bookmarkCollections: Map<string, BookmarkCollection>;
+  
+  // Session store
+  sessionStore: any;
+
   constructor() {
     this.bookmarks = new Map();
     this.notes = new Map();
@@ -114,6 +166,18 @@ export class MemStorage implements IStorage {
     this.chatSessions = new Map();
     this.chatMessages = new Map();
     this.settings = new Map();
+    
+    // Initialize new collections
+    this.users = new Map();
+    this.collections = new Map();
+    this.collectionMemberships = new Map();
+    this.bookmarkCollections = new Map();
+    
+    // Initialize session store
+    const MemoryStore = createMemoryStore(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // 24 hours
+    });
   }
 
   // Bookmarks
@@ -567,6 +631,229 @@ export class MemStorage implements IStorage {
 
 // PostgreSQL database storage implementation
 export class DatabaseStorage implements IStorage {
+  // Session store for auth
+  sessionStore: any;
+  
+  constructor() {
+    // We'll initialize the session store in auth.ts
+    this.sessionStore = null;
+  }
+  
+  // Users
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+  
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+  
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+  
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+  
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+  
+  async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(userUpdate)
+      .where(eq(users.id, id))
+      .returning();
+    
+    return updatedUser;
+  }
+  
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id)).returning({ id: users.id });
+    return result.length > 0;
+  }
+  
+  // Collections
+  async getCollections(): Promise<Collection[]> {
+    return await db.select().from(collections);
+  }
+  
+  async getPublicCollections(): Promise<Collection[]> {
+    return await db.select().from(collections).where(eq(collections.is_public, true));
+  }
+  
+  async getUserCollections(userId: string): Promise<Collection[]> {
+    return await db.select().from(collections).where(eq(collections.owner_id, userId));
+  }
+  
+  async getCollection(id: string): Promise<Collection | undefined> {
+    const [collection] = await db.select().from(collections).where(eq(collections.id, id));
+    return collection;
+  }
+  
+  async getDefaultCollection(userId: string): Promise<Collection | undefined> {
+    const [collection] = await db
+      .select()
+      .from(collections)
+      .where(eq(collections.owner_id, userId))
+      .where(eq(collections.is_default, true));
+    
+    return collection;
+  }
+  
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const [newCollection] = await db.insert(collections).values(collection).returning();
+    return newCollection;
+  }
+  
+  async updateCollection(id: string, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
+    const [updatedCollection] = await db
+      .update(collections)
+      .set(collectionUpdate)
+      .where(eq(collections.id, id))
+      .returning();
+    
+    return updatedCollection;
+  }
+  
+  async deleteCollection(id: string): Promise<boolean> {
+    const result = await db.delete(collections).where(eq(collections.id, id)).returning({ id: collections.id });
+    return result.length > 0;
+  }
+  
+  // Collection Memberships
+  async getCollectionMembers(collectionId: string): Promise<User[]> {
+    const memberships = await db
+      .select({
+        userId: collectionMemberships.user_id
+      })
+      .from(collectionMemberships)
+      .where(eq(collectionMemberships.collection_id, collectionId));
+    
+    if (memberships.length === 0) {
+      return [];
+    }
+    
+    const userIds = memberships.map(m => m.userId);
+    return await db
+      .select()
+      .from(users)
+      .where(sql`${users.id} IN (${userIds.join(', ')})`);
+  }
+  
+  async getUserCollectionMemberships(userId: string): Promise<CollectionMembership[]> {
+    return await db
+      .select()
+      .from(collectionMemberships)
+      .where(eq(collectionMemberships.user_id, userId));
+  }
+  
+  async addUserToCollection(
+    collectionId: string,
+    userId: string,
+    role: "viewer" | "editor" | "admin" = "viewer"
+  ): Promise<CollectionMembership> {
+    const [membership] = await db
+      .insert(collectionMemberships)
+      .values({
+        collection_id: collectionId,
+        user_id: userId,
+        role
+      })
+      .returning();
+    
+    return membership;
+  }
+  
+  async updateCollectionMembership(
+    collectionId: string,
+    userId: string,
+    role: "viewer" | "editor" | "admin"
+  ): Promise<CollectionMembership | undefined> {
+    const [updatedMembership] = await db
+      .update(collectionMemberships)
+      .set({ role })
+      .where(sql`${collectionMemberships.collection_id} = ${collectionId} AND ${collectionMemberships.user_id} = ${userId}`)
+      .returning();
+    
+    return updatedMembership;
+  }
+  
+  async removeUserFromCollection(collectionId: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(collectionMemberships)
+      .where(sql`${collectionMemberships.collection_id} = ${collectionId} AND ${collectionMemberships.user_id} = ${userId}`)
+      .returning({ id: collectionMemberships.id });
+    
+    return result.length > 0;
+  }
+  
+  // Bookmark-Collection relationships
+  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
+    const bookmarkIds = await db
+      .select({
+        bookmarkId: bookmarkCollections.bookmark_id
+      })
+      .from(bookmarkCollections)
+      .where(eq(bookmarkCollections.collection_id, collectionId));
+    
+    if (bookmarkIds.length === 0) {
+      return [];
+    }
+    
+    const ids = bookmarkIds.map(b => b.bookmarkId);
+    return await db
+      .select()
+      .from(bookmarks)
+      .where(sql`${bookmarks.id} IN (${ids.join(', ')})`);
+  }
+  
+  async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
+    const collectionIds = await db
+      .select({
+        collectionId: bookmarkCollections.collection_id
+      })
+      .from(bookmarkCollections)
+      .where(eq(bookmarkCollections.bookmark_id, bookmarkId));
+    
+    if (collectionIds.length === 0) {
+      return [];
+    }
+    
+    const ids = collectionIds.map(c => c.collectionId);
+    return await db
+      .select()
+      .from(collections)
+      .where(sql`${collections.id} IN (${ids.join(', ')})`);
+  }
+  
+  async addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<BookmarkCollection> {
+    const [relationship] = await db
+      .insert(bookmarkCollections)
+      .values({
+        bookmark_id: bookmarkId,
+        collection_id: collectionId
+      })
+      .returning();
+    
+    return relationship;
+  }
+  
+  async removeBookmarkFromCollection(bookmarkId: string, collectionId: string): Promise<boolean> {
+    const result = await db
+      .delete(bookmarkCollections)
+      .where(sql`${bookmarkCollections.bookmark_id} = ${bookmarkId} AND ${bookmarkCollections.collection_id} = ${collectionId}`)
+      .returning({ id: bookmarkCollections.id });
+    
+    return result.length > 0;
+  }
+  
   // Bookmarks
   async getBookmarks(): Promise<Bookmark[]> {
     return await db.select().from(bookmarks);
