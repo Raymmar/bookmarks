@@ -59,6 +59,7 @@ export const bookmarks = pgTable("bookmarks", {
   // Use a text array to store vector embedding until pgvector extension is properly configured
   vector_embedding: text("vector_embedding").array(),
   date_saved: timestamp("date_saved").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
   source: text("source", { enum: ["extension", "web", "import"] }).notNull(),
   // AI processing status to track the workflow
   ai_processing_status: text("ai_processing_status", { 
@@ -239,6 +240,7 @@ export const insertCollectionBookmarkSchema = createInsertSchema(collectionBookm
 export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
   id: true,
   vector_embedding: true,
+  updated_at: true,
 });
 
 export const insertNoteSchema = createInsertSchema(notes).omit({

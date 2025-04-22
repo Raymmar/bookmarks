@@ -347,7 +347,11 @@ export class MemStorage implements IStorage {
     const bookmark = this.bookmarks.get(id);
     if (!bookmark) return undefined;
     
-    const updatedBookmark = { ...bookmark, ...bookmarkUpdate };
+    const updatedBookmark = { 
+      ...bookmark, 
+      ...bookmarkUpdate,
+      updated_at: new Date()
+    };
     this.bookmarks.set(id, updatedBookmark);
     return updatedBookmark;
   }
@@ -973,7 +977,10 @@ export class DatabaseStorage implements IStorage {
   async updateBookmark(id: string, bookmarkUpdate: Partial<InsertBookmark>): Promise<Bookmark | undefined> {
     const [updatedBookmark] = await db
       .update(bookmarks)
-      .set(bookmarkUpdate)
+      .set({
+        ...bookmarkUpdate,
+        updated_at: new Date()
+      })
       .where(eq(bookmarks.id, id))
       .returning();
     
