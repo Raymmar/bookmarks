@@ -532,9 +532,10 @@ export default function GraphView() {
             {/* Absolute positioned close button when drawer is open */}
             {tagDrawerOpen && (
               <button
-                className="absolute top-0 right-0 p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center shadow-sm z-10"
+                className="absolute top-0 right-0 p-1.5 bg-gray-100 hover:bg-gray-200 flex items-center justify-center z-10"
                 onClick={toggleTagDrawer}
                 aria-label="Close tag drawer"
+                style={{ margin: 0 }}
               >
                 <ChevronUp className="h-4 w-4 text-gray-700" />
               </button>
