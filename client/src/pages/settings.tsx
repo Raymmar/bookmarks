@@ -12,7 +12,7 @@ import * as z from "zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RotateCcw } from "lucide-react";
 
 // Form validation schema
 const settingSchema = z.object({
@@ -25,6 +25,7 @@ type Setting = {
   value: string;
   description: string;
   updated_at: string;
+  user_id?: string;
 };
 
 const SettingsPage: React.FC = () => {
@@ -34,6 +35,12 @@ const SettingsPage: React.FC = () => {
   // Fetch all settings
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ["/api/settings"],
+    retry: 1,
+  });
+
+  // Fetch default settings from raymmar's account
+  const { data: defaultSettings, isLoading: isLoadingDefaults } = useQuery({
+    queryKey: ["/api/settings/defaults"],
     retry: 1,
   });
 
@@ -80,6 +87,13 @@ const SettingsPage: React.FC = () => {
       }
     }
   }, [settings, bookmarkSystemPromptForm, autoTaggingPromptForm, summaryPromptForm]);
+  
+  // Find default prompt values for placeholders
+  const getDefaultPrompt = (key: string): string => {
+    if (!defaultSettings) return "";
+    const defaultSetting = defaultSettings.find((s: Setting) => s.key === key);
+    return defaultSetting?.value || "";
+  };
 
   // Update setting mutation
   const updateSettingMutation = useMutation({
@@ -125,6 +139,31 @@ const SettingsPage: React.FC = () => {
 
   const onSummaryPromptSubmit = (data: { value: string }) => {
     updateSettingMutation.mutate({ key: "summary_prompt", value: data.value });
+  };
+  
+  // Reset to default handlers
+  const resetToDefault = (key: string, form: any) => {
+    const defaultValue = getDefaultPrompt(key);
+    if (defaultValue) {
+      updateSettingMutation.mutate({ 
+        key, 
+        value: defaultValue 
+      });
+      
+      // Also update the form for immediate UI feedback
+      form.reset({ value: defaultValue });
+      
+      toast({
+        title: "Reset to default",
+        description: "The prompt has been reset to the default value.",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not find default prompt. Please try again later.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -176,7 +215,7 @@ const SettingsPage: React.FC = () => {
                           <FormLabel>System Prompt</FormLabel>
                           <FormControl>
                             <Textarea 
-                              placeholder="Enter auto-tagging prompt..." 
+                              placeholder={getDefaultPrompt("auto_tagging_prompt")}
                               className="h-60 font-mono text-sm"
                               {...field} 
                             />
@@ -188,12 +227,24 @@ const SettingsPage: React.FC = () => {
                         </FormItem>
                       )}
                     />
-                    <Button 
-                      type="submit" 
-                      disabled={updateSettingMutation.isPending}
-                    >
-                      {updateSettingMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
+                    <div className="flex flex-row gap-2">
+                      <Button 
+                        type="submit" 
+                        disabled={updateSettingMutation.isPending}
+                      >
+                        {updateSettingMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => resetToDefault("auto_tagging_prompt", autoTaggingPromptForm)}
+                        disabled={updateSettingMutation.isPending || isLoadingDefaults}
+                        className="gap-1"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset to Default
+                      </Button>
+                    </div>
                   </form>
                 </Form>
               </CardContent>
@@ -219,7 +270,7 @@ const SettingsPage: React.FC = () => {
                           <FormLabel>System Prompt</FormLabel>
                           <FormControl>
                             <Textarea 
-                              placeholder="Enter summary prompt..." 
+                              placeholder={getDefaultPrompt("summary_prompt")}
                               className="h-60 font-mono text-sm"
                               {...field} 
                             />
@@ -231,12 +282,24 @@ const SettingsPage: React.FC = () => {
                         </FormItem>
                       )}
                     />
-                    <Button 
-                      type="submit" 
-                      disabled={updateSettingMutation.isPending}
-                    >
-                      {updateSettingMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
+                    <div className="flex flex-row gap-2">
+                      <Button 
+                        type="submit" 
+                        disabled={updateSettingMutation.isPending}
+                      >
+                        {updateSettingMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => resetToDefault("summary_prompt", summaryPromptForm)}
+                        disabled={updateSettingMutation.isPending || isLoadingDefaults}
+                        className="gap-1"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset to Default
+                      </Button>
+                    </div>
                   </form>
                 </Form>
               </CardContent>
@@ -262,8 +325,12 @@ const SettingsPage: React.FC = () => {
               <li><strong>Auto-Tagging:</strong> How tags are generated and what aspects of the content are prioritized for categorization.</li>
               <li><strong>Summarization:</strong> How detailed summaries are and what information is highlighted. This prompt is also used for generating insights and related information.</li>
             </ul>
-            <p>
+            <p className="mb-4">
               Making changes to these prompts will affect how new bookmarks are processed. Existing bookmark data won't be updated automatically.
+            </p>
+            <p>
+              If you haven't saved custom prompts, the system will use the default prompts as placeholders. 
+              You can reset to the default prompts at any time using the "Reset to Default" button.
             </p>
           </CardContent>
         </Card>

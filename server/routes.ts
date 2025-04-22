@@ -962,6 +962,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint to get the default prompts from raymmar's settings
+  app.get("/api/settings/defaults", async (req, res) => {
+    try {
+      const RAYMMAR_USER_ID = 'c95a1d56-f721-4f9a-9104-7e4cf59caad7';
+      const defaultSettings = await storage.getSettings(RAYMMAR_USER_ID);
+      
+      // Filter to just get the prompt settings
+      const promptSettings = defaultSettings.filter(setting => 
+        setting.key === 'auto_tagging_prompt' || 
+        setting.key === 'summary_prompt' ||
+        setting.key === 'bookmark_system_prompt'
+      );
+      
+      res.json(promptSettings);
+    } catch (error) {
+      console.error("Error retrieving default settings:", error);
+      res.status(500).json({ error: "Failed to retrieve default settings" });
+    }
+  });
+  
   app.get("/api/settings/:key", async (req, res) => {
     try {
       const setting = await storage.getSetting(req.params.key);
