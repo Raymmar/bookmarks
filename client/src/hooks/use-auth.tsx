@@ -141,9 +141,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/logout");
-      if (!res.ok) {
-        throw new Error("Logout failed");
+      try {
+        const res = await fetch("/api/logout", {
+          method: "POST",
+          credentials: "include"
+        });
+        
+        if (!res.ok) {
+          throw new Error("Logout failed");
+        }
+        
+        return;
+      } catch (error) {
+        console.error("Logout error:", error);
+        throw error;
       }
     },
     onSuccess: () => {
@@ -152,6 +163,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({
         queryKey: ["/api/bookmarks"],
       });
+      refetchUser();
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out",
