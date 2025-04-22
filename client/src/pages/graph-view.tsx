@@ -572,6 +572,17 @@ export default function GraphView() {
               </Badge>
             ))}
             
+            {/* Clear All button when drawer is open and tags are selected */}
+            {tagDrawerOpen && selectedTags.length > 0 && (
+              <Badge 
+                variant="secondary"
+                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                onClick={() => setSelectedTags([])}
+              >
+                Clear All <X className="h-3 w-3 ml-1" />
+              </Badge>
+            )}
+            
             {/* Show "more" badge when drawer is closed */}
             {!tagDrawerOpen && (
               (() => {
