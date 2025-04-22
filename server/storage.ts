@@ -473,35 +473,39 @@ export class MemStorage implements IStorage {
   // Tags
   async getTags(userId?: string): Promise<Tag[]> {
     if (userId) {
-      // Get user's bookmarks
+      // Get visible bookmarks: both user's own bookmarks and shared/public bookmarks
+      // For now, we only have the concept of user-owned bookmarks, so we just get those
       const userBookmarks = Array.from(this.bookmarks.values())
         .filter(bookmark => bookmark.user_id === userId);
       
       if (userBookmarks.length === 0) {
+        // User has no bookmarks, return empty array of tags
         return [];
       }
       
-      // Get bookmark IDs
-      const userBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
+      // Get bookmark IDs for the visible bookmarks
+      const visibleBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
       
       // Get bookmark-tag relationships for user's bookmarks
       const bookmarkTagEntries = Array.from(this.bookmarkTags.values())
-        .filter(bt => userBookmarkIds.includes(bt.bookmark_id));
+        .filter(bt => visibleBookmarkIds.includes(bt.bookmark_id));
       
       if (bookmarkTagEntries.length === 0) {
+        // No tag relationships found for visible bookmarks
         return [];
       }
       
       // Get tag IDs
       const tagIds = bookmarkTagEntries.map(bt => bt.tag_id);
       
-      // Return tags associated with the user's bookmarks
+      // Return tags associated with visible bookmarks
       return Array.from(this.tags.values())
         .filter(tag => tagIds.includes(tag.id));
     }
     
-    // If no userId provided, return all tags
-    return Array.from(this.tags.values());
+    // If no userId provided (user not logged in), only return tags for public bookmarks
+    // For now, we don't have a concept of public bookmarks, so we'll just return an empty array
+    return [];
   }
   
   async getTag(id: string): Promise<Tag | undefined> {
@@ -1065,9 +1069,11 @@ export class DatabaseStorage implements IStorage {
   
   // Tags
   async getTags(userId?: string): Promise<Tag[]> {
-    // If userId is provided, we need to filter tags that are associated with user's bookmarks
+    // For the main tag filtering in the UI, we want to return tags that are
+    // associated with bookmarks visible to the user, not just the user's bookmarks
     if (userId) {
-      // Get all bookmarks belonging to this user
+      // Get visible bookmarks: both user's own bookmarks and shared/public bookmarks
+      // For now, we only have the concept of user-owned bookmarks, so we just get those
       const userBookmarks = await db.select().from(bookmarks)
         .where(eq(bookmarks.user_id, userId));
       
@@ -1076,16 +1082,16 @@ export class DatabaseStorage implements IStorage {
         return [];
       }
       
-      // Get bookmark IDs for this user
-      const userBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
+      // Get bookmark IDs for the visible bookmarks
+      const visibleBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
       
       // Get all bookmark-tag relationships for these bookmarks
       const bookmarkTagRelations = await db
         .select().from(bookmarkTags)
-        .where(inArray(bookmarkTags.bookmark_id, userBookmarkIds));
+        .where(inArray(bookmarkTags.bookmark_id, visibleBookmarkIds));
       
       if (bookmarkTagRelations.length === 0) {
-        // No tag relationships found for user's bookmarks
+        // No tag relationships found for visible bookmarks
         return [];
       }
       
@@ -1097,72 +1103,9 @@ export class DatabaseStorage implements IStorage {
         .where(inArray(tags.id, tagIds));
     }
     
-    // If no userId provided, or for admin users, return all tags
-    const existingTags = await db.select().from(tags);
-    
-    // If we have tags in the normalized system, return them
-    if (existingTags.length > 0) {
-      return existingTags;
-    }
-    
-    // Otherwise, extract tags from bookmarks and populate the tags table on the fly
-    const allBookmarks = await db.select().from(bookmarks);
-    
-    // Collect all unique tags
-    const uniqueUserTags = new Set<string>();
-    const uniqueSystemTags = new Set<string>();
-    
-    allBookmarks.forEach(bookmark => {
-      if (bookmark.user_tags && Array.isArray(bookmark.user_tags)) {
-        bookmark.user_tags.forEach(tag => uniqueUserTags.add(tag));
-      }
-      
-      if (bookmark.system_tags && Array.isArray(bookmark.system_tags)) {
-        bookmark.system_tags.forEach(tag => uniqueSystemTags.add(tag));
-      }
-    });
-    
-    // Insert user tags
-    const userTagPromises = Array.from(uniqueUserTags).map(async tagName => {
-      try {
-        // Create tag if it doesn't exist
-        const [newTag] = await db.insert(tags).values({
-          name: tagName,
-          type: "user",
-          count: 0 // Will be updated later
-        }).returning();
-        
-        return newTag;
-      } catch (error) {
-        // If duplicate, get existing tag
-        const [existingTag] = await db.select().from(tags).where(eq(tags.name, tagName));
-        return existingTag;
-      }
-    });
-    
-    // Insert system tags
-    const systemTagPromises = Array.from(uniqueSystemTags).map(async tagName => {
-      try {
-        // Create tag if it doesn't exist
-        const [newTag] = await db.insert(tags).values({
-          name: tagName,
-          type: "system",
-          count: 0 // Will be updated later
-        }).returning();
-        
-        return newTag;
-      } catch (error) {
-        // If duplicate, get existing tag
-        const [existingTag] = await db.select().from(tags).where(eq(tags.name, tagName));
-        return existingTag;
-      }
-    });
-    
-    const userTags = await Promise.all(userTagPromises);
-    const systemTags = await Promise.all(systemTagPromises);
-    
-    // Return all tags
-    return [...userTags, ...systemTags];
+    // If no userId provided (user not logged in), only return tags for public bookmarks
+    // For now, we don't have a concept of public bookmarks, so we'll just return an empty array
+    return [];
   }
   
   async getTag(id: string): Promise<Tag | undefined> {
