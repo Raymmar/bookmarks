@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Bookmark } from "@shared/types";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
+import { useCollectionBookmarksForGraph } from "@/hooks/use-collection-queries";
 
 // Tag interfaces
 interface Tag {
@@ -34,6 +35,7 @@ export default function GraphView() {
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -55,10 +57,17 @@ export default function GraphView() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Fetch bookmarks
+  // Fetch regular bookmarks (used when no collection is selected)
   const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
+    enabled: !selectedCollectionId // Only fetch when no collection is selected
   });
+  
+  // Fetch bookmarks by collection (only when a collection is selected)
+  const { 
+    data: collectionBookmarks = [], 
+    isLoading: isLoadingCollectionBookmarks 
+  } = useCollectionBookmarksForGraph(selectedCollectionId);
 
   // Fetch tags
   const { data: tags = [], isLoading: isLoadingTags } = useQuery<Tag[]>({
@@ -225,7 +234,7 @@ export default function GraphView() {
   }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, isLoadingBookmarks, isLoadingTags]);
   
   // Combined loading state
-  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags;
+  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || isLoadingCollectionBookmarks;
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   

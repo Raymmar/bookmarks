@@ -1,5 +1,6 @@
 import { UseQueryResult, useMutation, useQuery } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { Bookmark } from '@shared/types';
 
 type Collection = {
   id: string;
@@ -35,6 +36,32 @@ export function useCollection(id: string): UseQueryResult<CollectionWithBookmark
       return collection;
     },
     enabled: !!id // Only run query if id is provided
+  });
+}
+
+// Hook for fetching bookmarks by collection for graph visualization
+export function useCollectionBookmarksForGraph(id: string | null): UseQueryResult<Bookmark[], Error> {
+  return useQuery({
+    queryKey: ['/api/collections/graph', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const bookmarks = await apiRequest('GET', `/api/collections/${id}/graph`);
+      return bookmarks;
+    },
+    enabled: !!id // Only run query if id is provided
+  });
+}
+
+// Hook for fetching bookmarks from multiple collections for graph visualization
+export function useMultiCollectionBookmarksForGraph(ids: string[]): UseQueryResult<Bookmark[], Error> {
+  return useQuery({
+    queryKey: ['/api/collections/graph', ids],
+    queryFn: async () => {
+      if (!ids || ids.length === 0) return [];
+      const bookmarks = await apiRequest('POST', '/api/collections/graph', { collectionIds: ids });
+      return bookmarks;
+    },
+    enabled: ids.length > 0 // Only run query if at least one id is provided
   });
 }
 
@@ -93,6 +120,7 @@ export function useCollectionMutations() {
     onSuccess: (_, variables) => {
       // Invalidate collection and bookmark queries
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections/graph', variables.collectionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId] });
     }
   });
@@ -106,6 +134,7 @@ export function useCollectionMutations() {
     onSuccess: (_, variables) => {
       // Invalidate collection and bookmark queries
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections/graph', variables.collectionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId] });
     }
   });

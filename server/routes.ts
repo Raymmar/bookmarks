@@ -1024,6 +1024,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to retrieve collection" });
     }
   });
+  
+  // Get bookmarks by collection ID with full details for graph visualization
+  app.get("/api/collections/:id/graph", async (req, res) => {
+    try {
+      const collection = await storage.getCollection(req.params.id);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+
+      // Check if user can access this collection
+      if (!req.isAuthenticated() && !collection.is_public) {
+        return res.status(403).json({ error: "Access denied to private collection" });
+      }
+
+      // Get bookmarks in this collection
+      const bookmarks = await storage.getBookmarksByCollectionId(collection.id);
+      
+      // Populate the bookmarks with related data (same as /api/bookmarks endpoint)
+      const populatedBookmarks = await Promise.all(
+        bookmarks.map(async (bookmark) => {
+          const notes = await storage.getNotesByBookmarkId(bookmark.id);
+          const highlights = await storage.getHighlightsByBookmarkId(bookmark.id);
+          const screenshots = await storage.getScreenshotsByBookmarkId(bookmark.id);
+          const insights = await storage.getInsightByBookmarkId(bookmark.id);
+          
+          return {
+            ...bookmark,
+            notes,
+            highlights,
+            screenshots,
+            insights
+          };
+        })
+      );
+
+      res.json(populatedBookmarks);
+    } catch (error) {
+      console.error("Error retrieving collection bookmarks for graph:", error);
+      res.status(500).json({ error: "Failed to retrieve collection bookmarks" });
+    }
+  });
+  
+  // Get bookmarks from multiple collections combined (for creating combined graph views)
+  app.post("/api/collections/graph", async (req, res) => {
+    try {
+      // Check the request body for collection IDs
+      const { collectionIds } = req.body;
+      
+      if (!collectionIds || !Array.isArray(collectionIds) || collectionIds.length === 0) {
+        return res.status(400).json({ error: "Must provide an array of collection IDs" });
+      }
+      
+      // Determine which collections the user can access
+      const accessibleCollectionIds = [];
+      for (const collectionId of collectionIds) {
+        const collection = await storage.getCollection(collectionId);
+        
+        if (!collection) {
+          continue; // Skip collections that don't exist
+        }
+        
+        // Check if user can access this collection
+        if (collection.is_public || (req.isAuthenticated() && collection.user_id === (req.user as Express.User).id)) {
+          accessibleCollectionIds.push(collectionId);
+        }
+      }
+      
+      if (accessibleCollectionIds.length === 0) {
+        return res.status(403).json({ error: "No accessible collections found" });
+      }
+      
+      // Get all bookmarks from accessible collections
+      const allBookmarks = new Map(); // Use a map to deduplicate bookmarks by ID
+      
+      for (const collectionId of accessibleCollectionIds) {
+        const bookmarks = await storage.getBookmarksByCollectionId(collectionId);
+        
+        // Add each bookmark to the map, replacing any duplicates
+        bookmarks.forEach(bookmark => {
+          allBookmarks.set(bookmark.id, bookmark);
+        });
+      }
+      
+      // Convert the map values back to an array
+      const uniqueBookmarks = Array.from(allBookmarks.values());
+      
+      // Populate the bookmarks with related data
+      const populatedBookmarks = await Promise.all(
+        uniqueBookmarks.map(async (bookmark) => {
+          const notes = await storage.getNotesByBookmarkId(bookmark.id);
+          const highlights = await storage.getHighlightsByBookmarkId(bookmark.id);
+          const screenshots = await storage.getScreenshotsByBookmarkId(bookmark.id);
+          const insights = await storage.getInsightByBookmarkId(bookmark.id);
+          
+          return {
+            ...bookmark,
+            notes,
+            highlights,
+            screenshots,
+            insights
+          };
+        })
+      );
+
+      res.json(populatedBookmarks);
+    } catch (error) {
+      console.error("Error retrieving multiple collection bookmarks for graph:", error);
+      res.status(500).json({ error: "Failed to retrieve collection bookmarks" });
+    }
+  });
 
   app.post("/api/collections", async (req, res) => {
     try {
