@@ -1,9 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, ChevronDown, Clock, CalendarPlus } from "lucide-react";
 import { Bookmark } from "@shared/types";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
 import { useEffect, useState } from "react";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Tag interface
 interface Tag {
@@ -66,6 +73,8 @@ interface SidebarPanelProps {
   onSelectBookmark: (bookmarkId: string) => void;
   onCloseDetail: () => void;
   isLoading: boolean;
+  sortOrder?: string;
+  onSortChange?: (value: string) => void;
 }
 
 export function SidebarPanel({ 
@@ -73,7 +82,9 @@ export function SidebarPanel({
   selectedBookmark, 
   onSelectBookmark, 
   onCloseDetail,
-  isLoading 
+  isLoading,
+  sortOrder = "newest",
+  onSortChange
 }: SidebarPanelProps) {
   
   // If a bookmark is selected, show the detail panel
@@ -89,9 +100,41 @@ export function SidebarPanel({
   // Otherwise, show the list of bookmarks
   return (
     <>
-      <div className="h-16 p-4 border-b border-gray-200 flex items-center">
-        <div className="flex w-full items-center justify-between">
+      <div className="border-b border-gray-200">
+        <div className="p-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-800">Bookmarks</h2>
+        </div>
+        
+        {/* Sorting controls */}
+        <div className="pb-3 px-4">
+          <Select
+            value={sortOrder}
+            onValueChange={(value) => onSortChange?.(value)}
+          >
+            <SelectTrigger className="w-full h-8 text-xs">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">
+                <div className="flex items-center">
+                  <CalendarPlus className="h-4 w-4 mr-2" />
+                  <span>Date Added (Newest)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="oldest">
+                <div className="flex items-center">
+                  <CalendarPlus className="h-4 w-4 mr-2" />
+                  <span>Date Added (Oldest)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="recently_updated">
+                <div className="flex items-center">
+                  <Clock className="h-4 w-4 mr-2" />
+                  <span>Recently Updated</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       
