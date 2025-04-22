@@ -15,7 +15,7 @@ import {
   collectionBookmarks, CollectionBookmark, InsertCollectionBookmark
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
@@ -72,7 +72,7 @@ export interface IStorage {
   createActivity(activity: InsertActivity): Promise<Activity>;
   
   // Tags
-  getTags(): Promise<Tag[]>;
+  getTags(userId?: string): Promise<Tag[]>;
   getTag(id: string): Promise<Tag | undefined>;
   getTagByName(name: string): Promise<Tag | undefined>;
   createTag(tag: InsertTag): Promise<Tag>;
@@ -471,7 +471,36 @@ export class MemStorage implements IStorage {
   }
   
   // Tags
-  async getTags(): Promise<Tag[]> {
+  async getTags(userId?: string): Promise<Tag[]> {
+    if (userId) {
+      // Get user's bookmarks
+      const userBookmarks = Array.from(this.bookmarks.values())
+        .filter(bookmark => bookmark.user_id === userId);
+      
+      if (userBookmarks.length === 0) {
+        return [];
+      }
+      
+      // Get bookmark IDs
+      const userBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
+      
+      // Get bookmark-tag relationships for user's bookmarks
+      const bookmarkTagEntries = Array.from(this.bookmarkTags.values())
+        .filter(bt => userBookmarkIds.includes(bt.bookmark_id));
+      
+      if (bookmarkTagEntries.length === 0) {
+        return [];
+      }
+      
+      // Get tag IDs
+      const tagIds = bookmarkTagEntries.map(bt => bt.tag_id);
+      
+      // Return tags associated with the user's bookmarks
+      return Array.from(this.tags.values())
+        .filter(tag => tagIds.includes(tag.id));
+    }
+    
+    // If no userId provided, return all tags
     return Array.from(this.tags.values());
   }
   
@@ -1035,7 +1064,40 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Tags
-  async getTags(): Promise<Tag[]> {
+  async getTags(userId?: string): Promise<Tag[]> {
+    // If userId is provided, we need to filter tags that are associated with user's bookmarks
+    if (userId) {
+      // Get all bookmarks belonging to this user
+      const userBookmarks = await db.select().from(bookmarks)
+        .where(eq(bookmarks.user_id, userId));
+      
+      if (userBookmarks.length === 0) {
+        // User has no bookmarks, return empty array of tags
+        return [];
+      }
+      
+      // Get bookmark IDs for this user
+      const userBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
+      
+      // Get all bookmark-tag relationships for these bookmarks
+      const bookmarkTagRelations = await db
+        .select().from(bookmarkTags)
+        .where(inArray(bookmarkTags.bookmark_id, userBookmarkIds));
+      
+      if (bookmarkTagRelations.length === 0) {
+        // No tag relationships found for user's bookmarks
+        return [];
+      }
+      
+      // Get the tag IDs
+      const tagIds = bookmarkTagRelations.map(relation => relation.tag_id);
+      
+      // Fetch the actual tag objects
+      return db.select().from(tags)
+        .where(inArray(tags.id, tagIds));
+    }
+    
+    // If no userId provided, or for admin users, return all tags
     const existingTags = await db.select().from(tags);
     
     // If we have tags in the normalized system, return them
