@@ -393,13 +393,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 {/* Create collection hint if no collections */}
                 {collections.length === 0 && !collectionsLoading && (
                   <li>
-                    <button 
-                      className="flex items-center px-2 py-2 text-sm rounded-lg text-blue-500 hover:bg-blue-50 cursor-pointer w-full text-left"
-                      onClick={() => setCreateCollectionOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2 text-blue-500" />
-                      Create your first collection
-                    </button>
                   </li>
                 )}
               </ul>
