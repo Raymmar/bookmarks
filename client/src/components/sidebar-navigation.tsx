@@ -97,19 +97,21 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   </div>
                 </Link>
               </li>
-              <li className="mb-1">
-                <Link href="/settings">
-                  <div className={cn(
-                    "flex items-center px-2 py-2 text-sm rounded-lg",
-                    location === "/settings" 
-                      ? "bg-primary text-white" 
-                      : "text-gray-700 hover:bg-gray-100"
-                  )}>
-                    <Settings className="h-5 w-5 mr-2" />
-                    Settings
-                  </div>
-                </Link>
-              </li>
+              {user && (
+                <li className="mb-1">
+                  <Link href="/settings">
+                    <div className={cn(
+                      "flex items-center px-2 py-2 text-sm rounded-lg",
+                      location === "/settings" 
+                        ? "bg-primary text-white" 
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}>
+                      <Settings className="h-5 w-5 mr-2" />
+                      Settings
+                    </div>
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
           
