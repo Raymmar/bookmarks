@@ -50,6 +50,9 @@ export default function GraphView() {
   });
   // Number of popular tags to show when drawer is closed
   const [popularTagCount] = useState<number>(10);
+  // For single row tag display
+  const [visibleTagCount, setVisibleTagCount] = useState<number>(10);
+  const tagContainerRef = useRef<HTMLDivElement>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -119,6 +122,37 @@ export default function GraphView() {
   
   // Track previous auth state to detect login vs logout
   const prevUserRef = useRef<{ id: string } | null>(null);
+  
+  // Calculate how many tags can fit in one row when drawer is closed
+  useEffect(() => {
+    if (tagDrawerOpen || !tagContainerRef.current) return;
+    
+    const calculateVisibleTags = () => {
+      const container = tagContainerRef.current;
+      if (!container) return;
+      
+      const containerWidth = container.offsetWidth;
+      // Subtract the toggle button width (approximately)
+      const availableWidth = containerWidth - 32;
+      
+      // Estimate the average tag width (including margins)
+      const averageTagWidth = 100; // Estimated average tag width in pixels
+      
+      // Calculate how many tags could fit in one row
+      const tagsPerRow = Math.floor(availableWidth / averageTagWidth);
+      
+      // Just use a simple calculation - max 8 tags or whatever fits
+      const maxVisibleTags = Math.max(tagsPerRow - 1, 1); // -1 to leave room for the "+X more" badge
+      
+      setVisibleTagCount(maxVisibleTags);
+    };
+    
+    calculateVisibleTags();
+    
+    // Recalculate on window resize
+    window.addEventListener('resize', calculateVisibleTags);
+    return () => window.removeEventListener('resize', calculateVisibleTags);
+  }, [tagDrawerOpen]);
   
   // Listen for user authentication changes and refresh bookmarks
   useEffect(() => {
@@ -216,6 +250,11 @@ export default function GraphView() {
   
   // Get tags sorted by usage count for popular tags feature
   const tagsByCount = [...tags].sort((a, b) => b.count - a.count);
+  
+  // Get popular tags for the closed drawer view
+  const popularTags = tagsByCount
+    .slice(0, popularTagCount)
+    .map(tag => tag.name);
   
   // Get bookmark tags using the bookmarksWithTags data
   const bookmarkTagsMap = new Map<string, string[]>();
@@ -397,11 +436,6 @@ export default function GraphView() {
     // Save state to localStorage
     localStorage.setItem('tagDrawerOpen', JSON.stringify(newState));
   };
-  
-  // Get popular tags by using our sorted tagsByCount list
-  const popularTags = tagsByCount
-    .slice(0, popularTagCount)
-    .map(tag => tag.name);
   
   const handleDeleteBookmark = async (id: string) => {
     try {
@@ -631,64 +665,81 @@ export default function GraphView() {
             </div>
           )}
           
-          {/* Tags drawer - minimal version */}
-          <div className="flex flex-wrap gap-1 items-center">
-            {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
-            {(tagDrawerOpen 
-              ? allTags 
-              // When drawer is closed, filter out selected tags from the popular tags
-              : popularTags.filter(tag => !selectedTags.includes(tag))
-            ).map((tag, index) => (
-              <Badge 
-                key={`tag-${tag}-${index}`} // Using index to ensure unique keys
-                variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleTagSelection(tag)}
-              >
-                {tag}
-                {selectedTags.includes(tag) && (
-                  <X 
-                    className="h-3 w-3 ml-1" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTagSelection(tag);
-                    }}
-                  />
-                )}
-              </Badge>
-            ))}
-            
-            {/* Clear All button when drawer is open and tags are selected */}
-            {tagDrawerOpen && selectedTags.length > 0 && (
-              <Badge 
-                variant="secondary"
-                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                onClick={() => setSelectedTags([])}
-              >
-                Clear All <X className="h-3 w-3 ml-1" />
-              </Badge>
-            )}
-            
-            {/* Show tag count badge when drawer is closed */}
-            {!tagDrawerOpen && (
-              (() => {
-                // Calculate remaining non-selected tags for display
-                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
-                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
+          {/* Tags drawer - minimal version with single row when closed */}
+          <div className="flex flex-nowrap gap-1 items-center overflow-hidden" ref={tagContainerRef}>
+            {/* Tags display with different behavior for open/closed states */}
+            {tagDrawerOpen ? (
+              // When drawer is open, show all tags with wrapping
+              <>
+                {allTags.map((tag, index) => (
+                  <Badge 
+                    key={`tag-${tag}-${index}`}
+                    variant={selectedTags.includes(tag) ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => toggleTagSelection(tag)}
+                  >
+                    {tag}
+                    {selectedTags.includes(tag) && (
+                      <X 
+                        className="h-3 w-3 ml-1" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTagSelection(tag);
+                        }}
+                      />
+                    )}
+                  </Badge>
+                ))}
                 
-                if (remainingTagsCount > 0) {
-                  return (
+                {/* Clear All button when tags are selected */}
+                {selectedTags.length > 0 && (
+                  <Badge 
+                    variant="secondary"
+                    className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                    onClick={() => setSelectedTags([])}
+                  >
+                    Clear All <X className="h-3 w-3 ml-1" />
+                  </Badge>
+                )}
+              </>
+            ) : (
+              // When drawer is closed, show limited tags in a single row
+              <>
+                {/* Show the calculated number of visible tags */}
+                {popularTags
+                  .filter(tag => !selectedTags.includes(tag))
+                  .slice(0, visibleTagCount)
+                  .map((tag, index) => (
                     <Badge 
-                      variant="secondary"
-                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                      onClick={toggleTagDrawer}
+                      key={`tag-${tag}-${index}`}
+                      variant="outline"
+                      className="cursor-pointer flex-shrink-0"
+                      onClick={() => toggleTagSelection(tag)}
                     >
-                      +{remainingTagsCount} more tags
+                      {tag}
                     </Badge>
-                  );
+                  ))
                 }
-                return null;
-              })()
+                
+                {/* Show the more tags badge as the last item in the row */}
+                {(() => {
+                  // Calculate remaining tags (not shown + selected)
+                  const remainingTagsCount = allTags.length - visibleTagCount - selectedTags.length;
+                  
+                  if (remainingTagsCount > 0) {
+                    return (
+                      <Badge 
+                        variant="secondary"
+                        className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center flex-shrink-0"
+                        onClick={toggleTagDrawer}
+                      >
+                        +{remainingTagsCount} more
+                      </Badge>
+                    );
+                  }
+                  return null;
+                })()}
+              </>
             )}
           </div>
         </div>
