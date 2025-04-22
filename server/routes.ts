@@ -697,8 +697,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat Sessions API endpoints
   app.get("/api/chat/sessions", async (req, res) => {
     try {
-      const sessions = await storage.getChatSessions();
-      res.json(sessions);
+      // If user is authenticated, filter sessions by user_id
+      if (req.isAuthenticated()) {
+        const userId = req.user.id;
+        const sessions = await storage.getChatSessions(userId);
+        res.json(sessions);
+      } else {
+        // If not authenticated, return all sessions with null user_id
+        const sessions = await storage.getChatSessions();
+        res.json(sessions);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to retrieve chat sessions" });
     }
@@ -727,6 +735,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Invalid chat session data", 
           details: parsedData.error 
         });
+      }
+      
+      // Add the user_id if the user is authenticated
+      if (req.isAuthenticated()) {
+        parsedData.data.user_id = req.user.id;
       }
       
       const session = await storage.createChatSession(parsedData.data);
@@ -818,6 +831,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If a session ID is provided, save the conversation
       if (sessionId) {
+        // Get the user ID if authenticated
+        const userId = req.isAuthenticated() ? req.user.id : null;
+        
         // Save the user message
         await storage.createChatMessage({
           session_id: sessionId,
@@ -832,9 +848,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: "assistant"
         });
         
-        // Update session with filters if they were provided
+        // Update session with filters if they were provided and user ID if authenticated
+        const updateData: any = {};
         if (filters) {
-          await storage.updateChatSession(sessionId, { filters });
+          updateData.filters = filters;
+        }
+        
+        // Only update user_id if the session doesn't already have one
+        if (userId) {
+          const session = await storage.getChatSession(sessionId);
+          if (session && !session.user_id) {
+            updateData.user_id = userId;
+          }
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          await storage.updateChatSession(sessionId, updateData);
         }
       }
       
@@ -848,8 +877,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Settings API endpoints
   app.get("/api/settings", async (req, res) => {
     try {
-      const settings = await storage.getSettings();
-      res.json(settings);
+      // If user is authenticated, filter settings by user_id
+      if (req.isAuthenticated()) {
+        const userId = req.user.id;
+        const settings = await storage.getSettings(userId);
+        res.json(settings);
+      } else {
+        // If not authenticated, return settings with null user_id
+        const settings = await storage.getSettings();
+        res.json(settings);
+      }
     } catch (error) {
       console.error("Error retrieving settings:", error);
       res.status(500).json({ error: "Failed to retrieve settings" });

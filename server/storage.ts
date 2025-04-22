@@ -591,7 +591,12 @@ export class MemStorage implements IStorage {
   }
   
   // Chat Sessions
-  async getChatSessions(): Promise<ChatSession[]> {
+  async getChatSessions(userId?: string): Promise<ChatSession[]> {
+    if (userId) {
+      return Array.from(this.chatSessions.values())
+        .filter(session => session.user_id === userId)
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    }
     return Array.from(this.chatSessions.values())
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   }
@@ -681,7 +686,11 @@ export class MemStorage implements IStorage {
   }
   
   // Settings
-  async getSettings(): Promise<Setting[]> {
+  async getSettings(userId?: string): Promise<Setting[]> {
+    if (userId) {
+      return Array.from(this.settings.values())
+        .filter(setting => setting.user_id === userId);
+    }
     return Array.from(this.settings.values());
   }
   
@@ -1199,7 +1208,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Chat Sessions
-  async getChatSessions(): Promise<ChatSession[]> {
+  async getChatSessions(userId?: string): Promise<ChatSession[]> {
+    if (userId) {
+      return await db
+        .select()
+        .from(chatSessions)
+        .where(eq(chatSessions.user_id, userId))
+        .orderBy(desc(chatSessions.updated_at));
+    }
     return await db
       .select()
       .from(chatSessions)
@@ -1296,7 +1312,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Settings
-  async getSettings(): Promise<Setting[]> {
+  async getSettings(userId?: string): Promise<Setting[]> {
+    if (userId) {
+      return await db
+        .select()
+        .from(settings)
+        .where(eq(settings.user_id, userId))
+        .orderBy(settings.key);
+    }
     return await db
       .select()
       .from(settings)
