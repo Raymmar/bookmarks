@@ -82,10 +82,21 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
             
             // If notes are provided, add them as a new note to the bookmark
             if (notes && notes.trim()) {
-              await apiRequest("POST", `/api/bookmarks/${urlCheckResult.existingBookmarkId}/notes`, {
-                text: notes,
-                type: "user"
-              });
+              try {
+                await apiRequest("POST", `/api/bookmarks/${urlCheckResult.existingBookmarkId}/notes`, {
+                  text: notes,
+                  type: "user"
+                });
+                
+                // Make sure to invalidate the notes query to refresh the data
+                queryClient.invalidateQueries({ 
+                  queryKey: [`/api/bookmarks/${urlCheckResult.existingBookmarkId}/notes`] 
+                });
+                
+                console.log("Added new note to existing bookmark:", urlCheckResult.existingBookmarkId);
+              } catch (error) {
+                console.error("Error adding note to existing bookmark:", error);
+              }
             }
             
             // Invalidate queries to refresh the data
@@ -113,9 +124,13 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
             }
             
             // Dispatch a custom event to show the bookmark in detail view
-            window.dispatchEvent(new CustomEvent('showBookmarkDetail', { 
+            // Dispatch to both window and document to ensure it's captured everywhere
+            const showBookmarkEvent = new CustomEvent('showBookmarkDetail', { 
               detail: { bookmarkId: urlCheckResult.existingBookmarkId } 
-            }));
+            });
+            window.dispatchEvent(showBookmarkEvent);
+            document.dispatchEvent(showBookmarkEvent);
+            console.log("Dispatched showBookmarkDetail event for:", urlCheckResult.existingBookmarkId);
             
             return;
           } catch (error) {

@@ -126,14 +126,36 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   }, [bookmark?.id]);
   
-  // Set optimistic notes when bookmark changes
+  // Fetch notes whenever the bookmark ID changes
   useEffect(() => {
-    if (bookmark && bookmark.notes) {
-      setOptimisticNotes(bookmark.notes);
+    if (bookmark) {
+      const fetchNotes = async () => {
+        try {
+          const notes = await apiRequest("GET", `/api/bookmarks/${bookmark.id}/notes`);
+          if (notes && notes.length > 0) {
+            setOptimisticNotes(notes);
+          } else if (bookmark.notes) {
+            // Fallback to notes from the bookmark object if API call returns empty
+            setOptimisticNotes(bookmark.notes);
+          } else {
+            setOptimisticNotes([]);
+          }
+        } catch (error) {
+          console.error("Error fetching notes for bookmark:", error);
+          // Fallback to notes from the bookmark object if API call fails
+          if (bookmark.notes) {
+            setOptimisticNotes(bookmark.notes);
+          } else {
+            setOptimisticNotes([]);
+          }
+        }
+      };
+      
+      fetchNotes();
     } else {
       setOptimisticNotes([]);
     }
-  }, [bookmark]);
+  }, [bookmark?.id]);
   
   // Check AI processing status
   useEffect(() => {
