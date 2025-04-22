@@ -7,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { X, LayoutGrid, Network, SearchX, ChevronUp, ChevronDown } from "lucide-react";
+import { X, LayoutGrid, Network, SearchX, ChevronUp, ChevronDown, BookmarkPlus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Bookmark } from "@shared/types";
+import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
 
 // Tag interfaces
 interface Tag {
@@ -38,6 +40,8 @@ export default function GraphView() {
   const [dateRange, setDateRange] = useState("all");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(["bookmark", "domain", "tag"]);
+  // Add Bookmark dialog state
+  const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
   // Drawer state with localStorage persistence
   const [tagDrawerOpen, setTagDrawerOpen] = useState<boolean>(() => {
     // Initialize from localStorage or default to closed
@@ -49,6 +53,7 @@ export default function GraphView() {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   // Fetch bookmarks
   const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useQuery<Bookmark[]>({
@@ -412,13 +417,24 @@ export default function GraphView() {
               <div className="bg-white p-8 rounded-lg shadow text-center max-w-md">
                 <SearchX className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-900 mb-1">No bookmarks found</h3>
-                <p className="text-gray-500">
+                <p className="text-gray-500 mb-4">
                   {searchQuery
                     ? "Try using different search terms or filters"
                     : selectedTags.length > 0 || selectedDomain
                       ? `Try ${selectedTags.length > 0 && selectedDomain ? "removing some filters" : selectedTags.length > 0 ? "selecting different tags" : "choosing a different domain"}`
-                      : "Add some bookmarks to see them in the explorer"}
+                      : user 
+                        ? "Create your first bookmark to begin exploring your knowledge graph"
+                        : "Login to see your personalized bookmarks"}
                 </p>
+                {user && (!searchQuery && !selectedTags.length && !selectedDomain) && (
+                  <Button 
+                    onClick={() => setAddBookmarkOpen(true)}
+                    className="mt-2"
+                  >
+                    <BookmarkPlus className="mr-2 h-4 w-4" />
+                    Create Your First Bookmark
+                  </Button>
+                )}
               </div>
             </div>
           ) : (
@@ -630,6 +646,19 @@ export default function GraphView() {
           isLoading={isLoading}
         />
       </div>
+
+      {/* Add Bookmark Dialog */}
+      <AddBookmarkDialog
+        open={addBookmarkOpen}
+        onOpenChange={setAddBookmarkOpen}
+        onBookmarkAdded={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+          toast({
+            title: "Bookmark added",
+            description: "Your bookmark has been added to your graph",
+          });
+        }}
+      />
     </div>
   );
 }
