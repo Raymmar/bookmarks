@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { useBookmarkMutations } from "@/hooks/use-bookmark-mutations";
 
 // Use the imported Tag type
 
@@ -31,7 +32,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
+  const [isUpdatePending, setIsUpdatePending] = useState(false);
   const { toast } = useToast();
+  
+  // Get the updateBookmark mutation from our custom hook
+  const { updateBookmark } = useBookmarkMutations();
   
   // Fetch all available tags for selection
   const { data: availableTags = [] } = useQuery<TagType[]>({
@@ -187,6 +192,47 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       checkProcessingStatus();
     }
   }, [bookmark, tags]);
+  
+  // Update bookmark details
+  const handleUpdateBookmark = async (updates: Partial<Bookmark>) => {
+    if (!bookmark) return;
+
+    // Prevent multiple simultaneous updates
+    if (isUpdatePending) return;
+    setIsUpdatePending(true);
+
+    try {
+      console.log(`Updating bookmark ${bookmark.id} with:`, updates);
+      
+      // Update local state immediately for a responsive UI
+      setBookmark(prev => prev ? { ...prev, ...updates } : prev);
+      
+      // Call the mutation to update the bookmark on the server
+      updateBookmark.mutate(
+        { 
+          bookmarkId: bookmark.id, 
+          updateData: updates 
+        },
+        {
+          onSettled: () => {
+            setIsUpdatePending(false);
+          }
+        }
+      );
+    } catch (error) {
+      console.error("Error in handleUpdateBookmark:", error);
+      setIsUpdatePending(false);
+      
+      // Revert to initial state on error
+      setBookmark(initialBookmark);
+      
+      toast({
+        title: "Error updating bookmark",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    }
+  };
   
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
@@ -442,59 +488,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   };
   
-  // Handle updating bookmark fields
-  const handleUpdateBookmark = async (updateData: Partial<Bookmark>) => {
-    if (!bookmark) return;
-    
-    try {
-      // Make API request to update the bookmark
-      const updatedBookmark = await apiRequest(
-        "PATCH", 
-        `/api/bookmarks/${bookmark.id}`, 
-        updateData
-      );
-      
-      // Update the local state
-      setBookmark(updatedBookmark);
-      
-      // Invalidate queries to refresh the data
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      
-      // Dispatch a custom event to notify other components of the bookmark update
-      // This allows real-time updates in the graph and other components
-      const bookmarkUpdateEvent = new CustomEvent('bookmarkUpdated', { 
-        detail: { 
-          bookmarkId: bookmark.id,
-          updatedFields: updateData,
-          updatedBookmark
-        } 
-      });
-      document.dispatchEvent(bookmarkUpdateEvent);
-      
-      console.log(`Bookmark ${bookmark.id} updated with fields:`, updateData);
-      
-      // Show success toast
-      toast({
-        title: "Bookmark updated",
-        description: "Your bookmark has been updated successfully",
-        variant: "default",
-      });
-    } catch (error) {
-      console.error("Error updating bookmark:", error);
-      
-      // Show error toast
-      toast({
-        title: "Update failed",
-        description: "There was a problem updating your bookmark. Please try again.",
-        variant: "destructive",
-      });
-      
-      // Revert to original data if it exists
-      if (initialBookmark) {
-        setBookmark(initialBookmark);
-      }
-    }
-  };
+
 
   // Remove a tag from the bookmark
   const handleRemoveTag = async (tagId: string) => {
