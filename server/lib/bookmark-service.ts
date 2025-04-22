@@ -37,6 +37,7 @@ export interface BookmarkCreationOptions {
   screenshotUrl?: string;
   highlights?: { quote: string; noteText?: string }[];
   source: string;
+  user_id?: string | null; // Add user_id field to associate bookmarks with users
 }
 
 export interface ProcessedUrlResult {
@@ -368,7 +369,8 @@ export class BookmarkService {
       description: options.description || "",
       content_html: options.content_html || null,
       source: options.source,
-      vector_embedding: null
+      vector_embedding: null,
+      user_id: options.user_id // Include user_id to associate bookmark with user
     };
 
     // Extract metadata if not provided
@@ -607,6 +609,7 @@ export class BookmarkService {
     // Update basic properties
     if (updateData.title) bookmarkUpdateData.title = updateData.title;
     if (updateData.description) bookmarkUpdateData.description = updateData.description;
+    if (updateData.user_id !== undefined) bookmarkUpdateData.user_id = updateData.user_id;
     
     // Update URL if provided (with normalization)
     if (updateData.url) {
