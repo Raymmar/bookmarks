@@ -47,6 +47,10 @@ export function ForceDirectedGraph({
   // Debug logs for filtered bookmarks received by the graph component
   console.log(`[Graph Component] Received ${bookmarks.length} bookmarks`);
   console.log(`[Graph Component] First few bookmark IDs: ${bookmarks.slice(0, 3).map(b => b.id).join(', ')}`);
+  
+  // Track previous bookmarks to detect changes for collection filtering
+  const prevBookmarksRef = useRef<Bookmark[]>([]);
+  const bookmarksHash = JSON.stringify(bookmarks.map(b => b.id).sort());
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
@@ -1128,11 +1132,12 @@ export function ForceDirectedGraph({
   // Using a ref to avoid re-recreating the entire graph
   useEffect(() => {
     if (graphInitializedRef.current) {
-      // Only auto-center on initial load
+      // Only auto-center on initial load or when collection filter changes
       const isInitialLoad = !lastCenteredStateRef.current;
+      console.log(`[Graph Component] Bookmarks data changed, updating graph with ${bookmarks.length} bookmarks`);
       updateGraphData(isInitialLoad);
     }
-  }, [bookmarks, insightLevel, updateGraphData]);
+  }, [bookmarks, bookmarksHash, insightLevel, updateGraphData]);
   
   // Effect for handling the selected bookmark
   useEffect(() => {
