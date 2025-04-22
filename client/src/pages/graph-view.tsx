@@ -640,20 +640,22 @@ export default function GraphView() {
                 : 'top-0 bottom-0 bg-transparent p-1 flex items-center justify-center'
             } hover:bg-gray-200 z-10`}
           >
-            {/* Simple toggle button with up/down arrow based on drawer state */}
+            {/* Toggle button with up/down arrow based on drawer state */}
             {tagDrawerOpen ? (
               <ChevronDown className="h-4 w-4 text-gray-700" />
             ) : (
               <>
-                {/* Show tag count if there are more tags than what we're displaying */}
-                {allTags.length > popularTags.length && (
+                {/* Only show count if there are more available tags than what fits in the drawer */}
+                {allTags.filter(tag => !selectedTags.includes(tag)).length > visibleTags.length && (
                   <div className="flex items-center">
-                    <span className="text-xs mr-1 font-medium">+{allTags.length - popularTags.length}</span>
+                    <span className="text-xs mr-1 font-medium">
+                      +{allTags.filter(tag => !selectedTags.includes(tag)).length - visibleTags.length}
+                    </span>
                     <ChevronUp className="h-4 w-4 text-gray-700" />
                   </div>
                 )}
-                {/* Just show up arrow if no additional tags beyond popular ones */}
-                {allTags.length <= popularTags.length && (
+                {/* Just show up arrow if all available tags are displayed */}
+                {allTags.filter(tag => !selectedTags.includes(tag)).length <= visibleTags.length && (
                   <ChevronUp className="h-4 w-4 text-gray-700" />
                 )}
               </>
