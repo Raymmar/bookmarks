@@ -735,8 +735,131 @@ export class MemStorage implements IStorage {
 
 // PostgreSQL database storage implementation
 export class DatabaseStorage implements IStorage {
+  // Users
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+  
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+  
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+  
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db
+      .insert(users)
+      .values(user)
+      .returning();
+    return newUser;
+  }
+  
+  async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ ...userUpdate, updated_at: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser || undefined;
+  }
+  
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return result.length > 0;
+  }
+  
+  // Collections
+  async getCollections(userId?: string): Promise<Collection[]> {
+    if (userId) {
+      return await db.select().from(collections).where(eq(collections.user_id, userId));
+    }
+    return await db.select().from(collections);
+  }
+  
+  async getCollection(id: string): Promise<Collection | undefined> {
+    const [collection] = await db.select().from(collections).where(eq(collections.id, id));
+    return collection || undefined;
+  }
+  
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const [newCollection] = await db
+      .insert(collections)
+      .values(collection)
+      .returning();
+    return newCollection;
+  }
+  
+  async updateCollection(id: string, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
+    const [updatedCollection] = await db
+      .update(collections)
+      .set({ ...collectionUpdate, updated_at: new Date() })
+      .where(eq(collections.id, id))
+      .returning();
+    return updatedCollection || undefined;
+  }
+  
+  async deleteCollection(id: string): Promise<boolean> {
+    const result = await db.delete(collections).where(eq(collections.id, id)).returning();
+    return result.length > 0;
+  }
+  
+  // Collection Bookmarks
+  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
+    const result = await db
+      .select({
+        bookmark: bookmarks
+      })
+      .from(collectionBookmarks)
+      .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
+      .where(eq(collectionBookmarks.collection_id, collectionId));
+    
+    return result.map(r => r.bookmark);
+  }
+  
+  async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
+    const result = await db
+      .select({
+        collection: collections
+      })
+      .from(collectionBookmarks)
+      .innerJoin(collections, eq(collectionBookmarks.collection_id, collections.id))
+      .where(eq(collectionBookmarks.bookmark_id, bookmarkId));
+    
+    return result.map(r => r.collection);
+  }
+  
+  async addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark> {
+    const [newCollectionBookmark] = await db
+      .insert(collectionBookmarks)
+      .values({
+        collection_id: collectionId,
+        bookmark_id: bookmarkId
+      })
+      .returning();
+    
+    return newCollectionBookmark;
+  }
+  
+  async removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean> {
+    const result = await db
+      .delete(collectionBookmarks)
+      .where(
+        sql`${collectionBookmarks.collection_id} = ${collectionId} AND ${collectionBookmarks.bookmark_id} = ${bookmarkId}`
+      )
+      .returning();
+    
+    return result.length > 0;
+  }
+  
   // Bookmarks
-  async getBookmarks(): Promise<Bookmark[]> {
+  async getBookmarks(userId?: string): Promise<Bookmark[]> {
+    if (userId) {
+      return await db.select().from(bookmarks).where(eq(bookmarks.user_id, userId));
+    }
     return await db.select().from(bookmarks);
   }
   
