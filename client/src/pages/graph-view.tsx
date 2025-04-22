@@ -747,17 +747,26 @@ export default function GraphView() {
             {(() => {
               // Calculate hidden tags count if drawer is closed
               if (!tagDrawerOpen) {
-                // Filter out selected tags from available tags
+                // All available tags excluding those that are selected
                 const availableTags = allTags.filter(tag => !selectedTags.includes(tag));
-                // Calculate how many tags are visible when drawer is closed
+                
+                // Calculate how many tags are visible in the single row
                 const visibleTagLimit = visibleTagsCount;
-                // Get only the visible tags (excluding selected tags)
+                
+                // Get the exact tags that are visible in the single row (non-selected popular tags)
                 const visibleNonSelectedTags = popularTags
                   .filter(tag => !selectedTags.includes(tag))
                   .slice(0, visibleTagLimit);
                 
-                // Calculate how many tags are hidden
-                const hiddenTagsCount = availableTags.length - visibleNonSelectedTags.length;
+                // Get the exact tag names that are visible
+                const visibleTagNames = visibleNonSelectedTags.map(tag => tag);
+                
+                // Calculate how many unique tags are actually hidden by counting tags that:
+                // 1. Are not selected (already filtered in availableTags)
+                // 2. Are not visible in the single row
+                const hiddenTagsCount = availableTags
+                  .filter(tag => !visibleTagNames.includes(tag))
+                  .length;
                 
                 if (hiddenTagsCount > 0) {
                   return (
