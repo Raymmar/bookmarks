@@ -383,33 +383,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.isAuthenticated()) {
         const userId = req.user.id;
         const activities = await storage.getActivities(userId);
+        console.log(`Retrieved ${activities.length} activities for user: ${userId}`);
         res.json(activities);
       } else {
         const activities = await storage.getActivities();
+        console.log(`Retrieved ${activities.length} public activities`);
         res.json(activities);
       }
     } catch (error) {
+      console.error("Error retrieving activities:", error);
       res.status(500).json({ error: "Failed to retrieve activities" });
     }
   });
 
   app.post("/api/activities", async (req, res) => {
     try {
-      // Support both new format (action/entity_type) and old format (type/content)
-      // but map everything to match the existing database schema
-      const { type, content, action, entity_type, entity_id, details, bookmark_id, bookmark_title } = req.body;
+      // Support both formats but ensure we're only using fields that exist in the DB
+      const { type, content, action, details, bookmark_id, bookmark_title } = req.body;
       
-      // Determine which format we're using - new or old and validate required fields
-      if (!type && !action) {
-        return res.status(400).json({ error: "Either 'type' or 'action' is required" });
+      // Determine which field to use as the type
+      const activityType = type || action;
+      
+      // Validate required fields
+      if (!activityType) {
+        return res.status(400).json({ error: "Activity type is required" });
       }
       
-      // Create activity data compatible with the current database schema
-      let activityData: any = {
-        // Use type directly or map action to type if type is missing
-        type: type || action,
+      // Create activity data compatible with the actual database schema
+      const activityData: any = {
+        // Use the type field (which exists in the DB)
+        type: activityType,
         
-        // Use content directly or map details to content if content is missing
+        // Use the content field (which exists in the DB)
         content: content || details || null,
         
         // Default tags array
@@ -430,9 +435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activityData.user_id = req.user.id;
       }
       
-      // Store the current timestamp for the activity
-      activityData.timestamp = new Date();
-      
+      console.log("Creating activity:", activityData);
       const activity = await storage.createActivity(activityData);
       res.status(201).json(activity);
     } catch (error) {
