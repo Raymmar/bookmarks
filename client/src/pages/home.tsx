@@ -33,21 +33,19 @@ export default function Home() {
     const handleFilterByCollection = (event: any) => {
       console.log('HOME: filterByCollection event received:', event.detail);
       if (event.detail && 'collectionId' in event.detail) {
-        console.log('HOME: Setting selectedCollectionId to:', event.detail.collectionId);
-        setSelectedCollectionId(event.detail.collectionId);
+        const newCollectionId = event.detail.collectionId;
+        console.log('HOME: Setting selectedCollectionId to:', newCollectionId);
         
-        // Force query invalidation for the collection bookmarks
-        if (event.detail.collectionId) {
-          console.log('HOME: Forcing query invalidation');
+        // Set the new collection ID
+        setSelectedCollectionId(newCollectionId);
+        
+        // Important: Force a query invalidation when changing collections
+        if (newCollectionId) {
+          console.log(`HOME: Invalidating query for collection ${newCollectionId}`);
           queryClient.invalidateQueries({ 
-            queryKey: ['/api/collections/bookmarks', event.detail.collectionId] 
+            queryKey: ['/api/collections/bookmarks', newCollectionId] 
           });
         }
-        
-        // Log state after setting
-        setTimeout(() => {
-          console.log('HOME: selectedCollectionId is now:', selectedCollectionId);
-        }, 100);
       }
     };
     
@@ -461,14 +459,16 @@ export default function Home() {
                   
                   <div className="h-80 border border-gray-200 rounded-lg overflow-hidden bg-white">
                     {/* This logs what we're rendering to help with debugging */}
-                    {selectedCollectionId && console.log(
-                      'DEBUG: Rendering graph with collection filter. Collection ID:', selectedCollectionId,
-                      `\nCollection bookmarks: ${bookmarksInCollection.length}`,
-                      `\nFiltered+Sorted: ${sortedBookmarks.length}`
+                    {console.log(
+                      selectedCollectionId 
+                        ? `DEBUG: Rendering graph with collection (${selectedCollectionId})`
+                        : 'DEBUG: Rendering graph with all bookmarks',
+                      `\nBookmarks count: ${sortedBookmarks.length}`
                     )}
 
-                    {/* We MUST have a "key" that changes when collections or bookmark count changes 
-                       this forces D3 to completely re-render the graph */}
+                    {/* We MUST have a "key" that changes whenever the collection changes 
+                       to force D3 to completely re-render the graph with new data. 
+                       The timestamp ensures a fresh render on every state change */}
                     <ForceDirectedGraph 
                       key={`graph-${selectedCollectionId || 'all'}-${new Date().getTime()}`}
                       bookmarks={sortedBookmarks} 
