@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,40 +12,41 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 interface EditCollectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  collectionId: string;
-  collectionName: string;
-  collectionDescription: string;
-  collectionIsPublic: boolean;
+  collection: {
+    id: string;
+    name: string;
+    description: string | null;
+    is_public: boolean;
+  } | null;
   onCollectionUpdated?: () => void;
 }
 
 export function EditCollectionDialog({ 
   open, 
   onOpenChange,
-  collectionId,
-  collectionName,
-  collectionDescription,
-  collectionIsPublic,
+  collection,
   onCollectionUpdated 
 }: EditCollectionDialogProps) {
-  const [name, setName] = useState(collectionName);
-  const [description, setDescription] = useState(collectionDescription);
-  const [isPublic, setIsPublic] = useState(collectionIsPublic);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const { toast } = useToast();
   const { updateCollection, deleteCollection } = useCollectionMutations();
 
-  // Reset form when the dialog opens with potentially new values
-  useState(() => {
-    if (open) {
-      setName(collectionName);
-      setDescription(collectionDescription);
-      setIsPublic(collectionIsPublic);
+  // Reset form when the collection changes or dialog opens
+  useEffect(() => {
+    if (collection) {
+      setName(collection.name);
+      setDescription(collection.description || "");
+      setIsPublic(collection.is_public);
     }
-  });
+  }, [collection, open]);
 
   const handleSubmit = async () => {
+    if (!collection) return;
+    
     if (!name) {
       toast({
         title: "Collection name is required",
@@ -59,7 +60,7 @@ export function EditCollectionDialog({
 
     try {
       await updateCollection.mutateAsync({
-        id: collectionId,
+        id: collection.id,
         name,
         description,
         is_public: isPublic
@@ -88,10 +89,12 @@ export function EditCollectionDialog({
   };
 
   const handleDelete = async () => {
+    if (!collection) return;
+    
     setIsSubmitting(true);
     
     try {
-      await deleteCollection.mutateAsync(collectionId);
+      await deleteCollection.mutateAsync(collection.id);
       
       toast({
         title: "Collection deleted",
@@ -115,6 +118,8 @@ export function EditCollectionDialog({
       setIsSubmitting(false);
     }
   };
+
+  if (!collection) return null;
 
   return (
     <>
@@ -165,7 +170,7 @@ export function EditCollectionDialog({
               disabled={isSubmitting}
               size="sm"
             >
-              Delete
+              Delete Collection
             </Button>
             <div className="flex gap-2">
               <Button 

@@ -44,15 +44,22 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
+  const [editCollectionOpen, setEditCollectionOpen] = useState(false);
+  const [selectedCollectionToEdit, setSelectedCollectionToEdit] = useState<{
+    id: string;
+    name: string;
+    description: string | null;
+    is_public: boolean;
+  } | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   
-  // Get mutation hooks for collections
-  const { updateCollection, deleteCollection } = useCollectionMutations();
-  
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
+  
+  // Get mutations for collections (create, update, delete)
+  const { updateCollection, deleteCollection } = useCollectionMutations();
 
   // Track selected collections for multi-selection with localStorage persistence
   const [selectedCollections, setSelectedCollections] = useState<string[]>(() => {
@@ -346,83 +353,18 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                           <DropdownMenuContent align="end" className="w-[160px]">
                             <DropdownMenuItem 
                               onClick={() => {
-                                // Open edit collection modal
-                                const name = collection.name;
-                                const description = collection.description || "";
-                                const isPublic = collection.is_public;
-                                
-                                // Open modal or form to edit
-                                if (window.confirm(`Edit collection: ${name}?`)) {
-                                  const newName = window.prompt("Collection name:", name);
-                                  if (newName) {
-                                    // Call API to update collection
-                                    updateCollection.mutate({
-                                      id: collection.id,
-                                      name: newName,
-                                      description,
-                                      is_public: isPublic
-                                    }, {
-                                      onSuccess: () => {
-                                        toast({
-                                          title: "Collection updated",
-                                          description: "Your collection has been updated successfully"
-                                        });
-                                      },
-                                      onError: () => {
-                                        toast({
-                                          title: "Error updating collection",
-                                          description: "Failed to update collection",
-                                          variant: "destructive"
-                                        });
-                                      }
-                                    });
-                                  }
-                                }
+                                // Open edit collection modal with current collection data
+                                setSelectedCollectionToEdit({
+                                  id: collection.id,
+                                  name: collection.name,
+                                  description: collection.description,
+                                  is_public: collection.is_public
+                                });
+                                setEditCollectionOpen(true);
                               }}
                             >
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Edit</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                // Confirm before deleting
-                                if (window.confirm(`Are you sure you want to delete collection: ${collection.name}?`)) {
-                                  // Call API to delete collection
-                                  deleteCollection.mutate(collection.id, {
-                                    onSuccess: () => {
-                                      toast({
-                                        title: "Collection deleted",
-                                        description: "Your collection has been deleted successfully"
-                                      });
-                                      
-                                      // If this collection was selected, clear the selection
-                                      if (selectedCollections.includes(collection.id)) {
-                                        const newSelection = selectedCollections.filter(id => id !== collection.id);
-                                        setSelectedCollections(newSelection);
-                                        
-                                        if (newSelection.length === 0) {
-                                          // Clear all filters if nothing selected
-                                          setSelectedCollectionId(null);
-                                          window.dispatchEvent(new CustomEvent('filterByCollection', { 
-                                            detail: { collectionId: null, collectionIds: [] } 
-                                          }));
-                                        }
-                                      }
-                                    },
-                                    onError: () => {
-                                      toast({
-                                        title: "Error deleting collection",
-                                        description: "Failed to delete collection",
-                                        variant: "destructive"
-                                      });
-                                    }
-                                  });
-                                }
-                              }}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -516,6 +458,16 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
           window.dispatchEvent(new CustomEvent('collectionCreated', { 
             detail: { collectionId } 
           }));
+        }}
+      />
+      
+      <EditCollectionDialog
+        open={editCollectionOpen}
+        onOpenChange={setEditCollectionOpen}
+        collection={selectedCollectionToEdit}
+        onCollectionUpdated={() => {
+          // Refresh collections data
+          queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
         }}
       />
     </nav>
