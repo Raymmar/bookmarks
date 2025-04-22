@@ -80,14 +80,26 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
               tags: selectedTags.length > 0 ? selectedTags : existingBookmark.user_tags,
             });
             
+            // If notes are provided, add them as a new note to the bookmark
+            if (notes && notes.trim()) {
+              await apiRequest("POST", `/api/bookmarks/${urlCheckResult.existingBookmarkId}/notes`, {
+                text: notes,
+                type: "user"
+              });
+            }
+            
             // Invalidate queries to refresh the data
             queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
             queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${urlCheckResult.existingBookmarkId}/tags`] });
             
-            // Show success message
+            // Show success message with details about what was updated
             toast({
               title: "Bookmark updated",
-              description: "Your existing bookmark has been updated with new information",
+              description: `Your existing bookmark has been updated with ${
+                notes ? 'new notes' : ''
+              }${notes && selectedTags.length > 0 ? ' and ' : ''}${
+                selectedTags.length > 0 ? 'new tags' : ''
+              }`,
               variant: "default",
             });
             

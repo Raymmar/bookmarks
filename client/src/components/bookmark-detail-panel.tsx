@@ -60,8 +60,10 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   
   // Listen for the custom showBookmarkDetail event
   useEffect(() => {
-    const handleShowBookmarkDetail = async (event: CustomEvent) => {
+    const handleShowBookmarkDetail = async (e: Event) => {
       try {
+        // Need to cast to access the detail property
+        const event = e as CustomEvent<{bookmarkId: string}>;
         const bookmarkId = event.detail?.bookmarkId;
         if (!bookmarkId) return;
         
@@ -79,6 +81,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           const fetchedTags = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/tags`);
           setTags(fetchedTags || []);
           
+          // Fetch and update notes if available
+          const notes = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/notes`);
+          if (notes && notes.length > 0) {
+            setOptimisticNotes(notes);
+          }
+          
           toast({
             title: "Bookmark updated",
             description: "The bookmark has been updated with your new information",
@@ -91,11 +99,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     };
     
     // Add event listener for the custom event
-    window.addEventListener('showBookmarkDetail', handleShowBookmarkDetail as EventListener);
+    window.addEventListener('showBookmarkDetail', handleShowBookmarkDetail);
     
     // Clean up the event listener when component unmounts
     return () => {
-      window.removeEventListener('showBookmarkDetail', handleShowBookmarkDetail as EventListener);
+      window.removeEventListener('showBookmarkDetail', handleShowBookmarkDetail);
     };
   }, [toast]);
   
