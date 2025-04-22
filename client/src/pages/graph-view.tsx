@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { X, LayoutGrid, Network, SearchX } from "lucide-react";
+import { X, LayoutGrid, Network, SearchX, ChevronUp, ChevronDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bookmark } from "@shared/types";
@@ -37,6 +37,14 @@ export default function GraphView() {
   const [sortOrder, setSortOrder] = useState("newest");
   const [dateRange, setDateRange] = useState("all");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  // Drawer state with localStorage persistence
+  const [tagDrawerOpen, setTagDrawerOpen] = useState<boolean>(() => {
+    // Initialize from localStorage or default to closed
+    const saved = localStorage.getItem('tagDrawerOpen');
+    return saved ? JSON.parse(saved) : false;
+  });
+  // Number of popular tags to show when drawer is closed
+  const [popularTagCount] = useState<number>(10);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -147,7 +155,8 @@ export default function GraphView() {
   const filteredBookmarkIds = bookmarks.filter(bookmark => {
     // Get this bookmark's tags from our map
     const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
-    const bookmarkSystemTags = bookmark.system_tags || [];
+    // Note: system_tags is being phased out in favor of the normalized tag system
+    const bookmarkSystemTags: string[] = [];
     const allBookmarkTags = [...bookmarkTags, ...bookmarkSystemTags];
     
     // Search query filter
