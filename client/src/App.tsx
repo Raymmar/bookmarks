@@ -10,6 +10,9 @@ import GraphView from "@/pages/graph-view";
 import AiChat from "@/pages/ai-chat";
 import Settings from "@/pages/settings";
 import MainLayout from "@/layouts/main-layout";
+import { AuthProvider } from "@/hooks/use-auth";
+import AuthPage from "@/pages/auth-page";
+import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
   return (
@@ -17,7 +20,8 @@ function Router() {
       <Route path="/" component={GraphView} />
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />
-      <Route path="/settings" component={Settings} />
+      <ProtectedRoute path="/settings" component={Settings} />
+      <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -26,12 +30,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <MainLayout>
-          <Router />
-        </MainLayout>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <MainLayout>
+            <Router />
+          </MainLayout>
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
