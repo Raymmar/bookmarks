@@ -475,41 +475,23 @@ export function ForceDirectedGraph({
       // Get nodes to include in view
       let nodesToCenter = [nodeData];
       
-      // For tag nodes, include connected bookmarks
-      if (nodeData.type === "tag") {
-        const tagId = nodeData.id;
-        const relatedNodes = simulationRef.current.nodes().filter(n => {
-          if (n.type !== "bookmark") return false;
-          
-          // Check if there's a link between this bookmark and the tag
-          const links = simulationRef.current?.force("link") as d3.ForceLink<GraphNode, GraphLink>;
-          const connection = links.links().some(link => {
-            const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-            const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-            return (sourceId === n.id && targetId === tagId) || (sourceId === tagId && targetId === n.id);
-          });
-          
-          return connection;
+      // For all node types, only show first-order connections (directly connected nodes)
+      const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
+      const connectedNodes = simulationRef.current.nodes().filter(n => {
+        return links.links().some(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+          return (sourceId === nodeData.id && targetId === n.id) || (sourceId === n.id && targetId === nodeData.id);
         });
-        
-        if (relatedNodes.length > 0) {
-          nodesToCenter = [nodeData, ...relatedNodes];
-        }
-      } else {
-        // For non-tag nodes, include directly connected nodes
-        const links = simulationRef.current.force("link") as d3.ForceLink<GraphNode, GraphLink>;
-        const connectedNodes = simulationRef.current.nodes().filter(n => {
-          return links.links().some(link => {
-            const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-            const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
-            return (sourceId === nodeData.id && targetId === n.id) || (sourceId === n.id && targetId === nodeData.id);
-          });
-        });
-        
-        if (connectedNodes.length > 0) {
-          nodesToCenter = [nodeData, ...connectedNodes];
-        }
+      });
+      
+      if (connectedNodes.length > 0) {
+        console.log(`Found ${connectedNodes.length} connected nodes`);
+        nodesToCenter = [nodeData, ...connectedNodes];
       }
+      
+      // Get the node position for logging
+      console.log(`Zooming to node at (${nodeData.x.toFixed(2)}, ${nodeData.y.toFixed(2)}) with level ${connectedNodes.length + 1}`);
       
       centerGraph(nodesToCenter);
     }
