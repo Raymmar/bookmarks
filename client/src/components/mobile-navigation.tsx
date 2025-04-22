@@ -36,40 +36,40 @@ export function MobileNavigation() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
         <div className="flex justify-around">
           <Link href="/">
-            <a className="flex flex-col items-center py-2 flex-1">
+            <div className="flex flex-col items-center py-2 flex-1 cursor-pointer">
               <Home className={cn(
                 "h-6 w-6",
                 location === "/" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">Home</span>
-            </a>
+            </div>
           </Link>
           <Link href="/activity">
-            <a className="flex flex-col items-center py-2 flex-1">
+            <div className="flex flex-col items-center py-2 flex-1 cursor-pointer">
               <FileText className={cn(
                 "h-6 w-6",
                 location === "/activity" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">Activity</span>
-            </a>
+            </div>
           </Link>
           <Link href="/graph">
-            <a className="flex flex-col items-center py-2 flex-1">
+            <div className="flex flex-col items-center py-2 flex-1 cursor-pointer">
               <Layers className={cn(
                 "h-6 w-6",
                 location === "/graph" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">Graph</span>
-            </a>
+            </div>
           </Link>
           <Link href="/ai-chat">
-            <a className="flex flex-col items-center py-2 flex-1">
+            <div className="flex flex-col items-center py-2 flex-1 cursor-pointer">
               <HelpCircle className={cn(
                 "h-6 w-6",
                 location === "/ai-chat" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">AI Chat</span>
-            </a>
+            </div>
           </Link>
         </div>
       </div>
