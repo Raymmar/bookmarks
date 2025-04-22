@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2 } from "lucide-react";
+import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon } from "lucide-react";
 import { Bookmark, Highlight, Note, Tag as TagType } from "@shared/types";
 import { formatDate } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -10,6 +10,18 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  useBookmarkCollections, 
+  useCollections, 
+  useCollectionMutations 
+} from "@/hooks/use-collection-queries";
 
 // Use the imported Tag type
 
@@ -32,6 +44,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
   const { toast } = useToast();
+  
+  // Collection related hooks and state
+  const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
+  const { data: allCollections = [] } = useCollections();
+  const { addBookmarkToCollection, removeBookmarkFromCollection } = useCollectionMutations();
   
   // Fetch all available tags for selection
   const { data: availableTags = [] } = useQuery<TagType[]>({
