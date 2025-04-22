@@ -111,35 +111,25 @@ export async function generateInsights(
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
       systemPrompt = customSystemPrompt;
-      // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
-      // But we want to be minimal and not override the user's intent
-      if (!systemPrompt.toLowerCase().includes("json")) {
-        systemPrompt += "\n\nNote: Please include your response in JSON format.";
-      }
       console.log("Using provided custom system prompt for insights generation");
     } 
-    // Otherwise try to get it from storage
+    // Otherwise get it from storage (we assume there will always be a default prompt set)
     else {
       try {
         // Use the summary prompt for insights generation
         const customPrompt = await storage.getSetting("summary_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
-          // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
-          // But we want to be minimal and not override the user's intent
-          if (!systemPrompt.toLowerCase().includes("json")) {
-            systemPrompt += "\n\nNote: Please include your response in JSON format.";
-          }
           console.log("Retrieved custom summary prompt from storage for insights generation");
         } else {
-          // If no custom prompt is available, use a minimal default with JSON format
-          systemPrompt = "Analyze the content and provide insights. Return your response in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
-          console.log("No custom summary prompt found, using minimal default for insights");
+          // This case should not happen as per requirements, but keeping a minimal fallback
+          systemPrompt = "Analyze the content.";
+          console.log("No custom summary prompt found, using minimal fallback");
         }
       } catch (err) {
-        // If error retrieving, use a minimal default with JSON format
-        systemPrompt = "Analyze the content and provide insights. Return your response in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
-        console.warn("Error retrieving summary prompt, using minimal default for insights:", err);
+        // This case should not happen as per requirements, but keeping a minimal fallback
+        systemPrompt = "Analyze the content.";
+        console.warn("Error retrieving summary prompt, using minimal fallback:", err);
       }
     }
     
@@ -293,34 +283,24 @@ export async function generateTags(content: string, url?: string, customSystemPr
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
       systemPrompt = customSystemPrompt;
-      // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
-      // But we want to be minimal and not override the user's intent
-      if (!systemPrompt.toLowerCase().includes("json")) {
-        systemPrompt += "\n\nNote: Please include your response in JSON format.";
-      }
       console.log("Using provided custom system prompt for tag generation");
     } 
-    // Otherwise try to get it from storage
+    // Otherwise get it from storage (we assume there will always be a default prompt set)
     else {
       try {
         const customPrompt = await storage.getSetting("auto_tagging_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
-          // For OpenAI API with response_format: { type: "json_object" }, we need the word "json" in the prompt
-          // But we want to be minimal and not override the user's intent
-          if (!systemPrompt.toLowerCase().includes("json")) {
-            systemPrompt += "\n\nNote: Please include your response in JSON format.";
-          }
           console.log("Retrieved custom tagging prompt from storage");
         } else {
-          // If no custom prompt is available, use a minimal default with JSON format
-          systemPrompt = "Extract tags from the content. Return your response in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
-          console.log("No custom tagging prompt found, using minimal default");
+          // This case should not happen as per requirements, but keeping a minimal fallback
+          systemPrompt = "Extract tags from the content.";
+          console.log("No custom tagging prompt found, using minimal fallback");
         }
       } catch (err) {
-        // If error retrieving, use a minimal default with JSON format
-        systemPrompt = "Extract tags from the content. Return your response in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
-        console.warn("Error retrieving tagging prompt, using minimal default:", err);
+        // This case should not happen as per requirements, but keeping a minimal fallback
+        systemPrompt = "Extract tags from the content.";
+        console.warn("Error retrieving tagging prompt, using minimal fallback:", err);
       }
     }
     
@@ -419,7 +399,7 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
       systemPrompt = customSystemPrompt;
       console.log("Using provided custom system prompt for summarization");
     } 
-    // Otherwise try to get it from storage
+    // Otherwise get it from storage (we assume there will always be a default prompt set)
     else {
       try {
         const customPrompt = await storage.getSetting("summary_prompt");
@@ -427,14 +407,14 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
           systemPrompt = customPrompt.value;
           console.log("Retrieved custom summary prompt from storage");
         } else {
-          // If no custom prompt is available, use a minimal default
-          systemPrompt = "Summarize the content in a clear, concise way that captures the main points.";
-          console.log("No custom summary prompt found, using minimal default");
+          // This case should not happen as per requirements, but keeping a minimal fallback
+          systemPrompt = "Summarize the content.";
+          console.log("No custom summary prompt found, using minimal fallback");
         }
       } catch (err) {
-        // If error retrieving, use a minimal default
-        systemPrompt = "Summarize the content in a clear, concise way that captures the main points.";
-        console.warn("Error retrieving summary prompt, using minimal default:", err);
+        // This case should not happen as per requirements, but keeping a minimal fallback
+        systemPrompt = "Summarize the content.";
+        console.warn("Error retrieving summary prompt, using minimal fallback:", err);
       }
     }
 
