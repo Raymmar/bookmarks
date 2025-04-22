@@ -393,6 +393,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/activities", async (req, res) => {
+    try {
+      const { action, entity_type, entity_id, details } = req.body;
+      
+      if (!action || !entity_type) {
+        return res.status(400).json({ error: "Action and entity_type are required" });
+      }
+      
+      // Include user_id if authenticated
+      const activityData = {
+        action,
+        entity_type,
+        entity_id: entity_id || null,
+        details: details || null
+      };
+      
+      if (req.isAuthenticated()) {
+        activityData.user_id = req.user.id;
+      }
+      
+      const activity = await storage.createActivity(activityData);
+      res.status(201).json(activity);
+    } catch (error) {
+      console.error("Error creating activity:", error);
+      res.status(500).json({ error: "Failed to create activity" });
+    }
+  });
+
   // URL Processing endpoint for checking duplicates
   app.post("/api/url/normalize", async (req, res) => {
     try {

@@ -126,9 +126,15 @@ export const activities = pgTable("activities", {
   bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }),
   bookmark_title: text("bookmark_title"),
   user_id: uuid("user_id").references(() => users.id),
+  // Use action instead of type
+  action: text("action").notNull(),
+  entity_type: text("entity_type").notNull(),
+  entity_id: uuid("entity_id"),
+  details: text("details"),
+  // Keeping these for backward compatibility
   type: text("type", { 
     enum: ["bookmark_added", "note_added", "highlight_added", "insight_generated"] 
-  }).notNull(),
+  }),
   content: text("content"),
   tags: text("tags").array().default([]),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
