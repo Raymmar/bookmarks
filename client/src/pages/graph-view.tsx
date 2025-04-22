@@ -495,8 +495,8 @@ export default function GraphView() {
             </div>
           )}
           
-          {/* Tags drawer - minimal version with prominent toggle */}
-          <div className="relative flex flex-wrap gap-1 items-center pr-10">
+          {/* Tags drawer - minimal version */}
+          <div className="relative flex flex-wrap gap-1 items-center">
             {/* Tags display - either popular tags or all tags */}
             {(tagDrawerOpen ? allTags : popularTags).map(tag => (
               <Badge 
@@ -518,29 +518,26 @@ export default function GraphView() {
               </Badge>
             ))}
             
-            {/* Show count of hidden tags when drawer is closed */}
-            {!tagDrawerOpen && allTags.length > popularTags.length && (
+            {/* Show "more" badge or collapse button */}
+            {!tagDrawerOpen && allTags.length > popularTags.length ? (
               <Badge 
                 variant="secondary"
                 className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
                 onClick={toggleTagDrawer}
               >
-                +{allTags.length - popularTags.length} more
+                +{allTags.length - popularTags.length} <ChevronDown className="h-3 w-3 ml-1" />
               </Badge>
+            ) : (
+              tagDrawerOpen && (
+                <Badge 
+                  variant="secondary"
+                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                  onClick={toggleTagDrawer}
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </Badge>
+              )
             )}
-            
-            {/* Always visible toggle arrow on the right side */}
-            <button
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 p-2 rounded-full hover:bg-gray-100 transition-colors"
-              onClick={toggleTagDrawer}
-              aria-label={tagDrawerOpen ? "Collapse tag drawer" : "Expand tag drawer"}
-            >
-              {tagDrawerOpen ? (
-                <ChevronUp className="h-5 w-5 text-gray-500" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-gray-500" />
-              )}
-            </button>
           </div>
         </div>
       </div>
