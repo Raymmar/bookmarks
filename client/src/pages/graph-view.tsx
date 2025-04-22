@@ -38,7 +38,11 @@ export default function GraphView() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [tagMode, setTagMode] = useState<"any" | "all">("any");
   const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
-  const [sortOrder, setSortOrder] = useState("newest");
+  // Initialize sortOrder from localStorage with fallback to "newest"
+  const [sortOrder, setSortOrder] = useState<string>(() => {
+    const savedSort = localStorage.getItem('bookmarkSortOrder');
+    return savedSort ? savedSort : "newest";
+  });
   const [dateRange, setDateRange] = useState("all");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(["bookmark", "domain", "tag"]);
@@ -452,6 +456,11 @@ export default function GraphView() {
       return new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime();
     } else if (sortOrder === "oldest") {
       return new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime();
+    } else if (sortOrder === "recently_updated") {
+      // First compare updated_at timestamps
+      const aUpdated = a.updated_at ? new Date(a.updated_at).getTime() : new Date(a.date_saved).getTime();
+      const bUpdated = b.updated_at ? new Date(b.updated_at).getTime() : new Date(b.date_saved).getTime();
+      return bUpdated - aUpdated;
     }
     return 0;
   });
@@ -615,7 +624,11 @@ export default function GraphView() {
               tagMode={tagMode}
               onTagModeChange={setTagMode}
               sortOrder={sortOrder}
-              onSortOrderChange={setSortOrder}
+              onSortOrderChange={(value) => {
+                // Persist sort order to localStorage
+                localStorage.setItem('bookmarkSortOrder', value);
+                setSortOrder(value);
+              }}
               visibleNodeTypes={visibleNodeTypes}
               onVisibleNodeTypesChange={setVisibleNodeTypes}
             />
@@ -864,6 +877,12 @@ export default function GraphView() {
             }, 50);
           }}
           isLoading={isLoading}
+          sortOrder={sortOrder}
+          onSortChange={(value) => {
+            // Persist sort order to localStorage
+            localStorage.setItem('bookmarkSortOrder', value);
+            setSortOrder(value);
+          }}
         />
       </div>
 
