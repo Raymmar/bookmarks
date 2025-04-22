@@ -631,64 +631,66 @@ export default function GraphView() {
           )}
           
           {/* Tags drawer - minimal version */}
-          <div className="flex flex-wrap gap-1 items-center">
-            {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
-            {(tagDrawerOpen 
-              ? allTags 
-              // When drawer is closed, filter out selected tags from the popular tags
-              : popularTags.filter(tag => !selectedTags.includes(tag))
-            ).map((tag, index) => (
-              <Badge 
-                key={`tag-${tag}-${index}`} // Using index to ensure unique keys
-                variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleTagSelection(tag)}
-              >
-                {tag}
-                {selectedTags.includes(tag) && (
-                  <X 
-                    className="h-3 w-3 ml-1" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTagSelection(tag);
-                    }}
-                  />
-                )}
-              </Badge>
-            ))}
-            
-            {/* Clear All button when drawer is open and tags are selected */}
-            {tagDrawerOpen && selectedTags.length > 0 && (
-              <Badge 
-                variant="secondary"
-                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                onClick={() => setSelectedTags([])}
-              >
-                Clear All <X className="h-3 w-3 ml-1" />
-              </Badge>
-            )}
-            
-            {/* Show "more" badge when drawer is closed */}
-            {!tagDrawerOpen && (
-              (() => {
-                // Calculate remaining non-selected tags for display
-                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
-                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
-                
-                if (remainingTagsCount > 0) {
-                  return (
-                    <Badge 
-                      variant="secondary"
-                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                      onClick={toggleTagDrawer}
-                    >
-                      +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
-                    </Badge>
-                  );
-                }
-                return null;
-              })()
-            )}
+          <div className="flex items-center overflow-x-auto whitespace-nowrap py-1 max-h-9">
+            <div className="flex gap-1 items-center flex-nowrap min-w-0">
+              {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
+              {(tagDrawerOpen 
+                ? allTags 
+                // When drawer is closed, filter out selected tags from the popular tags
+                : popularTags.filter(tag => !selectedTags.includes(tag))
+              ).map((tag, index) => (
+                <Badge 
+                  key={`tag-${tag}-${index}`} // Using index to ensure unique keys
+                  variant={selectedTags.includes(tag) ? "default" : "outline"}
+                  className="cursor-pointer whitespace-nowrap flex-shrink-0"
+                  onClick={() => toggleTagSelection(tag)}
+                >
+                  {tag}
+                  {selectedTags.includes(tag) && (
+                    <X 
+                      className="h-3 w-3 ml-1" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTagSelection(tag);
+                      }}
+                    />
+                  )}
+                </Badge>
+              ))}
+              
+              {/* Clear All button when drawer is open and tags are selected */}
+              {tagDrawerOpen && selectedTags.length > 0 && (
+                <Badge 
+                  variant="secondary"
+                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center flex-shrink-0"
+                  onClick={() => setSelectedTags([])}
+                >
+                  Clear All <X className="h-3 w-3 ml-1" />
+                </Badge>
+              )}
+              
+              {/* Show "more" badge when drawer is closed */}
+              {!tagDrawerOpen && (
+                (() => {
+                  // Calculate remaining non-selected tags for display
+                  const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
+                                             popularTags.filter(tag => !selectedTags.includes(tag)).length;
+                  
+                  if (remainingTagsCount > 0) {
+                    return (
+                      <Badge 
+                        variant="secondary"
+                        className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center flex-shrink-0"
+                        onClick={toggleTagDrawer}
+                      >
+                        +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
+                      </Badge>
+                    );
+                  }
+                  return null;
+                })()
+              )}
+            </div>
           </div>
         </div>
       </div>
