@@ -902,7 +902,10 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
     const [updatedUser] = await db
       .update(users)
-      .set(userUpdate)
+      .set({
+        ...userUpdate,
+        updated_at: new Date()
+      })
       .where(eq(users.id, id))
       .returning();
     
@@ -933,12 +936,10 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getDefaultCollection(userId: string): Promise<Collection | undefined> {
-    const [collection] = await db
-      .select()
+    const [collection] = await db.select()
       .from(collections)
       .where(eq(collections.owner_id, userId))
       .where(eq(collections.is_default, true));
-    
     return collection;
   }
   
@@ -950,7 +951,10 @@ export class DatabaseStorage implements IStorage {
   async updateCollection(id: string, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
     const [updatedCollection] = await db
       .update(collections)
-      .set(collectionUpdate)
+      .set({
+        ...collectionUpdate,
+        updated_at: new Date()
+      })
       .where(eq(collections.id, id))
       .returning();
     
@@ -964,27 +968,22 @@ export class DatabaseStorage implements IStorage {
   
   // Collection Memberships
   async getCollectionMembers(collectionId: string): Promise<User[]> {
-    const memberships = await db
-      .select({
-        userId: collectionMemberships.user_id
-      })
-      .from(collectionMemberships)
-      .where(eq(collectionMemberships.collection_id, collectionId));
+    const memberships = await db.select({
+      user_id: collectionMemberships.user_id
+    })
+    .from(collectionMemberships)
+    .where(eq(collectionMemberships.collection_id, collectionId));
     
     if (memberships.length === 0) {
       return [];
     }
     
-    const userIds = memberships.map(m => m.userId);
-    return await db
-      .select()
-      .from(users)
-      .where(sql`${users.id} IN (${userIds.join(', ')})`);
+    const userIds = memberships.map(m => m.user_id);
+    return await db.select().from(users).where(sql`${users.id} IN ${userIds}`);
   }
   
   async getUserCollectionMemberships(userId: string): Promise<CollectionMembership[]> {
-    return await db
-      .select()
+    return await db.select()
       .from(collectionMemberships)
       .where(eq(collectionMemberships.user_id, userId));
   }
@@ -994,14 +993,11 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     role: "viewer" | "editor" | "admin" = "viewer"
   ): Promise<CollectionMembership> {
-    const [membership] = await db
-      .insert(collectionMemberships)
-      .values({
-        collection_id: collectionId,
-        user_id: userId,
-        role
-      })
-      .returning();
+    const [membership] = await db.insert(collectionMemberships).values({
+      collection_id: collectionId,
+      user_id: userId,
+      role
+    }).returning();
     
     return membership;
   }
@@ -1014,58 +1010,72 @@ export class DatabaseStorage implements IStorage {
     const [updatedMembership] = await db
       .update(collectionMemberships)
       .set({ role })
-      .where(sql`${collectionMemberships.collection_id} = ${collectionId} AND ${collectionMemberships.user_id} = ${userId}`)
+      .where(
+        sql`${collectionMemberships.collection_id} = ${collectionId} AND ${collectionMemberships.user_id} = ${userId}`
+      )
       .returning();
     
     return updatedMembership;
   }
   
   async removeUserFromCollection(collectionId: string, userId: string): Promise<boolean> {
-    const result = await db
-      .delete(collectionMemberships)
-      .where(sql`${collectionMemberships.collection_id} = ${collectionId} AND ${collectionMemberships.user_id} = ${userId}`)
-      .returning({ id: collectionMemberships.id });
+    const result = await db.delete(collectionMemberships)
+      .where(
+        sql`${collectionMemberships.collection_id} = ${collectionId} AND ${collectionMemberships.user_id} = ${userId}`
+      )
+      .returning();
     
     return result.length > 0;
   }
   
   // Bookmark-Collection relationships
   async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
-    const bookmarkIds = await db
-      .select({
-        bookmarkId: bookmarkCollections.bookmark_id
-      })
-      .from(bookmarkCollections)
-      .where(eq(bookmarkCollections.collection_id, collectionId));
+    const relationships = await db.select({
+      bookmark_id: bookmarkCollections.bookmark_id
+    })
+    .from(bookmarkCollections)
+    .where(eq(bookmarkCollections.collection_id, collectionId));
     
-    if (bookmarkIds.length === 0) {
+    if (relationships.length === 0) {
       return [];
     }
     
-    const ids = bookmarkIds.map(b => b.bookmarkId);
-    return await db
-      .select()
-      .from(bookmarks)
-      .where(sql`${bookmarks.id} IN (${ids.join(', ')})`);
+    const bookmarkIds = relationships.map(rel => rel.bookmark_id);
+    return await db.select().from(bookmarks).where(sql`${bookmarks.id} IN ${bookmarkIds}`);
   }
   
   async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
-    const collectionIds = await db
-      .select({
-        collectionId: bookmarkCollections.collection_id
-      })
-      .from(bookmarkCollections)
-      .where(eq(bookmarkCollections.bookmark_id, bookmarkId));
+    const relationships = await db.select({
+      collection_id: bookmarkCollections.collection_id
+    })
+    .from(bookmarkCollections)
+    .where(eq(bookmarkCollections.bookmark_id, bookmarkId));
     
-    if (collectionIds.length === 0) {
+    if (relationships.length === 0) {
       return [];
     }
     
-    const ids = collectionIds.map(c => c.collectionId);
-    return await db
-      .select()
-      .from(collections)
-      .where(sql`${collections.id} IN (${ids.join(', ')})`);
+    const collectionIds = relationships.map(rel => rel.collection_id);
+    return await db.select().from(collections).where(sql`${collections.id} IN ${collectionIds}`);
+  }
+  
+  async addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<BookmarkCollection> {
+    const [relationship] = await db.insert(bookmarkCollections).values({
+      bookmark_id: bookmarkId,
+      collection_id: collectionId
+    }).returning();
+    
+    return relationship;
+  }
+  
+  async removeBookmarkFromCollection(bookmarkId: string, collectionId: string): Promise<boolean> {
+    const result = await db.delete(bookmarkCollections)
+      .where(
+        sql`${bookmarkCollections.bookmark_id} = ${bookmarkId} AND ${bookmarkCollections.collection_id} = ${collectionId}`
+      )
+      .returning();
+    
+    return result.length > 0;
   }
   
   async addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<BookmarkCollection> {
