@@ -449,11 +449,15 @@ export default function GraphView() {
     
   // Calculate visible tags based on container width when drawer is closed
   useEffect(() => {
+    // Create a stable reference to the filter state for this effect's lifetime
+    const isDrawerOpen = tagDrawerOpen;
+    const availableTags = popularTags.filter(tag => !selectedTags.includes(tag));
+    
     // Function to calculate visible tags
     const calculateVisibleTags = () => {
-      if (tagDrawerOpen || !tagContainerRef.current) {
-        // When drawer is open, we show all tags
-        setVisibleTags(popularTags.filter(tag => !selectedTags.includes(tag)));
+      if (isDrawerOpen || !tagContainerRef.current) {
+        // When drawer is open, show all available tags
+        setVisibleTags(availableTags);
         return;
       }
       
@@ -469,9 +473,6 @@ export default function GraphView() {
       // Track total width used so far
       let usedWidth = 0;
       const tagsToShow: string[] = [];
-      
-      // Only process tags that aren't already selected
-      const availableTags = popularTags.filter(tag => !selectedTags.includes(tag));
       
       // Add tags until we run out of space
       for (const tag of availableTags) {
@@ -490,8 +491,10 @@ export default function GraphView() {
       setVisibleTags(tagsToShow);
     };
     
-    // Run calculation immediately
-    calculateVisibleTags();
+    // Use a small delay to ensure the DOM has updated
+    const timeoutId = setTimeout(() => {
+      calculateVisibleTags();
+    }, 0);
     
     // Also recalculate when window is resized
     const handleResize = () => {
@@ -501,9 +504,10 @@ export default function GraphView() {
     window.addEventListener('resize', handleResize);
     
     return () => {
+      clearTimeout(timeoutId);
       window.removeEventListener('resize', handleResize);
     };
-  }, [tagDrawerOpen, popularTags, selectedTags]);
+  }, [tagDrawerOpen, selectedTags, popularTags]); // Dependencies that should trigger recalculation
   
   const handleDeleteBookmark = async (id: string) => {
     try {
@@ -636,32 +640,24 @@ export default function GraphView() {
                 : 'top-0 bottom-0 bg-transparent p-1 flex items-center justify-center'
             } hover:bg-gray-200 z-10`}
           >
-            {(() => {
-              // Only show tag count in toggle button for "all tags" beyond popular tags
-              if (!tagDrawerOpen) {
-                // Calculate all available tags vs. popular tags (not including selected tags)
-                const availableTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length;
-                const visibleTagsCount = visibleTags.length;
-                const popularTagsCount = popularTags.filter(tag => !selectedTags.includes(tag)).length;
-                
-                // Show count of additional tags beyond popular tags
-                const remainingBeyondPopular = availableTagsCount - popularTagsCount;
-                
-                if (remainingBeyondPopular > 0) {
-                  return (
-                    <div className="flex items-center">
-                      <span className="text-xs mr-1 font-medium">+{remainingBeyondPopular}</span>
-                      <ChevronUp className="h-4 w-4 text-gray-700" />
-                    </div>
-                  );
-                }
-              }
-              
-              // Default icons based on drawer state
-              return tagDrawerOpen ? 
-                <ChevronDown className="h-4 w-4 text-gray-700" /> : 
-                <ChevronUp className="h-4 w-4 text-gray-700" />;
-            })()}
+            {/* Simple toggle button with up/down arrow based on drawer state */}
+            {tagDrawerOpen ? (
+              <ChevronDown className="h-4 w-4 text-gray-700" />
+            ) : (
+              <>
+                {/* Show tag count if there are more tags than what we're displaying */}
+                {allTags.length > popularTags.length && (
+                  <div className="flex items-center">
+                    <span className="text-xs mr-1 font-medium">+{allTags.length - popularTags.length}</span>
+                    <ChevronUp className="h-4 w-4 text-gray-700" />
+                  </div>
+                )}
+                {/* Just show up arrow if no additional tags beyond popular ones */}
+                {allTags.length <= popularTags.length && (
+                  <ChevronUp className="h-4 w-4 text-gray-700" />
+                )}
+              </>
+            )}
           </button>
           
           {/* Bookmark filter indicator if a bookmark is selected */}
@@ -800,12 +796,7 @@ export default function GraphView() {
               );
             })}
             
-            {/* If drawer is closed and we have more tags available, show the count in the container */}
-            {!tagDrawerOpen && popularTags.filter(tag => !selectedTags.includes(tag)).length > visibleTags.length && (
-              <div className="text-xs text-gray-500 ml-1">
-                +{popularTags.filter(tag => !selectedTags.includes(tag)).length - visibleTags.length} more
-              </div>
-            )}
+            {/* No need for additional tag count indicator here since we have one in the toggle button */}
             
             {/* Clear All button when drawer is open and tags are selected */}
             {tagDrawerOpen && selectedTags.length > 0 && (
