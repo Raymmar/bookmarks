@@ -442,7 +442,7 @@ export default function GraphView() {
               aria-label="Close tag drawer"
               className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
             >
-              <ChevronUp className="h-4 w-4 text-gray-700" />
+              <ChevronDown className="h-4 w-4 text-gray-700" />
             </button>
           )}
           
@@ -536,7 +536,7 @@ export default function GraphView() {
                 className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
                 onClick={toggleTagDrawer}
               >
-                +{allTags.length - popularTags.length} <ChevronDown className="h-3 w-3 ml-1" />
+                +{allTags.length - popularTags.length} <ChevronUp className="h-3 w-3 ml-1" />
               </Badge>
             )}
           </div>
