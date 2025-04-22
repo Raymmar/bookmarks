@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { X, LayoutGrid, Network, SearchX, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { X, LayoutGrid, Network, SearchX, ChevronUp, ChevronDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bookmark } from "@shared/types";
