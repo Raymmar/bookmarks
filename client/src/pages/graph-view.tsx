@@ -524,171 +524,181 @@ export default function GraphView() {
         
         {/* Filters display at the bottom of the graph area */}
         <div className="relative flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
-          {/* Absolute positioned close button when drawer is open - positioned relative to parent with padding */}
-          {tagDrawerOpen && (
+          {/* Filter indicators section (bookmark, domain, tags) */}
+          <div className="mb-2">
+            {/* Active filters (bookmark, domain, tags) */}
+            <div className="flex flex-wrap gap-2 mb-2">
+              {/* Bookmark filter indicator if a bookmark is selected */}
+              {selectedBookmarkId && (
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-600 mr-2">Focused on:</span>
+                  <Badge 
+                    variant="default"
+                    className="cursor-pointer bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      setSelectedBookmarkId(null);
+                      
+                      // Trigger zoom-out when clicking the badge
+                      setTimeout(() => {
+                        const event = new CustomEvent('centerFullGraph', { 
+                          detail: { source: 'closeBookmarkFilter' } 
+                        });
+                        document.dispatchEvent(event);
+                      }, 50);
+                    }}
+                  >
+                    {selectedBookmark?.title || 'Bookmark'}
+                    <X 
+                      className="h-3 w-3 ml-1" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedBookmarkId(null);
+                        
+                        // Trigger zoom-out when clicking the X
+                        setTimeout(() => {
+                          const event = new CustomEvent('centerFullGraph', { 
+                            detail: { source: 'closeBookmarkFilter' } 
+                          });
+                          document.dispatchEvent(event);
+                        }, 50);
+                      }}
+                    />
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Domain filter indicator if selected */}
+              {selectedDomain && (
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-600 mr-2">Domain:</span>
+                  <Badge 
+                    variant="default"
+                    className="cursor-pointer bg-green-600 hover:bg-green-700"
+                    onClick={() => handleDomainSelection(selectedDomain)}
+                  >
+                    {selectedDomain}
+                    <X 
+                      className="h-3 w-3 ml-1" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDomainSelection(selectedDomain);
+                      }}
+                    />
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Selected tag filters indicator */}
+              {selectedTags.length > 0 && (
+                <div className="flex items-center flex-wrap gap-1">
+                  <span className="text-sm text-gray-600 mr-1">Tags:</span>
+                  {selectedTags.map((tag, index) => (
+                    <Badge 
+                      key={`selected-${tag}-${index}`}
+                      variant="default"
+                      className="cursor-pointer bg-primary hover:bg-primary/90"
+                      onClick={() => toggleTagSelection(tag)}
+                    >
+                      {tag}
+                      <X 
+                        className="h-3 w-3 ml-1" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTagSelection(tag);
+                        }}
+                      />
+                    </Badge>
+                  ))}
+                  
+                  {/* Clear All button when multiple tags are selected */}
+                  {selectedTags.length > 1 && (
+                    <Badge 
+                      variant="secondary"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center ml-1"
+                      onClick={() => setSelectedTags([])}
+                    >
+                      Clear All <X className="h-3 w-3 ml-1" />
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Tags display area */}
+          <div className="relative">
+            {/* Consistent drawer toggle button - always in the same position */}
             <button
               onClick={toggleTagDrawer}
-              aria-label="Close tag drawer"
+              aria-label={tagDrawerOpen ? "Close tag drawer" : "Open tag drawer"}
               className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
             >
-              <ChevronDown className="h-4 w-4 text-gray-700" />
+              {tagDrawerOpen ? (
+                <ChevronDown className="h-4 w-4 text-gray-700" />
+              ) : (
+                <ChevronUp className="h-4 w-4 text-gray-700" />
+              )}
             </button>
-          )}
-          
-          {/* Bookmark filter indicator if a bookmark is selected */}
-          {selectedBookmarkId && (
-            <div className="mb-2 flex items-center">
-              <span className="text-sm text-gray-600 mr-2">Focused on:</span>
-              <Badge 
-                variant="default"
-                className="cursor-pointer bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  setSelectedBookmarkId(null);
-                  
-                  // Trigger zoom-out when clicking the badge
-                  setTimeout(() => {
-                    const event = new CustomEvent('centerFullGraph', { 
-                      detail: { source: 'closeBookmarkFilter' } 
-                    });
-                    document.dispatchEvent(event);
-                  }, 50);
-                }}
-              >
-                {selectedBookmark?.title || 'Bookmark'}
-                <X 
-                  className="h-3 w-3 ml-1" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedBookmarkId(null);
-                    
-                    // Trigger zoom-out when clicking the X
-                    setTimeout(() => {
-                      const event = new CustomEvent('centerFullGraph', { 
-                        detail: { source: 'closeBookmarkFilter' } 
-                      });
-                      document.dispatchEvent(event);
-                    }, 50);
-                  }}
-                />
-              </Badge>
-            </div>
-          )}
-          
-          {/* Domain filter indicator if selected */}
-          {selectedDomain && (
-            <div className="mb-2 flex items-center">
-              <span className="text-sm text-gray-600 mr-2">Domain:</span>
-              <Badge 
-                variant="default"
-                className="cursor-pointer bg-green-600 hover:bg-green-700"
-                onClick={() => handleDomainSelection(selectedDomain)}
-              >
-                {selectedDomain}
-                <X 
-                  className="h-3 w-3 ml-1" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDomainSelection(selectedDomain);
-                  }}
-                />
-              </Badge>
-            </div>
-          )}
-          
-          {/* Selected tag filters indicator when drawer is closed */}
-          {!tagDrawerOpen && selectedTags.length > 0 && (
-            <div className="mb-2 flex items-center flex-wrap gap-1">
-              <span className="text-sm text-gray-600 mr-1">Tags:</span>
-              {selectedTags.map((tag, index) => (
+            
+            {/* Single-row tag display when drawer is closed, multi-row when open */}
+            <div className={`flex ${tagDrawerOpen ? 'flex-wrap' : 'flex-nowrap overflow-x-hidden'} gap-1 items-center pr-8`}>
+              {/* Tags display - either all tags (drawer open) or popular tags (drawer closed) */}
+              {(tagDrawerOpen 
+                ? allTags 
+                // When drawer is closed, filter out selected tags from the popular tags
+                : popularTags.filter(tag => !selectedTags.includes(tag))
+              ).map((tag, index) => (
                 <Badge 
-                  key={`selected-${tag}-${index}`}
-                  variant="default"
-                  className="cursor-pointer bg-primary hover:bg-primary/90"
+                  key={`tag-${tag}-${index}`}
+                  variant={selectedTags.includes(tag) ? "default" : "outline"}
+                  className="cursor-pointer whitespace-nowrap"
                   onClick={() => toggleTagSelection(tag)}
                 >
                   {tag}
-                  <X 
-                    className="h-3 w-3 ml-1" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTagSelection(tag);
-                    }}
-                  />
+                  {selectedTags.includes(tag) && (
+                    <X 
+                      className="h-3 w-3 ml-1" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTagSelection(tag);
+                      }}
+                    />
+                  )}
                 </Badge>
               ))}
               
-              {/* Clear All button when multiple tags are selected */}
-              {selectedTags.length > 1 && (
+              {/* Clear All button when drawer is open and tags are selected */}
+              {tagDrawerOpen && selectedTags.length > 0 && (
                 <Badge 
                   variant="secondary"
-                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center ml-1"
+                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center whitespace-nowrap"
                   onClick={() => setSelectedTags([])}
                 >
                   Clear All <X className="h-3 w-3 ml-1" />
                 </Badge>
               )}
+              
+              {/* Show tag count indicator when drawer is closed */}
+              {!tagDrawerOpen && (
+                (() => {
+                  // Calculate remaining non-selected tags for display
+                  const remainingTagsCount = allTags.length - 
+                                             popularTags.filter(tag => !selectedTags.includes(tag)).length;
+                  
+                  if (remainingTagsCount > 0) {
+                    return (
+                      <Badge 
+                        variant="secondary"
+                        className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center whitespace-nowrap"
+                      >
+                        +{remainingTagsCount} more
+                      </Badge>
+                    );
+                  }
+                  return null;
+                })()
+              )}
             </div>
-          )}
-          
-          {/* Tags drawer - minimal version */}
-          <div className="flex flex-wrap gap-1 items-center">
-            {/* Tags display - either popular tags or all tags, but not showing tags that are already selected when drawer is closed */}
-            {(tagDrawerOpen 
-              ? allTags 
-              // When drawer is closed, filter out selected tags from the popular tags
-              : popularTags.filter(tag => !selectedTags.includes(tag))
-            ).map((tag, index) => (
-              <Badge 
-                key={`tag-${tag}-${index}`} // Using index to ensure unique keys
-                variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleTagSelection(tag)}
-              >
-                {tag}
-                {selectedTags.includes(tag) && (
-                  <X 
-                    className="h-3 w-3 ml-1" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTagSelection(tag);
-                    }}
-                  />
-                )}
-              </Badge>
-            ))}
-            
-            {/* Clear All button when drawer is open and tags are selected */}
-            {tagDrawerOpen && selectedTags.length > 0 && (
-              <Badge 
-                variant="secondary"
-                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                onClick={() => setSelectedTags([])}
-              >
-                Clear All <X className="h-3 w-3 ml-1" />
-              </Badge>
-            )}
-            
-            {/* Show "more" badge when drawer is closed */}
-            {!tagDrawerOpen && (
-              (() => {
-                // Calculate remaining non-selected tags for display
-                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
-                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
-                
-                if (remainingTagsCount > 0) {
-                  return (
-                    <Badge 
-                      variant="secondary"
-                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                      onClick={toggleTagDrawer}
-                    >
-                      +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
-                    </Badge>
-                  );
-                }
-                return null;
-              })()
-            )}
           </div>
         </div>
       </div>
