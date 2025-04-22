@@ -356,6 +356,36 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const handleCollectionChange = async (collectionId: string) => {
     if (!bookmark) return;
     
+    // Special case: "remove" action for removing from collection
+    if (collectionId === "remove") {
+      try {
+        // Get the collections this bookmark is in
+        if (bookmarkCollections.length > 0) {
+          // Remove from all collections
+          for (const collection of bookmarkCollections) {
+            await removeBookmarkFromCollection.mutateAsync({
+              collectionId: collection.id,
+              bookmarkId: bookmark.id
+            });
+          }
+          
+          toast({
+            title: "Removed from collections",
+            description: "Bookmark has been removed from all collections",
+          });
+        }
+        return;
+      } catch (error) {
+        console.error("Error removing from collections:", error);
+        toast({
+          title: "Collection update failed",
+          description: "There was an error updating collections. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     // Check if bookmark is already in the selected collection
     const isInCollection = bookmarkCollections.some(c => c.id === collectionId);
     
@@ -1112,6 +1142,17 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 />
               </SelectTrigger>
               <SelectContent>
+                {/* Option to remove from all collections */}
+                {bookmarkCollections.length > 0 && (
+                  <SelectItem 
+                    key="remove" 
+                    value="remove"
+                    className="text-red-500 border-b"
+                  >
+                    Remove from all collections
+                  </SelectItem>
+                )}
+                
                 {allCollections.map((collection) => (
                   <SelectItem 
                     key={collection.id} 
