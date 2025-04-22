@@ -98,6 +98,8 @@ function getActivityTitle(activity: Activity): string {
   switch (activity.type) {
     case "bookmark_added":
       return "Bookmarked";
+    case "bookmark_updated":
+      return "Updated bookmark";
     case "note_added":
       return "Added a note to";
     case "highlight_added":
@@ -113,6 +115,8 @@ function getActivityIcon(type: string) {
   switch (type) {
     case "bookmark_added":
       return <Bookmark className="h-5 w-5 text-primary" />;
+    case "bookmark_updated":
+      return <Bookmark className="h-5 w-5 text-blue-500" />;
     case "note_added":
       return <FileText className="h-5 w-5 text-yellow-500" />;
     case "highlight_added":
@@ -128,6 +132,8 @@ function getActivityIconBgColor(type: string): string {
   switch (type) {
     case "bookmark_added":
       return "#e0e7ff"; // indigo-100
+    case "bookmark_updated":
+      return "#dbeafe"; // blue-100
     case "note_added":
       return "#fef3c7"; // yellow-100
     case "highlight_added":

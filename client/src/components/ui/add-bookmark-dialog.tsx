@@ -75,8 +75,18 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
             const existingBookmark = await apiRequest("GET", `/api/bookmarks/${urlCheckResult.existingBookmarkId}`);
             
             // Update the bookmark with new information
+            // Include a note about updating the bookmark in the description field if it's empty
+            const descriptionToSend = notes 
+              ? notes 
+              : (existingBookmark.description || "Updated bookmark");
+            
+            // Prepare what's being updated for the log message
+            const updatedInfo = [];
+            if (notes) updatedInfo.push("notes");
+            if (selectedTags.length > 0) updatedInfo.push("tags");
+            
             await apiRequest("PATCH", `/api/bookmarks/${urlCheckResult.existingBookmarkId}`, {
-              description: notes ? notes : existingBookmark.description,
+              description: descriptionToSend,
               tags: selectedTags.length > 0 ? selectedTags : existingBookmark.user_tags,
             });
             
