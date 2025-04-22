@@ -12,13 +12,17 @@ import {
   LogOut,
   Plus,
   FolderOpen,
-  Check
+  Check,
+  MoreHorizontal,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
 import { CreateCollectionDialog } from "@/components/ui/create-collection-dialog";
+import { EditCollectionDialog } from "@/components/ui/edit-collection-dialog";
 import { useAuth } from "@/hooks/use-auth";
-import { useCollections } from "@/hooks/use-collection-queries";
+import { useCollections, useCollectionMutations } from "@/hooks/use-collection-queries";
 import { queryClient } from "@/lib/queryClient";
 import {
   DropdownMenu,
@@ -43,6 +47,9 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
+  
+  // Get mutation hooks for collections
+  const { updateCollection, deleteCollection } = useCollectionMutations();
   
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
@@ -296,36 +303,129 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 ) : (
                   collections.map(collection => (
                     <li key={collection.id}>
-                      <div 
-                        className={cn(
-                          "flex items-center px-2 py-2 text-sm rounded-lg cursor-pointer",
-                          selectedCollections.includes(collection.id) 
-                            ? "bg-primary/10 text-primary font-medium" 
-                            : "text-gray-700 hover:bg-gray-100"
-                        )}
-                        onClick={() => handleCollectionClick(collection.id)}
-                        title="Click to select or deselect. You can select multiple collections."
-                      >
-                        <div className="flex h-4 w-4 items-center justify-center mr-2">
-                          {selectedCollections.includes(collection.id) ? (
-                            <Checkbox 
-                              id={`collection-${collection.id}`} 
-                              checked={true}
-                              className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                            />
-                          ) : (
-                            <Checkbox 
-                              id={`collection-${collection.id}`} 
-                              checked={false}
-                            />
+                      <div className="flex items-center">
+                        <div 
+                          className={cn(
+                            "flex flex-1 items-center px-2 py-2 text-sm rounded-lg cursor-pointer",
+                            selectedCollections.includes(collection.id) 
+                              ? "bg-primary/10 text-primary font-medium" 
+                              : "text-gray-700 hover:bg-gray-100"
+                          )}
+                          onClick={() => handleCollectionClick(collection.id)}
+                          title="Click to select or deselect. You can select multiple collections."
+                        >
+                          <div className="flex h-4 w-4 items-center justify-center mr-2">
+                            {selectedCollections.includes(collection.id) ? (
+                              <Checkbox 
+                                id={`collection-${collection.id}`} 
+                                checked={true}
+                                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                              />
+                            ) : (
+                              <Checkbox 
+                                id={`collection-${collection.id}`} 
+                                checked={false}
+                              />
+                            )}
+                          </div>
+                          <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
+                            {collection.name}
+                          </span>
+                          {!collection.is_public && (
+                            <span className="ml-1 text-xs text-gray-500">(Private)</span>
                           )}
                         </div>
-                        <span className={cn("truncate", selectedCollections.includes(collection.id) && "font-medium")}>
-                          {collection.name}
-                        </span>
-                        {!collection.is_public && (
-                          <span className="ml-1 text-xs text-gray-500">(Private)</span>
-                        )}
+                        
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 p-0 ml-1">
+                              <MoreHorizontal className="h-4 w-4 text-gray-500" />
+                              <span className="sr-only">More options</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-[160px]">
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                // Open edit collection modal
+                                const name = collection.name;
+                                const description = collection.description || "";
+                                const isPublic = collection.is_public;
+                                
+                                // Open modal or form to edit
+                                if (window.confirm(`Edit collection: ${name}?`)) {
+                                  const newName = window.prompt("Collection name:", name);
+                                  if (newName) {
+                                    // Call API to update collection
+                                    updateCollection.mutate({
+                                      id: collection.id,
+                                      name: newName,
+                                      description,
+                                      is_public: isPublic
+                                    }, {
+                                      onSuccess: () => {
+                                        toast({
+                                          title: "Collection updated",
+                                          description: "Your collection has been updated successfully"
+                                        });
+                                      },
+                                      onError: () => {
+                                        toast({
+                                          title: "Error updating collection",
+                                          description: "Failed to update collection",
+                                          variant: "destructive"
+                                        });
+                                      }
+                                    });
+                                  }
+                                }
+                              }}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                // Confirm before deleting
+                                if (window.confirm(`Are you sure you want to delete collection: ${collection.name}?`)) {
+                                  // Call API to delete collection
+                                  deleteCollection.mutate(collection.id, {
+                                    onSuccess: () => {
+                                      toast({
+                                        title: "Collection deleted",
+                                        description: "Your collection has been deleted successfully"
+                                      });
+                                      
+                                      // If this collection was selected, clear the selection
+                                      if (selectedCollections.includes(collection.id)) {
+                                        const newSelection = selectedCollections.filter(id => id !== collection.id);
+                                        setSelectedCollections(newSelection);
+                                        
+                                        if (newSelection.length === 0) {
+                                          // Clear all filters if nothing selected
+                                          setSelectedCollectionId(null);
+                                          window.dispatchEvent(new CustomEvent('filterByCollection', { 
+                                            detail: { collectionId: null, collectionIds: [] } 
+                                          }));
+                                        }
+                                      }
+                                    },
+                                    onError: () => {
+                                      toast({
+                                        title: "Error deleting collection",
+                                        description: "Failed to delete collection",
+                                        variant: "destructive"
+                                      });
+                                    }
+                                  });
+                                }
+                              }}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </li>
                   ))
