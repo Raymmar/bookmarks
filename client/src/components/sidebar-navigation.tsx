@@ -3,9 +3,9 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Bookmark, 
-  FileText, 
-  Layers, 
-  HelpCircle, 
+  Waypoints, 
+  Activity, 
+  Bot, 
   Circle, 
   Settings, 
   User, 
@@ -66,7 +66,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       ? "bg-primary text-white" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <Layers className="h-5 w-5 mr-2" />
+                    <Waypoints className="h-5 w-5 mr-2" />
                     Explore
                   </div>
                 </Link>
@@ -79,7 +79,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       ? "bg-primary text-white" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <FileText className="h-5 w-5 mr-2" />
+                    <Activity className="h-5 w-5 mr-2" />
                     Activity
                   </div>
                 </Link>
@@ -92,7 +92,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       ? "bg-primary text-white" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <HelpCircle className="h-5 w-5 mr-2" />
+                    <Bot className="h-5 w-5 mr-2" />
                     AI Chat
                   </div>
                 </Link>
