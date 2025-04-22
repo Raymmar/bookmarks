@@ -98,6 +98,25 @@ export class BookmarkService {
         this.storage.getSetting("summary_prompt")
       ]);
       
+      // If either prompt is missing, try to get raymmar's prompts as defaults
+      if (!taggingPrompt?.value || !summaryPrompt?.value) {
+        console.log("Some prompts are missing, checking for default prompts from raymmar");
+        // Raymmar's user ID
+        const RAYMMAR_USER_ID = 'c95a1d56-f721-4f9a-9104-7e4cf59caad7';
+        
+        // Get raymmar's settings
+        const raymmarSettings = await this.storage.getSettings(RAYMMAR_USER_ID);
+        
+        // Find the default prompts
+        const defaultTaggingPrompt = raymmarSettings.find(s => s.key === "auto_tagging_prompt");
+        const defaultSummaryPrompt = raymmarSettings.find(s => s.key === "summary_prompt");
+        
+        return {
+          taggingPrompt: taggingPrompt?.value || defaultTaggingPrompt?.value,
+          summaryPrompt: summaryPrompt?.value || defaultSummaryPrompt?.value
+        };
+      }
+      
       return {
         taggingPrompt: taggingPrompt?.value,
         summaryPrompt: summaryPrompt?.value

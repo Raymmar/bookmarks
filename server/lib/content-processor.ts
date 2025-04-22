@@ -282,12 +282,23 @@ export async function generateTags(content: string, url?: string, customSystemPr
       userSystemPrompt = customSystemPrompt;
       console.log("Using provided custom system prompt for tag generation");
     } 
-    // Otherwise get it from storage (we assume there will always be a default prompt set)
+    // Otherwise get it from storage
     else {
       // Get the tagging prompt from storage
       const customPrompt = await storage.getSetting("auto_tagging_prompt");
-      userSystemPrompt = customPrompt?.value;
-      console.log("Retrieved custom tagging prompt from storage");
+      
+      // If no custom prompt is found, try to get raymmar's default prompt
+      if (!customPrompt?.value) {
+        console.log("No custom prompt found, checking for raymmar's default prompt");
+        const RAYMMAR_USER_ID = 'c95a1d56-f721-4f9a-9104-7e4cf59caad7';
+        const raymmarSettings = await storage.getSettings(RAYMMAR_USER_ID);
+        const defaultPrompt = raymmarSettings.find(s => s.key === "auto_tagging_prompt");
+        userSystemPrompt = defaultPrompt?.value;
+        console.log("Using raymmar's default prompt for tag generation");
+      } else {
+        userSystemPrompt = customPrompt?.value;
+        console.log("Retrieved custom tagging prompt from storage");
+      }
     }
     
     // Combine base prompt with user prompt
