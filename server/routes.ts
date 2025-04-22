@@ -959,6 +959,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Setting not found" });
       }
       
+      // If setting has a user_id, make sure only authorized users can access it
+      if (setting.user_id && (!req.isAuthenticated() || setting.user_id !== req.user.id)) {
+        return res.status(403).json({ error: "Unauthorized access to user setting" });
+      }
+      
       res.json(setting);
     } catch (error) {
       console.error("Error retrieving setting:", error);
@@ -968,21 +973,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/settings", async (req, res) => {
     try {
+      // Require authentication for creating settings
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
       const parsedData = insertSettingSchema.safeParse(req.body);
       
       if (!parsedData.success) {
         return res.status(400).json({ error: "Invalid setting data", details: parsedData.error });
       }
       
-      // Add user_id if authenticated
-      if (req.isAuthenticated()) {
-        parsedData.data.user_id = req.user.id;
-      }
+      // Add user_id from authenticated user
+      parsedData.data.user_id = req.user.id;
       
       // Check if setting already exists
       const existingSetting = await storage.getSetting(parsedData.data.key);
       
       if (existingSetting) {
+        // If the setting has a user_id, make sure it belongs to the current user
+        if (existingSetting.user_id && existingSetting.user_id !== req.user.id) {
+          return res.status(403).json({ error: "Cannot update another user's setting" });
+        }
+        
         // Update existing setting
         const updatedSetting = await storage.updateSetting(existingSetting.key, parsedData.data.value);
         return res.status(200).json(updatedSetting);
