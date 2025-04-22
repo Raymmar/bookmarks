@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { X, LayoutGrid, Network, Search, ChevronUp, ChevronDown, BookmarkPlus, SearchX } from "lucide-react";
-import { useCollectionBookmarks } from "@/hooks/use-collection-queries";
+import { useCollectionBookmarks, useCollections } from "@/hooks/use-collection-queries";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -66,6 +66,9 @@ export default function GraphView() {
   const { data: tags = [], isLoading: isLoadingTags } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
   });
+  
+  // Fetch collections for displaying names in filter UI
+  const { data: collections = [], isLoading: isLoadingCollections } = useCollections();
   
   // Fetch collection bookmarks if a collection is selected
   const { data: collectionBookmarkIds = [], isLoading: isLoadingCollectionBookmarks } = useCollectionBookmarks(selectedCollectionId);
@@ -231,7 +234,7 @@ export default function GraphView() {
   }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, selectedCollectionId, isLoadingBookmarks, isLoadingTags]);
   
   // Combined loading state
-  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || isLoadingCollectionBookmarks;
+  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || isLoadingCollectionBookmarks || isLoadingCollections;
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
@@ -678,7 +681,7 @@ export default function GraphView() {
                 className="cursor-pointer bg-purple-600 hover:bg-purple-700"
                 onClick={() => setSelectedCollectionId(null)}
               >
-                {selectedCollectionId}
+                {collections.find(c => c.id === selectedCollectionId)?.name || selectedCollectionId}
                 <X 
                   className="h-3 w-3 ml-1" 
                   onClick={(e) => {
