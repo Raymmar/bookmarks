@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer, boolean, timestamp, uuid, json, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 // Chat Sessions table for persistent chat
 export const chatSessions = pgTable("chat_sessions", {
@@ -20,6 +21,16 @@ export const chatMessages = pgTable("chat_messages", {
   timestamp: timestamp("timestamp").defaultNow().notNull()
 });
 
+// Users table
+export const users = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  username: text("username").notNull().unique(),
+  email: text("email").unique(),
+  password: text("password").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Bookmarks table
 export const bookmarks = pgTable("bookmarks", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -35,6 +46,26 @@ export const bookmarks = pgTable("bookmarks", {
   ai_processing_status: text("ai_processing_status", { 
     enum: ["pending", "processing", "completed", "failed"] 
   }).default("pending"),
+  // Reference to the user who owns this bookmark
+  user_id: uuid("user_id").references(() => users.id),
+});
+
+// Collections table
+export const collections = pgTable("collections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  user_id: uuid("user_id").references(() => users.id).notNull(),
+  is_public: boolean("is_public").default(false).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Collection-Bookmarks join table
+export const collectionBookmarks = pgTable("collection_bookmarks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  collection_id: uuid("collection_id").references(() => collections.id, { onDelete: "cascade" }).notNull(),
+  bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }).notNull(),
 });
 
 // Notes table
@@ -109,11 +140,63 @@ export const settings = pgTable("settings", {
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Relations between tables
+export const usersRelations = relations(users, ({ many }) => ({
+  bookmarks: many(bookmarks),
+  collections: many(collections),
+}));
+
+export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
+  user: one(users, {
+    fields: [bookmarks.user_id],
+    references: [users.id],
+  }),
+  notes: many(notes),
+  highlights: many(highlights),
+  screenshots: many(screenshots),
+  insights: many(insights),
+  bookmarkTags: many(bookmarkTags),
+}));
+
+export const collectionsRelations = relations(collections, ({ one, many }) => ({
+  user: one(users, {
+    fields: [collections.user_id],
+    references: [users.id],
+  }),
+  collectionBookmarks: many(collectionBookmarks),
+}));
+
+export const collectionBookmarksRelations = relations(collectionBookmarks, ({ one }) => ({
+  collection: one(collections, {
+    fields: [collectionBookmarks.collection_id],
+    references: [collections.id],
+  }),
+  bookmark: one(bookmarks, {
+    fields: [collectionBookmarks.bookmark_id],
+    references: [bookmarks.id],
+  }),
+}));
+
 // Insert Schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export const insertCollectionSchema = createInsertSchema(collections).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export const insertCollectionBookmarkSchema = createInsertSchema(collectionBookmarks).omit({
+  id: true,
+});
+
 export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
   id: true,
   vector_embedding: true,
-  user_tags: true, // Remove user_tags since we're using the normalized tag system now
 });
 
 export const insertNoteSchema = createInsertSchema(notes).omit({
