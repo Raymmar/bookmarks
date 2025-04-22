@@ -32,20 +32,35 @@ export default function Home() {
   useEffect(() => {
     const handleFilterByCollection = (event: any) => {
       console.log('HOME: filterByCollection event received:', event.detail);
+      
+      // DEBUG: Print the current state before changing
+      console.log('HOME BEFORE: Current state -', { 
+        selectedCollectionId, 
+        bookmarksCount: bookmarks.length,
+        bookmarksInCollectionCount: bookmarksInCollection?.length || 0,
+      });
+      
       if (event.detail && 'collectionId' in event.detail) {
         const newCollectionId = event.detail.collectionId;
         console.log('HOME: Setting selectedCollectionId to:', newCollectionId);
         
-        // Set the new collection ID
+        // INTENTIONALLY LOG EVERYTHING TO DEBUG COLLECTION CHANGE PIPELINE
+        
+        // Set the new collection ID first
         setSelectedCollectionId(newCollectionId);
         
-        // Important: Force a query invalidation when changing collections
+        // Force query invalidation to refresh data
         if (newCollectionId) {
-          console.log(`HOME: Invalidating query for collection ${newCollectionId}`);
+          console.log(`HOME: *** APPLYING COLLECTION FILTER ${newCollectionId} ***`);
           queryClient.invalidateQueries({ 
             queryKey: ['/api/collections/bookmarks', newCollectionId] 
           });
+        } else {
+          console.log('HOME: *** CLEARING COLLECTION FILTER ***');
         }
+        
+        // THIS SHOULD TRIGGER A RE-RENDER
+        console.log(`HOME: State updated, component should re-render`);
       }
     };
     
@@ -54,7 +69,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('filterByCollection', handleFilterByCollection);
     };
-  }, [queryClient]);
+  }, [queryClient, bookmarks.length, bookmarksInCollection]);
 
   const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
