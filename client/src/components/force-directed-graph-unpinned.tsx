@@ -31,9 +31,18 @@ interface ForceDirectedGraphProps {
   onTagClick?: (tagName: string) => void;
   onDomainClick?: (domainName: string) => void;
   selectedBookmarkId?: string | null;
+  visibleNodeTypes?: string[];
 }
 
-export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTagClick, onDomainClick, selectedBookmarkId }: ForceDirectedGraphProps): JSX.Element {
+export function ForceDirectedGraph({ 
+  bookmarks, 
+  insightLevel, 
+  onNodeClick, 
+  onTagClick, 
+  onDomainClick, 
+  selectedBookmarkId,
+  visibleNodeTypes = ["bookmark", "domain", "tag"] 
+}: ForceDirectedGraphProps): JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);

@@ -37,6 +37,7 @@ export default function GraphView() {
   const [sortOrder, setSortOrder] = useState("newest");
   const [dateRange, setDateRange] = useState("all");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(["bookmark", "domain", "tag"]);
   // Drawer state with localStorage persistence
   const [tagDrawerOpen, setTagDrawerOpen] = useState<boolean>(() => {
     // Initialize from localStorage or default to closed
@@ -391,6 +392,8 @@ export default function GraphView() {
               onTagModeChange={setTagMode}
               sortOrder={sortOrder}
               onSortOrderChange={setSortOrder}
+              visibleNodeTypes={visibleNodeTypes}
+              onVisibleNodeTypesChange={setVisibleNodeTypes}
             />
           </div>
         </div>
@@ -428,6 +431,7 @@ export default function GraphView() {
                 onTagClick={handleTagClick}
                 onDomainClick={handleDomainSelection}
                 selectedBookmarkId={selectedBookmarkId}
+                visibleNodeTypes={visibleNodeTypes}
               />
             </div>
           )}

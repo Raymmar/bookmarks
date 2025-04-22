@@ -58,9 +58,22 @@ export function FilterControls({
     }
   };
   
-  // Only count non-tag filters for the filter badge count
-  const filtersActive = dateRange !== "all" || sources.length < 3;
-  const filterCount = (dateRange !== "all" ? 1 : 0) + (sources.length < 3 ? 1 : 0);
+  const handleNodeTypeToggle = (nodeType: string, checked: boolean) => {
+    if (!onVisibleNodeTypesChange) return;
+    
+    if (checked) {
+      onVisibleNodeTypesChange([...visibleNodeTypes, nodeType]);
+    } else {
+      onVisibleNodeTypesChange(visibleNodeTypes.filter(t => t !== nodeType));
+    }
+  };
+  
+  // Count non-tag filters for the filter badge count, including node type filters
+  const nodeTypesFiltered = visibleNodeTypes.length < 3; // Less than all 3 node types are visible
+  const filtersActive = dateRange !== "all" || sources.length < 3 || nodeTypesFiltered;
+  const filterCount = (dateRange !== "all" ? 1 : 0) + 
+                     (sources.length < 3 ? 1 : 0) + 
+                     (nodeTypesFiltered ? 1 : 0);
   
   return (
     <div className={cn("flex items-center", className)}>
@@ -166,6 +179,42 @@ export function FilterControls({
               </Select>
             </div>
             
+            <div>
+              <h3 className="text-xs font-medium text-gray-700 mb-2">Node Types</h3>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="node-type-bookmark"
+                    checked={visibleNodeTypes.includes("bookmark")}
+                    onCheckedChange={(checked) => {
+                      handleNodeTypeToggle("bookmark", checked as boolean);
+                    }}
+                  />
+                  <label htmlFor="node-type-bookmark" className="text-xs">Bookmarks</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="node-type-domain"
+                    checked={visibleNodeTypes.includes("domain")}
+                    onCheckedChange={(checked) => {
+                      handleNodeTypeToggle("domain", checked as boolean);
+                    }}
+                  />
+                  <label htmlFor="node-type-domain" className="text-xs">Domains</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="node-type-tag"
+                    checked={visibleNodeTypes.includes("tag")}
+                    onCheckedChange={(checked) => {
+                      handleNodeTypeToggle("tag", checked as boolean);
+                    }}
+                  />
+                  <label htmlFor="node-type-tag" className="text-xs">Tags</label>
+                </div>
+              </div>
+            </div>
+            
             {filtersActive && (
               <Button
                 variant="ghost"
@@ -175,6 +224,9 @@ export function FilterControls({
                   onTagsChange([]);
                   onDateRangeChange("all");
                   onSourcesChange(["extension", "web", "import"]);
+                  if (onVisibleNodeTypesChange) {
+                    onVisibleNodeTypesChange(["bookmark", "domain", "tag"]);
+                  }
                 }}
               >
                 Clear all filters
