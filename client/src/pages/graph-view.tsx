@@ -518,8 +518,8 @@ export default function GraphView() {
               </Badge>
             ))}
             
-            {/* Show "more" badge or collapse button */}
-            {!tagDrawerOpen && allTags.length > popularTags.length ? (
+            {/* Show "more" badge when drawer is closed */}
+            {!tagDrawerOpen && allTags.length > popularTags.length && (
               <Badge 
                 variant="secondary"
                 className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
@@ -527,16 +527,17 @@ export default function GraphView() {
               >
                 +{allTags.length - popularTags.length} <ChevronDown className="h-3 w-3 ml-1" />
               </Badge>
-            ) : (
-              tagDrawerOpen && (
-                <Badge 
-                  variant="secondary"
-                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                  onClick={toggleTagDrawer}
-                >
-                  <ChevronUp className="h-3 w-3" />
-                </Badge>
-              )
+            )}
+            
+            {/* Absolute positioned close button when drawer is open */}
+            {tagDrawerOpen && (
+              <button
+                className="absolute top-0 right-0 p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center shadow-sm z-10"
+                onClick={toggleTagDrawer}
+                aria-label="Close tag drawer"
+              >
+                <ChevronUp className="h-4 w-4 text-gray-700" />
+              </button>
             )}
           </div>
         </div>
