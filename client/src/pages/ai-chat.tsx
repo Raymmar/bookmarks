@@ -743,17 +743,14 @@ export default function AiChat() {
             <div className="h-full flex items-center justify-center">
               <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-sm">
                 <Bot className="h-12 w-12 text-primary mx-auto mb-3" />
-                <h2 className="text-xl font-semibold mb-2">Chat with Your Bookmarks</h2>
-                <p className="text-gray-600 mb-4">
-                  AI-powered insights and conversation with your bookmarks are available to logged-in users.
-                </p>
+                <h2 className="text-xl font-semibold mb-2">AI-powered insights + live chat.</h2>
                 <p className="text-gray-500 mb-4">
-                  Log in to start chatting with the AI about your saved content, request summaries, and explore connections between topics.
+                  Log in to start chatting with your bookmarks and exploring connections between topics.
                 </p>
                 <Button asChild className="mt-2">
                   <Link href="/auth">
                     <LogIn className="h-4 w-4 mr-2" />
-                    Log in to use AI Chat
+                    Log in to Chat
                   </Link>
                 </Button>
               </div>

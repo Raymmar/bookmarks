@@ -29,9 +29,9 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
           <div className="mb-6 pb-4 border-b border-gray-200">
             <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-50 rounded-lg">
               <LogIn className="h-10 w-10 text-primary mb-2" />
-              <h3 className="text-lg font-semibold mb-2">See Your Personal Activity</h3>
+              <h3 className="text-lg font-semibold mb-2">Network Activity</h3>
               <p className="text-gray-600 mb-4">
-                Log in to view your personal network activity and see all history.
+                Log in for a customized activity feed tailored to your bookmarks and insights.
               </p>
               <Link href="/auth">
                 <Button className="font-medium">

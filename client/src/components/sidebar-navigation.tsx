@@ -80,7 +80,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
                     <FileText className="h-5 w-5 mr-2" />
-                    Activity Feed
+                    Activity
                   </div>
                 </Link>
               </li>

@@ -102,7 +102,6 @@ export default function Activity() {
       
       {/* Content */}
       <div className="flex-1 p-4 pb-20 bg-gray-50 overflow-y-auto">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Activity Feed</h2>
         
         {isLoading ? (
           <div className="p-8 text-center">
