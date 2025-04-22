@@ -144,7 +144,12 @@ export function useCollectionMutations() {
   const removeBookmarkFromCollection = useMutation({
     mutationFn: async (variables: { collectionId: string; bookmarkId: string }) => {
       const { collectionId, bookmarkId } = variables;
-      return await apiRequest('DELETE', `/api/collections/${collectionId}/bookmarks/${bookmarkId}`);
+      try {
+        return await apiRequest('DELETE', `/api/collections/${collectionId}/bookmarks/${bookmarkId}`);
+      } catch (error) {
+        console.error(`Error removing bookmark ${bookmarkId} from collection ${collectionId}:`, error);
+        throw error; // Re-throw to be caught by the component
+      }
     },
     onSuccess: (_, variables) => {
       // Invalidate collection and bookmark queries
@@ -153,6 +158,10 @@ export function useCollectionMutations() {
       queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId] });
       // Invalidate bookmark collections query
       queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId, 'collections'] });
+    },
+    onError: (error, variables) => {
+      console.error(`Mutation error removing bookmark ${variables.bookmarkId} from collection ${variables.collectionId}:`, error);
+      // Let the component handle the error UI with toast notifications
     }
   });
 

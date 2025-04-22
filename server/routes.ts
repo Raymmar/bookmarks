@@ -1293,7 +1293,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "You can only remove bookmarks from your own collections" });
       }
       
-      await storage.removeBookmarkFromCollection(collectionId, bookmarkId);
+      // Verify the bookmark exists in this collection first
+      const collections = await storage.getCollectionsByBookmarkId(bookmarkId);
+      const isInCollection = collections.some(c => c.id === collectionId);
+      
+      if (!isInCollection) {
+        // If bookmark is not in this collection, still return success (idempotent)
+        return res.status(204).send();
+      }
+      
+      const success = await storage.removeBookmarkFromCollection(collectionId, bookmarkId);
+      
+      if (!success) {
+        throw new Error("Failed to remove bookmark relationship from database");
+      }
       
       res.status(204).send();
     } catch (error) {
