@@ -596,7 +596,37 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       
       <div className="p-4 overflow-auto">
         <div className="mb-4">
-          <h3 className="font-medium text-base mb-1">{bookmark.title}</h3>
+          <div
+            className="font-medium text-base mb-1 border-b border-transparent hover:border-gray-300 focus-within:border-primary cursor-text"
+            onClick={(e) => {
+              // Make sure the click was directly on the div and not on a child element
+              if (e.currentTarget === e.target) {
+                const inputElement = e.currentTarget.querySelector('input');
+                if (inputElement) inputElement.focus();
+              }
+            }}
+          >
+            <input
+              type="text"
+              value={bookmark.title}
+              className="w-full bg-transparent focus:outline-none font-medium"
+              onChange={(e) => {
+                setBookmark(prev => prev ? { ...prev, title: e.target.value } : prev);
+              }}
+              onBlur={(e) => {
+                if (e.target.value !== initialBookmark.title) {
+                  // Only make API call if title has changed
+                  handleUpdateBookmark({ title: e.target.value });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+            />
+          </div>
           <a 
             href={bookmark.url} 
             target="_blank" 
