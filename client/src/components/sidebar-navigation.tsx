@@ -15,7 +15,8 @@ import {
   Check,
   MoreHorizontal,
   Edit,
-  Trash2
+  Trash2,
+  Twitter
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
@@ -277,21 +278,38 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 </Link>
               </li>
               {user && (
-                <li className="mb-1">
-                  <Link href="/settings">
-                    <div className={cn(
-                      "flex items-center px-2 py-2 text-sm rounded-lg",
-                      location === "/settings" 
-                        ? "bg-secondary/20 text-primary border border-primary/20" 
-                        : "text-gray-700 hover:bg-gray-100"
-                    )}>
-                      <Settings className={cn("h-5 w-5 mr-2", 
-                        location === "/settings" ? "text-primary" : ""
-                      )} />
-                      Settings
-                    </div>
-                  </Link>
-                </li>
+                <>
+                  <li className="mb-1">
+                    <Link href="/x-integration">
+                      <div className={cn(
+                        "flex items-center px-2 py-2 text-sm rounded-lg",
+                        location === "/x-integration" 
+                          ? "bg-secondary/20 text-primary border border-primary/20" 
+                          : "text-gray-700 hover:bg-gray-100"
+                      )}>
+                        <Twitter className={cn("h-5 w-5 mr-2", 
+                          location === "/x-integration" ? "text-primary" : ""
+                        )} />
+                        X.com Integration
+                      </div>
+                    </Link>
+                  </li>
+                  <li className="mb-1">
+                    <Link href="/settings">
+                      <div className={cn(
+                        "flex items-center px-2 py-2 text-sm rounded-lg",
+                        location === "/settings" 
+                          ? "bg-secondary/20 text-primary border border-primary/20" 
+                          : "text-gray-700 hover:bg-gray-100"
+                      )}>
+                        <Settings className={cn("h-5 w-5 mr-2", 
+                          location === "/settings" ? "text-primary" : ""
+                        )} />
+                        Settings
+                      </div>
+                    </Link>
+                  </li>
+                </>
               )}
             </ul>
           </div>

@@ -49,12 +49,8 @@ const XIntegrationPanel = () => {
   // Fetch X.com connection status
   const { data: connectionStatus, isLoading: isLoadingStatus } = useQuery({
     queryKey: ['/api/x/status'],
-    queryFn: async () => {
-      const response = await apiRequest<XConnectionStatus>('/api/x/status', { method: 'GET' });
-      return response;
-    },
-    retry: false,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    retry: false
   });
 
   // Fetch X.com folders if connected
@@ -64,10 +60,6 @@ const XIntegrationPanel = () => {
     refetch: refetchFolders 
   } = useQuery({
     queryKey: ['/api/x/folders'],
-    queryFn: async () => {
-      const response = await apiRequest<XFolder[]>('/api/x/folders', { method: 'GET' });
-      return response;
-    },
     enabled: !!connectionStatus?.connected,
     retry: false,
     refetchOnWindowFocus: false
@@ -78,10 +70,6 @@ const XIntegrationPanel = () => {
     data: collections 
   } = useQuery({
     queryKey: ['/api/collections'],
-    queryFn: async () => {
-      const response = await apiRequest<Collection[]>('/api/collections', { method: 'GET' });
-      return response;
-    },
     retry: false,
     refetchOnWindowFocus: false
   });
