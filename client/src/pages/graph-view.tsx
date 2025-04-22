@@ -284,10 +284,11 @@ export default function GraphView() {
     const bookmarkSystemTags: string[] = [];
     const allBookmarkTags = [...bookmarkTags, ...bookmarkSystemTags];
     
-    // Collection filter
-    if (selectedCollectionId && collectionBookmarkIds.length > 0) {
+    // Collection filter - this is critically important for graph filtering
+    if (selectedCollectionId && collectionBookmarkIds && collectionBookmarkIds.length > 0) {
+      // If this bookmark is not in the selected collection, filter it out
       if (!collectionBookmarkIds.includes(bookmark.id)) {
-        return false;
+        return false; // Exclude this bookmark from filtered results
       }
     }
     
@@ -681,7 +682,7 @@ export default function GraphView() {
                 className="cursor-pointer bg-purple-600 hover:bg-purple-700"
                 onClick={() => setSelectedCollectionId(null)}
               >
-                {collections.find(c => c.id === selectedCollectionId)?.name || selectedCollectionId}
+                {collections && collections.find(c => c.id === selectedCollectionId)?.name || selectedCollectionId}
                 <X 
                   className="h-3 w-3 ml-1" 
                   onClick={(e) => {
