@@ -1,8 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { User, LogOut } from "lucide-react";
-import { Link } from "wouter";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,84 +9,78 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Link } from "wouter";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function UserProfile() {
   const { user, logoutMutation } = useAuth();
 
   if (!user) {
     return (
-      <div className="flex items-center justify-between p-2">
-        <div className="flex items-center space-x-2">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-gray-200 text-gray-500">
-              <User className="h-4 w-4" />
-            </AvatarFallback>
-          </Avatar>
-          <Link href="/auth">
-            <Button variant="ghost" size="sm">
-              Sign In
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <Button variant="outline" className="w-full justify-start" asChild>
+        <Link href="/auth">
+          <User className="mr-2 h-4 w-4" />
+          <span>Sign In</span>
+        </Link>
+      </Button>
     );
   }
 
+  // Handle logout
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  // Get user's initials for avatar
+  const getInitials = () => {
+    return user.username.substring(0, 2).toUpperCase();
+  };
+
   return (
-    <div className="p-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="flex items-center justify-between w-full bg-gray-50 hover:bg-gray-100 p-2"
-          >
-            <div className="flex items-center space-x-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  {user.username.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-left">
-                <p className="text-sm font-medium">{user.username}</p>
-                <p className="text-xs text-gray-500 truncate max-w-[120px]">
-                  {user.email}
-                </p>
-              </div>
-            </div>
-            <div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="w-full flex justify-between items-center">
+          <div className="flex items-center">
+            <Avatar className="h-8 w-8 mr-2">
+              <AvatarFallback>{getInitials()}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium">{user.username}</span>
+          </div>
+          <div className="opacity-60">
+            {logoutMutation.isPending ? (
+              <span className="animate-spin">⟳</span>
+            ) : (
               <svg
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  d="M6 8.5L10 4.5L9.1 3.6L6 6.7L2.9 3.6L2 4.5L6 8.5Z"
-                  fill="currentColor"
+                  d="M4 6L8 10L12 6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
               </svg>
-            </div>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <Link href="/settings">
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile Settings</span>
-            </DropdownMenuItem>
-          </Link>
-          <DropdownMenuItem
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>{logoutMutation.isPending ? "Logging out..." : "Logout"}</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+            )}
+          </div>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="start" side="right">
+        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings">User Settings</Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout} disabled={logoutMutation.isPending}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Log out</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

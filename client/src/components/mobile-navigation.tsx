@@ -35,42 +35,58 @@ export function MobileNavigation() {
       {/* Bottom mobile nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
         <div className="flex justify-around">
-          <Link href="/">
-            <a className="flex flex-col items-center py-2 flex-1">
+          <Button 
+            variant="ghost" 
+            className="flex flex-col items-center py-2 h-auto flex-1"
+            asChild
+          >
+            <Link href="/">
               <Home className={cn(
                 "h-6 w-6",
                 location === "/" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">Home</span>
-            </a>
-          </Link>
-          <Link href="/activity">
-            <a className="flex flex-col items-center py-2 flex-1">
+            </Link>
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="flex flex-col items-center py-2 h-auto flex-1"
+            asChild
+          >
+            <Link href="/activity">
               <FileText className={cn(
                 "h-6 w-6",
                 location === "/activity" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">Activity</span>
-            </a>
-          </Link>
-          <Link href="/graph">
-            <a className="flex flex-col items-center py-2 flex-1">
+            </Link>
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="flex flex-col items-center py-2 h-auto flex-1"
+            asChild
+          >
+            <Link href="/graph">
               <Layers className={cn(
                 "h-6 w-6",
                 location === "/graph" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">Graph</span>
-            </a>
-          </Link>
-          <Link href="/ai-chat">
-            <a className="flex flex-col items-center py-2 flex-1">
+            </Link>
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="flex flex-col items-center py-2 h-auto flex-1"
+            asChild
+          >
+            <Link href="/ai-chat">
               <HelpCircle className={cn(
                 "h-6 w-6",
                 location === "/ai-chat" ? "text-primary" : "text-gray-400"
               )} />
               <span className="text-xs text-gray-500">AI Chat</span>
-            </a>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
     </>
