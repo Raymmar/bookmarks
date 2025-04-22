@@ -143,6 +143,10 @@ export class MemStorage implements IStorage {
   // Settings
   private settings: Map<string, Setting>;
   
+  // X.com integration
+  private xCredentials: Map<string, XCredentials>;
+  private xFolders: Map<string, XFolder>;
+  
   // Database access - this is just a stub for the in-memory implementation
   getDb(): typeof db {
     throw new Error("Cannot access database directly in MemStorage mode");
@@ -163,6 +167,8 @@ export class MemStorage implements IStorage {
     this.chatSessions = new Map();
     this.chatMessages = new Map();
     this.settings = new Map();
+    this.xCredentials = new Map();
+    this.xFolders = new Map();
   }
   
   // User methods
@@ -812,6 +818,88 @@ export class MemStorage implements IStorage {
     // Delete the setting
     return this.settings.delete(setting.id);
   }
+  
+  // X.com integration methods
+  async createXCredentials(credentials: InsertXCredentials): Promise<XCredentials> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newCredentials: XCredentials = {
+      ...credentials,
+      id,
+      created_at: now,
+      updated_at: now,
+      last_sync_at: null
+    };
+    
+    this.xCredentials.set(id, newCredentials);
+    return newCredentials;
+  }
+  
+  async getXCredentialsByUserId(userId: string): Promise<XCredentials | undefined> {
+    return Array.from(this.xCredentials.values()).find(
+      credentials => credentials.user_id === userId
+    );
+  }
+  
+  async updateXCredentials(id: string, credentialsUpdate: Partial<XCredentials>): Promise<XCredentials | undefined> {
+    const credentials = this.xCredentials.get(id);
+    if (!credentials) return undefined;
+    
+    const updatedCredentials: XCredentials = {
+      ...credentials,
+      ...credentialsUpdate,
+      updated_at: new Date()
+    };
+    
+    this.xCredentials.set(id, updatedCredentials);
+    return updatedCredentials;
+  }
+  
+  async createXFolder(folder: InsertXFolder): Promise<XFolder> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newFolder: XFolder = {
+      ...folder,
+      id,
+      created_at: now,
+      updated_at: now,
+      last_sync_at: now
+    };
+    
+    this.xFolders.set(id, newFolder);
+    return newFolder;
+  }
+  
+  async getXFoldersByUserId(userId: string): Promise<XFolder[]> {
+    return Array.from(this.xFolders.values()).filter(
+      folder => folder.user_id === userId
+    );
+  }
+  
+  async updateXFolderLastSync(id: string): Promise<XFolder | undefined> {
+    const folder = this.xFolders.get(id);
+    if (!folder) return undefined;
+    
+    const updatedFolder: XFolder = {
+      ...folder,
+      last_sync_at: new Date(),
+      updated_at: new Date()
+    };
+    
+    this.xFolders.set(id, updatedFolder);
+    return updatedFolder;
+  }
+  
+  async findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined> {
+    return Array.from(this.bookmarks.values()).find(
+      bookmark => 
+        bookmark.user_id === userId && 
+        bookmark.external_id === externalId &&
+        bookmark.source === source
+    );
+  }
 }
 
 // PostgreSQL database storage implementation
@@ -1447,6 +1535,79 @@ export class DatabaseStorage implements IStorage {
       .returning({ id: settings.id });
     
     return result.length > 0;
+  }
+  
+  // X.com integration
+  async createXCredentials(credentials: InsertXCredentials): Promise<XCredentials> {
+    const [newCredentials] = await db.insert(xCredentials)
+      .values({
+        ...credentials,
+        created_at: new Date(),
+        updated_at: new Date(),
+        last_sync_at: null
+      })
+      .returning();
+    return newCredentials;
+  }
+  
+  async getXCredentialsByUserId(userId: string): Promise<XCredentials | undefined> {
+    const [credentials] = await db.select()
+      .from(xCredentials)
+      .where(eq(xCredentials.user_id, userId));
+    return credentials;
+  }
+  
+  async updateXCredentials(id: string, credentialsUpdate: Partial<XCredentials>): Promise<XCredentials | undefined> {
+    const [updatedCredentials] = await db.update(xCredentials)
+      .set({
+        ...credentialsUpdate,
+        updated_at: new Date()
+      })
+      .where(eq(xCredentials.id, id))
+      .returning();
+    return updatedCredentials;
+  }
+  
+  async createXFolder(folder: InsertXFolder): Promise<XFolder> {
+    const [newFolder] = await db.insert(xFolders)
+      .values({
+        ...folder,
+        created_at: new Date(),
+        updated_at: new Date(),
+        last_sync_at: new Date()
+      })
+      .returning();
+    return newFolder;
+  }
+  
+  async getXFoldersByUserId(userId: string): Promise<XFolder[]> {
+    return await db.select()
+      .from(xFolders)
+      .where(eq(xFolders.user_id, userId));
+  }
+  
+  async updateXFolderLastSync(id: string): Promise<XFolder | undefined> {
+    const [updatedFolder] = await db.update(xFolders)
+      .set({
+        last_sync_at: new Date(),
+        updated_at: new Date()
+      })
+      .where(eq(xFolders.id, id))
+      .returning();
+    return updatedFolder;
+  }
+  
+  async findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined> {
+    const [bookmark] = await db.select()
+      .from(bookmarks)
+      .where(
+        and(
+          eq(bookmarks.user_id, userId),
+          eq(bookmarks.external_id, externalId),
+          eq(bookmarks.source, source)
+        )
+      );
+    return bookmark;
   }
 }
 
