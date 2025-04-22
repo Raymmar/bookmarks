@@ -587,9 +587,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tags API endpoints
   app.get("/api/tags", async (req, res) => {
     try {
-      const tags = await storage.getTags();
+      // Get user ID if authenticated or undefined for non-authenticated users
+      const userId = req.isAuthenticated() ? (req.user as Express.User).id : undefined;
+      
+      // Pass user ID to filter tags by user's bookmarks
+      const tags = await storage.getTags(userId);
       res.json(tags);
     } catch (error) {
+      console.error("Error retrieving tags:", error);
       res.status(500).json({ error: "Failed to retrieve tags" });
     }
   });
