@@ -68,16 +68,56 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       const urlCheckResult = await apiRequest("POST", "/api/url/normalize", { url });
       
       if (urlCheckResult.exists) {
-        toast({
-          title: "URL already exists",
-          description: "This URL has already been bookmarked",
-          variant: "default",
-        });
-        
-        // Close dialog
-        onOpenChange(false);
-        setIsSubmitting(false);
-        return;
+        if (urlCheckResult.existingForUser) {
+          // URL exists for this user - update it with new info
+          try {
+            // Get existing bookmark
+            const existingBookmark = await apiRequest("GET", `/api/bookmarks/${urlCheckResult.existingBookmarkId}`);
+            
+            // Update the bookmark with new information
+            await apiRequest("PATCH", `/api/bookmarks/${urlCheckResult.existingBookmarkId}`, {
+              description: notes ? notes : existingBookmark.description,
+              tags: selectedTags.length > 0 ? selectedTags : existingBookmark.user_tags,
+            });
+            
+            // Invalidate queries to refresh the data
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+            queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${urlCheckResult.existingBookmarkId}/tags`] });
+            
+            // Show success message
+            toast({
+              title: "Bookmark updated",
+              description: "Your existing bookmark has been updated with new information",
+              variant: "default",
+            });
+            
+            // Close dialog and focus on updated bookmark
+            onOpenChange(false);
+            setIsSubmitting(false);
+            
+            // Use the bookmark detail panel to show the updated bookmark
+            if (onBookmarkAdded) {
+              onBookmarkAdded();
+            }
+            
+            // Dispatch a custom event to show the bookmark in detail view
+            window.dispatchEvent(new CustomEvent('showBookmarkDetail', { 
+              detail: { bookmarkId: urlCheckResult.existingBookmarkId } 
+            }));
+            
+            return;
+          } catch (error) {
+            console.error("Error updating existing bookmark:", error);
+            // Continue to regular bookmark creation as fallback
+          }
+        } else {
+          // URL exists but not for this user - inform them
+          toast({
+            title: "URL already exists",
+            description: "This URL has already been bookmarked by someone else",
+            variant: "default",
+          });
+        }
       }
       
       // Create the bookmark using our mutation hook - this will handle optimistic updates

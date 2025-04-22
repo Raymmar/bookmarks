@@ -58,6 +58,47 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     setBookmark(initialBookmark);
   }, [initialBookmark]);
   
+  // Listen for the custom showBookmarkDetail event
+  useEffect(() => {
+    const handleShowBookmarkDetail = async (event: CustomEvent) => {
+      try {
+        const bookmarkId = event.detail?.bookmarkId;
+        if (!bookmarkId) return;
+        
+        console.log(`Custom event received to show bookmark: ${bookmarkId}`);
+        
+        // Fetch the updated bookmark
+        const { apiRequest } = await import('@/lib/queryClient');
+        const updatedBookmark = await apiRequest("GET", `/api/bookmarks/${bookmarkId}`);
+        
+        if (updatedBookmark) {
+          // Update the bookmark state with the latest data
+          setBookmark(updatedBookmark);
+          
+          // Fetch the tags for this bookmark
+          const fetchedTags = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/tags`);
+          setTags(fetchedTags || []);
+          
+          toast({
+            title: "Bookmark updated",
+            description: "The bookmark has been updated with your new information",
+            variant: "default",
+          });
+        }
+      } catch (error) {
+        console.error("Error handling showBookmarkDetail event:", error);
+      }
+    };
+    
+    // Add event listener for the custom event
+    window.addEventListener('showBookmarkDetail', handleShowBookmarkDetail as EventListener);
+    
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.removeEventListener('showBookmarkDetail', handleShowBookmarkDetail as EventListener);
+    };
+  }, [toast]);
+  
   // Fetch tags for this bookmark
   useEffect(() => {
     if (bookmark) {
