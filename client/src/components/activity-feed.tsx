@@ -63,12 +63,10 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                     {getActivityTitle(activity)}
                     {" "}
                     {activity.bookmark_id && activity.bookmark_title ? (
-                      <Link href={`/bookmark/${activity.bookmark_id}`} className="text-primary hover:underline">
+                      <Link href={`/graph?bookmarkId=${activity.bookmark_id}`} className="text-primary hover:underline">
                         {activity.bookmark_title}
                       </Link>
-                    ) : (
-                      <span className="text-gray-600">Unknown bookmark</span>
-                    )}
+                    ) : null}
                   </p>
                   
                   {activity.content && (
