@@ -17,9 +17,10 @@ interface AddBookmarkDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onBookmarkAdded?: () => void;
+  selectedCollectionId?: string | null;
 }
 
-export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBookmarkDialogProps) {
+export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded, selectedCollectionId }: AddBookmarkDialogProps) {
   const [url, setUrl] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -51,8 +52,22 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
   useEffect(() => {
     if (open) {
       fetchLatestData();
+      
+      // Set the initial collection ID from prop or localStorage
+      const savedCollectionId = localStorage.getItem('selectedCollectionId');
+      
+      if (selectedCollectionId) {
+        // If a collection is selected in the sidebar, use that
+        setCollectionId(selectedCollectionId);
+      } else if (savedCollectionId) {
+        // Otherwise, try to use the saved collection from localStorage
+        setCollectionId(savedCollectionId);
+      }
+      
+      // Dispatch an event to notify that the add bookmark dialog was opened
+      window.dispatchEvent(new CustomEvent('openAddBookmarkDialog'));
     }
-  }, [open]);
+  }, [open, selectedCollectionId]);
 
   // Use our bookmark mutation hook for optimistic updates
   const { createBookmark } = useBookmarkMutations();

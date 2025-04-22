@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
@@ -10,11 +10,15 @@ import {
   Settings, 
   User, 
   LogOut,
-  Plus
+  Plus,
+  FolderOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
+import { CreateCollectionDialog } from "@/components/ui/create-collection-dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { useCollections } from "@/hooks/use-collection-queries";
+import { queryClient } from "@/lib/queryClient";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 
 interface SidebarNavigationProps {
   className?: string;
@@ -32,7 +37,71 @@ interface SidebarNavigationProps {
 export function SidebarNavigation({ className }: SidebarNavigationProps) {
   const [location] = useLocation();
   const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
+  const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const { user, logoutMutation } = useAuth();
+  const { toast } = useToast();
+  
+  // Fetch collections
+  const { data: collections = [], isLoading: collectionsLoading } = useCollections();
+
+  // Handle collection selection
+  const handleCollectionClick = (collectionId: string) => {
+    if (selectedCollectionId === collectionId) {
+      // If clicking the same collection, deselect it
+      setSelectedCollectionId(null);
+      // Clear the collection filter by dispatching an event
+      window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId: null } }));
+    } else {
+      // Select the collection
+      setSelectedCollectionId(collectionId);
+      // Filter bookmarks by collection by dispatching an event
+      window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId } }));
+    }
+  };
+
+  // Keep the selected collection available for new bookmarks
+  useEffect(() => {
+    // Set up a listener for the add bookmark dialog
+    const handleAddBookmarkOpen = () => {
+      // The bookmark dialog will read this from localStorage
+      if (selectedCollectionId) {
+        localStorage.setItem('selectedCollectionId', selectedCollectionId);
+      } else {
+        localStorage.removeItem('selectedCollectionId');
+      }
+    };
+    
+    window.addEventListener('openAddBookmarkDialog', handleAddBookmarkOpen);
+    return () => {
+      window.removeEventListener('openAddBookmarkDialog', handleAddBookmarkOpen);
+    };
+  }, [selectedCollectionId]);
+
+  // Add collection event listener for when a collection is created
+  useEffect(() => {
+    const handleCollectionCreated = (event: any) => {
+      if (event.detail && event.detail.collectionId) {
+        // Refresh collections
+        queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+        
+        // Set the newly created collection as selected
+        setSelectedCollectionId(event.detail.collectionId);
+        
+        // Show success toast
+        toast({
+          title: "Collection created",
+          description: "Your new collection is now available",
+          variant: "default"
+        });
+      }
+    };
+    
+    window.addEventListener('collectionCreated', handleCollectionCreated);
+    return () => {
+      window.removeEventListener('collectionCreated', handleCollectionCreated);
+    };
+  }, [toast]);
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -42,6 +111,14 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   const getUserInitials = () => {
     if (!user) return "";
     return user.username.slice(0, 2).toUpperCase();
+  };
+  
+  // Generate a random color for a collection
+  const getCollectionColor = (id: string) => {
+    const colors = ['text-blue-500 fill-blue-500', 'text-green-500 fill-green-500', 'text-yellow-500 fill-yellow-500', 
+                    'text-purple-500 fill-purple-500', 'text-pink-500 fill-pink-500', 'text-indigo-500 fill-indigo-500'];
+    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
   };
 
   return (
@@ -117,26 +194,58 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
           
           {user && (
             <div className="mb-6">
-              <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Collections</h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xs uppercase font-semibold text-gray-500">Collections</h2>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0"
+                  onClick={() => setCreateCollectionOpen(true)}
+                  title="Create new collection"
+                >
+                  <Plus className="h-4 w-4 text-gray-500" />
+                </Button>
+              </div>
+              
               <ul className="space-y-1">
-                <li>
-                  <div className="flex items-center px-2 py-2 text-sm rounded-lg text-gray-700 hover:bg-gray-100 cursor-pointer">
-                    <Circle className="h-4 w-4 mr-2 text-yellow-500 fill-yellow-500" />
-                    Research Project
-                  </div>
-                </li>
-                <li>
-                  <div className="flex items-center px-2 py-2 text-sm rounded-lg text-gray-700 hover:bg-gray-100 cursor-pointer">
-                    <Circle className="h-4 w-4 mr-2 text-green-500 fill-green-500" />
-                    Web Development
-                  </div>
-                </li>
-                <li>
-                  <div className="flex items-center px-2 py-2 text-sm rounded-lg text-gray-700 hover:bg-gray-100 cursor-pointer">
-                    <Circle className="h-4 w-4 mr-2 text-blue-500 fill-blue-500" />
-                    Machine Learning
-                  </div>
-                </li>
+                {collections.length === 0 ? (
+                  <li className="text-sm text-gray-500 py-1 px-2 italic">
+                    {collectionsLoading ? 'Loading collections...' : 'No collections yet'}
+                  </li>
+                ) : (
+                  collections.map(collection => (
+                    <li key={collection.id}>
+                      <div 
+                        className={cn(
+                          "flex items-center px-2 py-2 text-sm rounded-lg cursor-pointer",
+                          selectedCollectionId === collection.id 
+                            ? "bg-primary/10 text-primary font-medium" 
+                            : "text-gray-700 hover:bg-gray-100"
+                        )}
+                        onClick={() => handleCollectionClick(collection.id)}
+                      >
+                        <Circle className={cn("h-4 w-4 mr-2", getCollectionColor(collection.id))} />
+                        <span className="truncate">{collection.name}</span>
+                        {!collection.is_public && (
+                          <span className="ml-1 text-xs text-gray-500">(Private)</span>
+                        )}
+                      </div>
+                    </li>
+                  ))
+                )}
+                
+                {/* Create collection hint if no collections */}
+                {collections.length === 0 && !collectionsLoading && (
+                  <li>
+                    <button 
+                      className="flex items-center px-2 py-2 text-sm rounded-lg text-blue-500 hover:bg-blue-50 cursor-pointer w-full text-left"
+                      onClick={() => setCreateCollectionOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2 text-blue-500" />
+                      Create your first collection
+                    </button>
+                  </li>
+                )}
               </ul>
             </div>
           )}
@@ -198,6 +307,19 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
       <AddBookmarkDialog
         open={addBookmarkOpen}
         onOpenChange={setAddBookmarkOpen}
+        selectedCollectionId={selectedCollectionId}
+      />
+      
+      <CreateCollectionDialog
+        open={createCollectionOpen}
+        onOpenChange={setCreateCollectionOpen}
+        onCollectionCreated={(collectionId) => {
+          setSelectedCollectionId(collectionId);
+          // Dispatch event to notify that a collection was created
+          window.dispatchEvent(new CustomEvent('collectionCreated', { 
+            detail: { collectionId } 
+          }));
+        }}
       />
     </nav>
   );

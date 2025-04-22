@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
 import { ForceDirectedGraph } from "@/components/force-directed-graph";
 import { ActivityFeed } from "@/components/activity-feed";
-import { SearchX, Grid, List, Network } from "lucide-react";
+import { SearchX, Grid, List, Network, FolderOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCollections } from "@/hooks/use-collection-queries";
 import { Bookmark } from "@shared/types";
 
 export default function Home() {
