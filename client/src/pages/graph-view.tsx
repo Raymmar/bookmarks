@@ -530,10 +530,26 @@ export default function GraphView() {
             aria-label={tagDrawerOpen ? "Close tag drawer" : "Open tag drawer"}
             className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
           >
-            {tagDrawerOpen ? 
-              <ChevronDown className="h-4 w-4 text-gray-700" /> : 
-              <ChevronUp className="h-4 w-4 text-gray-700" />
-            }
+            {(() => {
+              // Calculate remaining non-selected tags count if drawer is closed
+              if (!tagDrawerOpen) {
+                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
+                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
+                if (remainingTagsCount > 0) {
+                  return (
+                    <div className="flex items-center">
+                      <span className="text-xs mr-1 font-medium">+{remainingTagsCount}</span>
+                      <ChevronUp className="h-4 w-4 text-gray-700" />
+                    </div>
+                  );
+                }
+              }
+              
+              // Default icons based on drawer state
+              return tagDrawerOpen ? 
+                <ChevronDown className="h-4 w-4 text-gray-700" /> : 
+                <ChevronUp className="h-4 w-4 text-gray-700" />;
+            })()}
           </button>
           
           {/* Bookmark filter indicator if a bookmark is selected */}
@@ -669,27 +685,7 @@ export default function GraphView() {
               </Badge>
             )}
             
-            {/* Show tag count badge when drawer is closed */}
-            {!tagDrawerOpen && (
-              (() => {
-                // Calculate remaining non-selected tags for display
-                const remainingTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - 
-                                           popularTags.filter(tag => !selectedTags.includes(tag)).length;
-                
-                if (remainingTagsCount > 0) {
-                  return (
-                    <Badge 
-                      variant="secondary"
-                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                      onClick={toggleTagDrawer}
-                    >
-                      +{remainingTagsCount} more tags
-                    </Badge>
-                  );
-                }
-                return null;
-              })()
-            )}
+            {/* Tag count badge has been moved to the toggle button */}
           </div>
         </div>
       </div>
