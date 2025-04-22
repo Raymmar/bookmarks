@@ -1457,5 +1457,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get collections a bookmark belongs to
+  app.get("/api/bookmarks/:bookmarkId/collections", async (req, res) => {
+    try {
+      const { bookmarkId } = req.params;
+      
+      // Check if bookmark exists
+      const bookmark = await storage.getBookmark(bookmarkId);
+      
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      // Get collections for this bookmark
+      const collections = await storage.getCollectionsByBookmarkId(bookmarkId);
+      
+      // Filter out private collections if user is not authenticated or not the owner
+      const filteredCollections = collections.filter(collection => {
+        if (collection.is_public) {
+          return true;
+        }
+        
+        if (req.isAuthenticated()) {
+          return collection.user_id === (req.user as Express.User).id;
+        }
+        
+        return false;
+      });
+      
+      res.json(filteredCollections);
+    } catch (error) {
+      console.error("Error retrieving bookmark collections:", error);
+      res.status(500).json({ error: "Failed to retrieve bookmark collections" });
+    }
+  });
+
   return httpServer;
 }

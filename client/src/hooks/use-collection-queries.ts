@@ -65,6 +65,19 @@ export function useMultiCollectionBookmarksForGraph(ids: string[]): UseQueryResu
   });
 }
 
+// Hook for fetching collections a bookmark belongs to
+export function useBookmarkCollections(bookmarkId: string): UseQueryResult<Collection[], Error> {
+  return useQuery({
+    queryKey: ['/api/bookmarks', bookmarkId, 'collections'],
+    queryFn: async () => {
+      if (!bookmarkId) return [];
+      const collections = await apiRequest('GET', `/api/bookmarks/${bookmarkId}/collections`);
+      return collections;
+    },
+    enabled: !!bookmarkId // Only run query if bookmarkId is provided
+  });
+}
+
 // Hook for collection mutations (create, update, delete)
 export function useCollectionMutations() {
   // Create a new collection
@@ -122,6 +135,8 @@ export function useCollectionMutations() {
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/collections/graph', variables.collectionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId] });
+      // Invalidate bookmark collections query
+      queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId, 'collections'] });
     }
   });
 
@@ -136,6 +151,8 @@ export function useCollectionMutations() {
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/collections/graph', variables.collectionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId] });
+      // Invalidate bookmark collections query
+      queryClient.invalidateQueries({ queryKey: ['/api/bookmarks', variables.bookmarkId, 'collections'] });
     }
   });
 
