@@ -504,9 +504,14 @@ export class MemStorage implements IStorage {
         .filter(tag => tagIds.includes(tag.id));
     }
     
-    // If no userId provided (user not logged in), only return tags for public bookmarks
-    // For now, we don't have a concept of public bookmarks, so we'll just return an empty array
-    return [];
+    // If no userId provided (user not logged in), still return tags associated with bookmarks
+    // Get all tag IDs from bookmark_tags relationships
+    const allBookmarkTagEntries = Array.from(this.bookmarkTags.values());
+    const allTagIds = [...new Set(allBookmarkTagEntries.map(bt => bt.tag_id))];
+    
+    // Return only tags that are associated with bookmarks
+    return Array.from(this.tags.values())
+      .filter(tag => allTagIds.includes(tag.id));
   }
   
   async getTag(id: string): Promise<Tag | undefined> {
@@ -1093,9 +1098,17 @@ export class DatabaseStorage implements IStorage {
       return userTags.map(result => result.tag);
     }
     
-    // If no userId provided (user not logged in), only return tags for public bookmarks
-    // For now, we don't have a concept of public bookmarks, so we'll just return an empty array
-    return [];
+    // If no userId provided (user not logged in), return tags for all bookmarks
+    // This ensures non-authenticated users still see relevant tags for filtering
+    const allTags = await db
+      .select({
+        tag: tags
+      })
+      .from(tags)
+      .innerJoin(bookmarkTags, eq(bookmarkTags.tag_id, tags.id));
+    
+    // Extract tag objects from the join result
+    return allTags.map(result => result.tag);
   }
   
   async getTag(id: string): Promise<Tag | undefined> {
