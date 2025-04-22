@@ -276,6 +276,13 @@ export default function GraphView() {
     bookmarksWithTagsMap.set(bookmark.id, bookmark);
   });
   
+  // Debug logs for collection filtering
+  if (selectedCollectionId) {
+    console.log(`Collection filter active: ${selectedCollectionId}`);
+    console.log(`Collection bookmark IDs: ${JSON.stringify(collectionBookmarkIds)}`);
+    console.log(`Total bookmarks before filtering: ${bookmarks.length}`);
+  }
+
   // Filter bookmarks based on search query, selected tags, domain, and collection
   const filteredBookmarkIds = bookmarks.filter(bookmark => {
     // Get this bookmark's tags from our map
@@ -287,7 +294,8 @@ export default function GraphView() {
     // Collection filter - this is critically important for graph filtering
     if (selectedCollectionId && collectionBookmarkIds && collectionBookmarkIds.length > 0) {
       // If this bookmark is not in the selected collection, filter it out
-      if (!collectionBookmarkIds.includes(bookmark.id)) {
+      const isInCollection = collectionBookmarkIds.includes(bookmark.id);
+      if (!isInCollection) {
         return false; // Exclude this bookmark from filtered results
       }
     }
@@ -350,6 +358,12 @@ export default function GraphView() {
   const filteredBookmarks = bookmarksWithTags.filter(bookmark => 
     filteredBookmarkIds.includes(bookmark.id)
   );
+  
+  // Debug logs for filtered bookmarks
+  if (selectedCollectionId) {
+    console.log(`Total bookmarks after filtering: ${filteredBookmarks.length}`);
+    console.log(`Filtered bookmarks IDs: ${JSON.stringify(filteredBookmarks.map(b => b.id))}`);
+  }
   
   // Sort bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {

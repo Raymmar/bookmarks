@@ -43,6 +43,10 @@ export function ForceDirectedGraph({
   selectedBookmarkId,
   visibleNodeTypes = ["bookmark", "domain", "tag"] 
 }: ForceDirectedGraphProps): JSX.Element {
+  
+  // Debug logs for filtered bookmarks received by the graph component
+  console.log(`[Graph Component] Received ${bookmarks.length} bookmarks`);
+  console.log(`[Graph Component] First few bookmark IDs: ${bookmarks.slice(0, 3).map(b => b.id).join(', ')}`);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
