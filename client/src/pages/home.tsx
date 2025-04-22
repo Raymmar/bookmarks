@@ -69,6 +69,13 @@ export default function Home() {
   // Choose which bookmarks to display based on whether a collection is selected
   const bookmarksToFilter = selectedCollectionId ? bookmarksInCollection : bookmarks;
   
+  // Log for debugging
+  useEffect(() => {
+    if (selectedCollectionId) {
+      console.log(`Filtering for collection ${selectedCollectionId}: ${bookmarksInCollection.length} bookmarks found`);
+    }
+  }, [selectedCollectionId, bookmarksInCollection]);
+  
   // Filter bookmarks by search query
   const filteredBookmarks = bookmarksToFilter.filter(bookmark => {
     if (!searchQuery) return true;
@@ -400,7 +407,9 @@ export default function Home() {
                   )}
                   
                   <div className="h-80 border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    {/* Add a key based on the collection ID to force re-render of the graph */}
                     <ForceDirectedGraph 
+                      key={`graph-${selectedCollectionId || 'all'}`}
                       bookmarks={sortedBookmarks} 
                       insightLevel={insightLevel}
                       onNodeClick={(id) => setSelectedBookmarkId(id)}
