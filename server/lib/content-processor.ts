@@ -122,13 +122,13 @@ export async function generateInsights(
           systemPrompt = customPrompt.value;
           console.log("Retrieved custom summary prompt from storage for insights generation");
         } else {
-          // If no custom prompt is available, use a minimal default
-          systemPrompt = "Analyze the content and provide insights.";
+          // If no custom prompt is available, use a minimal default with JSON format
+          systemPrompt = "Analyze the content and provide insights. Return your analysis in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
           console.log("No custom summary prompt found, using minimal default for insights");
         }
       } catch (err) {
-        // If error retrieving, use a minimal default
-        systemPrompt = "Analyze the content and provide insights.";
+        // If error retrieving, use a minimal default with JSON format
+        systemPrompt = "Analyze the content and provide insights. Return your analysis in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
         console.warn("Error retrieving summary prompt, using minimal default for insights:", err);
       }
     }
@@ -293,13 +293,13 @@ export async function generateTags(content: string, url?: string, customSystemPr
           systemPrompt = customPrompt.value;
           console.log("Retrieved custom tagging prompt from storage");
         } else {
-          // If no custom prompt is available, use a minimal default
-          systemPrompt = "Extract tags from the content.";
+          // If no custom prompt is available, use a minimal default with JSON format
+          systemPrompt = "Extract tags from the content. Return your tags in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
           console.log("No custom tagging prompt found, using minimal default");
         }
       } catch (err) {
-        // If error retrieving, use a minimal default
-        systemPrompt = "Extract tags from the content.";
+        // If error retrieving, use a minimal default with JSON format
+        systemPrompt = "Extract tags from the content. Return your tags in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
         console.warn("Error retrieving tagging prompt, using minimal default:", err);
       }
     }
@@ -408,12 +408,12 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
           console.log("Retrieved custom summary prompt from storage");
         } else {
           // If no custom prompt is available, use a minimal default
-          systemPrompt = "Summarize the content.";
+          systemPrompt = "Summarize the content in a clear, concise way that captures the main points.";
           console.log("No custom summary prompt found, using minimal default");
         }
       } catch (err) {
         // If error retrieving, use a minimal default
-        systemPrompt = "Summarize the content.";
+        systemPrompt = "Summarize the content in a clear, concise way that captures the main points.";
         console.warn("Error retrieving summary prompt, using minimal default:", err);
       }
     }
