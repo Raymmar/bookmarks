@@ -44,6 +44,24 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
+  
+  // Listen for collection filter events from other components
+  useEffect(() => {
+    const handleFilterByCollection = (event: any) => {
+      console.log('SIDEBAR: filterByCollection event received:', event.detail);
+      
+      if (event.detail && 'collectionId' in event.detail) {
+        const newCollectionId = event.detail.collectionId;
+        console.log('SIDEBAR: Setting selectedCollectionId to:', newCollectionId);
+        setSelectedCollectionId(newCollectionId);
+      }
+    };
+    
+    window.addEventListener('filterByCollection', handleFilterByCollection);
+    return () => {
+      window.removeEventListener('filterByCollection', handleFilterByCollection);
+    };
+  }, []);
 
   // Handle collection selection
   const handleCollectionClick = (collectionId: string) => {

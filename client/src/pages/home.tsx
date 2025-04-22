@@ -69,7 +69,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('filterByCollection', handleFilterByCollection);
     };
-  }, [queryClient, bookmarks.length, bookmarksInCollection]);
+  }, [queryClient, selectedCollectionId]); // Only depend on selectedCollectionId, not bookmarksInCollection
 
   const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
@@ -106,9 +106,13 @@ export default function Home() {
         const bookmarkIds = result.map((item: any) => item.bookmark_id);
         console.log(`Found ${bookmarkIds.length} bookmarks in collection ${selectedCollectionId}, IDs:`, bookmarkIds);
         
+        // Get all bookmarks first to avoid timing issues
+        const allBookmarks = await apiRequest('GET', '/api/bookmarks');
+        console.log(`Got ${allBookmarks.length} total bookmarks to filter from`);
+        
         // Map to actual bookmark objects
-        const filteredBookmarks = bookmarks.filter(bookmark => bookmarkIds.includes(bookmark.id));
-        console.log(`Filtered to ${filteredBookmarks.length} bookmark objects from all ${bookmarks.length} bookmarks`);
+        const filteredBookmarks = allBookmarks.filter((bookmark: any) => bookmarkIds.includes(bookmark.id));
+        console.log(`Filtered to ${filteredBookmarks.length} bookmark objects from all ${allBookmarks.length} bookmarks`);
         
         // This is critical information
         console.log(`--- COLLECTION FILTER RESULT: ${filteredBookmarks.length} bookmarks ---`);
