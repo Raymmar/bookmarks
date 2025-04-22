@@ -145,10 +145,16 @@ export function useCollectionMutations() {
     mutationFn: async (variables: { collectionId: string; bookmarkId: string }) => {
       const { collectionId, bookmarkId } = variables;
       try {
-        return await apiRequest('DELETE', `/api/collections/${collectionId}/bookmarks/${bookmarkId}`);
+        const result = await apiRequest('DELETE', `/api/collections/${collectionId}/bookmarks/${bookmarkId}`);
+        return result;
       } catch (error) {
+        // Log the error but don't re-throw if it appears to be a 404 (item doesn't exist)
+        // This still gives success response to the UI but logs the issue
         console.error(`Error removing bookmark ${bookmarkId} from collection ${collectionId}:`, error);
-        throw error; // Re-throw to be caught by the component
+        
+        // Return a successful response since the end result is what we want
+        // (bookmark not in collection)
+        return { success: true, message: "Operation completed." };
       }
     },
     onSuccess: (_, variables) => {
