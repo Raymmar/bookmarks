@@ -531,6 +531,17 @@ export default function GraphView() {
                   />
                 </Badge>
               ))}
+              
+              {/* Clear All button when multiple tags are selected */}
+              {selectedTags.length > 1 && (
+                <Badge 
+                  variant="secondary"
+                  className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center ml-1"
+                  onClick={() => setSelectedTags([])}
+                >
+                  Clear All <X className="h-3 w-3 ml-1" />
+                </Badge>
+              )}
             </div>
           )}
           
