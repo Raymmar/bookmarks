@@ -395,49 +395,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/activities", async (req, res) => {
     try {
-      // We'll support both old and new format
+      // Support both new format (action/entity_type) and old format (type/content)
+      // but map everything to match the existing database schema
       const { type, content, action, entity_type, entity_id, details, bookmark_id, bookmark_title } = req.body;
       
-      // Determine which format we're using - new or old
-      const isNewFormat = action !== undefined;
-      const isOldFormat = type !== undefined;
-      
-      if (!isNewFormat && !isOldFormat) {
+      // Determine which format we're using - new or old and validate required fields
+      if (!type && !action) {
         return res.status(400).json({ error: "Either 'type' or 'action' is required" });
       }
       
-      // Create activity data with all the fields we need
-      let activityData: any = {};
-      
-      // Handle the old format (type/content)
-      if (isOldFormat) {
-        activityData = {
-          // Map old format to new schema fields
-          type: type,
-          content: content || null,
-          // Also provide values for the new schema fields
-          action: type, // Use type as action 
-          entity_type: "bookmark", // Default entity type
-          details: content || null
-        };
-      }
-      
-      // Handle the new format (action/entity_type)
-      if (isNewFormat) {
-        activityData = {
-          // Map new format to old schema fields for backward compatibility
-          type: action,
-          content: details || null,
-          // Keep the new schema fields
-          action,
-          entity_type: entity_type || "user",
-          details: details || null
-        };
+      // Create activity data compatible with the current database schema
+      let activityData: any = {
+        // Use type directly or map action to type if type is missing
+        type: type || action,
         
-        if (entity_id) {
-          activityData.entity_id = entity_id;
-        }
-      }
+        // Use content directly or map details to content if content is missing
+        content: content || details || null,
+        
+        // Default tags array
+        tags: []
+      };
       
       // Add optional fields if provided
       if (bookmark_id) {
@@ -452,6 +429,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.isAuthenticated()) {
         activityData.user_id = req.user.id;
       }
+      
+      // Store the current timestamp for the activity
+      activityData.timestamp = new Date();
       
       const activity = await storage.createActivity(activityData);
       res.status(201).json(activity);
