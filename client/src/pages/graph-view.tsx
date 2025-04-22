@@ -524,16 +524,17 @@ export default function GraphView() {
         
         {/* Filters display at the bottom of the graph area */}
         <div className="relative flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
-          {/* Absolute positioned close button when drawer is open - positioned relative to parent with padding */}
-          {tagDrawerOpen && (
-            <button
-              onClick={toggleTagDrawer}
-              aria-label="Close tag drawer"
-              className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
-            >
-              <ChevronDown className="h-4 w-4 text-gray-700" />
-            </button>
-          )}
+          {/* Absolute positioned toggle button - always visible and positioned relative to parent with padding */}
+          <button
+            onClick={toggleTagDrawer}
+            aria-label={tagDrawerOpen ? "Close tag drawer" : "Open tag drawer"}
+            className="absolute top-0 right-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1 z-10"
+          >
+            {tagDrawerOpen ? 
+              <ChevronDown className="h-4 w-4 text-gray-700" /> : 
+              <ChevronUp className="h-4 w-4 text-gray-700" />
+            }
+          </button>
           
           {/* Bookmark filter indicator if a bookmark is selected */}
           {selectedBookmarkId && (
@@ -668,7 +669,7 @@ export default function GraphView() {
               </Badge>
             )}
             
-            {/* Show "more" badge when drawer is closed */}
+            {/* Show tag count badge when drawer is closed */}
             {!tagDrawerOpen && (
               (() => {
                 // Calculate remaining non-selected tags for display
@@ -682,7 +683,7 @@ export default function GraphView() {
                       className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
                       onClick={toggleTagDrawer}
                     >
-                      +{remainingTagsCount} <ChevronUp className="h-3 w-3 ml-1" />
+                      +{remainingTagsCount} more tags
                     </Badge>
                   );
                 }
