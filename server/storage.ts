@@ -19,6 +19,9 @@ import { eq, desc, sql, inArray } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
+  // Database access
+  getDb(): typeof db;
+  
   // Users
   getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
