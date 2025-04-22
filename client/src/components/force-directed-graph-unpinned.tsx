@@ -277,6 +277,18 @@ export function ForceDirectedGraph({
     const zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 3])
       .on("zoom", (event) => {
+        // Track user-initiated zoom events
+        if (event.sourceEvent) {
+          // Only consider direct user interaction (mouse/touch)
+          if (event.sourceEvent.type === 'wheel' || 
+              event.sourceEvent.type === 'mousedown' || 
+              event.sourceEvent.type === 'touchstart' ||
+              event.sourceEvent.type === 'dblclick') {
+            userInteractedRef.current = true;
+            // console.log("User manually zoomed or panned");
+          }
+        }
+        
         const g = svg.select("g.zoom-container");
         g.attr("transform", event.transform);
       });
@@ -736,7 +748,11 @@ export function ForceDirectedGraph({
   }, []);
   
   // Update graph data without recreating the simulation
-  const updateGraphData = useCallback(() => {
+  // Track if user has manually interacted with zoom
+  const userInteractedRef = useRef<boolean>(false);
+  
+  // Modified updateGraphData with autocenter parameter
+  const updateGraphData = useCallback((shouldAutoCenter: boolean = false) => {
     if (!simulationRef.current || !svgRef.current || !containerRef.current) return;
     
     // Generate new graph data, passing selectedBookmarkId for focused view
@@ -946,10 +962,10 @@ export function ForceDirectedGraph({
     // Restart with a higher alpha for better stabilization
     simulationRef.current.alpha(0.5).restart();
     
-    // Only center the graph if no node is currently selected
-    // This avoids competing with manual node selection
+    // Only center the graph if explicitly requested, no node is selected,
+    // and the user hasn't manually interacted with zoom
     setTimeout(() => {
-      if (!selectedNode) {
+      if (shouldAutoCenter && !selectedNode && !userInteractedRef.current) {
         centerGraph(filteredNodes);
       }
     }, 300);
@@ -994,13 +1010,15 @@ export function ForceDirectedGraph({
             
             // Use the standard update method rather than applying data directly
             // This avoids DOM manipulation issues and ensures proper graph update
-            updateGraphData();
+            // Don't auto-center - respect user's zoom level
+            updateGraphData(false);
           }, 200); // Wait a bit longer for server data to update
         } else {
           // Standard update for non-focused views
           setTimeout(() => {
             console.log("Refreshing graph for tag change");
-            updateGraphData();
+            // Don't auto-center - respect user's zoom level
+            updateGraphData(false);
           }, 100);
         }
       }
@@ -1011,8 +1029,16 @@ export function ForceDirectedGraph({
       // Skip if there is no graph data
       if (!simulationRef.current || !svgRef.current || !containerRef.current || !zoomBehaviorRef.current) return;
       
+      const customEvent = event as CustomEvent;
+      const source = customEvent.detail?.source || 'unknown';
+      console.log(`Centering full graph triggered from: ${source}`);
+      
       // When event is received, reset the selection state
       setSelectedNode(null);
+      
+      // Reset the user interaction flag - this is an explicit request to reset the view
+      // so we should honor it regardless of prior manual zoom interactions
+      userInteractedRef.current = false;
       
       // Reset visual styling of nodes and links to their default state
       const svg = d3.select(svgRef.current);
@@ -1064,6 +1090,7 @@ export function ForceDirectedGraph({
       // After reset, center on all nodes to ensure proper layout
       if (simulationRef.current.nodes().length > 0) {
         setTimeout(() => {
+          // Always center the graph when explicitly requested regardless of user zoom state
           centerGraph(simulationRef.current.nodes());
         }, 100);
       }
@@ -1097,7 +1124,9 @@ export function ForceDirectedGraph({
   // Using a ref to avoid re-recreating the entire graph
   useEffect(() => {
     if (graphInitializedRef.current) {
-      updateGraphData();
+      // Only auto-center on initial load
+      const isInitialLoad = !lastCenteredStateRef.current;
+      updateGraphData(isInitialLoad);
     }
   }, [bookmarks, insightLevel, updateGraphData]);
   
