@@ -479,7 +479,8 @@ export class BookmarkService {
           bookmark_title: bookmark.title,
           type: "bookmark_added", // Use an enum-compatible type
           content: "Screenshot added",
-          timestamp: new Date()
+          timestamp: new Date(),
+          user_id: bookmark.user_id // Include user_id from the bookmark
         });
       } catch (error) {
         console.error("Error adding screenshot:", error);
@@ -502,7 +503,8 @@ export class BookmarkService {
             bookmark_title: bookmark.title,
             type: "highlight_added",
             content: highlight.quote,
-            timestamp: new Date()
+            timestamp: new Date(),
+            user_id: bookmark.user_id // Include user_id from the bookmark
           });
         }
       } catch (error) {
