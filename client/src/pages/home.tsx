@@ -36,6 +36,14 @@ export default function Home() {
         console.log('HOME: Setting selectedCollectionId to:', event.detail.collectionId);
         setSelectedCollectionId(event.detail.collectionId);
         
+        // Force query invalidation for the collection bookmarks
+        if (event.detail.collectionId) {
+          console.log('HOME: Forcing query invalidation');
+          queryClient.invalidateQueries({ 
+            queryKey: ['/api/collections/bookmarks', event.detail.collectionId] 
+          });
+        }
+        
         // Log state after setting
         setTimeout(() => {
           console.log('HOME: selectedCollectionId is now:', selectedCollectionId);
@@ -48,7 +56,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('filterByCollection', handleFilterByCollection);
     };
-  }, []);
+  }, [queryClient]);
 
   const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
@@ -64,11 +72,17 @@ export default function Home() {
   const { data: bookmarksInCollection = [], isLoading: isCollectionBookmarksLoading } = useQuery({
     queryKey: ['/api/collections/bookmarks', selectedCollectionId],
     queryFn: async () => {
-      if (!selectedCollectionId) return [];
+      console.log("QUERY FUNCTION CALLED with selectedCollectionId:", selectedCollectionId);
+      if (!selectedCollectionId) {
+        console.log("No selectedCollectionId, returning empty array");
+        return [];
+      }
       
       try {
         // Get bookmark references from collection
+        console.log(`Fetching bookmarks from collection ${selectedCollectionId}...`);
         const result = await apiRequest('GET', `/api/collections/${selectedCollectionId}/bookmarks`);
+        console.log("API RESULT:", result);
         
         if (!result || !result.length) {
           console.log(`No bookmarks found in collection ${selectedCollectionId}`);
@@ -77,10 +91,12 @@ export default function Home() {
         
         // Extract bookmark IDs
         const bookmarkIds = result.map((item: any) => item.bookmark_id);
-        console.log(`Found ${bookmarkIds.length} bookmarks in collection ${selectedCollectionId}`);
+        console.log(`Found ${bookmarkIds.length} bookmarks in collection ${selectedCollectionId}, IDs:`, bookmarkIds);
         
         // Map to actual bookmark objects
-        return bookmarks.filter(bookmark => bookmarkIds.includes(bookmark.id));
+        const filteredBookmarks = bookmarks.filter(bookmark => bookmarkIds.includes(bookmark.id));
+        console.log(`Filtered to ${filteredBookmarks.length} bookmark objects`);
+        return filteredBookmarks;
       } catch (error) {
         console.error("Error fetching collection bookmarks:", error);
         return [];
