@@ -117,6 +117,41 @@ export default function GraphView() {
     };
   }, [queryClient, refetchBookmarkTags]);
   
+  // Listen for user authentication changes and refresh bookmarks
+  useEffect(() => {
+    // Refresh bookmark data when the user changes (login/logout)
+    console.log("User authentication state changed, refreshing bookmark data");
+    
+    // Invalidate and refetch all related queries
+    queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+    
+    // If a bookmark was selected, reset the selection as it might not belong to the current user
+    if (selectedBookmarkId && user) {
+      setSelectedBookmarkId(null);
+    }
+    
+    // If there are any filters applied, reset them when user changes
+    if ((selectedTags.length > 0 || selectedDomain) && user) {
+      setSelectedTags([]);
+      setSelectedDomain(null);
+      
+      // Trigger a zoom-out to show the full graph
+      setTimeout(() => {
+        const event = new CustomEvent('centerFullGraph', { 
+          detail: { source: 'authChange' } 
+        });
+        document.dispatchEvent(event);
+      }, 150);
+    }
+    
+    // Explicitly refetch the bookmarks with tags
+    if (!isLoadingBookmarks && !isLoadingTags) {
+      refetchBookmarkTags();
+    }
+  }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, isLoadingBookmarks, isLoadingTags]);
+  
   // Combined loading state
   const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags;
   
