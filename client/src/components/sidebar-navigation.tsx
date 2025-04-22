@@ -35,6 +35,16 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SidebarNavigationProps {
   className?: string;
@@ -52,6 +62,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
     is_public: boolean;
   } | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   
@@ -368,15 +379,15 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => {
-                                // Open delete confirmation dialog via edit dialog
+                                // Set the selected collection and open delete confirmation directly
                                 setSelectedCollectionToEdit({
                                   id: collection.id,
                                   name: collection.name,
                                   description: collection.description,
                                   is_public: collection.is_public
                                 });
-                                setEditCollectionOpen(true);
-                                // The actual delete button is in the edit dialog
+                                // Open delete confirmation dialog directly
+                                setDeleteConfirmOpen(true);
                               }}
                               className="text-red-600 focus:text-red-600"
                             >
@@ -476,36 +487,90 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
         onOpenChange={setEditCollectionOpen}
         collection={selectedCollectionToEdit}
         onCollectionUpdated={() => {
-          // Check if we're deleting the currently selected collection
-          if (selectedCollectionToEdit && selectedCollections.includes(selectedCollectionToEdit.id)) {
-            // Remove the deleted collection from selected collections
-            const newSelection = selectedCollections.filter(id => id !== selectedCollectionToEdit.id);
-            setSelectedCollections(newSelection);
-            
-            // Update localStorage
-            localStorage.setItem('selectedCollections', JSON.stringify(newSelection));
-            
-            // Update filter state
-            if (newSelection.length === 0) {
-              // Clear all filters if nothing selected
-              setSelectedCollectionId(null);
-              window.dispatchEvent(new CustomEvent('filterByCollection', { 
-                detail: { collectionId: null, collectionIds: [] } 
-              }));
-            } else if (newSelection.length === 1) {
-              // Single collection selected
-              const singleId = newSelection[0];
-              setSelectedCollectionId(singleId);
-              window.dispatchEvent(new CustomEvent('filterByCollection', { 
-                detail: { collectionId: singleId, collectionIds: newSelection } 
-              }));
-            }
-          }
-          
           // Refresh collections data
           queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
         }}
       />
+      
+      {/* Delete Collection Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete collection</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this collection? This action cannot be undone.
+              This will only remove the collection, not the bookmarks within it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={async () => {
+                if (!selectedCollectionToEdit) return;
+                
+                // Close dialog immediately for optimistic UI
+                setDeleteConfirmOpen(false);
+                
+                // Show optimistic success message
+                toast({
+                  title: "Collection deleted",
+                  description: "Your collection has been deleted successfully",
+                });
+                
+                try {
+                  // If we're deleting the currently selected collection
+                  if (selectedCollectionToEdit && selectedCollections.includes(selectedCollectionToEdit.id)) {
+                    // Remove the deleted collection from selected collections
+                    const newSelection = selectedCollections.filter(id => id !== selectedCollectionToEdit.id);
+                    setSelectedCollections(newSelection);
+                    
+                    // Update localStorage
+                    localStorage.setItem('selectedCollections', JSON.stringify(newSelection));
+                    
+                    // Update filter state
+                    if (newSelection.length === 0) {
+                      // Clear all filters if nothing selected
+                      setSelectedCollectionId(null);
+                      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+                        detail: { collectionId: null, collectionIds: [] } 
+                      }));
+                    } else if (newSelection.length === 1) {
+                      // Single collection selected
+                      const singleId = newSelection[0];
+                      setSelectedCollectionId(singleId);
+                      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+                        detail: { collectionId: singleId, collectionIds: newSelection } 
+                      }));
+                    }
+                  }
+                
+                  // Perform the actual deletion
+                  await deleteCollection.mutateAsync(selectedCollectionToEdit.id, {
+                    onError: (error) => {
+                      console.error('Error deleting collection:', error);
+                      // Only show error if the deletion actually fails
+                      toast({
+                        title: "Error occurred",
+                        description: "There was an issue with syncing the deletion. Please refresh the page.",
+                        variant: "destructive",
+                      });
+                    }
+                  });
+                  
+                  // Refresh collections data
+                  queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+                } catch (error) {
+                  // This is a fallback and likely won't be reached due to the onError handler above
+                  console.error('Error deleting collection:', error);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </nav>
   );
 }
