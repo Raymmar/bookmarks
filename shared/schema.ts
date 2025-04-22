@@ -128,7 +128,7 @@ export const activities = pgTable("activities", {
   user_id: uuid("user_id").references(() => users.id),
   // Standard activity fields in current database
   type: text("type", { 
-    enum: ["bookmark_added", "bookmark_updated", "note_added", "highlight_added", "insight_generated", "login", "logout", "register"] 
+    enum: ["bookmark_added", "bookmark_updated", "note_added", "highlight_added", "insight_generated", "login", "logout", "register", "collection_created"] 
   }).notNull(),
   content: text("content"),
   tags: text("tags").array().default([]),
