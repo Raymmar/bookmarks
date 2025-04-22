@@ -366,6 +366,23 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                               <Edit className="mr-2 h-4 w-4" />
                               <span>Edit</span>
                             </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                // Open delete confirmation dialog via edit dialog
+                                setSelectedCollectionToEdit({
+                                  id: collection.id,
+                                  name: collection.name,
+                                  description: collection.description,
+                                  is_public: collection.is_public
+                                });
+                                setEditCollectionOpen(true);
+                                // The actual delete button is in the edit dialog
+                              }}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -466,6 +483,32 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
         onOpenChange={setEditCollectionOpen}
         collection={selectedCollectionToEdit}
         onCollectionUpdated={() => {
+          // Check if we're deleting the currently selected collection
+          if (selectedCollectionToEdit && selectedCollections.includes(selectedCollectionToEdit.id)) {
+            // Remove the deleted collection from selected collections
+            const newSelection = selectedCollections.filter(id => id !== selectedCollectionToEdit.id);
+            setSelectedCollections(newSelection);
+            
+            // Update localStorage
+            localStorage.setItem('selectedCollections', JSON.stringify(newSelection));
+            
+            // Update filter state
+            if (newSelection.length === 0) {
+              // Clear all filters if nothing selected
+              setSelectedCollectionId(null);
+              window.dispatchEvent(new CustomEvent('filterByCollection', { 
+                detail: { collectionId: null, collectionIds: [] } 
+              }));
+            } else if (newSelection.length === 1) {
+              // Single collection selected
+              const singleId = newSelection[0];
+              setSelectedCollectionId(singleId);
+              window.dispatchEvent(new CustomEvent('filterByCollection', { 
+                detail: { collectionId: singleId, collectionIds: newSelection } 
+              }));
+            }
+          }
+          
           // Refresh collections data
           queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
         }}

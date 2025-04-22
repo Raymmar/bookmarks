@@ -93,27 +93,37 @@ export function EditCollectionDialog({
     
     setIsSubmitting(true);
     
+    // Close dialogs immediately for optimistic UI
+    onOpenChange(false);
+    setConfirmDeleteOpen(false);
+    
+    // Show optimistic success message
+    toast({
+      title: "Collection deleted",
+      description: "Your collection has been deleted successfully",
+    });
+    
     try {
-      await deleteCollection.mutateAsync(collection.id);
-      
-      toast({
-        title: "Collection deleted",
-        description: "Your collection has been deleted successfully",
-      });
-      
+      // Trigger callback before actual deletion to update UI
       if (onCollectionUpdated) {
         onCollectionUpdated();
       }
       
-      onOpenChange(false);
-      setConfirmDeleteOpen(false);
-    } catch (error) {
-      console.error('Error deleting collection:', error);
-      toast({
-        title: "Error deleting collection",
-        description: "There was an error deleting your collection. Please try again.",
-        variant: "destructive",
+      // Perform the actual deletion
+      await deleteCollection.mutateAsync(collection.id, {
+        onError: (error) => {
+          console.error('Error deleting collection:', error);
+          // Only show error if the deletion actually fails
+          toast({
+            title: "Error occurred",
+            description: "There was an issue with syncing the deletion. Please refresh the page.",
+            variant: "destructive",
+          });
+        }
       });
+    } catch (error) {
+      // This is a fallback and likely won't be reached due to the onError handler above
+      console.error('Error deleting collection:', error);
     } finally {
       setIsSubmitting(false);
     }
