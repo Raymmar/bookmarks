@@ -54,7 +54,7 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   
   return (
     <div 
-      className={`p-3 rounded-lg border cursor-pointer transition-all ${
+      className={`p-3 rounded-lg border cursor-pointer transition-all duration-300 ease-in-out ${
         isSelected
           ? "bg-primary-50 border-primary" 
           : "bg-white border-gray-200 hover:border-gray-300"
@@ -171,14 +171,15 @@ export function SidebarPanel({
             No bookmarks found. Try adjusting your filters.
           </div>
         ) : (
-          <div className="flex flex-col space-y-3">
+          <div className="flex flex-col space-y-3 transition-all">
             {bookmarks.map(bookmark => (
-              <BookmarkCard
-                key={bookmark.id}
-                bookmark={bookmark}
-                isSelected={selectedBookmark ? selectedBookmark.id === bookmark.id : false}
-                onClick={() => onSelectBookmark(bookmark.id)}
-              />
+              <div key={bookmark.id} className="transition-all duration-300 ease-in-out">
+                <BookmarkCard
+                  bookmark={bookmark}
+                  isSelected={selectedBookmark ? selectedBookmark.id === bookmark.id : false}
+                  onClick={() => onSelectBookmark(bookmark.id)}
+                />
+              </div>
             ))}
           </div>
         )}

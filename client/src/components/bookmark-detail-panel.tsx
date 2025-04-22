@@ -493,11 +493,13 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       // Update the local state with server response
       setBookmark(updatedBookmark);
       
-      // Invalidate queries to refresh the data after server confirms (with lower priority and longer delay)
-      // This ensures our optimistic update has time to complete any animations or transitions
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      }, 1000);
+      // Only invalidate queries if we're not in recently_updated sort mode
+      // For recently_updated, we keep our optimistic update intact with no server refresh
+      if (sortOrder !== 'recently_updated') {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+        }, 1000);
+      }
       
       // Dispatch a custom event to inform other components about the update
       const event = new CustomEvent('bookmarkUpdated', { 
