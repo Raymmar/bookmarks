@@ -1250,16 +1250,53 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       }
     };
     
+    // Handle complete graph reset (for logout)
+    const handleResetForceGraph = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log(`Graph reset requested (source: ${customEvent.detail?.source || 'unknown'})`);
+      
+      // Clear the current simulation
+      if (simulationRef.current) {
+        simulationRef.current.stop();
+        simulationRef.current = null;
+      }
+      
+      // Reset graph initialization flag
+      graphInitializedRef.current = false;
+      
+      // Reset the graph data
+      graphDataRef.current = null;
+      
+      // Clear any selected node
+      updateSelectedNode(null);
+      
+      // Reinitialize the graph with the new data
+      setTimeout(() => {
+        const cleanup = initializeGraph();
+        
+        // After initialization completes, center the graph
+        setTimeout(() => {
+          if (simulationRef.current) {
+            const nodes = simulationRef.current.nodes();
+            centerGraph(nodes);
+            console.log(`Graph reset complete with ${nodes.length} nodes`);
+          }
+        }, 150);
+      }, 50);
+    };
+    
     // Add event listeners
     document.addEventListener('selectGraphNode', handleSelectNode);
     document.addEventListener('centerFullGraph', handleCenterFullGraph);
+    document.addEventListener('resetForceGraph', handleResetForceGraph);
     
     // Clean up on unmount
     return () => {
       document.removeEventListener('selectGraphNode', handleSelectNode);
       document.removeEventListener('centerFullGraph', handleCenterFullGraph);
+      document.removeEventListener('resetForceGraph', handleResetForceGraph);
     };
-  }, [centerOnNode, updateSelectedNode]);
+  }, [centerOnNode, updateSelectedNode, initializeGraph, centerGraph]);
   
   // Update selected node visually without redrawing graph
   useEffect(() => {

@@ -144,12 +144,34 @@ export default function GraphView() {
       setSelectedDomain(null);
     }
     
-    // When auth state changes, trigger a full graph refresh and center
-    if (isLogin || isLogout) {
-      // Trigger a zoom-out to show the full graph
+    // When a logout occurs, we need to completely reset the graph state
+    if (isLogout) {
+      // Force a complete refresh of the public bookmarks data
+      queryClient.resetQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.resetQueries({ queryKey: ["/api/bookmarks-with-tags"] });
+      queryClient.resetQueries({ queryKey: ["/api/tags"] });
+      
+      // Trigger a complete graph reset by dispatching a special reset event
+      setTimeout(() => {
+        const resetEvent = new CustomEvent('resetForceGraph', { 
+          detail: { source: 'logout' } 
+        });
+        document.dispatchEvent(resetEvent);
+        
+        // After reset, center the graph (with a delay to ensure reset completes)
+        setTimeout(() => {
+          const centerEvent = new CustomEvent('centerFullGraph', { 
+            detail: { source: 'logoutComplete' } 
+          });
+          document.dispatchEvent(centerEvent);
+        }, 300);
+      }, 150);
+    } 
+    // For regular login events, just center the graph
+    else if (isLogin) {
       setTimeout(() => {
         const event = new CustomEvent('centerFullGraph', { 
-          detail: { source: 'authChange' } 
+          detail: { source: 'login' } 
         });
         document.dispatchEvent(event);
       }, 150);
