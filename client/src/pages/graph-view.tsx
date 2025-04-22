@@ -510,6 +510,30 @@ export default function GraphView() {
             </div>
           )}
           
+          {/* Selected tag filters indicator when drawer is closed */}
+          {!tagDrawerOpen && selectedTags.length > 0 && (
+            <div className="mb-2 flex items-center flex-wrap gap-1">
+              <span className="text-sm text-gray-600 mr-1">Tags:</span>
+              {selectedTags.map(tag => (
+                <Badge 
+                  key={`selected-${tag}`}
+                  variant="default"
+                  className="cursor-pointer bg-primary hover:bg-primary/90"
+                  onClick={() => toggleTagSelection(tag)}
+                >
+                  {tag}
+                  <X 
+                    className="h-3 w-3 ml-1" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTagSelection(tag);
+                    }}
+                  />
+                </Badge>
+              ))}
+            </div>
+          )}
+          
           {/* Tags drawer - minimal version */}
           <div className="flex flex-wrap gap-1 items-center">
             {/* Tags display - either popular tags or all tags */}
