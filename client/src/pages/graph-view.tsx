@@ -117,6 +117,44 @@ export default function GraphView() {
     };
   }, [queryClient, refetchBookmarkTags]);
   
+  // Listen for showBookmarkDetail event to focus a bookmark in the graph
+  useEffect(() => {
+    const handleShowBookmarkDetail = (e: Event) => {
+      // Cast to CustomEvent with the right detail type
+      const event = e as CustomEvent<{bookmarkId: string}>;
+      const bookmarkId = event.detail?.bookmarkId;
+      
+      if (bookmarkId) {
+        console.log(`Graph view received showBookmarkDetail event for bookmark: ${bookmarkId}`);
+        
+        // Set the selected bookmark ID
+        setSelectedBookmarkId(bookmarkId);
+        
+        // Use a small delay to ensure the graph has updated
+        setTimeout(() => {
+          // Format the node ID to match how it's stored in the graph component
+          const nodeId = `bookmark-${bookmarkId}`;
+          
+          // Use custom event to notify the graph component to select and center this node
+          const graphEvent = new CustomEvent('selectGraphNode', { 
+            detail: { nodeId: nodeId, source: 'bookmarkDetailRequest' } 
+          });
+          document.dispatchEvent(graphEvent);
+          
+          console.log(`Dispatched selectGraphNode event for node ${nodeId}`);
+        }, 100);
+      }
+    };
+    
+    // Add event listener
+    window.addEventListener('showBookmarkDetail', handleShowBookmarkDetail);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('showBookmarkDetail', handleShowBookmarkDetail);
+    };
+  }, []);
+  
   // Track previous auth state to detect login vs logout
   const prevUserRef = useRef<{ id: string } | null>(null);
   
