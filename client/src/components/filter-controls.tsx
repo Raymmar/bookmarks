@@ -113,7 +113,9 @@ export function FilterControls({
                   value={selectedCollectionId || "all"} 
                   onValueChange={(value) => {
                     if (onCollectionChange) {
-                      onCollectionChange(value === "all" ? null : value);
+                      const collectionId = value === "all" ? null : value;
+                      console.log(`[Filter Controls] Collection changed to: ${collectionId || 'All Collections'}`);
+                      onCollectionChange(collectionId);
                     }
                   }}
                 >
