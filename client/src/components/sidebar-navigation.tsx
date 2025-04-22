@@ -45,18 +45,73 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
 
-  // Handle collection selection
-  const handleCollectionClick = (collectionId: string) => {
-    if (selectedCollectionId === collectionId) {
-      // If clicking the same collection, deselect it
-      setSelectedCollectionId(null);
-      // Clear the collection filter by dispatching an event
-      window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId: null } }));
+  // Track selected collections for multi-selection
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  
+  // Update selected collections when primary collection changes
+  useEffect(() => {
+    if (selectedCollectionId) {
+      setSelectedCollections([selectedCollectionId]);
     } else {
-      // Select the collection
-      setSelectedCollectionId(collectionId);
-      // Filter bookmarks by collection by dispatching an event
-      window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId } }));
+      setSelectedCollections([]);
+    }
+  }, [selectedCollectionId]);
+  
+  // Handle collection selection
+  const handleCollectionClick = (collectionId: string, isCtrlPressed = false) => {
+    if (isCtrlPressed) {
+      // Multi-select mode (Ctrl key pressed)
+      let newSelection: string[];
+      
+      if (selectedCollections.includes(collectionId)) {
+        // Remove from selection if already selected
+        newSelection = selectedCollections.filter(id => id !== collectionId);
+      } else {
+        // Add to selection
+        newSelection = [...selectedCollections, collectionId];
+      }
+      
+      setSelectedCollections(newSelection);
+      
+      if (newSelection.length === 0) {
+        // Clear all filters if nothing selected
+        setSelectedCollectionId(null);
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId: null, collectionIds: [] } 
+        }));
+      } else if (newSelection.length === 1) {
+        // Single collection selected
+        const singleId = newSelection[0];
+        setSelectedCollectionId(singleId);
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId: singleId, collectionIds: newSelection } 
+        }));
+      } else {
+        // Multiple collections selected
+        setSelectedCollectionId(null); // Clear single selection
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId: null, collectionIds: newSelection } 
+        }));
+      }
+    } else {
+      // Single selection mode (no Ctrl key)
+      if (selectedCollectionId === collectionId) {
+        // If clicking the same collection, deselect it
+        setSelectedCollectionId(null);
+        setSelectedCollections([]);
+        // Clear the collection filter by dispatching an event
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId: null, collectionIds: [] } 
+        }));
+      } else {
+        // Select the collection
+        setSelectedCollectionId(collectionId);
+        setSelectedCollections([collectionId]);
+        // Filter bookmarks by collection by dispatching an event
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId, collectionIds: [collectionId] } 
+        }));
+      }
     }
   };
 
@@ -220,9 +275,12 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                           "flex items-center px-2 py-2 text-sm rounded-lg cursor-pointer",
                           selectedCollectionId === collection.id 
                             ? "bg-primary/10 text-primary font-medium" 
-                            : "text-gray-700 hover:bg-gray-100"
+                            : selectedCollections.includes(collection.id)
+                              ? "bg-primary/5 text-primary/90 font-medium" 
+                              : "text-gray-700 hover:bg-gray-100"
                         )}
-                        onClick={() => handleCollectionClick(collection.id)}
+                        onClick={(e) => handleCollectionClick(collection.id, e.ctrlKey || e.metaKey)}
+                        title="Click to select. Hold Ctrl/Cmd to select multiple collections."
                       >
                         <Circle className={cn("h-4 w-4 mr-2", getCollectionColor(collection.id))} />
                         <span className="truncate">{collection.name}</span>

@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Bookmark } from "@shared/types";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
-import { useCollectionBookmarksForGraph } from "@/hooks/use-collection-queries";
+import { useCollectionBookmarksForGraph, useMultiCollectionBookmarksForGraph } from "@/hooks/use-collection-queries";
 
 // Tag interfaces
 interface Tag {
@@ -63,11 +63,34 @@ export default function GraphView() {
     enabled: !selectedCollectionId // Only fetch when no collection is selected
   });
   
-  // Fetch bookmarks by collection (only when a collection is selected)
+  // State for multiple collection selection
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
+  
+  // Update multiple collections when single collection changes
+  useEffect(() => {
+    if (selectedCollectionId) {
+      setSelectedCollectionIds([selectedCollectionId]);
+    } else {
+      setSelectedCollectionIds([]);
+    }
+  }, [selectedCollectionId]);
+  
+  // Fetch bookmarks by single collection
   const { 
-    data: collectionBookmarks = [], 
-    isLoading: isLoadingCollectionBookmarks 
+    data: singleCollectionBookmarks = [], 
+    isLoading: isLoadingSingleCollection 
   } = useCollectionBookmarksForGraph(selectedCollectionId);
+  
+  // Fetch bookmarks by multiple collections
+  const {
+    data: multiCollectionBookmarks = [],
+    isLoading: isLoadingMultiCollections
+  } = useMultiCollectionBookmarksForGraph(selectedCollectionIds.length > 1 ? selectedCollectionIds : []);
+  
+  // Determine which bookmarks to use: multi-collection, single collection, or all bookmarks
+  const collectionBookmarks = 
+    selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
+    selectedCollectionId ? singleCollectionBookmarks : [];
 
   // Fetch tags
   const { data: tags = [], isLoading: isLoadingTags } = useQuery<Tag[]>({
@@ -164,6 +187,60 @@ export default function GraphView() {
     };
   }, []);
   
+  // Listen for collection filter changes
+  useEffect(() => {
+    const handleFilterByCollection = (e: Event) => {
+      // Cast to CustomEvent with the right detail type
+      const event = e as CustomEvent<{
+        collectionId: string | null, 
+        collectionIds?: string[]
+      }>;
+      
+      const collectionId = event.detail?.collectionId;
+      const collectionIds = event.detail?.collectionIds || [];
+      
+      console.log(`Graph view received filterByCollection event for collection: ${collectionId || 'all'}`);
+      
+      if (collectionIds.length > 1) {
+        console.log(`Multiple collections selected: ${collectionIds.join(', ')}`);
+        // Update the selected collections for multi-collection view
+        setSelectedCollectionId(null);
+        setSelectedCollectionIds(collectionIds);
+      } else {
+        // Update the selected collection ID for single collection view
+        setSelectedCollectionId(collectionId);
+        setSelectedCollectionIds(collectionId ? [collectionId] : []);
+      }
+      
+      // Reset any existing filters when changing collections
+      setSelectedBookmarkId(null);
+      
+      // After a brief delay to let the data load, center the graph
+      setTimeout(() => {
+        const resetEvent = new CustomEvent('resetForceGraph', { 
+          detail: { source: 'collectionChange' } 
+        });
+        document.dispatchEvent(resetEvent);
+        
+        // After reset, center the graph
+        setTimeout(() => {
+          const centerEvent = new CustomEvent('centerFullGraph', { 
+            detail: { source: 'collectionChange' } 
+          });
+          document.dispatchEvent(centerEvent);
+        }, 300);
+      }, 150);
+    };
+    
+    // Add event listener
+    window.addEventListener('filterByCollection', handleFilterByCollection);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('filterByCollection', handleFilterByCollection);
+    };
+  }, []);
+  
   // Track previous auth state to detect login vs logout
   const prevUserRef = useRef<{ id: string } | null>(null);
   
@@ -234,7 +311,8 @@ export default function GraphView() {
   }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, isLoadingBookmarks, isLoadingTags]);
   
   // Combined loading state
-  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || isLoadingCollectionBookmarks;
+  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || 
+                  isLoadingSingleCollection || isLoadingMultiCollections;
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
@@ -264,6 +342,9 @@ export default function GraphView() {
   // Get tags sorted by usage count for popular tags feature
   const tagsByCount = [...tags].sort((a, b) => b.count - a.count);
   
+  // Determine which bookmarks to use based on whether a collection is selected
+  const activeBookmarks = selectedCollectionId ? collectionBookmarks : bookmarks;
+  
   // Get bookmark tags using the bookmarksWithTags data
   const bookmarkTagsMap = new Map<string, string[]>();
   bookmarksWithTags.forEach(bookmark => {
@@ -277,7 +358,7 @@ export default function GraphView() {
   });
   
   // Filter bookmarks based on search query, selected tags, and domain
-  const filteredBookmarkIds = bookmarks.filter(bookmark => {
+  const filteredBookmarkIds = activeBookmarks.filter(bookmark => {
     // Get this bookmark's tags from our map
     const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
     // Note: system_tags is being phased out in favor of the normalized tag system
@@ -338,10 +419,32 @@ export default function GraphView() {
     }
   }).map(bookmark => bookmark.id);
   
-  // Filter bookmarksWithTags based on the filtered bookmark IDs
-  const filteredBookmarks = bookmarksWithTags.filter(bookmark => 
-    filteredBookmarkIds.includes(bookmark.id)
-  );
+  // Create a combined map of all bookmarks with tags for unified filtering
+  const combinedBookmarksWithTags: BookmarkWithTags[] = [];
+  
+  // For each bookmark ID in the filtered list, find the bookmark with its tags
+  filteredBookmarkIds.forEach(id => {
+    // Try to find the bookmark in the bookmarksWithTags first
+    const bookmark = bookmarksWithTagsMap.get(id);
+    
+    if (bookmark) {
+      combinedBookmarksWithTags.push(bookmark);
+    } else if (selectedCollectionId) {
+      // If not found, it might be a collection bookmark that hasn't been processed yet
+      const collectionBookmark = collectionBookmarks.find(b => b.id === id);
+      
+      if (collectionBookmark) {
+        // Create a temporary BookmarkWithTags object for this collection bookmark
+        combinedBookmarksWithTags.push({
+          ...collectionBookmark,
+          tags: [] // No tags info yet, but we'll still include the bookmark
+        });
+      }
+    }
+  });
+  
+  // Filtered bookmarks now come from either regular bookmarks or collection bookmarks
+  const filteredBookmarks = combinedBookmarksWithTags;
   
   // Sort bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
