@@ -395,20 +395,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/activities", async (req, res) => {
     try {
-      const { action, entity_type, entity_id, details } = req.body;
+      // We'll support both old and new format
+      const { type, content, action, entity_type, entity_id, details, bookmark_id, bookmark_title } = req.body;
       
-      if (!action || !entity_type) {
-        return res.status(400).json({ error: "Action and entity_type are required" });
+      // Determine which format we're using - new or old
+      const isNewFormat = action !== undefined;
+      const isOldFormat = type !== undefined;
+      
+      if (!isNewFormat && !isOldFormat) {
+        return res.status(400).json({ error: "Either 'type' or 'action' is required" });
       }
       
-      // Include user_id if authenticated
-      const activityData = {
-        action,
-        entity_type,
-        entity_id: entity_id || null,
-        details: details || null
-      };
+      // Create activity data with all the fields we need
+      let activityData: any = {};
       
+      // Handle the old format (type/content)
+      if (isOldFormat) {
+        activityData = {
+          // Map old format to new schema fields
+          type: type,
+          content: content || null,
+          // Also provide values for the new schema fields
+          action: type, // Use type as action 
+          entity_type: "bookmark", // Default entity type
+          details: content || null
+        };
+      }
+      
+      // Handle the new format (action/entity_type)
+      if (isNewFormat) {
+        activityData = {
+          // Map new format to old schema fields for backward compatibility
+          type: action,
+          content: details || null,
+          // Keep the new schema fields
+          action,
+          entity_type: entity_type || "user",
+          details: details || null
+        };
+        
+        if (entity_id) {
+          activityData.entity_id = entity_id;
+        }
+      }
+      
+      // Add optional fields if provided
+      if (bookmark_id) {
+        activityData.bookmark_id = bookmark_id;
+      }
+      
+      if (bookmark_title) {
+        activityData.bookmark_title = bookmark_title;
+      }
+      
+      // Add user_id if authenticated
       if (req.isAuthenticated()) {
         activityData.user_id = req.user.id;
       }
