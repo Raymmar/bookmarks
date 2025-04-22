@@ -47,12 +47,35 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
 
-  // Track selected collections for multi-selection
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  // Track selected collections for multi-selection with localStorage persistence
+  const [selectedCollections, setSelectedCollections] = useState<string[]>(() => {
+    // Initialize from localStorage if available
+    const savedCollections = localStorage.getItem('selectedCollections');
+    return savedCollections ? JSON.parse(savedCollections) : [];
+  });
   
-  // We'll remove this effect since we want to manage selectedCollections directly
-  // and keep selectedCollectionId only for backward compatibility with features
-  // that rely on a single collection being selected
+  // Save selected collections to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('selectedCollections', JSON.stringify(selectedCollections));
+    
+    // If we have selectedCollections, dispatch the filter event on page load
+    if (selectedCollections.length > 0) {
+      if (selectedCollections.length === 1) {
+        // Single collection
+        const singleId = selectedCollections[0];
+        setSelectedCollectionId(singleId);
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId: singleId, collectionIds: selectedCollections } 
+        }));
+      } else {
+        // Multiple collections
+        setSelectedCollectionId(null); // Clear single selection
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId: null, collectionIds: selectedCollections } 
+        }));
+      }
+    }
+  }, [selectedCollections]);
   
   // Handle collection selection with improved multi-select
   const handleCollectionClick = (collectionId: string) => {
@@ -67,6 +90,9 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
       // Add to selection
       newSelection = [...selectedCollections, collectionId];
     }
+    
+    // Save to localStorage immediately to ensure persistence
+    localStorage.setItem('selectedCollections', JSON.stringify(newSelection));
     
     setSelectedCollections(newSelection);
     
@@ -119,12 +145,18 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
         
         // Add the new collection to selectedCollections
         const newCollectionId = event.detail.collectionId;
-        setSelectedCollections([newCollectionId]);
+        const newSelection = [newCollectionId];
+        
+        // Save to localStorage immediately
+        localStorage.setItem('selectedCollections', JSON.stringify(newSelection));
+        
+        // Update state
+        setSelectedCollections(newSelection);
         setSelectedCollectionId(newCollectionId);
         
         // Trigger the filter event with the new collection
         window.dispatchEvent(new CustomEvent('filterByCollection', { 
-          detail: { collectionId: newCollectionId, collectionIds: [newCollectionId] } 
+          detail: { collectionId: newCollectionId, collectionIds: newSelection } 
         }));
         
         // Show success toast
@@ -245,9 +277,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   >
                     <Plus className="h-4 w-4 text-gray-500" />
                   </Button>
-                </div>
-                <div className="text-xs text-gray-500 italic">
-                  Select multiple collections to combine views
                 </div>
               </div>
               
