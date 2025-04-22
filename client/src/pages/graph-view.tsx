@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph-unpinned";
 import { SidebarPanel } from "@/components/sidebar-panel";
@@ -142,6 +142,78 @@ export default function GraphView() {
   
   // Get tags sorted by usage count for popular tags feature
   const tagsByCount = [...tags].sort((a, b) => b.count - a.count);
+  
+  // Paste event handler for URLs
+  const handlePasteEvent = useCallback(async (event: ClipboardEvent) => {
+    // Get clipboard text content
+    const clipboardText = event.clipboardData?.getData('text/plain');
+    
+    if (!clipboardText) return;
+    
+    // Simple URL validation - check if it looks like a URL
+    const urlRegex = /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i;
+    if (!urlRegex.test(clipboardText)) return;
+    
+    // Get the auto-extract setting
+    let autoExtract = true; // Default to true if setting doesn't exist
+    
+    try {
+      const response = await fetch('/api/settings/auto_extract_on_paste');
+      if (response.ok) {
+        const setting = await response.json();
+        autoExtract = setting.value === 'true';
+      }
+    } catch (error) {
+      console.error('Error fetching auto-extract setting:', error);
+    }
+    
+    // Prepare the bookmark data
+    const bookmarkData = {
+      url: clipboardText,
+      title: clipboardText, // Will be replaced by server-side extraction
+      description: '',
+      source: 'web',
+      autoExtract: autoExtract,
+      insightDepth: 1
+    };
+    
+    try {
+      toast({
+        title: "Creating bookmark",
+        description: "Processing URL pasted from clipboard...",
+      });
+      
+      // Create the bookmark
+      const response = await apiRequest('POST', '/api/bookmarks', bookmarkData);
+      
+      // Refresh the bookmarks list
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-with-tags"] });
+      
+      // Select the newly created bookmark
+      setTimeout(() => {
+        setSelectedBookmarkId(response.id);
+        
+        // Center on the new bookmark node
+        const nodeId = `bookmark-${response.id}`;
+        const event = new CustomEvent('selectGraphNode', { 
+          detail: { nodeId: nodeId, source: 'clipboardPaste' } 
+        });
+        document.dispatchEvent(event);
+      }, 500); // Give time for the query cache to update
+      
+      toast({
+        title: "Bookmark created",
+        description: "URL from clipboard has been added to your bookmarks.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error creating bookmark",
+        description: error instanceof Error ? error.message : "Failed to add URL from clipboard",
+        variant: "destructive",
+      });
+    }
+  }, [queryClient, toast]);
   
   // Get bookmark tags using the bookmarksWithTags data
   const bookmarkTagsMap = new Map<string, string[]>();
