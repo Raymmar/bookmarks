@@ -211,10 +211,12 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
                     location === "/" || location === "/graph"
-                      ? "bg-secondary text-secondary-foreground" 
+                      ? "bg-secondary/20 text-primary border border-primary/20" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <Waypoints className="h-5 w-5 mr-2" />
+                    <Waypoints className={cn("h-5 w-5 mr-2", 
+                      location === "/" || location === "/graph" ? "text-primary" : ""
+                    )} />
                     Explore
                   </div>
                 </Link>
@@ -224,10 +226,12 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
                     location === "/activity" 
-                      ? "bg-secondary text-secondary-foreground" 
+                      ? "bg-secondary/20 text-primary border border-primary/20" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <Activity className="h-5 w-5 mr-2" />
+                    <Activity className={cn("h-5 w-5 mr-2", 
+                      location === "/activity" ? "text-primary" : ""
+                    )} />
                     Activity
                   </div>
                 </Link>
@@ -237,10 +241,12 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
                     location === "/ai-chat" 
-                      ? "bg-secondary text-secondary-foreground" 
+                      ? "bg-secondary/20 text-primary border border-primary/20" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <Bot className="h-5 w-5 mr-2" />
+                    <Bot className={cn("h-5 w-5 mr-2", 
+                      location === "/ai-chat" ? "text-primary" : ""
+                    )} />
                     AI Chat
                   </div>
                 </Link>
@@ -251,10 +257,12 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                     <div className={cn(
                       "flex items-center px-2 py-2 text-sm rounded-lg",
                       location === "/settings" 
-                        ? "bg-secondary text-secondary-foreground" 
+                        ? "bg-secondary/20 text-primary border border-primary/20" 
                         : "text-gray-700 hover:bg-gray-100"
                     )}>
-                      <Settings className="h-5 w-5 mr-2" />
+                      <Settings className={cn("h-5 w-5 mr-2", 
+                        location === "/settings" ? "text-primary" : ""
+                      )} />
                       Settings
                     </div>
                   </Link>
