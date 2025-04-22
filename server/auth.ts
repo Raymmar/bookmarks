@@ -37,14 +37,13 @@ export function setupAuth(app: Express) {
   // Set up session using connect-pg-simple session store with our Postgres database
   const PostgresSessionStore = connectPg(session);
   
-  // Create a memory store as a fallback if needed
-  import createMemoryStore from "memorystore";
+  // Create a memory store for sessions as fallback
   const MemoryStore = createMemoryStore(session);
   
   // Determine which store to use based on DATABASE_URL availability
   const sessionStore = process.env.DATABASE_URL 
     ? new PostgresSessionStore({ 
-        conString: process.env.DATABASE_URL,
+        conObject: { connectionString: process.env.DATABASE_URL },
         createTableIfMissing: true
       })
     : new MemoryStore({ checkPeriod: 86400000 });

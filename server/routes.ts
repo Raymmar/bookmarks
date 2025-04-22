@@ -12,15 +12,21 @@ import {
 } from "@shared/schema";
 import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 import { bookmarkService } from "./lib/bookmark-service";
+import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
+  
+  // Set up authentication
+  setupAuth(app);
 
   // Bookmarks API endpoints
   app.get("/api/bookmarks", async (req, res) => {
     try {
-      const bookmarks = await storage.getBookmarks();
+      // If user is authenticated, filter bookmarks by user_id
+      const userId = req.isAuthenticated() ? (req.user as Express.User).id : undefined;
+      const bookmarks = await storage.getBookmarks(userId);
       
       // Populate the bookmarks with related data
       const populatedBookmarks = await Promise.all(
@@ -70,6 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const bookmarkData = parsedData.data;
       
+      // Get user ID if user is authenticated
+      const userId = req.isAuthenticated() ? (req.user as Express.User).id : null;
+      
       // Log full request body for debugging
       console.log("Creating bookmark with request body:", JSON.stringify(req.body, null, 2));
       
@@ -83,7 +92,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tags: req.body.tags || bookmarkData.user_tags || [], // Get tags from req.body.tags first, then fall back to legacy user_tags
         autoExtract: req.body.autoExtract === true || req.body.autoExtract === "true", // Ensure boolean conversion
         insightDepth: req.body.insightDepth ? parseInt(req.body.insightDepth) : 1, // Ensure numeric
-        source: bookmarkData.source || 'web'
+        source: bookmarkData.source || 'web',
+        user_id: userId
       });
       
       if (result.isExisting) {
