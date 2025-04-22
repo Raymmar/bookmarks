@@ -1,4 +1,3 @@
-import MainLayout from "@/layouts/main-layout";
 import XIntegrationPanel from "@/components/x-integration-panel";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
@@ -17,13 +16,11 @@ const XIntegrationPage = () => {
 
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="container p-4 mx-auto">
-          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-            <div className="w-6 h-6 border-2 border-foreground border-t-transparent rounded-full animate-spin"></div>
-          </div>
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex h-full items-center justify-center">
+          <div className="w-6 h-6 border-2 border-foreground border-t-transparent rounded-full animate-spin"></div>
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
@@ -32,8 +29,8 @@ const XIntegrationPage = () => {
   }
 
   return (
-    <MainLayout>
-      <div className="container mx-auto p-4 max-w-4xl">
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">X.com Integration</h1>
           <p className="text-muted-foreground">
@@ -58,7 +55,7 @@ const XIntegrationPage = () => {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 };
 
