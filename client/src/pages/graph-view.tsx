@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { X, LayoutGrid, Network, Search, ChevronUp, ChevronDown, BookmarkPlus, SearchX } from "lucide-react";
+import { useCollectionBookmarks } from "@/hooks/use-collection-queries";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -65,6 +66,9 @@ export default function GraphView() {
   const { data: tags = [], isLoading: isLoadingTags } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
   });
+  
+  // Fetch collection bookmarks if a collection is selected
+  const { data: collectionBookmarkIds = [], isLoading: isLoadingCollectionBookmarks } = useCollectionBookmarks(selectedCollectionId);
 
   // Fetch bookmark-tag associations for each bookmark
   const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags, refetch: refetchBookmarkTags } = useQuery<BookmarkWithTags[]>({
@@ -178,9 +182,10 @@ export default function GraphView() {
     }
     
     // If there are any filters applied, reset them on authentication change
-    if ((selectedTags.length > 0 || selectedDomain) && (isLogin || isLogout)) {
+    if ((selectedTags.length > 0 || selectedDomain || selectedCollectionId) && (isLogin || isLogout)) {
       setSelectedTags([]);
       setSelectedDomain(null);
+      setSelectedCollectionId(null);
     }
     
     // When a logout occurs, we need to completely reset the graph state
@@ -223,10 +228,10 @@ export default function GraphView() {
     
     // Update the previous user reference for the next render
     prevUserRef.current = user;
-  }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, isLoadingBookmarks, isLoadingTags]);
+  }, [user, queryClient, refetchBookmarkTags, selectedBookmarkId, selectedTags, selectedDomain, selectedCollectionId, isLoadingBookmarks, isLoadingTags]);
   
   // Combined loading state
-  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags;
+  const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || isLoadingCollectionBookmarks;
   
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
   
@@ -268,13 +273,20 @@ export default function GraphView() {
     bookmarksWithTagsMap.set(bookmark.id, bookmark);
   });
   
-  // Filter bookmarks based on search query, selected tags, and domain
+  // Filter bookmarks based on search query, selected tags, domain, and collection
   const filteredBookmarkIds = bookmarks.filter(bookmark => {
     // Get this bookmark's tags from our map
     const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
     // Note: system_tags is being phased out in favor of the normalized tag system
     const bookmarkSystemTags: string[] = [];
     const allBookmarkTags = [...bookmarkTags, ...bookmarkSystemTags];
+    
+    // Collection filter
+    if (selectedCollectionId && collectionBookmarkIds.length > 0) {
+      if (!collectionBookmarkIds.includes(bookmark.id)) {
+        return false;
+      }
+    }
     
     // Search query filter
     if (searchQuery) {
@@ -507,6 +519,8 @@ export default function GraphView() {
               onSortOrderChange={setSortOrder}
               visibleNodeTypes={visibleNodeTypes}
               onVisibleNodeTypesChange={setVisibleNodeTypes}
+              selectedCollectionId={selectedCollectionId}
+              onCollectionChange={setSelectedCollectionId}
             />
           </div>
         </div>
@@ -649,6 +663,27 @@ export default function GraphView() {
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDomainSelection(selectedDomain);
+                  }}
+                />
+              </Badge>
+            </div>
+          )}
+          
+          {/* Collection filter indicator if selected */}
+          {selectedCollectionId && (
+            <div className="mb-2 flex items-center">
+              <span className="text-sm text-gray-600 mr-2">Collection:</span>
+              <Badge 
+                variant="default"
+                className="cursor-pointer bg-purple-600 hover:bg-purple-700"
+                onClick={() => setSelectedCollectionId(null)}
+              >
+                {selectedCollectionId}
+                <X 
+                  className="h-3 w-3 ml-1" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCollectionId(null);
                   }}
                 />
               </Badge>
