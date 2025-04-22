@@ -9,19 +9,43 @@ import {
   bookmarkTags, BookmarkTag, InsertBookmarkTag,
   chatSessions, ChatSession, InsertChatSession,
   chatMessages, ChatMessage, InsertChatMessage,
-  settings, Setting, InsertSetting
+  settings, Setting, InsertSetting,
+  users, User, InsertUser,
+  collections, Collection, InsertCollection,
+  collectionBookmarks, CollectionBookmark, InsertCollectionBookmark
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
+  // Users
+  getUsers(): Promise<User[]>;
+  getUser(id: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+
   // Bookmarks
-  getBookmarks(): Promise<Bookmark[]>;
+  getBookmarks(userId?: string): Promise<Bookmark[]>;
   getBookmark(id: string): Promise<Bookmark | undefined>;
   createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
   updateBookmark(id: string, bookmark: Partial<InsertBookmark>): Promise<Bookmark | undefined>;
   deleteBookmark(id: string): Promise<boolean>;
+  
+  // Collections
+  getCollections(userId?: string): Promise<Collection[]>;
+  getCollection(id: string): Promise<Collection | undefined>;
+  createCollection(collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: string, collection: Partial<InsertCollection>): Promise<Collection | undefined>;
+  deleteCollection(id: string): Promise<boolean>;
+  
+  // Collection Bookmarks
+  getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]>;
+  getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]>;
+  addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark>;
+  removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean>;
   
   // Notes
   getNotesByBookmarkId(bookmarkId: string): Promise<Note[]>;
@@ -85,13 +109,15 @@ export interface IStorage {
 
 // In-memory storage implementation as a fallback
 export class MemStorage implements IStorage {
+  private users: Map<string, User>;
   private bookmarks: Map<string, Bookmark>;
   private notes: Map<string, Note>;
   private screenshots: Map<string, Screenshot>;
   private highlights: Map<string, Highlight>;
   private insights: Map<string, Insight>;
   private activities: Map<string, Activity>;
-
+  private collections: Map<string, Collection>;
+  private collectionBookmarks: Map<string, CollectionBookmark>;
   private tags: Map<string, Tag>;
   private bookmarkTags: Map<string, BookmarkTag>;
   
@@ -103,21 +129,163 @@ export class MemStorage implements IStorage {
   private settings: Map<string, Setting>;
   
   constructor() {
+    this.users = new Map();
     this.bookmarks = new Map();
     this.notes = new Map();
     this.screenshots = new Map();
     this.highlights = new Map();
     this.insights = new Map();
     this.activities = new Map();
+    this.collections = new Map();
+    this.collectionBookmarks = new Map();
     this.tags = new Map();
     this.bookmarkTags = new Map();
     this.chatSessions = new Map();
     this.chatMessages = new Map();
     this.settings = new Map();
   }
+  
+  // User methods
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+  
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+  
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      user => user.username.toLowerCase() === username.toLowerCase()
+    );
+  }
+  
+  async createUser(user: InsertUser): Promise<User> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newUser: User = {
+      ...user,
+      id,
+      created_at: now,
+      updated_at: now,
+    };
+    
+    this.users.set(id, newUser);
+    return newUser;
+  }
+  
+  async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser = { 
+      ...user, 
+      ...userUpdate,
+      updated_at: new Date()
+    };
+    
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(id);
+  }
+  
+  // Collection methods
+  async getCollections(userId?: string): Promise<Collection[]> {
+    if (userId) {
+      return Array.from(this.collections.values()).filter(
+        collection => collection.user_id === userId
+      );
+    }
+    return Array.from(this.collections.values());
+  }
+  
+  async getCollection(id: string): Promise<Collection | undefined> {
+    return this.collections.get(id);
+  }
+  
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newCollection: Collection = {
+      ...collection,
+      id,
+      created_at: now,
+      updated_at: now,
+    };
+    
+    this.collections.set(id, newCollection);
+    return newCollection;
+  }
+  
+  async updateCollection(id: string, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
+    const collection = this.collections.get(id);
+    if (!collection) return undefined;
+    
+    const updatedCollection = {
+      ...collection,
+      ...collectionUpdate,
+      updated_at: new Date(),
+    };
+    
+    this.collections.set(id, updatedCollection);
+    return updatedCollection;
+  }
+  
+  async deleteCollection(id: string): Promise<boolean> {
+    return this.collections.delete(id);
+  }
+  
+  // Collection Bookmarks methods
+  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
+    const collectionBookmarksEntries = Array.from(this.collectionBookmarks.values())
+      .filter(cb => cb.collection_id === collectionId);
+    
+    const bookmarkIds = collectionBookmarksEntries.map(cb => cb.bookmark_id);
+    return bookmarkIds.map(id => this.bookmarks.get(id)!).filter(Boolean);
+  }
+  
+  async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
+    const collectionBookmarksEntries = Array.from(this.collectionBookmarks.values())
+      .filter(cb => cb.bookmark_id === bookmarkId);
+    
+    const collectionIds = collectionBookmarksEntries.map(cb => cb.collection_id);
+    return collectionIds.map(id => this.collections.get(id)!).filter(Boolean);
+  }
+  
+  async addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark> {
+    const id = crypto.randomUUID();
+    
+    const newCollectionBookmark: CollectionBookmark = {
+      id,
+      collection_id: collectionId,
+      bookmark_id: bookmarkId,
+    };
+    
+    this.collectionBookmarks.set(id, newCollectionBookmark);
+    return newCollectionBookmark;
+  }
+  
+  async removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean> {
+    const collectionBookmark = Array.from(this.collectionBookmarks.values())
+      .find(cb => cb.collection_id === collectionId && cb.bookmark_id === bookmarkId);
+    
+    if (!collectionBookmark) return false;
+    
+    return this.collectionBookmarks.delete(collectionBookmark.id);
+  }
 
   // Bookmarks
-  async getBookmarks(): Promise<Bookmark[]> {
+  async getBookmarks(userId?: string): Promise<Bookmark[]> {
+    if (userId) {
+      return Array.from(this.bookmarks.values()).filter(
+        bookmark => bookmark.user_id === userId
+      );
+    }
     return Array.from(this.bookmarks.values());
   }
   

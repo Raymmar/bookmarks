@@ -248,6 +248,15 @@ export const insertSettingSchema = createInsertSchema(settings).omit({
 });
 
 // Types
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
+export type InsertCollection = z.infer<typeof insertCollectionSchema>;
+export type Collection = typeof collections.$inferSelect;
+
+export type InsertCollectionBookmark = z.infer<typeof insertCollectionBookmarkSchema>;
+export type CollectionBookmark = typeof collectionBookmarks.$inferSelect;
+
 export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
 export type Bookmark = typeof bookmarks.$inferSelect;
 
