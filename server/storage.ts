@@ -12,7 +12,9 @@ import {
   settings, Setting, InsertSetting,
   users, User, InsertUser,
   collections, Collection, InsertCollection,
-  collectionBookmarks, CollectionBookmark, InsertCollectionBookmark
+  collectionBookmarks, CollectionBookmark, InsertCollectionBookmark,
+  xCredentials, XCredentials, InsertXCredentials,
+  xFolders, XFolder, InsertXFolder
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, inArray, and } from "drizzle-orm";
@@ -109,6 +111,15 @@ export interface IStorage {
   createSetting(setting: InsertSetting): Promise<Setting>;
   updateSetting(key: string, value: string): Promise<Setting | undefined>;
   deleteSetting(key: string): Promise<boolean>;
+  
+  // X.com integration
+  createXCredentials(credentials: InsertXCredentials): Promise<XCredentials>;
+  getXCredentialsByUserId(userId: string): Promise<XCredentials | undefined>;
+  updateXCredentials(id: string, credentials: Partial<XCredentials>): Promise<XCredentials | undefined>;
+  createXFolder(folder: InsertXFolder): Promise<XFolder>;
+  getXFoldersByUserId(userId: string): Promise<XFolder[]>;
+  updateXFolderLastSync(id: string): Promise<XFolder | undefined>;
+  findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined>;
 }
 
 // In-memory storage implementation as a fallback
