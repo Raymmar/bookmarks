@@ -45,6 +45,7 @@ export interface ProcessedUrlResult {
   normalized: string;
   exists: boolean;
   existingBookmarkId?: string;
+  existingForUser?: boolean;  // Indicates if this bookmark already exists for this specific user
 }
 
 export class BookmarkService {
@@ -58,7 +59,7 @@ export class BookmarkService {
    * Processes a URL to normalize it and check for duplicates
    * 
    * @param url The URL to process
-   * @param userId Optional user ID to check for URL duplicates only for the same user
+   * @param userId Optional user ID to check for URL duplicates for a user
    * @returns Processed URL result with normalization and existence information
    */
   async processUrl(url: string, userId?: string | null): Promise<ProcessedUrlResult> {
@@ -69,13 +70,31 @@ export class BookmarkService {
     // Normalize the URL (with tracking param removal)
     const normalizedUrl = normalizeUrl(url, true);
     
-    // Check if a bookmark with this normalized URL already exists for this user
+    // Check if a bookmark with this normalized URL already exists
     const bookmarks = await this.storage.getBookmarks();
     
-    // If userId is provided, only check for duplicates for that user
+    // Find matching bookmark for this user specifically
+    const existingUserBookmark = userId 
+      ? bookmarks.find(bookmark => 
+          areUrlsEquivalent(bookmark.url, normalizedUrl) && 
+          bookmark.user_id === userId
+        )
+      : null;
+    
+    // If we found a bookmark for this specific user, return it
+    if (existingUserBookmark) {
+      return {
+        original: url,
+        normalized: normalizedUrl,
+        exists: true,
+        existingBookmarkId: existingUserBookmark.id,
+        existingForUser: true
+      };
+    }
+    
+    // Find if URL exists in general for domain consolidation purposes
     const existingBookmark = bookmarks.find(bookmark => 
-      areUrlsEquivalent(bookmark.url, normalizedUrl) && 
-      (userId ? bookmark.user_id === userId : false)
+      areUrlsEquivalent(bookmark.url, normalizedUrl)
     );
     
     if (existingBookmark) {
@@ -83,7 +102,8 @@ export class BookmarkService {
         original: url,
         normalized: normalizedUrl,
         exists: true,
-        existingBookmarkId: existingBookmark.id
+        existingBookmarkId: existingBookmark.id,
+        existingForUser: false
       };
     } else {
       return {
@@ -356,18 +376,97 @@ export class BookmarkService {
     const urlResult = await this.processUrl(options.url, options.user_id);
     
     // Check for duplicates for this user only
-    if (urlResult.exists && urlResult.existingBookmarkId) {
-      // Return existing bookmark instead of creating a duplicate for the same user
+    if (urlResult.exists && urlResult.existingBookmarkId && urlResult.existingForUser) {
+      // URL already exists for this user - update the existing bookmark with new information
       const existingBookmark = await this.storage.getBookmark(urlResult.existingBookmarkId);
-      console.log(`URL already exists as bookmark for this user: ${urlResult.existingBookmarkId}`);
+      console.log(`URL already exists as bookmark for this user: ${urlResult.existingBookmarkId} - Updating with new information`);
       
       if (!existingBookmark) {
         throw new Error("Error retrieving existing bookmark");
       }
       
+      // Prepare update data object to enhance the bookmark with new information
+      const updateData: Partial<InsertBookmark> = {};
+      
+      // Append new description if provided (don't overwrite)
+      if (options.description && options.description.trim() !== '') {
+        if (existingBookmark.description) {
+          // Append to existing description with a separator
+          updateData.description = `${existingBookmark.description}\n\n--- Additional context ---\n${options.description}`;
+        } else {
+          updateData.description = options.description;
+        }
+      }
+      
+      // Update content_html if provided and different from existing
+      if (options.content_html && options.content_html !== existingBookmark.content_html) {
+        updateData.content_html = options.content_html;
+      }
+      
+      // Apply any updates to the bookmark if we have changes
+      if (Object.keys(updateData).length > 0) {
+        await this.storage.updateBookmark(urlResult.existingBookmarkId, updateData);
+        console.log(`Updated bookmark ${urlResult.existingBookmarkId} with new information`);
+      }
+      
+      // Add user tags if provided
+      if (options.tags && options.tags.length > 0) {
+        try {
+          // Get existing tags to avoid duplicates
+          const existingTags = await this.storage.getTagsByBookmarkId(urlResult.existingBookmarkId);
+          const existingTagNames = existingTags.map(tag => tag.name.toLowerCase());
+          
+          // Apply tag normalization to new user tags
+          const { processAITags } = await import('./tag-normalizer');
+          const normalizedTags = processAITags(options.tags);
+          
+          console.log(`Adding new tags to existing bookmark ${urlResult.existingBookmarkId}`);
+          for (const tagName of normalizedTags) {
+            // Skip if tag already exists on this bookmark
+            if (existingTagNames.includes(tagName.toLowerCase())) {
+              console.log(`Tag "${tagName}" already exists on bookmark ${urlResult.existingBookmarkId}, skipping`);
+              continue;
+            }
+            
+            // Check if tag exists in system
+            let tag = await this.storage.getTagByName(tagName);
+            
+            if (!tag) {
+              // Create tag if it doesn't exist
+              tag = await this.storage.createTag({
+                name: tagName,
+                type: "user"
+              });
+            }
+            
+            // Associate tag with bookmark
+            await this.storage.addTagToBookmark(urlResult.existingBookmarkId, tag.id);
+            
+            // Increment tag count
+            await this.storage.incrementTagCount(tag.id);
+            console.log(`Added new tag "${tagName}" to existing bookmark ${urlResult.existingBookmarkId}`);
+          }
+        } catch (error) {
+          console.error(`Error adding new tags to existing bookmark ${urlResult.existingBookmarkId}:`, error);
+        }
+      }
+      
+      // Get the updated bookmark with the new information
+      const updatedBookmark = await this.storage.getBookmark(urlResult.existingBookmarkId);
+      
+      // Create activity for bookmark update
+      await this.storage.createActivity({
+        bookmark_id: urlResult.existingBookmarkId,
+        bookmark_title: updatedBookmark.title,
+        type: "bookmark_updated",
+        timestamp: new Date(),
+        user_id: updatedBookmark.user_id
+      });
+      
       return {
-        bookmark: existingBookmark,
-        isExisting: true
+        bookmark: updatedBookmark,
+        isExisting: true,
+        wasUpdated: true
       };
     }
 
@@ -644,18 +743,21 @@ export class BookmarkService {
       const normalizedTags = processAITags(updateData.tags);
       console.log(`Normalized tags: ${normalizedTags.join(', ')}`);
       
-      // Get current tags
+      // Get current tags to avoid duplicates and preserve existing tags
       const currentTags = await this.storage.getTagsByBookmarkId(bookmarkId);
+      const currentTagNames = currentTags.map(tag => tag.name.toLowerCase());
       
-      // Remove existing tag associations
-      for (const tag of currentTags) {
-        await this.storage.removeTagFromBookmark(bookmarkId, tag.id);
-        await this.storage.decrementTagCount(tag.id);
-      }
+      console.log(`Adding new tags to existing bookmark ${bookmarkId}`);
       
-      // Add new normalized tags
+      // Add new normalized tags (only adding new ones, not replacing)
       for (const tagName of normalizedTags) {
-        // First check if the tag already exists
+        // Skip if tag already exists on this bookmark
+        if (currentTagNames.includes(tagName.toLowerCase())) {
+          console.log(`Tag "${tagName}" already exists on bookmark ${bookmarkId}, skipping`);
+          continue;
+        }
+        
+        // Check if tag exists in system
         let tag = await this.storage.getTagByName(tagName);
         
         if (!tag) {
@@ -671,6 +773,7 @@ export class BookmarkService {
         
         // Increment tag count
         await this.storage.incrementTagCount(tag.id);
+        console.log(`Added new tag "${tagName}" to existing bookmark ${bookmarkId}`);
       }
     }
     
