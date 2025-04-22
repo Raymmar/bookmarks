@@ -3,7 +3,7 @@ import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bookmark, Pencil, FileText, Lightbulb, LogIn } from "lucide-react";
+import { Bookmark, Pencil, FileText, Lightbulb, LogIn, PlusCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 interface ActivityFeedProps {
@@ -106,6 +106,8 @@ function getActivityTitle(activity: Activity): string {
       return "Highlighted content in";
     case "insight_generated":
       return "Generated insights for";
+    case "collection_created":
+      return "Created collection";
     default:
       return "Updated";
   }
@@ -123,6 +125,8 @@ function getActivityIcon(type: string) {
       return <Pencil className="h-5 w-5 text-orange-500" />;
     case "insight_generated":
       return <Lightbulb className="h-5 w-5 text-green-500" />;
+    case "collection_created":
+      return <PlusCircle className="h-5 w-5 text-purple-500" />;
     default:
       return <Bookmark className="h-5 w-5 text-gray-500" />;
   }
@@ -140,6 +144,8 @@ function getActivityIconBgColor(type: string): string {
       return "#ffedd5"; // orange-100
     case "insight_generated":
       return "#d1fae5"; // green-100
+    case "collection_created":
+      return "#f3e8ff"; // purple-100
     default:
       return "#f3f4f6"; // gray-100
   }

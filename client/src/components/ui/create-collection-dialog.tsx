@@ -48,6 +48,12 @@ export function CreateCollectionDialog({
         is_public: isPublic
       });
       
+      // Log activity for collection creation
+      await apiRequest("POST", "/api/activities", {
+        type: "collection_created",
+        content: name, // Pass the collection name as content
+      });
+      
       // Reset form
       setName("");
       setDescription("");
@@ -64,6 +70,8 @@ export function CreateCollectionDialog({
       
       // Invalidate collections query to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
+      // Invalidate activities query to refresh activity log
+      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
       
       // Notify parent component of the newly created collection
       if (onCollectionCreated) {
