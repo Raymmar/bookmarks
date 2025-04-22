@@ -44,43 +44,19 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
-  
-  // Listen for collection filter events from other components
-  useEffect(() => {
-    const handleFilterByCollection = (event: any) => {
-      console.log('SIDEBAR: filterByCollection event received:', event.detail);
-      
-      if (event.detail && 'collectionId' in event.detail) {
-        const newCollectionId = event.detail.collectionId;
-        console.log('SIDEBAR: Setting selectedCollectionId to:', newCollectionId);
-        setSelectedCollectionId(newCollectionId);
-      }
-    };
-    
-    window.addEventListener('filterByCollection', handleFilterByCollection);
-    return () => {
-      window.removeEventListener('filterByCollection', handleFilterByCollection);
-    };
-  }, []);
 
   // Handle collection selection
   const handleCollectionClick = (collectionId: string) => {
-    console.log(`Collection clicked: ${collectionId}`);
-    
     if (selectedCollectionId === collectionId) {
       // If clicking the same collection, deselect it
-      console.log(`Deselecting collection: ${collectionId}`);
       setSelectedCollectionId(null);
       // Clear the collection filter by dispatching an event
       window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId: null } }));
-      console.log('Dispatched event with null collectionId');
     } else {
       // Select the collection
-      console.log(`Selecting collection: ${collectionId}`);
       setSelectedCollectionId(collectionId);
       // Filter bookmarks by collection by dispatching an event
       window.dispatchEvent(new CustomEvent('filterByCollection', { detail: { collectionId } }));
-      console.log('Dispatched event with collectionId:', collectionId);
     }
   };
 

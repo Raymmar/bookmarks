@@ -103,17 +103,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
       });
       
       // Create tag nodes and connect bookmark to its tags
-      // Get tags from the normalized tag system (for backward compatibility)
-      const bookmarkTags = bookmark.tags || [];
-      const tagNames = bookmarkTags.map(tag => typeof tag === 'string' ? tag : tag.name);
-      
-      // Fallback for legacy data structure if needed
-      const legacyUserTags = bookmark.user_tags || [];
-      const legacySystemTags = bookmark.system_tags || [];
-      
-      // Combine all tag sources and deduplicate
-      const allTags = [...new Set([...tagNames, ...legacyUserTags, ...legacySystemTags])];
-      
+      const allTags = [...new Set([...bookmark.user_tags, ...bookmark.system_tags])];
       allTags.forEach(tag => {
         // Create tag node if not exists
         if (!tagNodes[tag]) {
@@ -199,22 +189,8 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick }: For
         }
         
         // Connect by common tags with stronger connections for more matches
-        // Get tags from the normalized tag system for both bookmarks
-        const bookmarkTagsA = bookmarkA.tags || [];
-        const tagNamesA = bookmarkTagsA.map(tag => typeof tag === 'string' ? tag : tag.name);
-        
-        const bookmarkTagsB = bookmarkB.tags || [];
-        const tagNamesB = bookmarkTagsB.map(tag => typeof tag === 'string' ? tag : tag.name);
-        
-        // Fallback for legacy data structures if needed
-        const legacyUserTagsA = bookmarkA.user_tags || [];
-        const legacySystemTagsA = bookmarkA.system_tags || [];
-        const legacyUserTagsB = bookmarkB.user_tags || [];
-        const legacySystemTagsB = bookmarkB.system_tags || [];
-        
-        // Combine all tag sources for each bookmark and deduplicate
-        const tagsA = [...new Set([...tagNamesA, ...legacyUserTagsA, ...legacySystemTagsA])];
-        const tagsB = [...new Set([...tagNamesB, ...legacyUserTagsB, ...legacySystemTagsB])];
+        const tagsA = [...new Set([...bookmarkA.user_tags, ...bookmarkA.system_tags])];
+        const tagsB = [...new Set([...bookmarkB.user_tags, ...bookmarkB.system_tags])];
         
         const commonTags = tagsA.filter(tag => tagsB.includes(tag));
         

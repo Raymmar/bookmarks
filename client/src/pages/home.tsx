@@ -21,55 +21,8 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState("newest");
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [insightLevel, setInsightLevel] = useState(1);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
-  // Fetch collections
-  const { data: collections = [], isLoading: collectionsLoading } = useCollections();
-  
-  // Listen for collection filter events from the sidebar
-  useEffect(() => {
-    const handleFilterByCollection = (event: any) => {
-      console.log('HOME: filterByCollection event received:', event.detail);
-      
-      // DEBUG: Print the current state before changing
-      console.log('HOME BEFORE: Current state -', { 
-        selectedCollectionId, 
-        bookmarksCount: bookmarks.length,
-        bookmarksInCollectionCount: bookmarksInCollection?.length || 0,
-      });
-      
-      if (event.detail && 'collectionId' in event.detail) {
-        const newCollectionId = event.detail.collectionId;
-        console.log('HOME: Setting selectedCollectionId to:', newCollectionId);
-        
-        // INTENTIONALLY LOG EVERYTHING TO DEBUG COLLECTION CHANGE PIPELINE
-        
-        // Set the new collection ID first
-        setSelectedCollectionId(newCollectionId);
-        
-        // Force query invalidation to refresh data
-        if (newCollectionId) {
-          console.log(`HOME: *** APPLYING COLLECTION FILTER ${newCollectionId} ***`);
-          queryClient.invalidateQueries({ 
-            queryKey: ['/api/collections/bookmarks', newCollectionId] 
-          });
-        } else {
-          console.log('HOME: *** CLEARING COLLECTION FILTER ***');
-        }
-        
-        // THIS SHOULD TRIGGER A RE-RENDER
-        console.log(`HOME: State updated, component should re-render`);
-      }
-    };
-    
-    console.log('HOME: Adding filterByCollection event listener');
-    window.addEventListener('filterByCollection', handleFilterByCollection);
-    return () => {
-      window.removeEventListener('filterByCollection', handleFilterByCollection);
-    };
-  }, [queryClient, selectedCollectionId]); // Only depend on selectedCollectionId, not bookmarksInCollection
 
   const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
@@ -81,63 +34,7 @@ export default function Home() {
 
   const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
 
-  // Get bookmarks in the selected collection directly from the API
-  const { data: bookmarksInCollection = [], isLoading: isCollectionBookmarksLoading } = useQuery({
-    queryKey: ['/api/collections/bookmarks', selectedCollectionId],
-    queryFn: async () => {
-      console.log("QUERY FUNCTION CALLED with selectedCollectionId:", selectedCollectionId);
-      if (!selectedCollectionId) {
-        console.log("No selectedCollectionId, returning empty array");
-        return [];
-      }
-      
-      try {
-        // Get bookmark references from collection
-        console.log(`Fetching bookmarks from collection ${selectedCollectionId}...`);
-        const result = await apiRequest('GET', `/api/collections/${selectedCollectionId}/bookmarks`);
-        console.log("API RESULT for collection bookmarks:", result);
-        
-        if (!result || !result.length) {
-          console.log(`No bookmarks found in collection ${selectedCollectionId}`);
-          return [];
-        }
-        
-        // Extract bookmark IDs
-        const bookmarkIds = result.map((item: any) => item.bookmark_id);
-        console.log(`Found ${bookmarkIds.length} bookmarks in collection ${selectedCollectionId}, IDs:`, bookmarkIds);
-        
-        // Get all bookmarks first to avoid timing issues
-        const allBookmarks = await apiRequest('GET', '/api/bookmarks');
-        console.log(`Got ${allBookmarks.length} total bookmarks to filter from`);
-        
-        // Map to actual bookmark objects
-        const filteredBookmarks = allBookmarks.filter((bookmark: any) => bookmarkIds.includes(bookmark.id));
-        console.log(`Filtered to ${filteredBookmarks.length} bookmark objects from all ${allBookmarks.length} bookmarks`);
-        
-        // This is critical information
-        console.log(`--- COLLECTION FILTER RESULT: ${filteredBookmarks.length} bookmarks ---`);
-        return filteredBookmarks;
-      } catch (error) {
-        console.error("Error fetching collection bookmarks:", error);
-        return [];
-      }
-    },
-    enabled: !!selectedCollectionId
-  });
-  
-  // Choose which bookmarks to display based on whether a collection is selected
-  const bookmarksToFilter = selectedCollectionId ? bookmarksInCollection : bookmarks;
-  
-  // Log for debugging
-  useEffect(() => {
-    if (selectedCollectionId) {
-      const collectionName = collections.find(c => c.id === selectedCollectionId)?.name || 'Unknown';
-      console.log(`Filtering for collection "${collectionName}" (${selectedCollectionId}): ${bookmarksInCollection.length} bookmarks found`);
-    }
-  }, [selectedCollectionId, bookmarksInCollection, collections]);
-  
-  // Filter bookmarks by search query
-  const filteredBookmarks = bookmarksToFilter.filter(bookmark => {
+  const filteredBookmarks = bookmarks.filter(bookmark => {
     if (!searchQuery) return true;
     
     const searchLower = searchQuery.toLowerCase();
@@ -145,8 +42,8 @@ export default function Home() {
       bookmark.title.toLowerCase().includes(searchLower) ||
       bookmark.description?.toLowerCase().includes(searchLower) ||
       bookmark.url.toLowerCase().includes(searchLower) ||
-      bookmark.user_tags?.some(tag => tag.toLowerCase().includes(searchLower)) ||
-      bookmark.system_tags?.some(tag => tag.toLowerCase().includes(searchLower))
+      bookmark.user_tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
+      bookmark.system_tags.some(tag => tag.toLowerCase().includes(searchLower))
     );
   });
 
@@ -158,16 +55,6 @@ export default function Home() {
     }
     return 0;
   });
-  
-  // Log sorting results for debugging
-  useEffect(() => {
-    console.log(`Bookmarks pipeline: 
-      - Total bookmarks: ${bookmarks.length}
-      - Collection filtered: ${bookmarksToFilter.length}
-      - Search + collection filtered: ${filteredBookmarks.length}
-      - Final sorted: ${sortedBookmarks.length}
-    `);
-  }, [bookmarks.length, bookmarksToFilter.length, filteredBookmarks.length, sortedBookmarks.length]);
 
   const handleDeleteBookmark = async (id: string) => {
     try {
@@ -178,16 +65,8 @@ export default function Home() {
         description: "Your bookmark was successfully deleted",
       });
       
-      // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
-      
-      // If we're in a collection view, also invalidate the collection bookmarks
-      if (selectedCollectionId) {
-        queryClient.invalidateQueries({ 
-          queryKey: ['/api/collections/bookmarks', selectedCollectionId] 
-        });
-      }
       
       if (selectedBookmarkId === id) {
         setSelectedBookmarkId(null);
@@ -293,46 +172,7 @@ export default function Home() {
               <TabsContent value="cards" className="space-y-8 mt-0">
                 {/* Card View */}
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800">
-                      {selectedCollectionId 
-                        ? 'Collection: ' + (collections.find(c => c.id === selectedCollectionId)?.name || 'Loading...')
-                        : 'All Bookmarks'}
-                    </h2>
-                    
-                    {/* Show clear filter button when a collection is selected */}
-                    {selectedCollectionId && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCollectionId(null);
-                          // Dispatch event to clear the selection in sidebar
-                          window.dispatchEvent(new CustomEvent('filterByCollection', { 
-                            detail: { collectionId: null } 
-                          }));
-                        }}
-                        className="text-xs"
-                      >
-                        Clear Collection Filter
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {selectedCollectionId && (
-                    <div className="mb-4">
-                      <Badge 
-                        variant="outline" 
-                        className="flex items-center gap-1 bg-primary/10 text-primary border-primary/30"
-                      >
-                        <FolderOpen className="h-3 w-3" />
-                        {collections.find(c => c.id === selectedCollectionId)?.name || 'Collection'}
-                        {collections.find(c => c.id === selectedCollectionId)?.is_public === false && 
-                          <span className="text-xs text-gray-500">(Private)</span>
-                        }
-                      </Badge>
-                    </div>
-                  )}
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Bookmarks</h2>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {sortedBookmarks.map((bookmark) => (
@@ -350,46 +190,7 @@ export default function Home() {
               <TabsContent value="list" className="space-y-8 mt-0">
                 {/* List View */}
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800">
-                      {selectedCollectionId 
-                        ? 'Collection: ' + (collections.find(c => c.id === selectedCollectionId)?.name || 'Loading...')
-                        : 'All Bookmarks'}
-                    </h2>
-                    
-                    {/* Show clear filter button when a collection is selected */}
-                    {selectedCollectionId && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCollectionId(null);
-                          // Dispatch event to clear the selection in sidebar
-                          window.dispatchEvent(new CustomEvent('filterByCollection', { 
-                            detail: { collectionId: null } 
-                          }));
-                        }}
-                        className="text-xs"
-                      >
-                        Clear Collection Filter
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {selectedCollectionId && (
-                    <div className="mb-4">
-                      <Badge 
-                        variant="outline" 
-                        className="flex items-center gap-1 bg-primary/10 text-primary border-primary/30"
-                      >
-                        <FolderOpen className="h-3 w-3" />
-                        {collections.find(c => c.id === selectedCollectionId)?.name || 'Collection'}
-                        {collections.find(c => c.id === selectedCollectionId)?.is_public === false && 
-                          <span className="text-xs text-gray-500">(Private)</span>
-                        }
-                      </Badge>
-                    </div>
-                  )}
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">Bookmarks List</h2>
                   
                   <div className="space-y-2">
                     {sortedBookmarks.map((bookmark) => (
@@ -424,29 +225,8 @@ export default function Home() {
                 {/* Graph View */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800">
-                      {selectedCollectionId 
-                        ? 'Collection Graph: ' + (collections.find(c => c.id === selectedCollectionId)?.name || 'Loading...')
-                        : 'Knowledge Graph'}
-                    </h2>
+                    <h2 className="text-lg font-semibold text-gray-800">Knowledge Graph</h2>
                     <div className="flex items-center space-x-3">
-                      {/* Show clear filter button when a collection is selected */}
-                      {selectedCollectionId && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedCollectionId(null);
-                            // Dispatch event to clear the selection in sidebar
-                            window.dispatchEvent(new CustomEvent('filterByCollection', { 
-                              detail: { collectionId: null } 
-                            }));
-                          }}
-                          className="text-xs"
-                        >
-                          Show All Bookmarks
-                        </Button>
-                      )}
                       <Select value={String(insightLevel)} onValueChange={(value) => setInsightLevel(parseInt(value))}>
                         <SelectTrigger className="w-48">
                           <SelectValue placeholder="Insight depth" />
@@ -461,50 +241,12 @@ export default function Home() {
                     </div>
                   </div>
                   
-                  {selectedCollectionId && (
-                    <div className="mb-4">
-                      <Badge 
-                        variant="outline" 
-                        className="flex items-center gap-1 bg-primary/10 text-primary border-primary/30"
-                      >
-                        <FolderOpen className="h-3 w-3" />
-                        {collections.find(c => c.id === selectedCollectionId)?.name || 'Collection'}
-                        {collections.find(c => c.id === selectedCollectionId)?.is_public === false && 
-                          <span className="text-xs text-gray-500">(Private)</span>
-                        }
-                      </Badge>
-                    </div>
-                  )}
-                  
                   <div className="h-80 border border-gray-200 rounded-lg overflow-hidden bg-white">
-                    {/* This logs what we're rendering to help with debugging */}
-                    {console.log(
-                      selectedCollectionId 
-                        ? `DEBUG: Rendering graph with collection (${selectedCollectionId})`
-                        : 'DEBUG: Rendering graph with all bookmarks',
-                      `\nBookmarks count: ${sortedBookmarks.length}`
-                    )}
-
-                    {/* We MUST have a "key" that changes whenever the collection changes 
-                       to force D3 to completely re-render the graph with new data. 
-                       The timestamp ensures a fresh render on every state change */}
                     <ForceDirectedGraph 
-                      key={`graph-${selectedCollectionId || 'all'}-${new Date().getTime()}`}
                       bookmarks={sortedBookmarks} 
                       insightLevel={insightLevel}
                       onNodeClick={(id) => setSelectedBookmarkId(id)}
                     />
-                    {/* Add debug information for verifying the graph is getting updated data */}
-                    <div className="p-1 flex justify-between text-xs text-gray-400">
-                      <div>
-                        {selectedCollectionId ? 
-                          `Showing ${sortedBookmarks.length} bookmarks in collection` : 
-                          `Showing ${sortedBookmarks.length} total bookmarks`}
-                      </div>
-                      <div>
-                        Filter pipeline: {bookmarks.length} → {bookmarksToFilter.length} → {sortedBookmarks.length}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </TabsContent>
