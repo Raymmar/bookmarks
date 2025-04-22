@@ -39,6 +39,7 @@ export interface IStorage {
   
   // Collections
   getCollections(userId?: string): Promise<Collection[]>;
+  getPublicCollections(): Promise<Collection[]>;
   getCollection(id: string): Promise<Collection | undefined>;
   createCollection(collection: InsertCollection): Promise<Collection>;
   updateCollection(id: string, collection: Partial<InsertCollection>): Promise<Collection | undefined>;
@@ -209,6 +210,12 @@ export class MemStorage implements IStorage {
       );
     }
     return Array.from(this.collections.values());
+  }
+  
+  async getPublicCollections(): Promise<Collection[]> {
+    return Array.from(this.collections.values()).filter(
+      collection => collection.is_public
+    );
   }
   
   async getCollection(id: string): Promise<Collection | undefined> {
@@ -841,6 +848,10 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(collections).where(eq(collections.user_id, userId));
     }
     return await db.select().from(collections);
+  }
+  
+  async getPublicCollections(): Promise<Collection[]> {
+    return await db.select().from(collections).where(eq(collections.is_public, true));
   }
   
   async getCollection(id: string): Promise<Collection | undefined> {

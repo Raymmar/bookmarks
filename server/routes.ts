@@ -979,6 +979,218 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Collections API endpoints
+  app.get("/api/collections", async (req, res) => {
+    try {
+      // If user is authenticated, filter collections by user_id or public status
+      let collections = [];
+      if (req.isAuthenticated()) {
+        const userId = (req.user as Express.User).id;
+        // Get both the user's collections and any public collections
+        collections = await storage.getCollections(userId);
+      } else {
+        // Only return public collections for unauthenticated users
+        collections = await storage.getPublicCollections();
+      }
+      res.json(collections);
+    } catch (error) {
+      console.error("Error retrieving collections:", error);
+      res.status(500).json({ error: "Failed to retrieve collections" });
+    }
+  });
+
+  app.get("/api/collections/:id", async (req, res) => {
+    try {
+      const collection = await storage.getCollection(req.params.id);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+
+      // Check if user can access this collection
+      if (!req.isAuthenticated() && !collection.is_public) {
+        return res.status(403).json({ error: "Access denied to private collection" });
+      }
+
+      // Get bookmarks in this collection
+      const bookmarks = await storage.getBookmarksByCollectionId(collection.id);
+      
+      res.json({
+        ...collection,
+        bookmarks
+      });
+    } catch (error) {
+      console.error("Error retrieving collection:", error);
+      res.status(500).json({ error: "Failed to retrieve collection" });
+    }
+  });
+
+  app.post("/api/collections", async (req, res) => {
+    try {
+      // User must be authenticated to create a collection
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      
+      const { name, description, is_public } = req.body;
+
+      // Validate required fields
+      if (!name) {
+        return res.status(400).json({ error: "Collection name is required" });
+      }
+
+      const collection = await storage.createCollection({
+        name,
+        description: description || "",
+        user_id: userId,
+        is_public: is_public === true || is_public === "true"
+      });
+
+      res.status(201).json(collection);
+    } catch (error) {
+      console.error("Error creating collection:", error);
+      res.status(500).json({ error: "Failed to create collection" });
+    }
+  });
+
+  app.put("/api/collections/:id", async (req, res) => {
+    try {
+      // User must be authenticated to update a collection
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const collectionId = req.params.id;
+      
+      // Get the collection to verify ownership
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      // Check if user owns this collection
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only update your own collections" });
+      }
+      
+      const { name, description, is_public } = req.body;
+      
+      const updatedCollection = await storage.updateCollection(collectionId, {
+        name,
+        description,
+        is_public
+      });
+      
+      res.json(updatedCollection);
+    } catch (error) {
+      console.error("Error updating collection:", error);
+      res.status(500).json({ error: "Failed to update collection" });
+    }
+  });
+
+  app.delete("/api/collections/:id", async (req, res) => {
+    try {
+      // User must be authenticated to delete a collection
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const collectionId = req.params.id;
+      
+      // Get the collection to verify ownership
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      // Check if user owns this collection
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only delete your own collections" });
+      }
+      
+      await storage.deleteCollection(collectionId);
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting collection:", error);
+      res.status(500).json({ error: "Failed to delete collection" });
+    }
+  });
+
+  // Collection-Bookmark relationship API
+  app.post("/api/collections/:collectionId/bookmarks/:bookmarkId", async (req, res) => {
+    try {
+      // User must be authenticated to add bookmarks to collections
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const { collectionId, bookmarkId } = req.params;
+      
+      // Verify the collection exists and user owns it
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only add bookmarks to your own collections" });
+      }
+      
+      // Verify the bookmark exists
+      const bookmark = await storage.getBookmark(bookmarkId);
+      
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      const result = await storage.addBookmarkToCollection(collectionId, bookmarkId);
+      
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error adding bookmark to collection:", error);
+      res.status(500).json({ error: "Failed to add bookmark to collection" });
+    }
+  });
+
+  app.delete("/api/collections/:collectionId/bookmarks/:bookmarkId", async (req, res) => {
+    try {
+      // User must be authenticated to remove bookmarks from collections
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const { collectionId, bookmarkId } = req.params;
+      
+      // Verify the collection exists and user owns it
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only remove bookmarks from your own collections" });
+      }
+      
+      await storage.removeBookmarkFromCollection(collectionId, bookmarkId);
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing bookmark from collection:", error);
+      res.status(500).json({ error: "Failed to remove bookmark from collection" });
+    }
+  });
+  
   // Settings API endpoints
   app.get("/api/settings", async (req, res) => {
     try {
