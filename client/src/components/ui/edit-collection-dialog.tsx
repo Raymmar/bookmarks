@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useCollectionMutations } from "@/hooks/use-collection-queries";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 interface EditCollectionDialogProps {
   open: boolean;
@@ -31,9 +31,8 @@ export function EditCollectionDialog({
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const { toast } = useToast();
-  const { updateCollection, deleteCollection } = useCollectionMutations();
+  const { updateCollection } = useCollectionMutations();
 
   // Reset form when the collection changes or dialog opens
   useEffect(() => {
@@ -88,140 +87,67 @@ export function EditCollectionDialog({
     }
   };
 
-  const handleDelete = async () => {
-    if (!collection) return;
-    
-    setIsSubmitting(true);
-    
-    // Close dialogs immediately for optimistic UI
-    onOpenChange(false);
-    setConfirmDeleteOpen(false);
-    
-    // Show optimistic success message
-    toast({
-      title: "Collection deleted",
-      description: "Your collection has been deleted successfully",
-    });
-    
-    try {
-      // Trigger callback before actual deletion to update UI
-      if (onCollectionUpdated) {
-        onCollectionUpdated();
-      }
-      
-      // Perform the actual deletion
-      await deleteCollection.mutateAsync(collection.id, {
-        onError: (error) => {
-          console.error('Error deleting collection:', error);
-          // Only show error if the deletion actually fails
-          toast({
-            title: "Error occurred",
-            description: "There was an issue with syncing the deletion. Please refresh the page.",
-            variant: "destructive",
-          });
-        }
-      });
-    } catch (error) {
-      // This is a fallback and likely won't be reached due to the onError handler above
-      console.error('Error deleting collection:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+
 
   if (!collection) return null;
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Collection</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1"
-                placeholder="My Research Collection"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="description">Description <span className="text-gray-400 text-xs">(Optional)</span></Label>
-              <Textarea
-                id="description"
-                placeholder="A brief description of this collection"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            
-            <div className="flex items-center space-x-2 pt-2">
-              <Switch 
-                id="is-public" 
-                checked={isPublic} 
-                onCheckedChange={setIsPublic}
-              />
-              <Label htmlFor="is-public" className="text-sm">
-                Make collection public
-              </Label>
-            </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Collection</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1"
+              placeholder="My Research Collection"
+            />
           </div>
-          <DialogFooter className="flex justify-between sm:justify-between">
-            <Button 
-              variant="destructive"
-              onClick={() => setConfirmDeleteOpen(true)}
-              disabled={isSubmitting}
-              size="sm"
-            >
-              Delete Collection
-            </Button>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete collection</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this collection? This action cannot be undone.
-              This will only remove the collection, not the bookmarks within it.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
-              disabled={isSubmitting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isSubmitting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+          
+          <div>
+            <Label htmlFor="description">Description <span className="text-gray-400 text-xs">(Optional)</span></Label>
+            <Textarea
+              id="description"
+              placeholder="A brief description of this collection"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+          
+          <div className="flex items-center space-x-2 pt-2">
+            <Switch 
+              id="is-public" 
+              checked={isPublic} 
+              onCheckedChange={setIsPublic}
+            />
+            <Label htmlFor="is-public" className="text-sm">
+              Make collection public
+            </Label>
+          </div>
+        </div>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Saving..." : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
