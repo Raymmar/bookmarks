@@ -131,6 +131,11 @@ export class MemStorage implements IStorage {
   // Settings
   private settings: Map<string, Setting>;
   
+  // Database access - this is just a stub for the in-memory implementation
+  getDb(): typeof db {
+    throw new Error("Cannot access database directly in MemStorage mode");
+  }
+  
   constructor() {
     this.users = new Map();
     this.bookmarks = new Map();
@@ -789,6 +794,10 @@ export class MemStorage implements IStorage {
 
 // PostgreSQL database storage implementation
 export class DatabaseStorage implements IStorage {
+  // Database access - provide raw access to the database for direct queries
+  getDb(): typeof db {
+    return db;
+  }
   // Users
   async getUsers(): Promise<User[]> {
     return await db.select().from(users);
