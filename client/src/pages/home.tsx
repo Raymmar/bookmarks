@@ -82,7 +82,7 @@ export default function Home() {
         // Get bookmark references from collection
         console.log(`Fetching bookmarks from collection ${selectedCollectionId}...`);
         const result = await apiRequest('GET', `/api/collections/${selectedCollectionId}/bookmarks`);
-        console.log("API RESULT:", result);
+        console.log("API RESULT for collection bookmarks:", result);
         
         if (!result || !result.length) {
           console.log(`No bookmarks found in collection ${selectedCollectionId}`);
@@ -95,7 +95,10 @@ export default function Home() {
         
         // Map to actual bookmark objects
         const filteredBookmarks = bookmarks.filter(bookmark => bookmarkIds.includes(bookmark.id));
-        console.log(`Filtered to ${filteredBookmarks.length} bookmark objects`);
+        console.log(`Filtered to ${filteredBookmarks.length} bookmark objects from all ${bookmarks.length} bookmarks`);
+        
+        // This is critical information
+        console.log(`--- COLLECTION FILTER RESULT: ${filteredBookmarks.length} bookmarks ---`);
         return filteredBookmarks;
       } catch (error) {
         console.error("Error fetching collection bookmarks:", error);
@@ -457,18 +460,31 @@ export default function Home() {
                   )}
                   
                   <div className="h-80 border border-gray-200 rounded-lg overflow-hidden bg-white">
-                    {/* Add a key based on the collection ID to force re-render of the graph */}
+                    {/* This logs what we're rendering to help with debugging */}
+                    {selectedCollectionId && console.log(
+                      'DEBUG: Rendering graph with collection filter. Collection ID:', selectedCollectionId,
+                      `\nCollection bookmarks: ${bookmarksInCollection.length}`,
+                      `\nFiltered+Sorted: ${sortedBookmarks.length}`
+                    )}
+
+                    {/* We MUST have a "key" that changes when collections or bookmark count changes 
+                       this forces D3 to completely re-render the graph */}
                     <ForceDirectedGraph 
-                      key={`graph-${selectedCollectionId || 'all'}-${sortedBookmarks.length}`}
+                      key={`graph-${selectedCollectionId || 'all'}-${new Date().getTime()}`}
                       bookmarks={sortedBookmarks} 
                       insightLevel={insightLevel}
                       onNodeClick={(id) => setSelectedBookmarkId(id)}
                     />
                     {/* Add debug information for verifying the graph is getting updated data */}
-                    <div className="p-1 text-xs text-gray-400">
-                      {selectedCollectionId ? 
-                        `Showing ${sortedBookmarks.length} bookmarks in collection` : 
-                        `Showing ${sortedBookmarks.length} total bookmarks`}
+                    <div className="p-1 flex justify-between text-xs text-gray-400">
+                      <div>
+                        {selectedCollectionId ? 
+                          `Showing ${sortedBookmarks.length} bookmarks in collection` : 
+                          `Showing ${sortedBookmarks.length} total bookmarks`}
+                      </div>
+                      <div>
+                        Filter pipeline: {bookmarks.length} → {bookmarksToFilter.length} → {sortedBookmarks.length}
+                      </div>
                     </div>
                   </div>
                 </div>
