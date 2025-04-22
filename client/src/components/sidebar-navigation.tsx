@@ -50,14 +50,9 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   // Track selected collections for multi-selection
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   
-  // Update selected collections when primary collection changes
-  useEffect(() => {
-    if (selectedCollectionId) {
-      setSelectedCollections([selectedCollectionId]);
-    } else {
-      setSelectedCollections([]);
-    }
-  }, [selectedCollectionId]);
+  // We'll remove this effect since we want to manage selectedCollections directly
+  // and keep selectedCollectionId only for backward compatibility with features
+  // that rely on a single collection being selected
   
   // Handle collection selection with improved multi-select
   const handleCollectionClick = (collectionId: string) => {
@@ -122,8 +117,15 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
         // Refresh collections
         queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
         
-        // Set the newly created collection as selected
-        setSelectedCollectionId(event.detail.collectionId);
+        // Add the new collection to selectedCollections
+        const newCollectionId = event.detail.collectionId;
+        setSelectedCollections([newCollectionId]);
+        setSelectedCollectionId(newCollectionId);
+        
+        // Trigger the filter event with the new collection
+        window.dispatchEvent(new CustomEvent('filterByCollection', { 
+          detail: { collectionId: newCollectionId, collectionIds: [newCollectionId] } 
+        }));
         
         // Show success toast
         toast({
@@ -231,17 +233,22 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
           
           {user && (
             <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xs uppercase font-semibold text-gray-500">Collections</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0"
-                  onClick={() => setCreateCollectionOpen(true)}
-                  title="Create new collection"
-                >
-                  <Plus className="h-4 w-4 text-gray-500" />
-                </Button>
+              <div className="flex flex-col space-y-1 mb-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs uppercase font-semibold text-gray-500">Collections</h2>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0"
+                    onClick={() => setCreateCollectionOpen(true)}
+                    title="Create new collection"
+                  >
+                    <Plus className="h-4 w-4 text-gray-500" />
+                  </Button>
+                </div>
+                <div className="text-xs text-gray-500 italic">
+                  Select multiple collections to combine views
+                </div>
               </div>
               
               <ul className="space-y-1">
