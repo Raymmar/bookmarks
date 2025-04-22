@@ -495,8 +495,8 @@ export default function GraphView() {
             </div>
           )}
           
-          {/* Tags drawer - minimal version */}
-          <div className="relative flex flex-wrap gap-1 items-center">
+          {/* Tags drawer - minimal version with container overflow visible for button */}
+          <div className="relative flex flex-wrap gap-1 items-center pb-1">
             {/* Tags display - either popular tags or all tags */}
             {(tagDrawerOpen ? allTags : popularTags).map(tag => (
               <Badge 
@@ -529,16 +529,17 @@ export default function GraphView() {
               </Badge>
             )}
             
-            {/* Absolute positioned close button when drawer is open */}
+            {/* Absolute positioned close button when drawer is open - with no spacing from corner */}
             {tagDrawerOpen && (
-              <button
-                className="absolute top-0 right-0 p-1.5 bg-gray-100 hover:bg-gray-200 flex items-center justify-center z-10"
-                onClick={toggleTagDrawer}
-                aria-label="Close tag drawer"
-                style={{ margin: 0 }}
-              >
-                <ChevronUp className="h-4 w-4 text-gray-700" />
-              </button>
+              <div className="absolute top-0 right-0 p-0 m-0 z-10">
+                <button
+                  onClick={toggleTagDrawer}
+                  aria-label="Close tag drawer"
+                  className="bg-gray-100 hover:bg-gray-200 flex items-center justify-center p-1"
+                >
+                  <ChevronUp className="h-4 w-4 text-gray-700" />
+                </button>
+              </div>
             )}
           </div>
         </div>
