@@ -105,12 +105,15 @@ export async function generateInsights(
     
     console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
+    // Basic system prompt to set context for the AI
+    const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
+    
     // Get custom system prompt
-    let systemPrompt;
+    let userSystemPrompt;
     
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
-      systemPrompt = customSystemPrompt;
+      userSystemPrompt = customSystemPrompt;
       console.log("Using provided custom system prompt for insights generation");
     } 
     // Otherwise get it from storage (we assume there will always be a default prompt set)
@@ -119,19 +122,22 @@ export async function generateInsights(
         // Use the summary prompt for insights generation
         const customPrompt = await storage.getSetting("summary_prompt");
         if (customPrompt && customPrompt.value) {
-          systemPrompt = customPrompt.value;
+          userSystemPrompt = customPrompt.value;
           console.log("Retrieved custom summary prompt from storage for insights generation");
         } else {
           // This case should not happen as per requirements, but keeping a minimal fallback
-          systemPrompt = "Analyze the content.";
+          userSystemPrompt = "Analyze the content.";
           console.log("No custom summary prompt found, using minimal fallback");
         }
       } catch (err) {
         // This case should not happen as per requirements, but keeping a minimal fallback
-        systemPrompt = "Analyze the content.";
+        userSystemPrompt = "Analyze the content.";
         console.warn("Error retrieving summary prompt, using minimal fallback:", err);
       }
     }
+    
+    // Combine base prompt with user prompt
+    let systemPrompt = `${baseSystemPrompt}\n\nUser Instructions: ${userSystemPrompt}`;
     
     // Add URL and depth level context to the system prompt
     if (url) {
@@ -277,12 +283,15 @@ export async function generateTags(content: string, url?: string, customSystemPr
     const useUrlDirectly = url && (!content || content.length < 100);
     console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
     
+    // Basic system prompt to set context for the AI
+    const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
+    
     // Get custom system prompt
-    let systemPrompt;
+    let userSystemPrompt;
     
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
-      systemPrompt = customSystemPrompt;
+      userSystemPrompt = customSystemPrompt;
       console.log("Using provided custom system prompt for tag generation");
     } 
     // Otherwise get it from storage (we assume there will always be a default prompt set)
@@ -290,19 +299,22 @@ export async function generateTags(content: string, url?: string, customSystemPr
       try {
         const customPrompt = await storage.getSetting("auto_tagging_prompt");
         if (customPrompt && customPrompt.value) {
-          systemPrompt = customPrompt.value;
+          userSystemPrompt = customPrompt.value;
           console.log("Retrieved custom tagging prompt from storage");
         } else {
           // This case should not happen as per requirements, but keeping a minimal fallback
-          systemPrompt = "Extract tags from the content.";
+          userSystemPrompt = "Extract tags from the content.";
           console.log("No custom tagging prompt found, using minimal fallback");
         }
       } catch (err) {
         // This case should not happen as per requirements, but keeping a minimal fallback
-        systemPrompt = "Extract tags from the content.";
+        userSystemPrompt = "Extract tags from the content.";
         console.warn("Error retrieving tagging prompt, using minimal fallback:", err);
       }
     }
+    
+    // Combine base prompt with user prompt
+    let systemPrompt = `${baseSystemPrompt}\n\nUser Instructions: ${userSystemPrompt}`;
     
     // Add URL context to the system prompt if available
     if (url) {
@@ -391,12 +403,15 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
   try {
     const contentToSummarize = content.slice(0, 8000); // Limit content to avoid token limits
     
+    // Basic system prompt to set context for the AI
+    const baseSystemPrompt = "You will receive content from a user submitted bookmark. Follow the user's instructions precisely.";
+    
     // Get custom system prompt
-    let systemPrompt;
+    let userSystemPrompt;
     
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
-      systemPrompt = customSystemPrompt;
+      userSystemPrompt = customSystemPrompt;
       console.log("Using provided custom system prompt for summarization");
     } 
     // Otherwise get it from storage (we assume there will always be a default prompt set)
@@ -404,19 +419,22 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
       try {
         const customPrompt = await storage.getSetting("summary_prompt");
         if (customPrompt && customPrompt.value) {
-          systemPrompt = customPrompt.value;
+          userSystemPrompt = customPrompt.value;
           console.log("Retrieved custom summary prompt from storage");
         } else {
           // This case should not happen as per requirements, but keeping a minimal fallback
-          systemPrompt = "Summarize the content.";
+          userSystemPrompt = "Summarize the content.";
           console.log("No custom summary prompt found, using minimal fallback");
         }
       } catch (err) {
         // This case should not happen as per requirements, but keeping a minimal fallback
-        systemPrompt = "Summarize the content.";
+        userSystemPrompt = "Summarize the content.";
         console.warn("Error retrieving summary prompt, using minimal fallback:", err);
       }
     }
+    
+    // Combine base prompt with user prompt
+    const systemPrompt = `${baseSystemPrompt}\n\nUser Instructions: ${userSystemPrompt}`;
 
     const response = await openai.chat.completions.create({
       model: MODEL,
