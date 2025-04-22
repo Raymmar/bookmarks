@@ -610,6 +610,7 @@ export class MemStorage implements IStorage {
       created_at: now,
       updated_at: now,
       filters: session.filters || null,
+      user_id: session.user_id || null,
     };
     
     this.chatSessions.set(id, newSession);
@@ -1218,7 +1219,8 @@ export class DatabaseStorage implements IStorage {
     const sessionData = {
       ...session,
       created_at: now,
-      updated_at: now
+      updated_at: now,
+      user_id: session.user_id || null // Make sure user_id is included
     };
     
     const [newSession] = await db

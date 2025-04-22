@@ -9,7 +9,8 @@ export const chatSessions = pgTable("chat_sessions", {
   title: text("title").default("New Chat"), // Making this nullable to fix the type error
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
-  filters: jsonb("filters") // Stores the filter settings for this chat session
+  filters: jsonb("filters"), // Stores the filter settings for this chat session
+  user_id: uuid("user_id").references(() => users.id), // Reference to the user who owns this chat session
 });
 
 // Chat Messages table to store conversation history
@@ -20,6 +21,23 @@ export const chatMessages = pgTable("chat_messages", {
   content: text("content").notNull(),
   timestamp: timestamp("timestamp").defaultNow().notNull()
 });
+
+// Define relationship between chat sessions and users
+export const chatSessionsRelations = relations(chatSessions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [chatSessions.user_id],
+    references: [users.id]
+  }),
+  messages: many(chatMessages)
+}));
+
+// Define relationship between chat messages and chat sessions
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  session: one(chatSessions, {
+    fields: [chatMessages.session_id],
+    references: [chatSessions.id]
+  })
+}));
 
 // Users table
 export const users = pgTable("users", {
@@ -148,6 +166,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   collections: many(collections),
   activities: many(activities),
   settings: many(settings),
+  chatSessions: many(chatSessions),
 }));
 
 export const activitiesRelations = relations(activities, ({ one }) => ({
