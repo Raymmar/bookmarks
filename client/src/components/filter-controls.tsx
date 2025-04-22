@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCollections } from "@/hooks/use-collection-queries";
 
 interface FilterControlsProps {
   tags: string[];
