@@ -1124,6 +1124,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Collection-Bookmark relationship API
+  // Get all bookmarks in a collection
+  app.get("/api/collections/:id/bookmarks", async (req, res) => {
+    try {
+      const collectionId = req.params.id;
+      
+      // Get the collection to check if it's public or the user owns it
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      // If the collection is private, check if the user is authorized to access it
+      if (!collection.is_public) {
+        // Check if user is authenticated
+        if (!req.isAuthenticated()) {
+          return res.status(401).json({ error: "Authentication required to access private collection" });
+        }
+        
+        // Check if user owns the collection
+        const userId = (req.user as Express.User).id;
+        if (collection.user_id !== userId) {
+          return res.status(403).json({ error: "You don't have permission to access this private collection" });
+        }
+      }
+      
+      // Get all bookmark_ids in this collection
+      const bookmarkRefs = await storage.getBookmarksInCollection(collectionId);
+      
+      // Return full bookmark objects for each bookmark in the collection
+      const bookmarks = [];
+      for (const ref of bookmarkRefs) {
+        const bookmark = await storage.getBookmark(ref.bookmark_id);
+        if (bookmark) {
+          bookmarks.push({
+            bookmark_id: ref.bookmark_id,
+            added_at: ref.created_at
+          });
+        }
+      }
+      
+      res.json(bookmarks);
+    } catch (error) {
+      console.error("Error getting bookmarks in collection:", error);
+      res.status(500).json({ error: "Failed to retrieve bookmarks in collection" });
+    }
+  });
+
   app.post("/api/collections/:collectionId/bookmarks/:bookmarkId", async (req, res) => {
     try {
       // User must be authenticated to add bookmarks to collections

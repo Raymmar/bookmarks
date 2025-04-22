@@ -57,11 +57,26 @@ export default function Home() {
     queryKey: ['/api/collections/bookmarks', selectedCollectionId],
     queryFn: async () => {
       if (!selectedCollectionId) return [];
-      // Get complete bookmark objects directly
-      const result = await apiRequest('GET', `/api/collections/${selectedCollectionId}/bookmarks`);
-      // Map the bookmark_ids to the actual bookmark objects
-      const bookmarkIds = result.map((item: any) => item.bookmark_id);
-      return bookmarks.filter(bookmark => bookmarkIds.includes(bookmark.id));
+      
+      try {
+        // Get bookmark references from collection
+        const result = await apiRequest('GET', `/api/collections/${selectedCollectionId}/bookmarks`);
+        
+        if (!result || !result.length) {
+          console.log(`No bookmarks found in collection ${selectedCollectionId}`);
+          return [];
+        }
+        
+        // Extract bookmark IDs
+        const bookmarkIds = result.map((item: any) => item.bookmark_id);
+        console.log(`Found ${bookmarkIds.length} bookmarks in collection ${selectedCollectionId}`);
+        
+        // Map to actual bookmark objects
+        return bookmarks.filter(bookmark => bookmarkIds.includes(bookmark.id));
+      } catch (error) {
+        console.error("Error fetching collection bookmarks:", error);
+        return [];
+      }
     },
     enabled: !!selectedCollectionId
   });
@@ -72,9 +87,10 @@ export default function Home() {
   // Log for debugging
   useEffect(() => {
     if (selectedCollectionId) {
-      console.log(`Filtering for collection ${selectedCollectionId}: ${bookmarksInCollection.length} bookmarks found`);
+      const collectionName = collections.find(c => c.id === selectedCollectionId)?.name || 'Unknown';
+      console.log(`Filtering for collection "${collectionName}" (${selectedCollectionId}): ${bookmarksInCollection.length} bookmarks found`);
     }
-  }, [selectedCollectionId, bookmarksInCollection]);
+  }, [selectedCollectionId, bookmarksInCollection, collections]);
   
   // Filter bookmarks by search query
   const filteredBookmarks = bookmarksToFilter.filter(bookmark => {
