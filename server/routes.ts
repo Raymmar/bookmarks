@@ -379,8 +379,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Activities API endpoints
   app.get("/api/activities", async (req, res) => {
     try {
-      const activities = await storage.getActivities();
-      res.json(activities);
+      // If user is authenticated, filter activities by user_id
+      if (req.isAuthenticated()) {
+        const userId = req.user.id;
+        const activities = await storage.getActivities(userId);
+        res.json(activities);
+      } else {
+        const activities = await storage.getActivities();
+        res.json(activities);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to retrieve activities" });
     }
@@ -914,6 +921,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!parsedData.success) {
         return res.status(400).json({ error: "Invalid setting data", details: parsedData.error });
+      }
+      
+      // Add user_id if authenticated
+      if (req.isAuthenticated()) {
+        parsedData.data.user_id = req.user.id;
       }
       
       // Check if setting already exists

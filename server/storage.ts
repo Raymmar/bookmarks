@@ -1002,7 +1002,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Activities
-  async getActivities(): Promise<Activity[]> {
+  async getActivities(userId?: string): Promise<Activity[]> {
+    if (userId) {
+      return await db
+        .select()
+        .from(activities)
+        .where(eq(activities.user_id, userId))
+        .orderBy(desc(activities.timestamp));
+    }
     return await db.select().from(activities).orderBy(desc(activities.timestamp));
   }
   
