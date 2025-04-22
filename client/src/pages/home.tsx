@@ -138,6 +138,16 @@ export default function Home() {
     }
     return 0;
   });
+  
+  // Log sorting results for debugging
+  useEffect(() => {
+    console.log(`Bookmarks pipeline: 
+      - Total bookmarks: ${bookmarks.length}
+      - Collection filtered: ${bookmarksToFilter.length}
+      - Search + collection filtered: ${filteredBookmarks.length}
+      - Final sorted: ${sortedBookmarks.length}
+    `);
+  }, [bookmarks.length, bookmarksToFilter.length, filteredBookmarks.length, sortedBookmarks.length]);
 
   const handleDeleteBookmark = async (id: string) => {
     try {
@@ -449,11 +459,17 @@ export default function Home() {
                   <div className="h-80 border border-gray-200 rounded-lg overflow-hidden bg-white">
                     {/* Add a key based on the collection ID to force re-render of the graph */}
                     <ForceDirectedGraph 
-                      key={`graph-${selectedCollectionId || 'all'}`}
+                      key={`graph-${selectedCollectionId || 'all'}-${sortedBookmarks.length}`}
                       bookmarks={sortedBookmarks} 
                       insightLevel={insightLevel}
                       onNodeClick={(id) => setSelectedBookmarkId(id)}
                     />
+                    {/* Add debug information for verifying the graph is getting updated data */}
+                    <div className="p-1 text-xs text-gray-400">
+                      {selectedCollectionId ? 
+                        `Showing ${sortedBookmarks.length} bookmarks in collection` : 
+                        `Showing ${sortedBookmarks.length} total bookmarks`}
+                    </div>
                   </div>
                 </div>
               </TabsContent>
