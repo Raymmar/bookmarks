@@ -63,7 +63,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                     {getActivityTitle(activity)}
                     {" "}
                     {activity.bookmark_id && activity.bookmark_title ? (
-                      <span className="text-primary">{activity.bookmark_title}</span>
+                      <span className="font-medium">{activity.bookmark_title}</span>
                     ) : null}
                   </p>
                   
