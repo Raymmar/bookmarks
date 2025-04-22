@@ -319,7 +319,8 @@ export class BookmarkService {
             bookmark_title: bookmark.title,
             type: "insight_generated",
             tags: insights.tags,
-            timestamp: new Date()
+            timestamp: new Date(),
+            user_id: bookmark.user_id // Include user_id from the bookmark
           });
           
           console.log(`Insights and activity created for bookmark ${bookmarkId}`);
@@ -401,7 +402,8 @@ export class BookmarkService {
       bookmark_id: bookmark.id,
       bookmark_title: bookmark.title,
       type: "bookmark_added",
-      timestamp: new Date()
+      timestamp: new Date(),
+      user_id: bookmark.user_id // Include user_id from the bookmark
     });
     
     // Add user tags immediately (don't wait for AI processing)
@@ -454,7 +456,8 @@ export class BookmarkService {
           bookmark_title: bookmark.title,
           type: "note_added",
           content: options.notes,
-          timestamp: new Date()
+          timestamp: new Date(),
+          user_id: bookmark.user_id // Include user_id from the bookmark
         });
       } catch (error) {
         console.error("Error adding notes:", error);
