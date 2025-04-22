@@ -662,7 +662,7 @@ export default function GraphView() {
                 <Badge 
                   key={`selected-${tag}-${index}`}
                   variant="default"
-                  className="cursor-pointer bg-primary hover:bg-primary/90 ring-2 ring-primary shadow-sm"
+                  className="cursor-pointer bg-primary hover:bg-primary/90"
                   onClick={() => toggleTagSelection(tag)}
                 >
                   {tag}
@@ -700,7 +700,7 @@ export default function GraphView() {
               <Badge 
                 key={`tag-${tag}-${index}`} // Using index to ensure unique keys
                 variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className={`cursor-pointer ${selectedTags.includes(tag) ? "ring-2 ring-primary shadow-sm" : ""}`}
+                className="cursor-pointer"
                 onClick={() => toggleTagSelection(tag)}
               >
                 {tag}
