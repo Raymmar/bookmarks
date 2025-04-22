@@ -111,6 +111,10 @@ export async function generateInsights(
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
       systemPrompt = customSystemPrompt;
+      // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+      if (!systemPrompt.toLowerCase().includes("json")) {
+        systemPrompt += "\n\nPlease format your response as JSON.";
+      }
       console.log("Using provided custom system prompt for insights generation");
     } 
     // Otherwise try to get it from storage
@@ -120,15 +124,19 @@ export async function generateInsights(
         const customPrompt = await storage.getSetting("summary_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
+          // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+          if (!systemPrompt.toLowerCase().includes("json")) {
+            systemPrompt += "\n\nPlease format your response as JSON.";
+          }
           console.log("Retrieved custom summary prompt from storage for insights generation");
         } else {
           // If no custom prompt is available, use a minimal default with JSON format
-          systemPrompt = "Analyze the content and provide insights. Return your analysis in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
+          systemPrompt = "Analyze the content and provide insights. Return your response in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
           console.log("No custom summary prompt found, using minimal default for insights");
         }
       } catch (err) {
         // If error retrieving, use a minimal default with JSON format
-        systemPrompt = "Analyze the content and provide insights. Return your analysis in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
+        systemPrompt = "Analyze the content and provide insights. Return your response in JSON format with the following structure: { \"summary\": \"A concise summary\", \"sentiment\": 5, \"tags\": [\"tag1\", \"tag2\"], \"relatedLinks\": [] }";
         console.warn("Error retrieving summary prompt, using minimal default for insights:", err);
       }
     }
@@ -283,6 +291,10 @@ export async function generateTags(content: string, url?: string, customSystemPr
     // Use custom system prompt if provided directly to this function
     if (customSystemPrompt) {
       systemPrompt = customSystemPrompt;
+      // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+      if (!systemPrompt.toLowerCase().includes("json")) {
+        systemPrompt += "\n\nPlease format your response as JSON.";
+      }
       console.log("Using provided custom system prompt for tag generation");
     } 
     // Otherwise try to get it from storage
@@ -291,15 +303,19 @@ export async function generateTags(content: string, url?: string, customSystemPr
         const customPrompt = await storage.getSetting("auto_tagging_prompt");
         if (customPrompt && customPrompt.value) {
           systemPrompt = customPrompt.value;
+          // Ensure the prompt contains "json" if we're using response_format: { type: "json_object" }
+          if (!systemPrompt.toLowerCase().includes("json")) {
+            systemPrompt += "\n\nPlease format your response as JSON.";
+          }
           console.log("Retrieved custom tagging prompt from storage");
         } else {
           // If no custom prompt is available, use a minimal default with JSON format
-          systemPrompt = "Extract tags from the content. Return your tags in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
+          systemPrompt = "Extract tags from the content. Return your response in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
           console.log("No custom tagging prompt found, using minimal default");
         }
       } catch (err) {
         // If error retrieving, use a minimal default with JSON format
-        systemPrompt = "Extract tags from the content. Return your tags in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
+        systemPrompt = "Extract tags from the content. Return your response in JSON format with the following structure: { \"tags\": [\"tag1\", \"tag2\", \"tag3\"] }";
         console.warn("Error retrieving tagging prompt, using minimal default:", err);
       }
     }
