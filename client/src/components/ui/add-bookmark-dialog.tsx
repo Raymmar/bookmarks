@@ -23,7 +23,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
   const [url, setUrl] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
-  const [collectionId, setCollectionId] = useState("");
+  const [collectionId, setCollectionId] = useState("none");
   const [showNewCollectionDialog, setShowNewCollectionDialog] = useState(false);
   const [autoExtract, setAutoExtract] = useState(true);
   const [insightDepth, setInsightDepth] = useState("1");
@@ -163,7 +163,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       }
       
       // If a collection was selected and we have a bookmark ID, add it to the collection
-      if (collectionId && bookmarkId) {
+      if (collectionId && collectionId !== "none" && bookmarkId) {
         try {
           await addBookmarkToCollection.mutateAsync({
             collectionId,
@@ -189,7 +189,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
       setUrl("");
       setSelectedTags([]);
       setNotes("");
-      setCollectionId("");
+      setCollectionId("none");
       setAutoExtract(true);
       setInsightDepth("1");
       
@@ -282,7 +282,7 @@ export function AddBookmarkDialog({ open, onOpenChange, onBookmarkAdded }: AddBo
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="">Not in a collection</SelectItem>
+                    <SelectItem value="none">Not in a collection</SelectItem>
                     {collections.map((collection) => (
                       <SelectItem key={collection.id} value={collection.id}>
                         {collection.name} {collection.is_public ? "(Public)" : "(Private)"}
