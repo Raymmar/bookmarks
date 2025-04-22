@@ -741,7 +741,27 @@ export function ForceDirectedGraph({
     
     // Generate new graph data, passing selectedBookmarkId for focused view
     const newGraphData = generateGraphData(bookmarks, insightLevel, selectedBookmarkId || undefined);
-    graphDataRef.current = newGraphData;
+    
+    // Filter nodes based on visible node types
+    const filteredNodes = newGraphData.nodes.filter(node => 
+      visibleNodeTypes.includes(node.type)
+    );
+    
+    // Create a set of visible node IDs for efficient lookup
+    const visibleNodeIds = new Set(filteredNodes.map(node => node.id));
+    
+    // Filter links to only include connections between visible nodes
+    const filteredLinks = newGraphData.links.filter(link => {
+      const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+      const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+    });
+    
+    // Store the filtered graph data
+    graphDataRef.current = {
+      nodes: filteredNodes,
+      links: filteredLinks
+    };
     
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
@@ -757,7 +777,7 @@ export function ForceDirectedGraph({
     });
     
     // Copy positions to new nodes
-    newGraphData.nodes.forEach(node => {
+    filteredNodes.forEach(node => {
       if (nodePositions.has(node.id)) {
         const pos = nodePositions.get(node.id);
         node.x = pos.x;
@@ -766,7 +786,7 @@ export function ForceDirectedGraph({
     });
     
     // Determine node count
-    const nodeCount = newGraphData.nodes.length;
+    const nodeCount = filteredNodes.length;
     
     // Set initial positions for new nodes and reset fixed positions
     // Now position any new nodes
@@ -788,8 +808,8 @@ export function ForceDirectedGraph({
     
     // Use the same physics configuration for all graphs, regardless of size
     simulationRef.current
-      .nodes(newGraphData.nodes)
-      .force("link", d3.forceLink<GraphNode, GraphLink>(newGraphData.links)
+      .nodes(filteredNodes)
+      .force("link", d3.forceLink<GraphNode, GraphLink>(filteredLinks)
         .id(d => d.id)
         .distance(d => {
           // Adjusted link distances - domain connections are half as long as tag connections
@@ -826,7 +846,7 @@ export function ForceDirectedGraph({
     
     const link = linkGroup
       .selectAll("line")
-      .data(newGraphData.links)
+      .data(filteredLinks)
       .enter()
       .append("line")
       .attr("class", "link")
@@ -838,7 +858,7 @@ export function ForceDirectedGraph({
     // Create node groups
     const node = nodeGroup
       .selectAll(".node")
-      .data(newGraphData.nodes)
+      .data(filteredNodes)
       .enter()
       .append("g")
       .attr("class", d => `node node-${d.type}`)
@@ -930,12 +950,12 @@ export function ForceDirectedGraph({
     // This avoids competing with manual node selection
     setTimeout(() => {
       if (!selectedNode) {
-        centerGraph(newGraphData.nodes);
+        centerGraph(filteredNodes);
       }
     }, 300);
     
   }, [bookmarks, insightLevel, generateGraphData, centerGraph, getLinkColor, 
-      getNodeColor, handleNodeClick, handleNodeHover, dragstarted, dragged, dragended]);
+      getNodeColor, handleNodeClick, handleNodeHover, dragstarted, dragged, dragended, visibleNodeTypes]);
 
   // Listen for external node selection and tag changes
   useEffect(() => {
