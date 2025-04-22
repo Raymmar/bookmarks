@@ -454,8 +454,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "URL is required" });
       }
       
+      // Get user ID if user is authenticated
+      const userId = req.isAuthenticated() ? (req.user as Express.User).id : null;
+      
       // Use the bookmark service to process the URL
-      const urlResult = await bookmarkService.processUrl(url);
+      // Pass the user ID to only check for duplicates for this specific user
+      const urlResult = await bookmarkService.processUrl(url, userId);
       
       // Return the result directly from the service
       return res.json(urlResult);
