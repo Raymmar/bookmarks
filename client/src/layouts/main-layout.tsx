@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { SidebarNavigation } from "@/components/sidebar-navigation";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -9,6 +10,20 @@ interface MainLayoutProps {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [location] = useLocation();
+  const { user } = useAuth();
+  
+  // Don't show navigation on auth page
+  const isAuthPage = location === "/auth";
+  
+  if (isAuthPage) {
+    return (
+      <div className="flex h-screen w-full">
+        <main className="flex-1 overflow-hidden w-full">
+          {children}
+        </main>
+      </div>
+    );
+  }
   
   return (
     <div className="flex h-screen w-full">
