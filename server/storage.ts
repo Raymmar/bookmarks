@@ -627,6 +627,241 @@ export class MemStorage implements IStorage {
     // Delete the setting
     return this.settings.delete(setting.id);
   }
+  
+  // User methods
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+  
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+  
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      user => user.username.toLowerCase() === username.toLowerCase()
+    );
+  }
+  
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      user => user.email.toLowerCase() === email.toLowerCase()
+    );
+  }
+  
+  async createUser(user: InsertUser): Promise<User> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newUser: User = {
+      ...user,
+      id,
+      created_at: now,
+      updated_at: now,
+    };
+    
+    this.users.set(id, newUser);
+    return newUser;
+  }
+  
+  async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      ...userUpdate,
+      updated_at: new Date()
+    };
+    
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(id);
+  }
+  
+  // Collections methods
+  async getCollections(): Promise<Collection[]> {
+    return Array.from(this.collections.values());
+  }
+  
+  async getPublicCollections(): Promise<Collection[]> {
+    return Array.from(this.collections.values()).filter(
+      collection => collection.is_public
+    );
+  }
+  
+  async getUserCollections(userId: string): Promise<Collection[]> {
+    return Array.from(this.collections.values()).filter(
+      collection => collection.owner_id === userId
+    );
+  }
+  
+  async getCollection(id: string): Promise<Collection | undefined> {
+    return this.collections.get(id);
+  }
+  
+  async getDefaultCollection(userId: string): Promise<Collection | undefined> {
+    return Array.from(this.collections.values()).find(
+      collection => collection.owner_id === userId && collection.is_default
+    );
+  }
+  
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newCollection: Collection = {
+      ...collection,
+      id,
+      created_at: now,
+      updated_at: now,
+    };
+    
+    this.collections.set(id, newCollection);
+    return newCollection;
+  }
+  
+  async updateCollection(id: string, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
+    const collection = this.collections.get(id);
+    if (!collection) return undefined;
+    
+    const updatedCollection: Collection = {
+      ...collection,
+      ...collectionUpdate,
+      updated_at: new Date()
+    };
+    
+    this.collections.set(id, updatedCollection);
+    return updatedCollection;
+  }
+  
+  async deleteCollection(id: string): Promise<boolean> {
+    return this.collections.delete(id);
+  }
+  
+  // Collection Memberships methods
+  async getCollectionMembers(collectionId: string): Promise<User[]> {
+    const memberships = Array.from(this.collectionMemberships.values()).filter(
+      membership => membership.collection_id === collectionId
+    );
+    
+    if (memberships.length === 0) {
+      return [];
+    }
+    
+    return memberships
+      .map(membership => this.users.get(membership.user_id))
+      .filter((user): user is User => !!user);
+  }
+  
+  async getUserCollectionMemberships(userId: string): Promise<CollectionMembership[]> {
+    return Array.from(this.collectionMemberships.values()).filter(
+      membership => membership.user_id === userId
+    );
+  }
+  
+  async addUserToCollection(
+    collectionId: string,
+    userId: string,
+    role: "viewer" | "editor" | "admin" = "viewer"
+  ): Promise<CollectionMembership> {
+    const id = crypto.randomUUID();
+    
+    const newMembership: CollectionMembership = {
+      id,
+      collection_id: collectionId,
+      user_id: userId,
+      role,
+    };
+    
+    this.collectionMemberships.set(id, newMembership);
+    return newMembership;
+  }
+  
+  async updateCollectionMembership(
+    collectionId: string,
+    userId: string,
+    role: "viewer" | "editor" | "admin"
+  ): Promise<CollectionMembership | undefined> {
+    const membership = Array.from(this.collectionMemberships.values()).find(
+      m => m.collection_id === collectionId && m.user_id === userId
+    );
+    
+    if (!membership) return undefined;
+    
+    const updatedMembership: CollectionMembership = {
+      ...membership,
+      role
+    };
+    
+    this.collectionMemberships.set(membership.id, updatedMembership);
+    return updatedMembership;
+  }
+  
+  async removeUserFromCollection(collectionId: string, userId: string): Promise<boolean> {
+    const membership = Array.from(this.collectionMemberships.values()).find(
+      m => m.collection_id === collectionId && m.user_id === userId
+    );
+    
+    if (!membership) return false;
+    
+    return this.collectionMemberships.delete(membership.id);
+  }
+  
+  // Bookmark-Collection relationships
+  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
+    const relationships = Array.from(this.bookmarkCollections.values()).filter(
+      rel => rel.collection_id === collectionId
+    );
+    
+    if (relationships.length === 0) {
+      return [];
+    }
+    
+    return relationships
+      .map(rel => this.bookmarks.get(rel.bookmark_id))
+      .filter((bookmark): bookmark is Bookmark => !!bookmark);
+  }
+  
+  async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
+    const relationships = Array.from(this.bookmarkCollections.values()).filter(
+      rel => rel.bookmark_id === bookmarkId
+    );
+    
+    if (relationships.length === 0) {
+      return [];
+    }
+    
+    return relationships
+      .map(rel => this.collections.get(rel.collection_id))
+      .filter((collection): collection is Collection => !!collection);
+  }
+  
+  async addBookmarkToCollection(bookmarkId: string, collectionId: string): Promise<BookmarkCollection> {
+    const id = crypto.randomUUID();
+    
+    const newRelationship: BookmarkCollection = {
+      id,
+      bookmark_id: bookmarkId,
+      collection_id: collectionId,
+    };
+    
+    this.bookmarkCollections.set(id, newRelationship);
+    return newRelationship;
+  }
+  
+  async removeBookmarkFromCollection(bookmarkId: string, collectionId: string): Promise<boolean> {
+    const relationship = Array.from(this.bookmarkCollections.values()).find(
+      rel => rel.bookmark_id === bookmarkId && rel.collection_id === collectionId
+    );
+    
+    if (!relationship) return false;
+    
+    return this.bookmarkCollections.delete(relationship.id);
+  }
 }
 
 // PostgreSQL database storage implementation
