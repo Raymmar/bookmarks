@@ -118,22 +118,10 @@ export async function generateInsights(
     } 
     // Otherwise get it from storage (we assume there will always be a default prompt set)
     else {
-      try {
-        // Use the summary prompt for insights generation
-        const customPrompt = await storage.getSetting("summary_prompt");
-        if (customPrompt && customPrompt.value) {
-          userSystemPrompt = customPrompt.value;
-          console.log("Retrieved custom summary prompt from storage for insights generation");
-        } else {
-          // This case should not happen as per requirements, but keeping a minimal fallback
-          userSystemPrompt = "Analyze the content.";
-          console.log("No custom summary prompt found, using minimal fallback");
-        }
-      } catch (err) {
-        // This case should not happen as per requirements, but keeping a minimal fallback
-        userSystemPrompt = "Analyze the content.";
-        console.warn("Error retrieving summary prompt, using minimal fallback:", err);
-      }
+      // Use the summary prompt for insights generation
+      const customPrompt = await storage.getSetting("summary_prompt");
+      userSystemPrompt = customPrompt?.value;
+      console.log("Retrieved custom summary prompt from storage for insights generation");
     }
     
     // Combine base prompt with user prompt
@@ -296,21 +284,10 @@ export async function generateTags(content: string, url?: string, customSystemPr
     } 
     // Otherwise get it from storage (we assume there will always be a default prompt set)
     else {
-      try {
-        const customPrompt = await storage.getSetting("auto_tagging_prompt");
-        if (customPrompt && customPrompt.value) {
-          userSystemPrompt = customPrompt.value;
-          console.log("Retrieved custom tagging prompt from storage");
-        } else {
-          // This case should not happen as per requirements, but keeping a minimal fallback
-          userSystemPrompt = "Extract tags from the content.";
-          console.log("No custom tagging prompt found, using minimal fallback");
-        }
-      } catch (err) {
-        // This case should not happen as per requirements, but keeping a minimal fallback
-        userSystemPrompt = "Extract tags from the content.";
-        console.warn("Error retrieving tagging prompt, using minimal fallback:", err);
-      }
+      // Get the tagging prompt from storage
+      const customPrompt = await storage.getSetting("auto_tagging_prompt");
+      userSystemPrompt = customPrompt?.value;
+      console.log("Retrieved custom tagging prompt from storage");
     }
     
     // Combine base prompt with user prompt
@@ -416,21 +393,10 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
     } 
     // Otherwise get it from storage (we assume there will always be a default prompt set)
     else {
-      try {
-        const customPrompt = await storage.getSetting("summary_prompt");
-        if (customPrompt && customPrompt.value) {
-          userSystemPrompt = customPrompt.value;
-          console.log("Retrieved custom summary prompt from storage");
-        } else {
-          // This case should not happen as per requirements, but keeping a minimal fallback
-          userSystemPrompt = "Summarize the content.";
-          console.log("No custom summary prompt found, using minimal fallback");
-        }
-      } catch (err) {
-        // This case should not happen as per requirements, but keeping a minimal fallback
-        userSystemPrompt = "Summarize the content.";
-        console.warn("Error retrieving summary prompt, using minimal fallback:", err);
-      }
+      // Get the summary prompt from storage
+      const customPrompt = await storage.getSetting("summary_prompt");
+      userSystemPrompt = customPrompt?.value;
+      console.log("Retrieved custom summary prompt from storage");
     }
     
     // Combine base prompt with user prompt
@@ -447,7 +413,8 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
           role: "user",
           content: contentToSummarize
         }
-      ]
+      ],
+      response_format: { type: "json_object" }
     });
 
     return response.choices[0].message.content || "No summary generated";
