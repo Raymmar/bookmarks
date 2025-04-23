@@ -367,11 +367,10 @@ export default function GraphView() {
   
   // Filter bookmarks based on search query, selected tags, and domain
   const filteredBookmarkIds = activeBookmarks.filter(bookmark => {
-    // Get this bookmark's tags from our map
+    // Get this bookmark's tags from our map using the normalized tag system
     const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
-    // Note: system_tags is being phased out in favor of the normalized tag system
-    const bookmarkSystemTags: string[] = [];
-    const allBookmarkTags = [...bookmarkTags, ...bookmarkSystemTags];
+    // Use only normalized tags
+    const allBookmarkTags = [...bookmarkTags];
     
     // Search query filter
     if (searchQuery) {
