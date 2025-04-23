@@ -57,6 +57,7 @@ interface XApiResponse<T> {
 
 /**
  * Interface for X.com Tweet data
+ * Structured to be compatible with the Twitter API SDK response
  */
 interface XTweet {
   id: string;
@@ -67,22 +68,12 @@ interface XTweet {
     retweet_count: number;
     reply_count: number;
     like_count: number;
-    quote_count: number;
+    quote_count?: number;
   };
   entities?: {
-    urls?: Array<{
-      url: string;
-      expanded_url: string;
-      display_url: string;
-      media_key?: string;
-    }>;
-    mentions?: Array<{
-      username: string;
-      id: string;
-    }>;
-    hashtags?: Array<{
-      tag: string;
-    }>;
+    urls?: Array<any>; // Using any to accommodate the SDK's structure
+    mentions?: Array<any>;
+    hashtags?: Array<any>;
   };
 }
 
@@ -150,7 +141,7 @@ export class XService {
     }
     
     // Exchange the code for an access token using the SDK
-    const token = await this.authClient.requestAccessToken(code);
+    const tokenResult = await this.authClient.requestAccessToken(code);
     
     // Create a Twitter API client
     const client = new Client(this.authClient);
@@ -164,15 +155,21 @@ export class XService {
     
     const userInfo = userResponse.data;
     
-    // Calculate token expiration (default to 2 hours if expires_in is not available)
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + (token.expires_in || 7200));
+    // Calculate token expiration based on the token's expires_at
+    let expiresAt: Date;
+    if (tokenResult.token.expires_at) {
+      expiresAt = new Date(tokenResult.token.expires_at);
+    } else {
+      // Default to 2 hours if no expiration is provided
+      expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + 7200);
+    }
     
     // Create credentials object
     const credentials: InsertXCredentials = {
       user_id: '', // This will be filled in by the calling function
-      access_token: token.access_token,
-      refresh_token: token.refresh_token || '',
+      access_token: tokenResult.token.access_token || '',
+      refresh_token: tokenResult.token.refresh_token || '',
       token_expires_at: expiresAt,
       x_user_id: userInfo.id,
       x_username: userInfo.username,
@@ -189,71 +186,82 @@ export class XService {
       throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
     }
 
-    const tokenUrl = `${X_API_BASE}/2/oauth2/token`;
-    
-    const params = new URLSearchParams();
-    params.append('client_id', X_CLIENT_ID);
-    params.append('client_secret', X_CLIENT_SECRET);
-    params.append('grant_type', 'refresh_token');
-    params.append('refresh_token', refreshToken);
-    
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to refresh token: ${JSON.stringify(errorData)}`);
+    try {
+      // Set up auth client with the refresh token
+      this.authClient = new auth.OAuth2User({
+        client_id: X_CLIENT_ID,
+        client_secret: X_CLIENT_SECRET,
+        callback: X_REDIRECT_URI,
+        scopes: REQUIRED_SCOPES,
+        token: {
+          refresh_token: refreshToken,
+          token_type: 'bearer'
+        }
+      });
+      
+      // Use the SDK to refresh the token
+      const tokenResult = await this.authClient.refreshAccessToken();
+      
+      // Calculate token expiration
+      let expiresAt: Date;
+      if (tokenResult.token.expires_at) {
+        expiresAt = new Date(tokenResult.token.expires_at);
+      } else {
+        // Default to 2 hours if no expiration is provided
+        expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + 7200);
+      }
+      
+      // Create updated credentials
+      return {
+        access_token: tokenResult.token.access_token || '',
+        refresh_token: tokenResult.token.refresh_token || refreshToken,
+        token_expires_at: expiresAt,
+        updated_at: new Date(),
+      };
+    } catch (error) {
+      console.error('Failed to refresh token:', error);
+      throw new Error(`Failed to refresh token: ${error}`);
     }
-    
-    const tokenData = await response.json() as {
-      access_token: string;
-      refresh_token: string;
-      expires_in: number;
-    };
-    
-    // Calculate token expiration
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
-    
-    // Create updated credentials
-    return {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      token_expires_at: expiresAt,
-      updated_at: new Date(),
-    };
   }
 
   /**
    * Get the authenticated user's information
    */
   async getUserInfo(accessToken: string): Promise<XUser> {
-    const userUrl = `${X_API_BASE}/2/users/me`;
-    
-    // Use OAuth 2.0 Bearer token authentication
-    const response = await fetch(userUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to get user info: ${JSON.stringify(errorData)}`);
+    try {
+      // Set up auth client with the access token
+      this.authClient = new auth.OAuth2User({
+        client_id: X_CLIENT_ID,
+        client_secret: X_CLIENT_SECRET,
+        callback: X_REDIRECT_URI,
+        scopes: REQUIRED_SCOPES,
+        token: {
+          access_token: accessToken,
+          token_type: 'bearer'
+        }
+      });
+      
+      // Create a Twitter API client
+      const client = new Client(this.authClient);
+      
+      // Get user information using the SDK
+      const userResponse = await client.users.findMyUser();
+      
+      if (!userResponse.data) {
+        throw new Error('Failed to get user info from X.com API');
+      }
+      
+      return {
+        id: userResponse.data.id,
+        name: userResponse.data.name,
+        username: userResponse.data.username,
+        profile_image_url: userResponse.data.profile_image_url
+      };
+    } catch (error) {
+      console.error('Failed to get user info:', error);
+      throw new Error(`Failed to get user info: ${error}`);
     }
-    
-    const userData = await response.json() as XApiResponse<XUser>;
-    
-    if (!userData.data) {
-      throw new Error('No user data returned from X API');
-    }
-    
-    return userData.data;
   }
 
   /**
@@ -359,9 +367,17 @@ export class XService {
     // Extract media URLs from entities if available
     const mediaUrls: string[] = [];
     if (tweet.entities && tweet.entities.urls) {
+      // With the Twitter API SDK, the entities.urls might have a different structure
       tweet.entities.urls.forEach(url => {
-        if (url.media_key) {
-          mediaUrls.push(url.expanded_url);
+        // The expanded_url might be undefined in the SDK response
+        const expandedUrl = typeof url === 'object' && url.expanded_url 
+          ? url.expanded_url 
+          : typeof url === 'object' && url.url 
+            ? url.url 
+            : '';
+            
+        if (expandedUrl) {
+          mediaUrls.push(expandedUrl);
         }
       });
     }
@@ -383,7 +399,10 @@ export class XService {
       like_count: tweet.public_metrics?.like_count || 0,
       repost_count: tweet.public_metrics?.retweet_count || 0,
       reply_count: tweet.public_metrics?.reply_count || 0,
-      quote_count: tweet.public_metrics?.quote_count || 0,
+      // Handle optional quote_count properly
+      quote_count: (tweet.public_metrics?.quote_count !== undefined) 
+        ? tweet.public_metrics.quote_count 
+        : 0,
       media_urls: mediaUrls,
     };
     
