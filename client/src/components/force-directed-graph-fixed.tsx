@@ -112,19 +112,15 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
         existingLinkIds.add(domainLinkId);
       }
       
-      // Add tags from bookmarksWithTags if available
-      // Since bookmarks in the props don't include the normalized tags directly,
-      // we need to extract tags from system_tags and fetch normalized tags separately
+      // Get tags from the normalized tag structure
+      // This is the only source of tags now that we've migrated to the normalized system
       
-      // First, add system tags
-      const systemTags = bookmark.system_tags || [];
-      
-      // Then check if the bookmark has a 'tags' property (from bookmarksWithTags)
+      // Check if the bookmark has a 'tags' property (from bookmarksWithTags)
       const normalizedTags = (bookmark as BookmarkWithTags).tags ? 
         (bookmark as BookmarkWithTags).tags.map(tag => tag.name) : [];
       
-      // Combine all tags
-      const tags = [...normalizedTags, ...systemTags];
+      // Use only normalized tags
+      const tags = [...normalizedTags];
       
       // Add each tag to the graph
       tags.forEach(tag => {
