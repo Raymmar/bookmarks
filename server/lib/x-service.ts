@@ -27,8 +27,8 @@ import { Client, auth } from 'twitter-api-sdk';
  * X API configuration
  * These values should be obtained from the X Developer Portal
  */
-const X_CLIENT_ID = process.env.X_API_KEY || '';
-const X_CLIENT_SECRET = process.env.X_API_SECRET || '';
+const X_CLIENT_ID = process.env.X_CLIENT_ID || '';
+const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET || '';
 const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'https://atmospr.replit.app/api/x/callback';
 const X_API_BASE = 'https://api.twitter.com';
 
@@ -105,9 +105,9 @@ export class XService {
   constructor() {
     // Check API configuration
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
-      console.error('XService: Missing API keys - X_API_KEY or X_API_SECRET not set');
+      console.error('XService: Missing OAuth credentials - X_CLIENT_ID or X_CLIENT_SECRET not set');
     } else {
-      console.log('XService: X API keys are configured');
+      console.log('XService: X OAuth client credentials are configured');
       console.log('XService: Redirect URI:', X_REDIRECT_URI);
     }
     
@@ -139,8 +139,8 @@ export class XService {
     console.log("XService: Generating authorization URL");
 
     if (!X_CLIENT_ID) {
-      console.error("XService: X_API_KEY environment variable is not set");
-      throw new Error('X_API_KEY environment variable is not set');
+      console.error("XService: X_CLIENT_ID environment variable is not set");
+      throw new Error('X_CLIENT_ID environment variable is not set');
     }
 
     try {
@@ -185,8 +185,8 @@ export class XService {
     console.log("X.com exchangeCodeForToken: Starting token exchange process");
     
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
-      console.error("X.com exchangeCodeForToken: Missing API keys in environment");
-      throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
+      console.error("X.com exchangeCodeForToken: Missing OAuth client credentials in environment");
+      throw new Error('X_CLIENT_ID or X_CLIENT_SECRET environment variables are not set');
     }
 
     console.log("X.com exchangeCodeForToken: Validating state parameter");
@@ -268,7 +268,7 @@ export class XService {
    */
   async refreshAccessToken(refreshToken: string): Promise<Partial<XCredentials>> {
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
-      throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
+      throw new Error('X_CLIENT_ID or X_CLIENT_SECRET environment variables are not set');
     }
 
     try {
