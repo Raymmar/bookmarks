@@ -1259,7 +1259,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             
             <div className="space-y-2">
               {bookmark.insights.related_links.map((link: string, index: number) => (
-                <a key={index} href={link} className="block p-2 hover:bg-gray-50 rounded" target="_blank" rel="noopener noreferrer">
+                <a key={index} href={link} className="block p-2 rounded" target="_blank" rel="noopener noreferrer">
                   <h5 className="text-sm font-medium text-gray-800">{link.substring(link.lastIndexOf('/') + 1)}</h5>
                 </a>
               ))}
