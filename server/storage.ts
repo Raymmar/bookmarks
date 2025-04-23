@@ -351,8 +351,6 @@ export class MemStorage implements IStorage {
       ...bookmark,
       id,
       date_saved: dateSaved,
-      user_tags: bookmark.user_tags || [],
-      system_tags: bookmark.system_tags || [],
       vector_embedding: null, // Add this field to satisfy TypeScript
     };
     

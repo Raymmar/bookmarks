@@ -91,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: bookmarkData.description,
         content_html: bookmarkData.content_html,
         notes: req.body.notes ? (Array.isArray(req.body.notes) ? req.body.notes[0]?.text : req.body.notes) : undefined,
-        tags: req.body.tags || bookmarkData.user_tags || [], // Get tags from req.body.tags first, then fall back to legacy user_tags
+        tags: req.body.tags || [], // Get tags from req.body.tags
         autoExtract: req.body.autoExtract === true || req.body.autoExtract === "true", // Ensure boolean conversion
         insightDepth: req.body.insightDepth ? parseInt(req.body.insightDepth) : 1, // Ensure numeric
         source: bookmarkData.source || 'web',
@@ -126,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           title: req.body.title,
           description: req.body.description,
           notes: req.body.notes,
-          tags: req.body.tags || req.body.user_tags || [], // Check tags first, then legacy user_tags
+          tags: req.body.tags || [], // Get tags from req.body.tags
           source: req.body.source
         });
         
