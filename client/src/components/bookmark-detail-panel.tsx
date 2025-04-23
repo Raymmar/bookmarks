@@ -818,12 +818,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             {/* Tweet author info */}
             {bookmark.author_username && (
               <div className="flex items-start mb-3">
-                <div className="flex-shrink-0 mr-3">
-                  {/* Placeholder avatar - in a real implementation, you would fetch the actual profile image */}
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Twitter className="h-6 w-6 text-blue-500" />
-                  </div>
-                </div>
+                {/* We've removed the Twitter bird icon placeholder avatar as requested */}
                 <div>
                   <div className="font-bold">{bookmark.author_name || 'Twitter User'}</div>
                   <div className="text-gray-500 text-sm">@{bookmark.author_username}</div>
@@ -868,43 +863,46 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               </div>
             )}
             
-            {/* Tweet stats */}
-            <div className="flex items-center justify-between text-gray-500 border-t border-gray-100 pt-3 text-sm">
-              <div className="flex items-center space-x-5">
+            {/* Tweet stats - more compact design to prevent overflow */}
+            <div className="border-t border-gray-100 pt-3 text-xs">
+              {/* Engagement stats in a more compact format */}
+              <div className="flex flex-wrap gap-3 mb-2 text-gray-500">
                 {bookmark.like_count !== undefined && (
-                  <div className="flex items-center">
-                    <Heart className="h-4 w-4 mr-1 text-red-500" />
-                    <span>{bookmark.like_count}</span>
-                  </div>
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <Heart className="h-3 w-3 mr-1 text-red-500" />
+                    {bookmark.like_count}
+                  </span>
                 )}
                 {bookmark.repost_count !== undefined && (
-                  <div className="flex items-center">
-                    <Repeat className="h-4 w-4 mr-1 text-green-500" />
-                    <span>{bookmark.repost_count}</span>
-                  </div>
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <Repeat className="h-3 w-3 mr-1 text-green-500" />
+                    {bookmark.repost_count}
+                  </span>
                 )}
                 {bookmark.reply_count !== undefined && (
-                  <div className="flex items-center">
-                    <MessagesSquare className="h-4 w-4 mr-1 text-blue-500" />
-                    <span>{bookmark.reply_count}</span>
-                  </div>
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <MessagesSquare className="h-3 w-3 mr-1 text-blue-500" />
+                    {bookmark.reply_count}
+                  </span>
                 )}
                 {bookmark.quote_count !== undefined && (
-                  <div className="flex items-center">
-                    <Quote className="h-4 w-4 mr-1 text-purple-500" />
-                    <span>{bookmark.quote_count}</span>
-                  </div>
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <Quote className="h-3 w-3 mr-1 text-purple-500" />
+                    {bookmark.quote_count}
+                  </span>
                 )}
               </div>
-              <div>
+              
+              {/* Link to original tweet */}
+              <div className="text-right">
                 <a 
                   href={bookmark.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center text-blue-500 hover:text-blue-600"
+                  className="inline-flex items-center text-blue-500 hover:text-blue-600"
                 >
-                  <Share2 className="h-4 w-4 mr-1" />
-                  <span>Open Tweet</span>
+                  <Share2 className="h-3 w-3 mr-1" />
+                  <span>View on X</span>
                 </a>
               </div>
             </div>
