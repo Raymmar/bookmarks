@@ -132,50 +132,85 @@ export class XService {
    * Exchange an authorization code for an access token
    */
   async exchangeCodeForToken(code: string, state: string): Promise<InsertXCredentials> {
+    console.log("X.com exchangeCodeForToken: Starting token exchange process");
+    
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
+      console.error("X.com exchangeCodeForToken: Missing API keys in environment");
       throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
     }
 
+    console.log("X.com exchangeCodeForToken: Validating state parameter");
+    console.log("State received:", state);
+    console.log("Expected state:", this.STATE);
+    
     if (state !== this.STATE) {
+      console.error("X.com exchangeCodeForToken: State mismatch");
       throw new Error('State parameter does not match');
     }
     
-    // Exchange the code for an access token using the SDK
-    const tokenResult = await this.authClient.requestAccessToken(code);
-    
-    // Create a Twitter API client
-    const client = new Client(this.authClient);
-    
-    // Get the authenticated user's information
-    const userResponse = await client.users.findMyUser();
-    
-    if (!userResponse.data) {
-      throw new Error('Failed to get user info from X.com API');
+    try {
+      console.log("X.com exchangeCodeForToken: Requesting access token with code");
+      
+      // Exchange the code for an access token using the SDK
+      const tokenResult = await this.authClient.requestAccessToken(code);
+      
+      console.log("X.com exchangeCodeForToken: Token obtained", {
+        hasAccessToken: !!tokenResult.token.access_token,
+        hasRefreshToken: !!tokenResult.token.refresh_token,
+        expiresAt: tokenResult.token.expires_at
+      });
+      
+      // Create a Twitter API client
+      console.log("X.com exchangeCodeForToken: Creating Twitter API client");
+      const client = new Client(this.authClient);
+      
+      // Get the authenticated user's information
+      console.log("X.com exchangeCodeForToken: Fetching user information");
+      const userResponse = await client.users.findMyUser();
+      
+      if (!userResponse.data) {
+        console.error("X.com exchangeCodeForToken: No user data in response");
+        throw new Error('Failed to get user info from X.com API');
+      }
+      
+      console.log("X.com exchangeCodeForToken: User info obtained", {
+        id: userResponse.data.id,
+        username: userResponse.data.username
+      });
+      
+      const userInfo = userResponse.data;
+      
+      // Calculate token expiration based on the token's expires_at
+      let expiresAt: Date;
+      if (tokenResult.token.expires_at) {
+        expiresAt = new Date(tokenResult.token.expires_at);
+        console.log("X.com exchangeCodeForToken: Token expires at", expiresAt);
+      } else {
+        // Default to 2 hours if no expiration is provided
+        expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + 7200);
+        console.log("X.com exchangeCodeForToken: No expiration provided, setting default to", expiresAt);
+      }
+      
+      // Create credentials object
+      const credentials: InsertXCredentials = {
+        user_id: '', // This will be filled in by the calling function
+        access_token: tokenResult.token.access_token || '',
+        refresh_token: tokenResult.token.refresh_token || '',
+        token_expires_at: expiresAt,
+        x_user_id: userInfo.id,
+        x_username: userInfo.username,
+      };
+      
+      console.log("X.com exchangeCodeForToken: Credentials prepared successfully");
+      return credentials;
+    } catch (error) {
+      console.error("X.com exchangeCodeForToken: Error during token exchange", error);
+      if (error instanceof Error) {
+        console.error("X.com exchangeCodeForToken error details:", error.message, error.stack);
+      }
+      throw error;
     }
-    
-    const userInfo = userResponse.data;
-    
-    // Calculate token expiration based on the token's expires_at
-    let expiresAt: Date;
-    if (tokenResult.token.expires_at) {
-      expiresAt = new Date(tokenResult.token.expires_at);
-    } else {
-      // Default to 2 hours if no expiration is provided
-      expiresAt = new Date();
-      expiresAt.setSeconds(expiresAt.getSeconds() + 7200);
-    }
-    
-    // Create credentials object
-    const credentials: InsertXCredentials = {
-      user_id: '', // This will be filled in by the calling function
-      access_token: tokenResult.token.access_token || '',
-      refresh_token: tokenResult.token.refresh_token || '',
-      token_expires_at: expiresAt,
-      x_user_id: userInfo.id,
-      x_username: userInfo.username,
-    };
-    
-    return credentials;
   }
 
   /**

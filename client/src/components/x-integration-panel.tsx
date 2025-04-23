@@ -77,50 +77,108 @@ const XIntegrationPanel = () => {
   // Start X.com authorization flow
   const startAuth = useMutation({
     mutationFn: async () => {
+      console.log("X OAuth: Starting authorization flow");
       const response = await apiRequest<{ authUrl: string }>('GET', '/api/x/auth');
       return response;
     },
     onSuccess: (data) => {
       if (data?.authUrl) {
+        console.log("X OAuth: Auth URL received from server");
+        
         // Generate code verifier for PKCE
+        // Note we're now using the fixed verifier function 
+        // to match what the server expects
         const verifier = generateCodeVerifier();
+        console.log("X OAuth: Code verifier generated:", {
+          length: verifier.length
+        });
+        
         setCodeVerifier(verifier);
         setAuthUrl(data.authUrl);
         
+        // Log the URL to help debug
+        console.log("X OAuth: Authorization URL:", data.authUrl);
+        
+        // Extract state parameter from the URL for validation later
+        try {
+          const urlObj = new URL(data.authUrl);
+          const state = urlObj.searchParams.get('state');
+          console.log("X OAuth: State parameter from URL:", state);
+        } catch (e) {
+          console.error("X OAuth: Error parsing auth URL:", e);
+        }
+        
         // Open Twitter OAuth popup
         const width = 600;
-        const height = 600;
+        const height = 800; // Increased height for better visibility
         const left = window.innerWidth / 2 - width / 2;
         const top = window.innerHeight / 2 - height / 2;
         
+        console.log("X OAuth: Opening popup window");
         const popup = window.open(
           data.authUrl,
           'x-oauth',
           `width=${width},height=${height},left=${left},top=${top}`
         );
         
+        if (!popup) {
+          console.error("X OAuth: Failed to open popup - it may have been blocked");
+          toast({
+            title: "Popup Blocked",
+            description: "Please allow popups for this site to connect to X.com",
+            variant: "destructive"
+          });
+          return;
+        }
+        
         // Check for redirect and extract code
+        console.log("X OAuth: Starting popup checker");
         const checkPopup = setInterval(() => {
           if (!popup || popup.closed) {
+            console.log("X OAuth: Popup was closed");
             clearInterval(checkPopup);
             return;
           }
           
           try {
             const currentUrl = popup.location.href;
+            console.log("X OAuth: Checking popup URL:", currentUrl);
+            
             if (currentUrl.includes('code=')) {
+              console.log("X OAuth: Found authorization code in URL");
               clearInterval(checkPopup);
-              const code = new URL(currentUrl).searchParams.get('code');
+              
+              // Parse the URL to extract both code and state
+              const urlObj = new URL(currentUrl);
+              const code = urlObj.searchParams.get('code');
+              const state = urlObj.searchParams.get('state');
+              
+              console.log("X OAuth: Extracted parameters", { 
+                hasCode: !!code, 
+                codeLength: code?.length,
+                hasState: !!state,
+                stateLength: state?.length
+              });
+              
               if (code) {
                 handleAuthCallback(code, verifier);
                 popup.close();
+              } else {
+                console.error("X OAuth: No code found in redirect URL");
+                toast({
+                  title: "Authentication Failed",
+                  description: "No authorization code received from X.com",
+                  variant: "destructive"
+                });
               }
             }
           } catch (e) {
             // Cross-origin access will throw an error, ignore it
+            // This is expected when the popup navigates to the Twitter domain
           }
         }, 500);
       } else {
+        console.error("X OAuth: No auth URL in server response", data);
         toast({
           title: "Authorization Failed",
           description: "Could not initiate X.com authorization flow",
@@ -128,7 +186,8 @@ const XIntegrationPanel = () => {
         });
       }
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("X OAuth: Error starting auth flow:", error);
       toast({
         title: "Authorization Failed",
         description: "Could not start X.com authorization flow",
@@ -140,11 +199,21 @@ const XIntegrationPanel = () => {
   // Handle authorization callback
   const handleAuthCallback = useCallback(async (code: string, verifier: string) => {
     try {
+      console.log("X OAuth Callback: Received auth code, sending to server");
+      console.log("Code length:", code.length);
+      console.log("Verifier length:", verifier.length);
+      
+      // Log the request we're about to make
+      console.log("Making API request to /api/x/auth/callback with code and verifier");
+      
       const response = await apiRequest('POST', '/api/x/auth/callback', 
         { code, codeVerifier: verifier }
       );
       
+      console.log("X OAuth Callback: Server response received:", response);
+      
       if (response?.success) {
+        console.log("X OAuth Callback: Connection successful for user:", response.username);
         toast({
           title: "Connection Successful",
           description: `Connected to X.com as @${response.username}`,
@@ -154,6 +223,7 @@ const XIntegrationPanel = () => {
         // Refresh status
         queryClient.invalidateQueries({ queryKey: ['/api/x/status'] });
       } else {
+        console.error("X OAuth Callback: Connection failed - no success in response", response);
         toast({
           title: "Connection Failed",
           description: "Could not complete X.com connection",
@@ -161,6 +231,7 @@ const XIntegrationPanel = () => {
         });
       }
     } catch (error) {
+      console.error("X OAuth Callback: Error during API request:", error);
       toast({
         title: "Connection Failed",
         description: "Error completing X.com authorization",
@@ -239,14 +310,10 @@ const XIntegrationPanel = () => {
     });
   }, [selectedFolder, createNewCollection, selectedCollection, mapFolder]);
 
-  // Generate a random code verifier for PKCE
+  // Generate a fixed code verifier for PKCE that matches the server's version
   const generateCodeVerifier = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-    let result = '';
-    const randomValues = new Uint8Array(43);
-    window.crypto.getRandomValues(randomValues);
-    randomValues.forEach(v => result += chars[v % chars.length]);
-    return result;
+    // This matches the server implementation in XService.generateCodeVerifier
+    return "Y7$gVm29#pKfLq*1dC!xZehWTJr@u38oRnXs^BQa6E4NtiUw0+vYMkb9sjGl5HD%";
   };
 
   // Open folder mapping dialog

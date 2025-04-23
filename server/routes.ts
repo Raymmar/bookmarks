@@ -1531,18 +1531,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/x/auth/callback", async (req, res) => {
     try {
       if (!req.isAuthenticated()) {
+        console.log("X.com callback: User not authenticated");
         return res.status(401).json({ error: "Authentication required" });
       }
       
+      console.log("X.com callback received:", req.body);
       const { code, codeVerifier } = req.body;
       
       if (!code || !codeVerifier) {
+        console.log("X.com callback missing parameters:", { code: !!code, codeVerifier: !!codeVerifier });
         return res.status(400).json({ error: "Missing required parameters" });
       }
       
       // Exchange code for token
       const userId = (req.user as Express.User).id;
+      console.log(`X.com callback: Exchanging code for token for user ${userId}`);
       const credentials = await xService.exchangeCodeForToken(code, codeVerifier);
+      
+      console.log("X.com credentials obtained:", {
+        accessToken: !!credentials.access_token,
+        refreshToken: !!credentials.refresh_token,
+        x_username: credentials.x_username,
+        x_user_id: credentials.x_user_id
+      });
       
       // Save credentials to database
       const savedCredentials = await storage.createXCredentials({
@@ -1550,9 +1561,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user_id: userId
       });
       
+      console.log("X.com credentials saved to database:", {
+        id: savedCredentials.id,
+        username: savedCredentials.x_username
+      });
+      
       res.json({ success: true, username: savedCredentials.x_username });
     } catch (error) {
       console.error("Error handling X.com OAuth callback:", error);
+      if (error instanceof Error) {
+        console.error("X.com callback error details:", error.message, error.stack);
+      }
       res.status(500).json({ error: "Failed to complete X.com authentication" });
     }
   });
