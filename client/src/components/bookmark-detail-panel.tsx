@@ -866,44 +866,31 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             {/* Tweet stats - more compact design to prevent overflow */}
             <div className="border-t border-gray-100 pt-3 text-xs">
               {/* Engagement stats in a more compact format */}
-              <div className="flex flex-wrap gap-3 mb-2 text-gray-500">
+              <div className="flex flex-wrap justify-items-stretch gap-4 text-gray-500">
                 {bookmark.like_count !== undefined && (
                   <span className="inline-flex items-center whitespace-nowrap">
-                    <Heart className="h-3 w-3 mr-1 text-red-500" />
+                    <Heart className="h-3 w-3 mr-2" />
                     {bookmark.like_count}
                   </span>
                 )}
                 {bookmark.repost_count !== undefined && (
                   <span className="inline-flex items-center whitespace-nowrap">
-                    <Repeat className="h-3 w-3 mr-1 text-green-500" />
+                    <Repeat className="h-3 w-3 mr-1" />
                     {bookmark.repost_count}
                   </span>
                 )}
                 {bookmark.reply_count !== undefined && (
                   <span className="inline-flex items-center whitespace-nowrap">
-                    <MessagesSquare className="h-3 w-3 mr-1 text-blue-500" />
+                    <MessagesSquare className="h-3 w-3 mr-1" />
                     {bookmark.reply_count}
                   </span>
                 )}
                 {bookmark.quote_count !== undefined && (
                   <span className="inline-flex items-center whitespace-nowrap">
-                    <Quote className="h-3 w-3 mr-1 text-purple-500" />
+                    <Quote className="h-3 w-3 mr-1" />
                     {bookmark.quote_count}
                   </span>
                 )}
-              </div>
-              
-              {/* Link to original tweet */}
-              <div className="text-right">
-                <a 
-                  href={bookmark.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center text-blue-500 hover:text-blue-600"
-                >
-                  <Share2 className="h-3 w-3 mr-1" />
-                  <span>View on X</span>
-                </a>
               </div>
             </div>
           </div>
@@ -911,7 +898,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         
         {/* AI Insights Section */}
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 w-full">
             <h4 className="text-sm font-medium text-gray-700">AI Insights</h4>
             {/* AI Processing Status & Trigger Button */}
             {aiProcessingStatus === 'pending' && (
