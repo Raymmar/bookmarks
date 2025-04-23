@@ -77,7 +77,7 @@ const XIntegrationPanel = () => {
   // Start X.com authorization flow
   const startAuth = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest<{ authUrl: string }>('/api/x/auth', { method: 'GET' });
+      const response = await apiRequest<{ authUrl: string }>('GET', '/api/x/auth');
       return response;
     },
     onSuccess: (data) => {
@@ -140,10 +140,9 @@ const XIntegrationPanel = () => {
   // Handle authorization callback
   const handleAuthCallback = useCallback(async (code: string, verifier: string) => {
     try {
-      const response = await apiRequest('/api/x/auth/callback', {
-        method: 'POST',
-        body: JSON.stringify({ code, codeVerifier: verifier })
-      });
+      const response = await apiRequest('POST', '/api/x/auth/callback', 
+        { code, codeVerifier: verifier }
+      );
       
       if (response?.success) {
         toast({
@@ -173,7 +172,7 @@ const XIntegrationPanel = () => {
   // Sync bookmarks from X.com
   const syncBookmarks = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('/api/x/sync', { method: 'POST' });
+      const response = await apiRequest('POST', '/api/x/sync');
       return response;
     },
     onSuccess: (data) => {
@@ -203,10 +202,7 @@ const XIntegrationPanel = () => {
       collectionId?: string, 
       createNew: boolean 
     }) => {
-      const response = await apiRequest('/api/x/folders/map', {
-        method: 'POST',
-        body: JSON.stringify(params)
-      });
+      const response = await apiRequest('POST', '/api/x/folders/map', params);
       return response;
     },
     onSuccess: () => {

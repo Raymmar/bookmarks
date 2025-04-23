@@ -27,8 +27,8 @@ import { URLSearchParams } from 'url';
  * X API configuration
  * These values should be obtained from the X Developer Portal
  */
-const X_CLIENT_ID = process.env.X_CLIENT_ID || '';
-const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET || '';
+const X_CLIENT_ID = process.env.X_API_KEY || '';
+const X_CLIENT_SECRET = process.env.X_API_SECRET || '';
 const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'http://localhost:5000/api/x/callback';
 const X_API_BASE = 'https://api.twitter.com';
 
@@ -113,7 +113,7 @@ export class XService {
    */
   getAuthorizationUrl(): string {
     if (!X_CLIENT_ID) {
-      throw new Error('X_CLIENT_ID environment variable is not set');
+      throw new Error('X_API_KEY environment variable is not set');
     }
 
     // Create a PKCE code verifier
