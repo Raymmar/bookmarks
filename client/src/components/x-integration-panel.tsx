@@ -474,20 +474,11 @@ const XIntegrationPanel = () => {
 };
 
 /**
- * Generate a code verifier for PKCE OAuth flow
- * Creates a random string of specified length
+ * Return a fixed code verifier for PKCE OAuth flow
+ * Using a static key provided for consistency
  */
-function generateCodeVerifier(length = 64) {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  let result = '';
-  const randomValues = new Uint8Array(length);
-  window.crypto.getRandomValues(randomValues);
-  
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(randomValues[i] % characters.length);
-  }
-  
-  return result;
+function generateCodeVerifier() {
+  return "Y7$gVm29#pKfLq*1dC!xZehWTJr@u38oRnXs^BQa6E4NtiUw0+vYMkb9sjGl5HD%";
 }
 
 export default XIntegrationPanel;

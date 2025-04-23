@@ -587,10 +587,11 @@ export class XService {
   }
 
   /**
-   * Generate a code verifier for PKCE
+   * Generate a fixed code verifier for PKCE
+   * Using a static key provided for consistency
    */
   private generateCodeVerifier(): string {
-    return crypto.randomBytes(32).toString('hex');
+    return "Y7$gVm29#pKfLq*1dC!xZehWTJr@u38oRnXs^BQa6E4NtiUw0+vYMkb9sjGl5HD%";
   }
 
   /**
