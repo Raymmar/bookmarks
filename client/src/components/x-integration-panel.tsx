@@ -161,7 +161,8 @@ const XIntegrationPanel = () => {
               });
               
               if (code) {
-                handleAuthCallback(code, verifier);
+                // Pass both code and state to handle callback
+                handleAuthCallback(code, verifier, state);
                 popup.close();
               } else {
                 console.error("X OAuth: No code found in redirect URL");
@@ -197,17 +198,18 @@ const XIntegrationPanel = () => {
   });
 
   // Handle authorization callback
-  const handleAuthCallback = useCallback(async (code: string, verifier: string) => {
+  const handleAuthCallback = useCallback(async (code: string, verifier: string, state?: string) => {
     try {
       console.log("X OAuth Callback: Received auth code, sending to server");
       console.log("Code length:", code.length);
       console.log("Verifier length:", verifier.length);
+      console.log("State parameter:", state || "none provided");
       
       // Log the request we're about to make
-      console.log("Making API request to /api/x/auth/callback with code and verifier");
+      console.log("Making API request to /api/x/auth/callback with code, verifier and state");
       
       const response = await apiRequest('POST', '/api/x/auth/callback', 
-        { code, codeVerifier: verifier }
+        { code, codeVerifier: verifier, state: state || "state" }
       );
       
       console.log("X OAuth Callback: Server response received:", response);
