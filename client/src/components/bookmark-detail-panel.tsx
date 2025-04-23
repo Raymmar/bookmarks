@@ -812,6 +812,105 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           </a>
         </div>
         
+        {/* Twitter Card for X.com bookmarks */}
+        {bookmark.source === 'x' && (
+          <div className="mb-4 mt-4 bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            {/* Tweet author info */}
+            {bookmark.author_username && (
+              <div className="flex items-start mb-3">
+                <div className="flex-shrink-0 mr-3">
+                  {/* Placeholder avatar - in a real implementation, you would fetch the actual profile image */}
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Twitter className="h-6 w-6 text-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <div className="font-bold">{bookmark.author_name || 'Twitter User'}</div>
+                  <div className="text-gray-500 text-sm">@{bookmark.author_username}</div>
+                </div>
+                <div className="ml-auto">
+                  <a 
+                    href={`https://twitter.com/${bookmark.author_username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-600"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+            )}
+            
+            {/* Tweet content */}
+            <div className="mb-4 text-gray-800">
+              {bookmark.description}
+            </div>
+            
+            {/* Tweet media (if any) */}
+            {bookmark.media_urls && bookmark.media_urls.length > 0 && (
+              <div className="mb-4">
+                {bookmark.media_urls.map((url, index) => (
+                  <a 
+                    key={index} 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block mb-2 overflow-hidden rounded-lg border border-gray-200"
+                  >
+                    {/* For images, we could display them directly, 
+                        but since we don't know the content type from the URL alone,
+                        we just show the link for now */}
+                    <div className="bg-gray-50 p-3 text-sm text-primary hover:underline truncate">
+                      {url}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+            
+            {/* Tweet stats */}
+            <div className="flex items-center justify-between text-gray-500 border-t border-gray-100 pt-3 text-sm">
+              <div className="flex items-center space-x-5">
+                {bookmark.like_count !== undefined && (
+                  <div className="flex items-center">
+                    <Heart className="h-4 w-4 mr-1 text-red-500" />
+                    <span>{bookmark.like_count}</span>
+                  </div>
+                )}
+                {bookmark.repost_count !== undefined && (
+                  <div className="flex items-center">
+                    <Repeat className="h-4 w-4 mr-1 text-green-500" />
+                    <span>{bookmark.repost_count}</span>
+                  </div>
+                )}
+                {bookmark.reply_count !== undefined && (
+                  <div className="flex items-center">
+                    <MessagesSquare className="h-4 w-4 mr-1 text-blue-500" />
+                    <span>{bookmark.reply_count}</span>
+                  </div>
+                )}
+                {bookmark.quote_count !== undefined && (
+                  <div className="flex items-center">
+                    <Quote className="h-4 w-4 mr-1 text-purple-500" />
+                    <span>{bookmark.quote_count}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <a 
+                  href={bookmark.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center text-blue-500 hover:text-blue-600"
+                >
+                  <Share2 className="h-4 w-4 mr-1" />
+                  <span>Open Tweet</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* AI Insights Section */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
