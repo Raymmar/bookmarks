@@ -473,4 +473,21 @@ const XIntegrationPanel = () => {
   );
 };
 
+/**
+ * Generate a code verifier for PKCE OAuth flow
+ * Creates a random string of specified length
+ */
+function generateCodeVerifier(length = 64) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let result = '';
+  const randomValues = new Uint8Array(length);
+  window.crypto.getRandomValues(randomValues);
+  
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(randomValues[i] % characters.length);
+  }
+  
+  return result;
+}
+
 export default XIntegrationPanel;
