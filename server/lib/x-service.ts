@@ -9,7 +9,6 @@
  * - Managing folder to collection mapping
  */
 
-import fetch from 'node-fetch';
 import { storage } from '../storage';
 import { db } from '../db';
 import { eq, and } from 'drizzle-orm';
@@ -22,6 +21,7 @@ import {
 } from '@shared/schema';
 import crypto from 'crypto';
 import { URLSearchParams } from 'url';
+import { Client, auth } from 'twitter-api-sdk';
 
 /**
  * X API configuration
@@ -36,10 +36,10 @@ const X_API_BASE = 'https://api.twitter.com';
  * Scopes needed for reading bookmarks
  */
 const REQUIRED_SCOPES = [
-  'tweet.read',
-  'users.read',
-  'bookmark.read',
-  'offline.access'
+  'tweet.read' as const,
+  'users.read' as const,
+  'bookmark.read' as const,
+  'offline.access' as const
 ];
 
 /**
@@ -108,6 +108,18 @@ interface XFolderData {
  * X.com API service class
  */
 export class XService {
+  private authClient: auth.OAuth2User;
+  private STATE = "state";
+  
+  constructor() {
+    this.authClient = new auth.OAuth2User({
+      client_id: X_CLIENT_ID,
+      client_secret: X_CLIENT_SECRET,
+      callback: X_REDIRECT_URI,
+      scopes: REQUIRED_SCOPES,
+    });
+  }
+  
   /**
    * Generate the OAuth authorization URL for X.com
    */
@@ -116,77 +128,51 @@ export class XService {
       throw new Error('X_API_KEY environment variable is not set');
     }
 
-    // Create a PKCE code verifier
-    const codeVerifier = this.generateCodeVerifier();
+    // Create the authorization URL using the SDK
+    const authUrl = this.authClient.generateAuthURL({
+      state: this.STATE,
+      code_challenge_method: "s256",
+    });
     
-    // Store the code verifier in the session
-    // TODO: Implement session storage for code verifier
-    
-    // Create a code challenge from the verifier
-    const codeChallenge = this.generateCodeChallenge(codeVerifier);
-    
-    // Create the authorization URL
-    const authUrl = new URL(`${X_API_BASE}/2/oauth2/authorize`);
-    authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('client_id', X_CLIENT_ID);
-    authUrl.searchParams.append('redirect_uri', X_REDIRECT_URI);
-    authUrl.searchParams.append('scope', REQUIRED_SCOPES.join(' '));
-    authUrl.searchParams.append('state', crypto.randomBytes(16).toString('hex'));
-    authUrl.searchParams.append('code_challenge', codeChallenge);
-    authUrl.searchParams.append('code_challenge_method', 'S256');
-    
-    return authUrl.toString();
+    return authUrl;
   }
 
   /**
    * Exchange an authorization code for an access token
    */
-  async exchangeCodeForToken(code: string, codeVerifier: string): Promise<InsertXCredentials> {
+  async exchangeCodeForToken(code: string, state: string): Promise<InsertXCredentials> {
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
       throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
     }
 
-    const tokenUrl = `${X_API_BASE}/2/oauth2/token`;
-    
-    const params = new URLSearchParams();
-    params.append('client_id', X_CLIENT_ID);
-    params.append('client_secret', X_CLIENT_SECRET);
-    params.append('code', code);
-    params.append('code_verifier', codeVerifier);
-    params.append('grant_type', 'authorization_code');
-    params.append('redirect_uri', X_REDIRECT_URI);
-    
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to exchange code for token: ${JSON.stringify(errorData)}`);
+    if (state !== this.STATE) {
+      throw new Error('State parameter does not match');
     }
     
-    const tokenData = await response.json() as {
-      access_token: string;
-      refresh_token: string;
-      expires_in: number;
-    };
+    // Exchange the code for an access token using the SDK
+    const token = await this.authClient.requestAccessToken(code);
+    
+    // Create a Twitter API client
+    const client = new Client(this.authClient);
     
     // Get the authenticated user's information
-    const userInfo = await this.getUserInfo(tokenData.access_token);
+    const userResponse = await client.users.findMyUser();
     
-    // Calculate token expiration
+    if (!userResponse.data) {
+      throw new Error('Failed to get user info from X.com API');
+    }
+    
+    const userInfo = userResponse.data;
+    
+    // Calculate token expiration (default to 2 hours if expires_in is not available)
     const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+    expiresAt.setSeconds(expiresAt.getSeconds() + (token.expires_in || 7200));
     
     // Create credentials object
     const credentials: InsertXCredentials = {
       user_id: '', // This will be filled in by the calling function
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: token.access_token,
+      refresh_token: token.refresh_token || '',
       token_expires_at: expiresAt,
       x_user_id: userInfo.id,
       x_username: userInfo.username,
@@ -273,55 +259,86 @@ export class XService {
   /**
    * Get user's bookmarked tweets
    */
-  async getBookmarks(accessToken: string, userId: string, paginationToken?: string): Promise<{ tweets: XTweet[], users: { [key: string]: XUser }, nextToken?: string }> {
-    // Ensure token is valid
-    await this.ensureValidToken(userId);
+  async getBookmarks(userId: string, paginationToken?: string): Promise<{ tweets: XTweet[], users: { [key: string]: XUser }, nextToken?: string }> {
+    // Get user credentials
+    const credentials = await this.getUserCredentials(userId);
     
-    const bookmarksUrl = new URL(`${X_API_BASE}/2/users/${userId}/bookmarks`);
-    
-    // Set query parameters for the request
-    bookmarksUrl.searchParams.append('expansions', 'author_id');
-    bookmarksUrl.searchParams.append('tweet.fields', 'created_at,public_metrics,entities');
-    bookmarksUrl.searchParams.append('user.fields', 'name,username,profile_image_url');
-    bookmarksUrl.searchParams.append('max_results', '100');
-    
-    if (paginationToken) {
-      bookmarksUrl.searchParams.append('pagination_token', paginationToken);
+    if (!credentials) {
+      throw new Error('User is not authenticated with X.com');
     }
     
-    const response = await fetch(bookmarksUrl.toString(), {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+    // Create a Twitter API client with the stored credentials
+    this.authClient = new auth.OAuth2User({
+      client_id: X_CLIENT_ID,
+      client_secret: X_CLIENT_SECRET,
+      callback: X_REDIRECT_URI,
+      scopes: REQUIRED_SCOPES,
+      token: {
+        access_token: credentials.access_token,
+        refresh_token: credentials.refresh_token || '',
+        expires_at: credentials.token_expires_at?.getTime() || 0,
+        token_type: 'bearer'
+      }
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to get bookmarks: ${JSON.stringify(errorData)}`);
-    }
+    const client = new Client(this.authClient);
     
-    const bookmarksData = await response.json() as XApiResponse<XTweet[]>;
-    
-    if (!bookmarksData.data) {
-      // No bookmarks found, return empty arrays
-      return { tweets: [], users: {} };
-    }
-    
-    // Extract tweets
-    const tweets = bookmarksData.data;
-    
-    // Extract users from includes
-    const users: { [key: string]: XUser } = {};
-    if (bookmarksData.includes && bookmarksData.includes.users) {
-      bookmarksData.includes.users.forEach((user: XUser) => {
-        users[user.id] = user;
+    try {
+      // Use the SDK to fetch bookmarks
+      const bookmarksResponse = await client.bookmarks.getUsersIdBookmarks(credentials.x_user_id, {
+        "expansions": [
+          "author_id"
+        ],
+        "tweet.fields": [
+          "created_at",
+          "public_metrics",
+          "entities"
+        ],
+        "user.fields": [
+          "name",
+          "username",
+          "profile_image_url"
+        ],
+        "max_results": 100,
+        "pagination_token": paginationToken
       });
+      
+      if (!bookmarksResponse.data) {
+        // No bookmarks found, return empty arrays
+        return { tweets: [], users: {} };
+      }
+      
+      // Convert SDK response to our internal format
+      const tweets = bookmarksResponse.data.map(tweet => ({
+        id: tweet.id,
+        text: tweet.text,
+        created_at: tweet.created_at,
+        author_id: tweet.author_id,
+        public_metrics: tweet.public_metrics,
+        entities: tweet.entities
+      }));
+      
+      // Extract users from includes
+      const users: { [key: string]: XUser } = {};
+      if (bookmarksResponse.includes && bookmarksResponse.includes.users) {
+        bookmarksResponse.includes.users.forEach(user => {
+          users[user.id] = {
+            id: user.id,
+            name: user.name,
+            username: user.username,
+            profile_image_url: user.profile_image_url
+          };
+        });
+      }
+      
+      // Extract next pagination token if available
+      const nextToken = bookmarksResponse.meta?.next_token;
+      
+      return { tweets, users, nextToken };
+    } catch (error) {
+      console.error('Error fetching bookmarks:', error);
+      throw new Error(`Failed to get bookmarks: ${error}`);
     }
-    
-    // Extract next pagination token if available
-    const nextToken = bookmarksData.meta && bookmarksData.meta.next_token;
-    
-    return { tweets, users, nextToken };
   }
 
   /**
@@ -391,13 +408,6 @@ export class XService {
    * Sync bookmarks from X.com to our database
    */
   async syncBookmarks(userId: string): Promise<{ added: number, updated: number, errors: number }> {
-    // Fetch X.com credentials for the user
-    const credentials = await this.getUserCredentials(userId);
-    
-    if (!credentials) {
-      throw new Error('User is not authenticated with X.com');
-    }
-    
     // Track statistics
     let added = 0;
     let updated = 0;
@@ -409,7 +419,7 @@ export class XService {
     
     do {
       try {
-        const result = await this.getBookmarks(credentials.access_token, credentials.x_user_id, nextToken);
+        const result = await this.getBookmarks(userId, nextToken);
         allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
         allBookmarks.users = { ...allBookmarks.users, ...result.users };
         nextToken = result.nextToken;
