@@ -29,7 +29,7 @@ import { URLSearchParams } from 'url';
  */
 const X_CLIENT_ID = process.env.X_API_KEY || '';
 const X_CLIENT_SECRET = process.env.X_API_SECRET || '';
-const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'https://universal-bookmarks.josephgeorge1.repl.co/api/x/callback';
+const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'https://atmospr.replit.app/api/x/callback';
 const X_API_BASE = 'https://api.twitter.com';
 
 /**
