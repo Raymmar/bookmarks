@@ -1536,17 +1536,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log("X.com callback received:", req.body);
-      const { code, codeVerifier } = req.body;
+      const { code, codeVerifier, state } = req.body;
       
-      if (!code || !codeVerifier) {
-        console.log("X.com callback missing parameters:", { code: !!code, codeVerifier: !!codeVerifier });
-        return res.status(400).json({ error: "Missing required parameters" });
+      if (!code) {
+        console.log("X.com callback missing code parameter");
+        return res.status(400).json({ error: "Missing authorization code" });
+      }
+      
+      if (!codeVerifier) {
+        console.log("X.com callback missing codeVerifier parameter");
+        return res.status(400).json({ error: "Missing code verifier" });
       }
       
       // Exchange code for token
       const userId = (req.user as Express.User).id;
       console.log(`X.com callback: Exchanging code for token for user ${userId}`);
-      const credentials = await xService.exchangeCodeForToken(code, codeVerifier);
+      console.log("Using state:", state || "state");
+      
+      // Using the fixed state value "state" if not provided from the client
+      const credentials = await xService.exchangeCodeForToken(code, state || "state");
       
       console.log("X.com credentials obtained:", {
         accessToken: !!credentials.access_token,

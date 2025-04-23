@@ -103,29 +103,79 @@ export class XService {
   private STATE = "state";
   
   constructor() {
-    this.authClient = new auth.OAuth2User({
-      client_id: X_CLIENT_ID,
-      client_secret: X_CLIENT_SECRET,
-      callback: X_REDIRECT_URI,
-      scopes: REQUIRED_SCOPES,
-    });
+    // Check API configuration
+    if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
+      console.error('XService: Missing API keys - X_API_KEY or X_API_SECRET not set');
+    } else {
+      console.log('XService: X API keys are configured');
+      console.log('XService: Redirect URI:', X_REDIRECT_URI);
+    }
+    
+    // Initialize auth client with Twitter API SDK
+    try {
+      this.authClient = new auth.OAuth2User({
+        client_id: X_CLIENT_ID,
+        client_secret: X_CLIENT_SECRET,
+        callback: X_REDIRECT_URI,
+        scopes: REQUIRED_SCOPES,
+      });
+      console.log('XService: Auth client initialized successfully');
+    } catch (error) {
+      console.error('XService: Failed to initialize auth client:', error);
+      // Initialize with empty values to prevent fatal errors
+      this.authClient = new auth.OAuth2User({
+        client_id: X_CLIENT_ID || 'missing',
+        client_secret: X_CLIENT_SECRET || 'missing',
+        callback: X_REDIRECT_URI,
+        scopes: REQUIRED_SCOPES,
+      });
+    }
   }
   
   /**
    * Generate the OAuth authorization URL for X.com
    */
   getAuthorizationUrl(): string {
+    console.log("XService: Generating authorization URL");
+
     if (!X_CLIENT_ID) {
+      console.error("XService: X_API_KEY environment variable is not set");
       throw new Error('X_API_KEY environment variable is not set');
     }
 
-    // Create the authorization URL using the SDK
-    const authUrl = this.authClient.generateAuthURL({
-      state: this.STATE,
-      code_challenge_method: "s256",
-    });
-    
-    return authUrl;
+    try {
+      // Generate code verifier and challenge
+      const codeVerifier = this.generateCodeVerifier();
+      const codeChallenge = this.generateCodeChallenge(codeVerifier);
+      
+      console.log("XService: Generated code verifier length:", codeVerifier.length);
+      console.log("XService: Generated code challenge length:", codeChallenge.length);
+      
+      // Create the authorization URL using the SDK
+      // The Twitter API SDK interfaces are not fully documented with TypeScript interfaces
+      // so we need to use the any type to add the code_challenge parameter
+      const params: any = {
+        state: this.STATE,
+        code_challenge_method: "s256"
+      };
+      
+      // Add code challenge if available
+      if (codeChallenge) {
+        params.code_challenge = codeChallenge;
+      }
+      
+      const authUrl = this.authClient.generateAuthURL(params);
+      
+      console.log("XService: Generated authorization URL for X.com");
+      
+      return authUrl;
+    } catch (error) {
+      console.error("XService: Error generating authorization URL:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", error.message, error.stack);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -653,10 +703,15 @@ export class XService {
 
   /**
    * Generate a fixed code verifier for PKCE
-   * Using a static key provided for consistency
+   * Using a static key provided for consistency between server and client
    */
   private generateCodeVerifier(): string {
-    return "Y7$gVm29#pKfLq*1dC!xZehWTJr@u38oRnXs^BQa6E4NtiUw0+vYMkb9sjGl5HD%";
+    // Using a fixed string to ensure consistency with client
+    // In a production app, this should be randomly generated and stored in the session
+    console.log("XService: Generating fixed code verifier");
+    const verifier = "Y7$gVm29#pKfLq*1dC!xZehWTJr@u38oRnXs^BQa6E4NtiUw0+vYMkb9sjGl5HD%";
+    console.log("XService: Code verifier length:", verifier.length);
+    return verifier;
   }
 
   /**
