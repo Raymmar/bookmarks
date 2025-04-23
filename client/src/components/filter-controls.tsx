@@ -220,7 +220,7 @@ export function FilterControls({
                 onClick={() => {
                   onTagsChange([]);
                   onDateRangeChange("all");
-                  onSourcesChange(["extension", "web", "import"]);
+                  onSourcesChange(["extension", "web", "import", "x"]);
                   if (onVisibleNodeTypesChange) {
                     onVisibleNodeTypesChange(["bookmark", "domain", "tag"]);
                   }
