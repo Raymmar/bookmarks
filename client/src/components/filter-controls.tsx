@@ -150,6 +150,16 @@ export function FilterControls({
                   />
                   <label htmlFor="filter-source-import" className="text-xs">Import</label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="filter-source-x"
+                    checked={sources.includes("x")}
+                    onCheckedChange={(checked) => {
+                      handleSourceToggle("x", checked as boolean);
+                    }}
+                  />
+                  <label htmlFor="filter-source-x" className="text-xs">X.com</label>
+                </div>
               </div>
             </div>
             

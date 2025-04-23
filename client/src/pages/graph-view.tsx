@@ -44,7 +44,7 @@ export default function GraphView() {
     return savedSort ? savedSort : "newest";
   });
   const [dateRange, setDateRange] = useState("all");
-  const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  const [sources, setSources] = useState<string[]>(["extension", "web", "import", "x"]);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(["bookmark", "domain", "tag"]);
   // Add Bookmark dialog state
   const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
