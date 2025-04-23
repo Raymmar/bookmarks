@@ -143,7 +143,7 @@ export class XService {
    */
   async exchangeCodeForToken(code: string, codeVerifier: string): Promise<InsertXCredentials> {
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
-      throw new Error('X_CLIENT_ID or X_CLIENT_SECRET environment variables are not set');
+      throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
     }
 
     const tokenUrl = `${X_API_BASE}/2/oauth2/token`;
@@ -200,7 +200,7 @@ export class XService {
    */
   async refreshAccessToken(refreshToken: string): Promise<Partial<XCredentials>> {
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
-      throw new Error('X_CLIENT_ID or X_CLIENT_SECRET environment variables are not set');
+      throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
     }
 
     const tokenUrl = `${X_API_BASE}/2/oauth2/token`;
