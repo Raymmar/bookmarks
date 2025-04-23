@@ -249,15 +249,37 @@ export class XService {
   async getUserInfo(accessToken: string): Promise<XUser> {
     const userUrl = `${X_API_BASE}/2/users/me`;
     
+    // Generate OAuth authorization header
+    const authHeader = this.generateOAuth1Header('GET', userUrl);
+    
     const response = await fetch(userUrl, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': authHeader,
       },
     });
     
+    // First try with OAuth 1.0a header
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to get user info: ${JSON.stringify(errorData)}`);
+      // If that fails, try with OAuth 2.0 bearer token as fallback
+      console.log('OAuth 1.0a authentication failed, trying OAuth 2.0...');
+      const bearerResponse = await fetch(userUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      if (!bearerResponse.ok) {
+        const errorData = await bearerResponse.json();
+        throw new Error(`Failed to get user info: ${JSON.stringify(errorData)}`);
+      }
+      
+      const userData = await bearerResponse.json() as XApiResponse<XUser>;
+      
+      if (!userData.data) {
+        throw new Error('No user data returned from X API');
+      }
+      
+      return userData.data;
     }
     
     const userData = await response.json() as XApiResponse<XUser>;
@@ -600,6 +622,57 @@ export class XService {
   private generateCodeChallenge(verifier: string): string {
     const hash = crypto.createHash('sha256').update(verifier).digest();
     return hash.toString('base64url');
+  }
+  
+  /**
+   * Generate OAuth 1.0a authorization header
+   * This method creates the correct OAuth signature required by Twitter's API
+   */
+  private generateOAuth1Header(method: string, url: string, params: Record<string, string> = {}): string {
+    if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
+      throw new Error('X_API_KEY or X_API_SECRET environment variables are not set');
+    }
+    
+    // Add OAuth parameters
+    const oauthParams: Record<string, string> = {
+      oauth_consumer_key: X_CLIENT_ID,
+      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_version: '1.0',
+    };
+    
+    // Combine all parameters
+    const allParams = { ...params, ...oauthParams };
+    
+    // Create parameter string
+    const paramString = Object.keys(allParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(allParams[key])}`)
+      .join('&');
+    
+    // Create signature base string
+    const signatureBaseString = [
+      method.toUpperCase(),
+      encodeURIComponent(url),
+      encodeURIComponent(paramString)
+    ].join('&');
+    
+    // Create signing key
+    const signingKey = `${encodeURIComponent(X_CLIENT_SECRET)}&`;
+    
+    // Generate signature
+    const signature = createHmac('sha1', signingKey)
+      .update(signatureBaseString)
+      .digest('base64');
+    
+    // Add signature to OAuth parameters
+    oauthParams.oauth_signature = signature;
+    
+    // Create authorization header string
+    return 'OAuth ' + Object.keys(oauthParams)
+      .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
+      .join(', ');
   }
 }
 
