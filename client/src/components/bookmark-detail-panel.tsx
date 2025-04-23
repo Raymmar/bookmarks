@@ -44,30 +44,30 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
   const { toast } = useToast();
-  
+
   // Collection related hooks and state
   const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
   const { data: allCollections = [] } = useCollections();
   const { addBookmarkToCollection, removeBookmarkFromCollection } = useCollectionMutations();
-  
+
   // Fetch all available tags for selection
   const { data: availableTags = [] } = useQuery<TagType[]>({
     queryKey: ["/api/tags"],
     staleTime: 10000, // 10 seconds before considering data stale
   });
-  
+
   // Set all tags when the query data changes
   useEffect(() => {
     if (availableTags.length > 0) {
       setAllTags(availableTags);
     }
   }, [availableTags]);
-  
+
   // Update bookmark state when the prop changes
   useEffect(() => {
     setBookmark(initialBookmark);
   }, [initialBookmark]);
-  
+
   // Listen for the custom showBookmarkDetail event
   useEffect(() => {
     const handleShowBookmarkDetail = async (e: Event) => {
@@ -76,27 +76,27 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         const event = e as CustomEvent<{bookmarkId: string}>;
         const bookmarkId = event.detail?.bookmarkId;
         if (!bookmarkId) return;
-        
+
         console.log(`Custom event received to show bookmark: ${bookmarkId}`);
-        
+
         // Fetch the updated bookmark
         const { apiRequest } = await import('@/lib/queryClient');
         const updatedBookmark = await apiRequest("GET", `/api/bookmarks/${bookmarkId}`);
-        
+
         if (updatedBookmark) {
           // Update the bookmark state with the latest data
           setBookmark(updatedBookmark);
-          
+
           // Fetch the tags for this bookmark
           const fetchedTags = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/tags`);
           setTags(fetchedTags || []);
-          
+
           // Fetch and update notes if available
           const notes = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/notes`);
           if (notes && notes.length > 0) {
             setOptimisticNotes(notes);
           }
-          
+
           toast({
             title: "Bookmark updated",
             description: "The bookmark has been updated with your new information",
@@ -107,16 +107,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         console.error("Error handling showBookmarkDetail event:", error);
       }
     };
-    
+
     // Add event listener for the custom event
     window.addEventListener('showBookmarkDetail', handleShowBookmarkDetail);
-    
+
     // Clean up the event listener when component unmounts
     return () => {
       window.removeEventListener('showBookmarkDetail', handleShowBookmarkDetail);
     };
   }, [toast]);
-  
+
   // Fetch tags for this bookmark
   useEffect(() => {
     if (bookmark) {
@@ -131,11 +131,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           console.error("Error fetching tags for bookmark:", error);
         }
       };
-      
+
       fetchTags();
     }
   }, [bookmark?.id]);
-  
+
   // Fetch notes whenever the bookmark ID changes
   useEffect(() => {
     if (bookmark) {
@@ -160,13 +160,13 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           }
         }
       };
-      
+
       fetchNotes();
     } else {
       setOptimisticNotes([]);
     }
   }, [bookmark?.id]);
-  
+
   // Check AI processing status
   useEffect(() => {
     if (bookmark) {
@@ -177,21 +177,21 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         // Check if we have insights or system-generated tags
         const hasInsights = bookmark.insights && Object.keys(bookmark.insights).length > 0;
         const hasSystemTags = tags.some(tag => tag.type === 'system');
-        
+
         if (hasInsights || hasSystemTags) {
           setAiProcessingStatus('completed');
         } else {
           setAiProcessingStatus('pending');
         }
       }
-      
+
       // Fetch the current processing status
       const checkProcessingStatus = async () => {
         try {
           const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
           if (response.ok) {
             const statusData = await response.json();
-            
+
             if (statusData.aiProcessingComplete) {
               setAiProcessingStatus('completed');
             }
@@ -200,45 +200,45 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           console.error("Error checking AI processing status:", error);
         }
       };
-      
+
       checkProcessingStatus();
     }
   }, [bookmark, tags]);
-  
+
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
     if (!bookmark) return;
-    
+
     setIsProcessingAi(true);
     setAiProcessingStatus('processing');
-    
+
     try {
       await apiRequest("POST", `/api/bookmarks/${bookmark.id}/process`, {
         insightDepth: 2 // Request deeper insights
       });
-      
+
       toast({
         title: "AI processing started",
         description: "The AI analysis has been triggered and will run in the background",
       });
-      
+
       // Poll for status updates
       const checkInterval = setInterval(async () => {
         try {
           const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
           if (response.ok) {
             const statusData = await response.json();
-            
+
             if (statusData.aiProcessingComplete) {
               clearInterval(checkInterval);
               setAiProcessingStatus('completed');
               setIsProcessingAi(false);
-              
+
               // Refresh bookmark data and fetch insights
               queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
               queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}`] });
               queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
-              
+
               // Also fetch insights and tags directly to update the UI without a page refresh
               try {
                 // Fetch the updated insights
@@ -247,7 +247,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 if (insightsResponse.ok) {
                   insightsData = await insightsResponse.json();
                 }
-                
+
                 // Fetch the updated tags
                 const tagsResponse = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
                 let tagsData = null;
@@ -256,7 +256,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                   // Update the tags directly in state
                   setTags(tagsData);
                 }
-                
+
                 // Update the bookmark with new insights
                 if (bookmark && insightsData) {
                   // Create a new bookmark object with the updated insights
@@ -267,10 +267,10 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                   // Update the bookmark ref
                   setBookmark(updatedBookmark);
                 }
-                
+
                 // Log that we've updated everything optimistically
                 console.log("Optimistically updated bookmark with insights and tags from AI processing");
-                
+
                 // Notify the graph about the new tags for immediate visual updates
                 if (tagsData && Array.isArray(tagsData)) {
                   tagsData.forEach(tag => {
@@ -289,7 +289,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               } catch (error) {
                 console.error("Error fetching insights or tags after processing:", error);
               }
-              
+
               toast({
                 title: "AI processing complete",
                 description: "The bookmark has been analyzed and insights are now available",
@@ -300,14 +300,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           console.error("Error checking processing status:", error);
         }
       }, 5000); // Check every 5 seconds
-      
+
       // Clear interval after 60 seconds (timeout)
       setTimeout(() => {
         clearInterval(checkInterval);
         if (aiProcessingStatus === 'processing') {
           setAiProcessingStatus('failed');
           setIsProcessingAi(false);
-          
+
           toast({
             title: "AI processing timed out",
             description: "The AI analysis is taking longer than expected. Try again later.",
@@ -315,12 +315,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           });
         }
       }, 60000);
-      
+
     } catch (error) {
       console.error("Error triggering AI processing:", error);
       setAiProcessingStatus('failed');
       setIsProcessingAi(false);
-      
+
       toast({
         title: "Error processing bookmark",
         description: error instanceof Error ? error.message : "An unknown error occurred",
@@ -346,16 +346,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       </>
     );
   }
-  
+
   // Filter tags that aren't already added to this bookmark
   const filteredTags = allTags.filter(tag => 
     !tags.some(existingTag => existingTag.id === tag.id)
   );
-  
+
   // Handle collection selection changes
   const handleCollectionChange = async (collectionId: string) => {
     if (!bookmark) return;
-    
+
     // Special case: "remove" action for removing from collection
     if (collectionId === "remove") {
       try {
@@ -368,7 +368,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               bookmarkId: bookmark.id
             });
           }
-          
+
           toast({
             title: "Removed from collections",
             description: "Bookmark has been removed from all collections",
@@ -385,10 +385,10 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         return;
       }
     }
-    
+
     // Check if bookmark is already in the selected collection
     const isInCollection = bookmarkCollections.some(c => c.id === collectionId);
-    
+
     try {
       if (isInCollection) {
         // Remove bookmark from collection
@@ -396,7 +396,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           collectionId,
           bookmarkId: bookmark.id
         });
-        
+
         toast({
           title: "Removed from collection",
           description: "Bookmark has been removed from the collection",
@@ -407,7 +407,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           collectionId,
           bookmarkId: bookmark.id
         });
-        
+
         toast({
           title: "Added to collection",
           description: "Bookmark has been added to the collection",
@@ -422,34 +422,34 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       });
     }
   };
-  
+
   // Adding a tag to the bookmark
   const handleAddTag = async (tagId: string) => {
     if (!bookmark) return;
-    
+
     setIsSubmittingTag(true);
-    
+
     try {
       // Find the tag to add from all available tags
       const tagToAdd = allTags.find(tag => tag.id === tagId);
       if (!tagToAdd) return;
-      
+
       // Optimistically update the UI
       setTags(prev => [...prev, tagToAdd]);
-      
+
       // Make the API request
       await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {});
-      
+
       toast({
         title: "Tag added",
         description: `Tag "${tagToAdd.name}" has been added to the bookmark`,
       });
-      
+
       // Invalidate ALL related queries to ensure UI consistency across components
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
-      
+
       // Dispatch a custom event to notify the graph of the tag change
       const event = new CustomEvent('tagChanged', { 
         detail: { 
@@ -459,11 +459,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         } 
       });
       document.dispatchEvent(event);
-      
+
     } catch (error) {
       // Revert the optimistic update on error
       setTags(prev => prev.filter(tag => tag.id !== tagId));
-      
+
       toast({
         title: "Error adding tag",
         description: error instanceof Error ? error.message : "An unknown error occurred",
@@ -473,37 +473,37 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       setIsSubmittingTag(false);
     }
   };
-  
+
   // Creating a new tag and adding it to the bookmark
   const handleCreateAndAddTag = async () => {
     if (!newTagText.trim() || !bookmark) return;
-    
+
     setIsSubmittingTag(true);
-    
+
     try {
       // Create the new tag
       const newTag = await apiRequest<TagType>("POST", "/api/tags", {
         name: newTagText.trim(),
         type: "user"
       });
-      
+
       // Optimistically update the UI
       setTags(prev => [...prev, newTag]);
       setAllTags(prev => [...prev, newTag]); // Update the local cache of all tags
-      
+
       // Add tag to bookmark
       await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${newTag.id}`, {});
-      
+
       toast({
         title: "Tag added",
         description: `New tag "${newTag.name}" has been created and added to the bookmark`,
       });
-      
+
       // Invalidate ALL related queries to ensure UI consistency across components
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
-      
+
       // Dispatch a custom event to notify the graph of the tag change
       const event = new CustomEvent('tagChanged', { 
         detail: { 
@@ -514,11 +514,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         } 
       });
       document.dispatchEvent(event);
-      
+
       // Reset the input
       setNewTagText("");
       setIsAddingTag(false);
-      
+
     } catch (error) {
       toast({
         title: "Error creating tag",
@@ -529,37 +529,37 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       setIsSubmittingTag(false);
     }
   };
-  
+
   // Handle updating bookmark fields
   const handleUpdateBookmark = async (updateData: Partial<Bookmark>) => {
     if (!bookmark) return;
-    
+
     try {
       // Immediately set the updated_at timestamp to the current time for optimistic updates
       const now = new Date().toISOString();
-      
+
       // Create the optimistically updated bookmark with current timestamp
       const optimisticBookmark = {
         ...bookmark,
         ...updateData,
         updated_at: now
       };
-      
+
       // Update the local state
       setBookmark(optimisticBookmark);
-      
+
       // Get current bookmarks from the cache
       const currentBookmarks = queryClient.getQueryData<Bookmark[]>(["/api/bookmarks"]) || [];
-      
+
       // Get current localStorage sort setting
       const sortOrder = localStorage.getItem('bookmarkSortOrder') || 'newest';
-      
+
       // Check if we need to reorder (only for "recently_updated" sort)
       if (sortOrder === 'recently_updated') {
         // For recently_updated sort, create a new sorted list with the updated bookmark at the top
         const filteredBookmarks = currentBookmarks.filter(b => b.id !== bookmark.id);
         const sortedBookmarks = [optimisticBookmark, ...filteredBookmarks];
-        
+
         // Update the cache with the reordered list in a single operation
         queryClient.setQueryData(["/api/bookmarks"], sortedBookmarks);
       } else {
@@ -570,17 +570,17 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           )
         );
       }
-      
+
       // Make API request to update the bookmark
       const updatedBookmark = await apiRequest(
         "PATCH", 
         `/api/bookmarks/${bookmark.id}`, 
         updateData
       );
-      
+
       // Update the local state with server response
       setBookmark(updatedBookmark);
-      
+
       // Only invalidate queries if we're not in recently_updated sort mode
       // For recently_updated, we keep our optimistic update intact with no server refresh
       if (sortOrder !== 'recently_updated') {
@@ -588,7 +588,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
         }, 1000);
       }
-      
+
       // Dispatch a custom event to inform other components about the update
       const event = new CustomEvent('bookmarkUpdated', { 
         detail: { 
@@ -597,7 +597,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         } 
       });
       document.dispatchEvent(event);
-      
+
       // Show success toast
       toast({
         title: "Bookmark updated",
@@ -606,19 +606,19 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       });
     } catch (error) {
       console.error("Error updating bookmark:", error);
-      
+
       // Show error toast
       toast({
         title: "Update failed",
         description: "There was a problem updating your bookmark. Please try again.",
         variant: "destructive",
       });
-      
+
       // Revert to original data if it exists
       if (initialBookmark) {
         setBookmark(initialBookmark);
       }
-      
+
       // Invalidate queries to refresh the data from server
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
     }
@@ -627,14 +627,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   // Remove a tag from the bookmark
   const handleRemoveTag = async (tagId: string) => {
     if (!bookmark) return;
-    
+
     // Find the tag to remove
     const tagToRemove = tags.find(tag => tag.id === tagId);
     if (!tagToRemove) return;
-    
+
     // Optimistically update the UI
     setTags(prev => prev.filter(tag => tag.id !== tagId));
-    
+
     try {
       // Make the API request using fetch directly to better handle empty responses
       const response = await fetch(`/api/bookmarks/${bookmark.id}/tags/${tagId}`, {
@@ -643,22 +643,22 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`Server responded with status: ${response.status}`);
       }
-      
+
       toast({
         title: "Tag removed",
         description: `Tag "${tagToRemove.name}" has been removed from the bookmark`,
       });
-      
+
       // Invalidate ALL related queries to ensure UI consistency across components
       // This ensures the graph, sidebar, and detail panel all update correctly
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
-      
+
       // Dispatch a custom event to notify the graph of the tag change
       const event = new CustomEvent('tagChanged', { 
         detail: { 
@@ -669,17 +669,17 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         } 
       });
       document.dispatchEvent(event);
-      
+
       console.log(`Tag ${tagToRemove.name} (${tagId}) successfully removed from bookmark ${bookmark.id}`);
-      
+
     } catch (error) {
       console.error("Error removing tag:", error);
-      
+
       // Revert the optimistic update on error
       if (tagToRemove) {
         setTags(prev => [...prev, tagToRemove]);
       }
-      
+
       toast({
         title: "Error removing tag",
         description: error instanceof Error ? error.message : "An unknown error occurred",
@@ -690,12 +690,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
 
   const handleAddNote = async () => {
     if (!newNote.trim() || !bookmark) return;
-    
+
     setIsSubmitting(true);
-    
+
     // Create a temporary ID for the optimistic update
     const tempId = `temp-${Date.now()}`;
-    
+
     // Create an optimistic note
     const optimisticNote: Note = {
       id: tempId,
@@ -703,30 +703,30 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       text: newNote.trim(),
       timestamp: new Date().toISOString() as any // Type cast to handle expected Date type
     };
-    
+
     // Optimistically update the UI
     setOptimisticNotes(prev => [optimisticNote, ...prev]);
-    
+
     try {
       // Make the API request
       const createdNote = await apiRequest<Note>("POST", `/api/bookmarks/${bookmark.id}/notes`, {
         text: newNote.trim(),
       });
-      
+
       // Update the optimistic note with the real data
       setOptimisticNotes(prev => 
         prev.map(note => note.id === tempId ? createdNote : note)
       );
-      
+
       toast({
         title: "Note added",
         description: "Your note was successfully added to the bookmark",
       });
-      
+
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/notes`] });
-      
+
       // Dispatch a custom event for potential event listeners
       const event = new CustomEvent('noteAdded', { 
         detail: { 
@@ -736,18 +736,18 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         } 
       });
       document.dispatchEvent(event);
-      
+
       console.log(`Note "${createdNote.text.substring(0, 30)}..." successfully added to bookmark ${bookmark.id}`);
-      
+
       setNewNote("");
       setIsAddingNote(false);
-      
+
     } catch (error) {
       console.error("Error adding note:", error);
-      
+
       // Remove the optimistic note on error
       setOptimisticNotes(prev => prev.filter(note => note.id !== tempId));
-      
+
       toast({
         title: "Error adding note",
         description: error instanceof Error ? error.message : "An unknown error occurred",
@@ -768,7 +768,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           </Button>
         </div>
       </div>
-      
+
       <div className="p-4 overflow-auto">
         <div className="mb-4">
           <div
@@ -811,7 +811,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             {bookmark.url}
           </a>
         </div>
-        
+
         {/* Twitter Card for X.com bookmarks */}
         {bookmark.source === 'x' && (
           <div className="mb-4 mt-4 bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -835,12 +835,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 </div>
               </div>
             )}
-            
+
             {/* Tweet content */}
             <div className="mb-4 text-gray-800">
               {bookmark.description}
             </div>
-            
+
             {/* Tweet media (if any) */}
             {bookmark.media_urls && bookmark.media_urls.length > 0 && (
               <div className="mb-4">
@@ -862,7 +862,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 ))}
               </div>
             )}
-            
+
             {/* Tweet stats - more compact design to prevent overflow */}
             <div className="border-t border-gray-100 pt-3 text-xs">
               {/* Engagement stats in a more compact format */}
@@ -895,7 +895,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             </div>
           </div>
         )}
-        
+
         {/* AI Insights Section */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2 w-full">
@@ -953,14 +953,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               </Button>
             )}
           </div>
-          
+
           {bookmark.insights?.summary ? (
             <div>
-              <h5 className="text-xs font-medium text-gray-600 mb-1">Summary</h5>
+              <h5 className="text-xs font-medium text-gray-600 mb-1></h5>
               <p className="text-sm text-gray-600 mb-3">
                 {bookmark.insights.summary}
               </p>
-              
+
               {bookmark.insights.related_links && bookmark.insights.related_links.length > 0 && (
                 <div>
                   <h5 className="text-xs font-medium text-gray-600 mb-1">Related Links</h5>
@@ -990,7 +990,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             </div>
           )}
         </div>
-        
+
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-medium text-gray-700">Tags</h4>
@@ -1003,7 +1003,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               + Add Tag
             </Button>
           </div>
-          
+
           {isAddingTag && (
             <div className="mb-3">
               <div className="relative mb-2">
@@ -1024,7 +1024,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                   </Button>
                 )}
               </div>
-              
+
               {/* Show matching tags or option to create new tag */}
               {newTagText.trim() !== "" && (
                 <div className="border rounded p-2 mb-2 max-h-32 overflow-y-auto">
@@ -1037,7 +1037,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                       <span className="text-sm">Create new tag "<span className="font-semibold">{newTagText.trim()}</span>"</span>
                     </div>
                   )}
-                  
+
                   {filteredTags
                     .filter(tag => tag.name.toLowerCase().includes(newTagText.toLowerCase()))
                     .slice(0, 5)
@@ -1051,7 +1051,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                       <span className="text-xs text-gray-500">Used {tag.count} times</span>
                     </div>
                   ))}
-                  
+
                   {filteredTags.filter(tag => tag.name.toLowerCase().includes(newTagText.toLowerCase())).length === 0 && 
                    allTags.some(tag => tag.name.toLowerCase() === newTagText.trim().toLowerCase()) && (
                     <div className="text-sm text-gray-500 p-1">
@@ -1060,7 +1060,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                   )}
                 </div>
               )}
-              
+
               <div className="flex justify-end space-x-2">
                 <Button 
                   variant="outline" 
@@ -1086,7 +1086,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               </div>
             </div>
           )}
-          
+
           <div className="flex flex-wrap gap-1">
             {/* User-added tags with remove capability */}
             {tags.map(tag => (
@@ -1106,13 +1106,13 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 </Button>
               </Badge>
             ))}
-            
+
             {tags.length === 0 && (
               <div className="text-sm text-gray-500 italic">No tags</div>
             )}
           </div>
         </div>
-        
+
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-medium text-gray-700">Highlights</h4>
@@ -1120,7 +1120,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               {bookmark.highlights ? bookmark.highlights.length : 0} highlights
             </span>
           </div>
-          
+
           {bookmark.highlights && bookmark.highlights.length > 0 ? (
             <div className="space-y-3">
               {bookmark.highlights.map((highlight: Highlight, index: number) => (
@@ -1133,7 +1133,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             <div className="text-sm text-gray-500 italic">No highlights yet</div>
           )}
         </div>
-        
+
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-medium text-gray-700">Notes</h4>
@@ -1146,7 +1146,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               + Add Note
             </Button>
           </div>
-          
+
           {isAddingNote && (
             <div className="mb-3">
               <Textarea
@@ -1177,7 +1177,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               </div>
             </div>
           )}
-          
+
           {optimisticNotes.length > 0 ? (
             <div className="space-y-3">
               {optimisticNotes.map((note: Note, index: number) => (
@@ -1208,7 +1208,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             <div className="text-sm text-gray-500 italic">No notes yet</div>
           )}
         </div>
-        
+
         {/* Collections Section */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
@@ -1236,7 +1236,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                     Remove from all collections
                   </SelectItem>
                 )}
-                
+
                 {allCollections.map((collection) => (
                   <SelectItem 
                     key={collection.id} 
@@ -1250,13 +1250,13 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             </Select>
           </div>
         </div>
-        
+
         {bookmark.insights?.related_links && bookmark.insights.related_links.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-medium text-gray-700">Related Bookmarks</h4>
             </div>
-            
+
             <div className="space-y-2">
               {bookmark.insights.related_links.map((link: string, index: number) => (
                 <a key={index} href={link} className="block p-2 rounded" target="_blank" rel="noopener noreferrer">
