@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
+  Cable,
   Twitter
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -287,10 +288,10 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                           ? "bg-secondary/20 text-primary border border-primary/20" 
                           : "text-gray-700 hover:bg-gray-100"
                       )}>
-                        <Twitter className={cn("h-5 w-5 mr-2", 
+                        <Cable className={cn("h-5 w-5 mr-2", 
                           location === "/x-integration" ? "text-primary" : ""
                         )} />
-                        X.com Integration
+                        Connect
                       </div>
                     </Link>
                   </li>

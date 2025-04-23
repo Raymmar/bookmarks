@@ -31,12 +31,6 @@ const XIntegrationPage = () => {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">X.com Integration</h1>
-          <p className="text-muted-foreground">
-            Connect to X.com to import your bookmarked tweets and organize them with your other bookmarks.
-          </p>
-        </div>
 
         <div className="grid gap-6">
           <XIntegrationPanel />
@@ -44,13 +38,13 @@ const XIntegrationPage = () => {
           <div className="bg-muted p-4 rounded-md text-sm text-muted-foreground">
             <h3 className="font-medium mb-2">About X.com Integration</h3>
             <p className="mb-2">
-              This integration allows you to import your bookmarked tweets and organize them in collections.
+              Connect with x.com to import your bookmarks and folders.
             </p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Bookmarked tweets will be imported as links to the original tweet</li>
-              <li>Tweet text, author, and engagement metrics are saved with each bookmark</li>
-              <li>X.com folders can be mapped to your bookmark collections</li>
-              <li>You can sync your bookmarks manually whenever you want</li>
+              <li>Bookmarks will be imported as links to the original tweet</li>
+              <li>Tweet text, author, engagement metrics and more are saved with each bookmark</li>
+              <li>Map oyour flders to bookmark collections</li>
+              <li>Sync bookmarks manually or on a schedule</li>
             </ul>
           </div>
         </div>

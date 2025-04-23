@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCw, FolderPlus, Link, Twitter } from "lucide-react";
+import { Loader2, RefreshCw, FolderPlus, Link, Cable } from "lucide-react";
 
 // Type definitions
 interface XConnectionStatus {
@@ -330,8 +330,8 @@ const XIntegrationPanel = () => {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center">
-          <Twitter className="mr-2 h-5 w-5" />
-          X.com Integration
+          <Cable className="mr-2 h-5 w-5" />
+          Connect to X
         </CardTitle>
         <CardDescription>
           Connect your X.com account to import your bookmarked tweets
