@@ -378,7 +378,7 @@ export default function GraphView() {
   // Determine which bookmarks to use based on whether a collection is selected
   const fullBookmarks = selectedCollectionId ? collectionBookmarks : bookmarks;
   
-  // Apply limit to bookmarks if loadLimit is set
+  // Apply load limit to bookmarks if loadLimit is set
   const activeBookmarks = useMemo(() => {
     if (loadLimit === null) {
       return fullBookmarks; // Load all bookmarks
@@ -715,6 +715,30 @@ export default function GraphView() {
               visibleNodeTypes={visibleNodeTypes}
               onVisibleNodeTypesChange={setVisibleNodeTypes}
             />
+            
+            {/* Load limit controls */}
+            <div className="flex items-center">
+              <Select
+                value={loadLimit === null ? "all" : loadLimit.toString()}
+                onValueChange={(value) => {
+                  if (value === "all") {
+                    setLoadLimit(null);
+                  } else {
+                    setLoadLimit(Number(value));
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[100px] h-9">
+                  <SelectValue placeholder="Show" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="25">Recent 25</SelectItem>
+                  <SelectItem value="50">Recent 50</SelectItem>
+                  <SelectItem value="100">Recent 100</SelectItem>
+                  <SelectItem value="all">Show All</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
         
@@ -755,6 +779,12 @@ export default function GraphView() {
           ) : (
             // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
+              {/* Display load indicator when showing limited bookmarks */}
+              {loadLimit !== null && fullBookmarks.length > loadLimit && (
+                <div className="absolute top-4 right-4 z-10 bg-white/80 backdrop-blur-sm py-1 px-3 text-xs rounded-full border shadow-sm">
+                  Showing {Math.min(loadLimit, filteredBookmarks.length)} of {fullBookmarks.length} bookmarks
+                </div>
+              )}
               <ForceDirectedGraph
                 bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
