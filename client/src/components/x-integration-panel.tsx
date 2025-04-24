@@ -384,23 +384,47 @@ const XIntegrationPanel = () => {
                 </p>
               </div>
               
-              <Button 
-                onClick={() => syncBookmarks.mutate()} 
-                disabled={syncBookmarks.isPending}
-                className="w-full"
-              >
-                {syncBookmarks.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Syncing Bookmarks...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Sync X.com Bookmarks
-                  </>
-                )}
-              </Button>
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => syncBookmarks.mutate()} 
+                  disabled={syncBookmarks.isPending}
+                  className="w-full"
+                >
+                  {syncBookmarks.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing Bookmarks...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync X.com Bookmarks
+                    </>
+                  )}
+                </Button>
+                
+                <Button 
+                  onClick={() => startAuth.mutate()} 
+                  disabled={startAuth.isPending}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {startAuth.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Reconnecting...
+                    </>
+                  ) : (
+                    <>
+                      <Twitter className="mr-2 h-4 w-4" />
+                      Reconnect to X.com
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  If syncing fails, try reconnecting to refresh your X.com access
+                </p>
+              </div>
             </TabsContent>
             
             <TabsContent value="folders" className="py-4">

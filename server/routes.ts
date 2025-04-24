@@ -1702,25 +1702,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "X.com connection not found" });
       }
       
-      // Get folders from X.com
-      const folders = await xService.getFolders(credentials.access_token, credentials.x_user_id);
-      
-      // Get existing folder mappings
-      const existingMappings = await storage.getXFoldersByUserId(userId);
-      
-      // Combine data for response
-      const foldersWithMappings = folders.map(folder => {
-        const mapping = existingMappings.find(m => m.x_folder_id === folder.id);
-        return {
-          ...folder,
-          collection_id: mapping?.collection_id || null,
-          mapped: !!mapping
-        };
-      });
-      
-      res.json(foldersWithMappings);
+      try {
+        // Get folders from X.com - using user's UUID, not the x_user_id
+        const folders = await xService.getFolders(credentials.access_token, userId);
+        
+        // Get existing folder mappings
+        const existingMappings = await storage.getXFoldersByUserId(userId);
+        
+        // Combine data for response
+        const foldersWithMappings = folders.map(folder => {
+          const mapping = existingMappings.find(m => m.x_folder_id === folder.id);
+          return {
+            ...folder,
+            collection_id: mapping?.collection_id || null,
+            mapped: !!mapping
+          };
+        });
+        
+        res.json(foldersWithMappings);
+      } catch (folderError) {
+        console.error("Error retrieving X.com folders:", folderError);
+        // Return empty array instead of error to avoid breaking the UI
+        res.json([]);
+      }
     } catch (error) {
-      console.error("Error retrieving X.com folders:", error);
+      console.error("Error in X.com folders endpoint:", error);
       res.status(500).json({ error: "Failed to retrieve X.com folders" });
     }
   });

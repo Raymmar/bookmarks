@@ -532,20 +532,42 @@ export class XService {
       }
       console.log(`X Sync: Found credentials for user ${userId}, username: ${credentials.x_username}`);
       
-      // Ensure token is still valid, refresh if needed
-      if (credentials.token_expires_at && credentials.token_expires_at < new Date()) {
-        console.log(`X Sync: Token expired, refreshing...`);
+      // Check if token is expired
+      const isTokenExpired = credentials.token_expires_at && credentials.token_expires_at < new Date();
+      
+      // If token is expired and we have a refresh token, try to refresh it
+      if (isTokenExpired) {
+        console.log(`X Sync: Token expired, attempting to refresh...`);
+        
+        // Check if we have a refresh token
         if (!credentials.refresh_token) {
           console.error(`X Sync: No refresh token available for user ${userId}`);
-          throw new Error('No refresh token available to refresh expired access token');
+          return { 
+            added: 0, 
+            updated: 0, 
+            errors: 1 
+          };
         }
         
-        const refreshedCreds = await this.refreshAccessToken(credentials.refresh_token);
-        await storage.updateXCredentials(credentials.id, refreshedCreds);
-        console.log(`X Sync: Token refreshed successfully`);
+        try {
+          // Try to refresh the token
+          const refreshedCreds = await this.refreshAccessToken(credentials.refresh_token);
+          await storage.updateXCredentials(credentials.id, refreshedCreds);
+          console.log(`X Sync: Token refreshed successfully`);
+        } catch (refreshError) {
+          console.error(`X Sync: Failed to refresh token:`, refreshError);
+          // Token refresh failed, user needs to re-authenticate
+          console.log(`X Sync: User needs to reconnect to X.com`);
+          
+          return { 
+            added: 0, 
+            updated: 0, 
+            errors: 1 
+          };
+        }
       }
     } catch (error) {
-      console.error(`X Sync: Error checking or refreshing credentials:`, error);
+      console.error(`X Sync: Error checking credentials:`, error);
       return { added: 0, updated: 0, errors: 1 };
     }
     
