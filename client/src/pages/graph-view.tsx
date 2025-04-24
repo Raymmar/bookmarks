@@ -738,7 +738,7 @@ export default function GraphView() {
                     role="combobox"
                     className="w-[130px] h-9 justify-between"
                   >
-                    {loadLimit === null ? "Show All" : `Show ${loadLimit}`}
+                    {loadLimit === null ? `Show All (${fullBookmarks.length})` : `Show ${loadLimit}`}
                     <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -798,15 +798,12 @@ export default function GraphView() {
                             loadLimit === null ? "opacity-100" : "opacity-0"
                           }`}
                         />
-                        <span>Show All</span>
+                        <span>Show All ({fullBookmarks.length})</span>
                       </CommandItem>
                     </CommandGroup>
                   </Command>
                 </PopoverContent>
               </Popover>
-              <span className="ml-2 text-xs text-gray-500">
-                ({fullBookmarks.length} total)
-              </span>
             </div>
           </div>
         </div>
