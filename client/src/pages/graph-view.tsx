@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph-unpinned";
+import { ForceDirectedGraphProgressive } from "@/components/force-directed-graph-progressive";
 import { SidebarPanel } from "@/components/sidebar-panel";
 import { FilterControls } from "@/components/filter-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +15,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Bookmark } from "@shared/types";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
 import { useCollectionBookmarksForGraph, useMultiCollectionBookmarksForGraph } from "@/hooks/use-collection-queries";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Tag interfaces
 interface Tag {
@@ -46,6 +49,11 @@ export default function GraphView() {
   const [dateRange, setDateRange] = useState("all");
   const [sources, setSources] = useState<string[]>(["extension", "web", "import", "x"]);
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(["bookmark", "domain", "tag"]);
+  // Progressive loading option - initialize from localStorage or default to true
+  const [useProgressiveLoading, setUseProgressiveLoading] = useState<boolean>(() => {
+    const savedSetting = localStorage.getItem('useProgressiveLoading');
+    return savedSetting ? JSON.parse(savedSetting) : true;
+  });
   // Add Bookmark dialog state
   const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
   // Drawer state with localStorage persistence
