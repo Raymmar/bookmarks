@@ -296,9 +296,21 @@ while considering the bookmark context provided above.
               processedText = bookmark.description;
             }
             
+            // Extract image URLs for X tweets if not already provided
+            let mediaUrls = bookmark.media_urls || [];
+            
+            // For X tweets, try to extract image URLs if none are provided
+            if (isXTweet && (!mediaUrls || mediaUrls.length === 0)) {
+              try {
+                console.log(`Attempting to extract image URLs from X tweet for tag generation: ${url}`);
+                mediaUrls = await extractXImageUrls(url);
+                console.log(`Extracted ${mediaUrls.length} image URLs from X tweet for tag generation`);
+              } catch (xError) {
+                console.error(`Error extracting X tweet image URLs for tag generation:`, xError);
+              }
+            }
+            
             // Pass the custom tagging prompt to the generateTags function
-            // Include media URLs for multimodal analysis if available
-            const mediaUrls = bookmark.media_urls || [];
             const tags = await generateTags(processedText || '', url, systemPrompts.taggingPrompt, mediaUrls);
             console.log(`Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(', ')}`);
             return tags;
@@ -332,9 +344,21 @@ while considering the bookmark context provided above.
               processedText = bookmark.description;
             }
             
+            // Extract image URLs for X tweets if not already provided
+            let mediaUrls = bookmark.media_urls || [];
+            
+            // For X tweets, try to extract image URLs if none are provided
+            if (isXTweet && (!mediaUrls || mediaUrls.length === 0)) {
+              try {
+                console.log(`Attempting to extract image URLs from X tweet: ${url}`);
+                mediaUrls = await extractXImageUrls(url);
+                console.log(`Extracted ${mediaUrls.length} image URLs from X tweet`);
+              } catch (xError) {
+                console.error(`Error extracting X tweet image URLs:`, xError);
+              }
+            }
+            
             // Pass the custom summary prompt to the generateInsights function
-            // Include media URLs for multimodal analysis if available
-            const mediaUrls = bookmark.media_urls || [];
             const result = await generateInsights(url, processedText || '', insightDepth, systemPrompts.summaryPrompt, mediaUrls);
             console.log(`Insights generated for bookmark ${bookmarkId}. Summary length: ${result.summary.length}`);
             return result;
