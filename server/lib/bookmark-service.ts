@@ -137,10 +137,11 @@ export class BookmarkService {
         // Media URLs section for the template
         const mediaUrlsSection = hasMediaUrls ? `
 MEDIA CONTENT:
-${bookmark.media_urls.map((url: string, index: number) => `Image ${index + 1}: ${url}`).join('\n')}
+The bookmark contains ${bookmark.media_urls.length} image(s) that are attached to this message.
 
-NOTE ON MEDIA: You have multimodal capabilities. If the bookmark contains image URLs listed above, 
-analyze each image to extract additional context that will help with classification and summarization.
+IMPORTANT ABOUT IMAGES: You have multimodal capabilities and will receive these images directly in this API call.
+You should analyze the visual content of each attached image and explicitly describe what you see in them.
+Include specific visual details from the images in your response - describe notable people, objects, text, or scenes visible in the images.
 ` : '';
         
         // Build template strings with the bookmark data inserted
