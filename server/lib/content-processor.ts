@@ -153,44 +153,55 @@ export async function generateInsights(
     
     // For multimodal analysis (with images)
     if (hasImages) {
-      // Create multimodal message content
-      const multimodalContent: Array<any> = []; 
-      
-      // Add text content first
-      if (content && content.trim().length > 0) {
-        multimodalContent.push({
-          type: "text",
-          text: content.slice(0, 15000) // Limit content length
-        });
-      } else if (url) {
-        multimodalContent.push({
-          type: "text",
-          text: `Please analyze the following URL and images: ${url}`
-        });
-      }
-      
-      // Add image URLs to the content
-      if (imageUrls.length > 0) {
-        console.log(`Including ${imageUrls.length} images in insights generation analysis`);
+      try {
+        // Create multimodal message content
+        const multimodalContent: Array<any> = []; 
         
-        // Add each image
-        for (const imageUrl of imageUrls) {
-          if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim().length > 0) {
-            multimodalContent.push({
-              type: "image_url",
-              image_url: {
-                url: imageUrl
-              }
-            });
+        // Add text content first
+        if (content && content.trim().length > 0) {
+          multimodalContent.push({
+            type: "text",
+            text: content.slice(0, 15000) // Limit content length
+          });
+        } else if (url) {
+          multimodalContent.push({
+            type: "text",
+            text: `Please analyze the following URL and images: ${url}`
+          });
+        }
+        
+        // Add image URLs to the content
+        if (imageUrls.length > 0) {
+          console.log(`Including ${imageUrls.length} images in insights generation analysis`);
+          
+          // Add each image
+          for (const imageUrl of imageUrls) {
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim().length > 0) {
+              multimodalContent.push({
+                type: "image_url",
+                image_url: {
+                  url: imageUrl
+                }
+              });
+            }
           }
         }
+        
+        // Add the multimodal content as user message
+        messages.push({
+          role: "user",
+          content: multimodalContent
+        });
+      } catch (imageError) {
+        console.error("Error setting up multimodal content, falling back to text-only analysis:", imageError);
+        
+        // Fall back to text-only analysis
+        const contentToAnalyze = content ? content.slice(0, 15000) : "";
+        messages.push({
+          role: "user",
+          content: contentToAnalyze || url
+        });
       }
-      
-      // Add the multimodal content as user message
-      messages.push({
-        role: "user",
-        content: multimodalContent
-      });
     }
     // Standard text-only analysis
     else {
@@ -212,12 +223,43 @@ export async function generateInsights(
 
     console.log(`Sending request to OpenAI for insights on ${url}`);
     
-    
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: messages,
-      response_format: { type: "json_object" }
-    });
+    let response;
+    try {
+      response = await openai.chat.completions.create({
+        model: MODEL,
+        messages: messages,
+        response_format: { type: "json_object" }
+      });
+    } catch (apiError) {
+      console.error("OpenAI API error when getting insights, falling back to text-only analysis:", apiError);
+
+      // If we hit an error with images, retry without images
+      if (hasImages) {
+        console.log("Retrying insights without image URLs due to API error");
+        
+        // Create new messages array without images
+        const textOnlyMessages: ChatCompletionMessageParam[] = [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: content || url || ""
+          }
+        ];
+        
+        // Retry with text-only content
+        response = await openai.chat.completions.create({
+          model: MODEL,
+          messages: textOnlyMessages,
+          response_format: { type: "json_object" }
+        });
+      } else {
+        // If not related to images, rethrow
+        throw apiError;
+      }
+    }
 
     const resultText = response.choices[0].message.content || "{}";
     console.log("Raw insights result:", resultText);
@@ -373,44 +415,55 @@ export async function generateTags(
     
     // For multimodal analysis (with images)
     if (hasImages) {
-      // Create multimodal message content
-      const multimodalContent: Array<any> = []; 
-      
-      // Add text content first
-      if (content && content.trim().length > 0) {
-        multimodalContent.push({
-          type: "text",
-          text: content.slice(0, 15000) // Limit content length
-        });
-      } else if (url) {
-        multimodalContent.push({
-          type: "text",
-          text: `Please analyze the following URL and images: ${url}`
-        });
-      }
-      
-      // Add image URLs to the content
-      if (imageUrls.length > 0) {
-        console.log(`Including ${imageUrls.length} images in tag generation analysis`);
+      try {
+        // Create multimodal message content
+        const multimodalContent: Array<any> = []; 
         
-        // Add each image
-        for (const imageUrl of imageUrls) {
-          if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim().length > 0) {
-            multimodalContent.push({
-              type: "image_url",
-              image_url: {
-                url: imageUrl
-              }
-            });
+        // Add text content first
+        if (content && content.trim().length > 0) {
+          multimodalContent.push({
+            type: "text",
+            text: content.slice(0, 15000) // Limit content length
+          });
+        } else if (url) {
+          multimodalContent.push({
+            type: "text",
+            text: `Please analyze the following URL and images: ${url}`
+          });
+        }
+        
+        // Add image URLs to the content
+        if (imageUrls.length > 0) {
+          console.log(`Including ${imageUrls.length} images in tag generation analysis`);
+          
+          // Add each image
+          for (const imageUrl of imageUrls) {
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim().length > 0) {
+              multimodalContent.push({
+                type: "image_url",
+                image_url: {
+                  url: imageUrl
+                }
+              });
+            }
           }
         }
+        
+        // Add the multimodal content as user message
+        messages.push({
+          role: "user",
+          content: multimodalContent
+        });
+      } catch (imageError) {
+        console.error("Error setting up multimodal content for tag generation, falling back to text-only analysis:", imageError);
+        
+        // Fall back to text-only analysis
+        const contentToAnalyze = content ? content.slice(0, 15000) : "";
+        messages.push({
+          role: "user",
+          content: contentToAnalyze || url || ""
+        });
       }
-      
-      // Add the multimodal content as user message
-      messages.push({
-        role: "user",
-        content: multimodalContent
-      });
     } 
     // Standard text-only analysis
     else {
