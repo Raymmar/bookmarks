@@ -675,19 +675,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       tagName = tagName.trim();
       
+      // Apply tag normalization to ensure consistency
+      // Import the tag normalizer function
+      const { normalizeTag } = await import('./lib/tag-normalizer');
+      const normalizedTagName = normalizeTag(tagName);
+      
+      console.log(`Normalized tag name: "${tagName}" -> "${normalizedTagName}"`);
+      
       // Get tag type with validation
       let tagType: "user" | "system" = "user";
       if (req.body.type === "system") {
         tagType = "system";
       }
       
-      // Create a tag data object
+      // Create a tag data object with normalized name
       const tagData = {
-        name: tagName,
+        name: normalizedTagName,
         type: tagType
       };
       
-      console.log("Creating tag with data:", tagData);
+      console.log("Creating tag with normalized data:", tagData);
       
       // Check if tag with same name already exists (case-insensitive)
       const existingTag = await storage.getTagByName(tagData.name);
@@ -714,9 +721,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Tag not found" });
       }
       
-      // If updating the name, check for duplicates
+      // If updating the name, normalize it and check for duplicates
       if (req.body.name && req.body.name !== tag.name) {
-        const existingTag = await storage.getTagByName(req.body.name);
+        // Apply tag normalization to new name
+        const { normalizeTag } = await import('./lib/tag-normalizer');
+        const normalizedName = normalizeTag(req.body.name);
+        
+        console.log(`Normalized tag name for update: "${req.body.name}" -> "${normalizedName}"`);
+        
+        // Update the request with the normalized name
+        req.body.name = normalizedName;
+        
+        // Check for duplicates using normalized name
+        const existingTag = await storage.getTagByName(normalizedName);
         if (existingTag) {
           return res.status(409).json({ 
             error: "Tag with this name already exists", 
