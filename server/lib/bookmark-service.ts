@@ -272,6 +272,13 @@ Please analyze this content and follow the user's instructions while considering
               }
             }
             
+            // Check if this is an X.com URL - for X tweets, we want to prioritize the description field
+            const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
+            if (isXTweet && bookmark.description) {
+              console.log(`Using X tweet description as primary content for tag generation: "${bookmark.description.substring(0, 50)}..."`);
+              processedText = bookmark.description;
+            }
+            
             // Pass the custom tagging prompt to the generateTags function
             const tags = await generateTags(processedText || '', url, systemPrompts.taggingPrompt);
             console.log(`Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(', ')}`);
@@ -297,6 +304,13 @@ Please analyze this content and follow the user's instructions while considering
               } catch (contentError) {
                 console.warn(`Error processing content for insight generation: ${contentError.message}`);
               }
+            }
+            
+            // Check if this is an X.com URL - for X tweets, we want to prioritize the description field
+            const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
+            if (isXTweet && bookmark.description) {
+              console.log(`Using X tweet description as primary content for insights generation: "${bookmark.description.substring(0, 50)}..."`);
+              processedText = bookmark.description;
             }
             
             // Pass the custom summary prompt to the generateInsights function
