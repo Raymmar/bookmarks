@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCw, FolderPlus, Link, Cable } from "lucide-react";
+import { Loader2, RefreshCw, FolderPlus, Link as LinkIcon, Cable, ExternalLink } from "lucide-react";
 
 // Type definitions
 interface XConnectionStatus {
@@ -198,7 +198,7 @@ const XIntegrationPanel = () => {
   });
 
   // Handle authorization callback
-  const handleAuthCallback = useCallback(async (code: string, verifier: string, state?: string) => {
+  const handleAuthCallback = useCallback(async (code: string, verifier: string, state?: string | null) => {
     try {
       console.log("X OAuth Callback: Received auth code, sending to server");
       console.log("Code length:", code.length);
@@ -376,31 +376,52 @@ const XIntegrationPanel = () => {
             <TabsContent value="bookmarks" className="py-4">
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground">
-                  Connected as <span className="font-medium">@{connectionStatus.username}</span>
+                  Connected as <span className="font-medium">@{connectionStatus?.username}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Last synchronized: {connectionStatus.lastSync ? 
+                  Last synchronized: {connectionStatus?.lastSync ? 
                     new Date(connectionStatus.lastSync).toLocaleString() : 'Never'}
                 </p>
               </div>
               
-              <Button 
-                onClick={() => syncBookmarks.mutate()} 
-                disabled={syncBookmarks.isPending}
-                className="w-full"
-              >
-                {syncBookmarks.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Syncing Bookmarks...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Sync X.com Bookmarks
-                  </>
-                )}
-              </Button>
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => syncBookmarks.mutate()} 
+                  disabled={syncBookmarks.isPending}
+                  className="w-full"
+                >
+                  {syncBookmarks.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing Bookmarks...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync X.com Bookmarks
+                    </>
+                  )}
+                </Button>
+                
+                <Button 
+                  onClick={() => startAuth.mutate()} 
+                  disabled={startAuth.isPending}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {startAuth.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Re-authenticating...
+                    </>
+                  ) : (
+                    <>
+                      <Twitter className="mr-2 h-4 w-4" />
+                      Re-authenticate with X.com
+                    </>
+                  )}
+                </Button>
+              </div>
             </TabsContent>
             
             <TabsContent value="folders" className="py-4">
@@ -437,7 +458,7 @@ const XIntegrationPanel = () => {
                   <Separator />
                   
                   <div className="space-y-2">
-                    {folders.map(folder => (
+                    {folders.map((folder) => (
                       <div key={folder.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted">
                         <div>
                           <p className="font-medium">{folder.name}</p>
@@ -456,7 +477,7 @@ const XIntegrationPanel = () => {
                         >
                           {folder.mapped ? (
                             <>
-                              <Link className="mr-1 h-3 w-3" />
+                              <LinkIcon className="mr-1 h-3 w-3" />
                               Remap
                             </>
                           ) : (
@@ -507,7 +528,7 @@ const XIntegrationPanel = () => {
                     <SelectValue placeholder="Select a collection" />
                   </SelectTrigger>
                   <SelectContent>
-                    {collections.map(collection => (
+                    {collections.map((collection) => (
                       <SelectItem key={collection.id} value={collection.id}>
                         {collection.name}
                       </SelectItem>
@@ -541,13 +562,5 @@ const XIntegrationPanel = () => {
     </Card>
   );
 };
-
-/**
- * Return a fixed code verifier for PKCE OAuth flow
- * Using a static key provided for consistency
- */
-function generateCodeVerifier() {
-  return "Y7$gVm29#pKfLq*1dC!xZehWTJr@u38oRnXs^BQa6E4NtiUw0+vYMkb9sjGl5HD%";
-}
 
 export default XIntegrationPanel;

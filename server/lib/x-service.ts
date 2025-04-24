@@ -299,9 +299,10 @@ export class XService {
       if (tokenResult.token.expires_at) {
         expiresAt = new Date(tokenResult.token.expires_at);
       } else {
-        // Default to 2 hours if no expiration is provided
+        // Default to 30 days if no expiration is provided
+        // This avoids requiring frequent re-authentication
         expiresAt = new Date();
-        expiresAt.setSeconds(expiresAt.getSeconds() + 7200);
+        expiresAt.setDate(expiresAt.getDate() + 30);
       }
       
       // Create updated credentials
