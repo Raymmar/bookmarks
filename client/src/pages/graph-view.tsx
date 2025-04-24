@@ -736,10 +736,10 @@ export default function GraphView() {
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-[130px] h-9 justify-between"
+                    className="w-[160px] h-9 justify-between"
                   >
                     {loadLimit === null ? `Show All (${fullBookmarks.length})` : `Show ${loadLimit}`}
-                    <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <ChevronDown className="h-4 w-4 ml-1 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[200px] p-0">
