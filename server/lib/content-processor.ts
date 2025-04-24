@@ -2,7 +2,6 @@ import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { storage } from "../storage";
 import { processAITags, TAG_SYSTEM_PROMPT } from "./tag-normalizer";
-import { processImageUrls } from "./image-processor";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const MODEL = "gpt-4o";
@@ -99,8 +98,7 @@ export async function generateInsights(
   url: string,
   content?: string,
   depthLevel: number = 1,
-  customSystemPrompt?: string,
-  imageUrls?: string[]
+  customSystemPrompt?: string
 ): Promise<{ summary: string; sentiment: number; tags: string[]; relatedLinks: string[] }> {
   try {
     // Check if this is an X.com URL
@@ -110,12 +108,10 @@ export async function generateInsights(
     // For other URLs, use URL-direct analysis if content is not available
     const useUrlDirectly = !isXTweet && url && (!content || content.length < 100);
     
-    // Log whether we're using images
-    const hasImages = imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0;
-    console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}${hasImages ? ' with image analysis' : ''}`);
+    console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
     
     // Basic system prompt to set context for the AI
-    const baseSystemPrompt = "You will receive content details about a user submitted bookmark, which may include text and/or images. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
+    const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
     
     // Get custom system prompt
     let userSystemPrompt;
@@ -152,131 +148,28 @@ export async function generateInsights(
       }
     ];
     
-    // For multimodal analysis (with images)
-    if (hasImages) {
-      try {
-        // Process and download images first
-        console.log(`Processing ${imageUrls.length} images for insights generation analysis: ${JSON.stringify(imageUrls)}`);
-        const processedImages = await processImageUrls(imageUrls, 'Insights');
-        
-        if (processedImages.length === 0) {
-          console.warn(`No images were successfully processed for insights, falling back to text-only analysis`);
-        }
-        
-        // Create multimodal message content
-        const multimodalContent: Array<any> = []; 
-        
-        // Add text content first
-        if (content && content.trim().length > 0) {
-          multimodalContent.push({
-            type: "text",
-            text: content.slice(0, 15000) // Limit content length
-          });
-        } else if (url) {
-          multimodalContent.push({
-            type: "text",
-            text: `Please analyze the following URL and images: ${url}`
-          });
-        }
-        
-        // Add processed image base64 data to the content
-        if (processedImages.length > 0) {
-          console.log(`Including ${processedImages.length} processed images in insights generation analysis`);
-          
-          // Add each image
-          for (const base64Image of processedImages) {
-            if (base64Image && typeof base64Image === 'string' && base64Image.trim().length > 0) {
-              multimodalContent.push({
-                type: "image_url",
-                image_url: {
-                  url: base64Image
-                }
-              });
-            }
-          }
-          
-          // Add the multimodal content as user message
-          messages.push({
-            role: "user",
-            content: multimodalContent
-          });
-        } else {
-          // If we couldn't process any images, fall back to text-only
-          console.log("No images were successfully processed, falling back to text-only analysis");
-          const contentToAnalyze = content ? content.slice(0, 15000) : "";
-          messages.push({
-            role: "user",
-            content: contentToAnalyze || url || ""
-          });
-        }
-      } catch (imageError) {
-        console.error("Error setting up multimodal content, falling back to text-only analysis:", imageError);
-        
-        // Fall back to text-only analysis
-        const contentToAnalyze = content ? content.slice(0, 15000) : "";
-        messages.push({
-          role: "user",
-          content: contentToAnalyze || url || ""
-        });
-      }
-    }
-    // Standard text-only analysis
-    else {
-      // Add content or URL as user message with NO additional instructions
-      if (useUrlDirectly) {
-        messages.push({
-          role: "user",
-          content: url
-        });
-      } else {
-        // Use provided content (with length limit)
-        const contentToAnalyze = content ? content.slice(0, 15000) : ""; // Increased limit for GPT-4o
-        messages.push({
-          role: "user",
-          content: contentToAnalyze
-        });
-      }
+    // Add content or URL as user message with NO additional instructions
+    if (useUrlDirectly) {
+      messages.push({
+        role: "user",
+        content: url
+      });
+    } else {
+      // Use provided content (with length limit)
+      const contentToAnalyze = content ? content.slice(0, 15000) : ""; // Increased limit for GPT-4o
+      messages.push({
+        role: "user",
+        content: contentToAnalyze
+      });
     }
 
     console.log(`Sending request to OpenAI for insights on ${url}`);
     
-    let response;
-    try {
-      response = await openai.chat.completions.create({
-        model: MODEL,
-        messages: messages,
-        response_format: { type: "json_object" }
-      });
-    } catch (apiError) {
-      console.error("OpenAI API error when getting insights, falling back to text-only analysis:", apiError);
-
-      // If we hit an error with images, retry without images
-      if (hasImages) {
-        console.log("Retrying insights without image URLs due to API error");
-        
-        // Create new messages array without images
-        const textOnlyMessages: ChatCompletionMessageParam[] = [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: content || url || ""
-          }
-        ];
-        
-        // Retry with text-only content
-        response = await openai.chat.completions.create({
-          model: MODEL,
-          messages: textOnlyMessages,
-          response_format: { type: "json_object" }
-        });
-      } else {
-        // If not related to images, rethrow
-        throw apiError;
-      }
-    }
+    const response = await openai.chat.completions.create({
+      model: MODEL,
+      messages: messages,
+      response_format: { type: "json_object" }
+    });
 
     const resultText = response.choices[0].message.content || "{}";
     console.log("Raw insights result:", resultText);
@@ -375,14 +268,9 @@ export async function generateInsights(
 }
 
 /**
- * Generate tags from content or URL, potentially including image analysis
+ * Generate tags from content or URL
  */
-export async function generateTags(
-  content: string, 
-  url?: string, 
-  customSystemPrompt?: string, 
-  imageUrls?: string[]
-): Promise<string[]> {
+export async function generateTags(content: string, url?: string, customSystemPrompt?: string): Promise<string[]> {
   try {
     // Check if this is an X.com URL
     const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
@@ -391,12 +279,10 @@ export async function generateTags(
     // For other URLs, use URL-direct analysis if content is not available
     const useUrlDirectly = !isXTweet && url && (!content || content.length < 100);
     
-    // Log whether we're using images
-    const hasImages = imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0;
-    console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}${hasImages ? ' with image analysis' : ''}`);
+    console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
     
     // Basic system prompt to set context for the AI
-    const baseSystemPrompt = "You will receive content details about a user submitted bookmark, which may include text and/or images. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
+    const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
     
     // Get custom system prompt
     let userSystemPrompt;
@@ -430,90 +316,19 @@ export async function generateTags(
       }
     ];
     
-    // For multimodal analysis (with images)
-    if (hasImages) {
-      try {
-        // Process and download images first
-        console.log(`Processing ${imageUrls.length} images for tag generation analysis: ${JSON.stringify(imageUrls)}`);
-        const processedImages = await processImageUrls(imageUrls, 'TagGen');
-        
-        if (processedImages.length === 0) {
-          console.warn(`No images were successfully processed for tag generation, falling back to text-only tag generation`);
-        }
-        
-        // Create multimodal message content
-        const multimodalContent: Array<any> = []; 
-        
-        // Add text content first
-        if (content && content.trim().length > 0) {
-          multimodalContent.push({
-            type: "text",
-            text: content.slice(0, 15000) // Limit content length
-          });
-        } else if (url) {
-          multimodalContent.push({
-            type: "text",
-            text: `Please analyze the following URL and images: ${url}`
-          });
-        }
-        
-        // Add processed image base64 data to the content
-        if (processedImages.length > 0) {
-          console.log(`Including ${processedImages.length} processed images in tag generation analysis`);
-          
-          // Add each image
-          for (const base64Image of processedImages) {
-            if (base64Image && typeof base64Image === 'string' && base64Image.trim().length > 0) {
-              multimodalContent.push({
-                type: "image_url",
-                image_url: {
-                  url: base64Image
-                }
-              });
-            }
-          }
-          
-          // Add the multimodal content as user message
-          messages.push({
-            role: "user",
-            content: multimodalContent
-          });
-        } else {
-          // If we couldn't process any images, fall back to text-only
-          console.log("No images were successfully processed, falling back to text-only tag generation");
-          const contentToAnalyze = content ? content.slice(0, 15000) : "";
-          messages.push({
-            role: "user",
-            content: contentToAnalyze || url || ""
-          });
-        }
-      } catch (imageError) {
-        console.error("Error setting up multimodal content for tag generation, falling back to text-only analysis:", imageError);
-        
-        // Fall back to text-only analysis
-        const contentToAnalyze = content ? content.slice(0, 15000) : "";
-        messages.push({
-          role: "user",
-          content: contentToAnalyze || url || ""
-        });
-      }
-    } 
-    // Standard text-only analysis
-    else {
-      // Add content or URL as user message with NO additional instructions
-      if (useUrlDirectly && url) {
-        messages.push({
-          role: "user",
-          content: url
-        });
-      } else {
-        // Use provided content (with length limit)
-        const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
-        messages.push({
-          role: "user",
-          content: contentToAnalyze
-        });
-      }
+    // Add content or URL as user message with NO additional instructions
+    if (useUrlDirectly && url) {
+      messages.push({
+        role: "user",
+        content: url
+      });
+    } else {
+      // Use provided content (with length limit)
+      const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
+      messages.push({
+        role: "user",
+        content: contentToAnalyze
+      });
     }
 
     console.log(`Sending request to OpenAI for tag generation${url ? ` for URL: ${url}` : ''}`);

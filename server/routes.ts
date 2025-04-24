@@ -15,7 +15,6 @@ import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 import { bookmarkService } from "./lib/bookmark-service";
 import { setupAuth } from "./auth";
 import { xService } from "./lib/x-service";
-import { processImageUrls } from "./lib/image-processor";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -533,37 +532,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking AI processing status:", error);
       res.status(500).json({ error: "Failed to check AI processing status" });
-    }
-  });
-
-  // Endpoint to fetch processed images for a bookmark
-  app.get("/api/bookmarks/:id/processed-images", async (req, res) => {
-    try {
-      const bookmarkId = req.params.id;
-      const bookmark = await storage.getBookmark(bookmarkId);
-      
-      if (!bookmark) {
-        return res.status(404).json({ error: "Bookmark not found" });
-      }
-      
-      // Check if the bookmark has media URLs
-      if (!bookmark.media_urls || !Array.isArray(bookmark.media_urls) || bookmark.media_urls.length === 0) {
-        return res.json({ images: [] });
-      }
-      
-      console.log(`Processing ${bookmark.media_urls.length} media URLs for bookmark ${bookmark.id}`);
-      
-      // Process the image URLs to get base64 data
-      const base64Images = await processImageUrls(bookmark.media_urls, `bookmark-${bookmark.id}`);
-      
-      return res.json({ 
-        images: base64Images,
-        mediaCount: bookmark.media_urls.length,
-        successCount: base64Images.length
-      });
-    } catch (error) {
-      console.error("Error processing bookmark images:", error);
-      res.status(500).json({ error: "Failed to process bookmark images" });
     }
   });
 

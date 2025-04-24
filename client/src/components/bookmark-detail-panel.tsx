@@ -10,7 +10,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { MediaDisplay } from "@/components/ui/media-display";
 import { 
   Select,
   SelectContent,
@@ -845,7 +844,22 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             {/* Tweet media (if any) */}
             {bookmark.media_urls && bookmark.media_urls.length > 0 && (
               <div className="mb-4">
-                <MediaDisplay bookmarkId={bookmark.id} mediaUrls={bookmark.media_urls} />
+                {bookmark.media_urls.map((url, index) => (
+                  <a 
+                    key={index} 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block mb-2 overflow-hidden rounded-lg border border-gray-200"
+                  >
+                    {/* For images, we could display them directly, 
+                        but since we don't know the content type from the URL alone,
+                        we just show the link for now */}
+                    <div className="bg-gray-50 p-3 text-sm text-primary hover:underline truncate">
+                      {url}
+                    </div>
+                  </a>
+                ))}
               </div>
             )}
             

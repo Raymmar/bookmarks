@@ -24,7 +24,6 @@ import {
   generateInsights
 } from './content-processor';
 import { extractMetadata } from './metadata-extractor';
-import { extractXImageUrls } from './image-processor';
 
 export interface BookmarkCreationOptions {
   url: string;
@@ -131,24 +130,11 @@ export class BookmarkService {
         // Flag to identify X tweets specifically
         const isXTweet = bookmark.source === 'x';
         
-        // Check if the bookmark has media URLs
-        const hasMediaUrls = bookmark.media_urls && Array.isArray(bookmark.media_urls) && bookmark.media_urls.length > 0;
-        
-        // Media URLs section for the template
-        const mediaUrlsSection = hasMediaUrls ? `
-MEDIA CONTENT:
-The bookmark contains ${bookmark.media_urls.length} image(s) that are attached to this message.
-
-IMPORTANT ABOUT IMAGES: You have multimodal capabilities and will receive encoded images directly in this API call.
-You should analyze the visual content of each attached image and explicitly describe what you see in them in order to use the image information in your response for additional context to the users prompts. You should not describe the images in a generic way, but rather describe them in detail.
-Include specific visual details from the images in your response - describe notable people, objects, text, or scenes visible in the images. graphics, memes, or other visual content should be described and interpreted in order to add context for the bookmark summary. 
-` : '';
-        
         // Build template strings with the bookmark data inserted
         const templateBase = `
 You are analyzing a bookmark from the AtmosphereAI platform.
 
-BOOKMARK CONTEXT:
+BOOKMARK DATA:
 URL: ${bookmark.url || 'N/A'}
 Title: ${bookmark.title || 'N/A'}
 Source: ${bookmark.source || 'N/A'}
@@ -158,19 +144,17 @@ Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || '
 Tweet content: ${bookmark.description || 'N/A'}
 Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
 ` : ''}
-${mediaUrlsSection}
 
 USER INSTRUCTIONS:
 ${taggingPrompt?.value || ''}
 
-Please analyze all the provided content (including any images if present) and follow the user's instructions 
-while considering the bookmark context provided above.
+Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
 `;
 
         const summaryTemplateBase = `
 You are analyzing a bookmark from the AtmosphereAI platform.
 
-BOOKMARK CONTEXT:
+BOOKMARK DATA:
 URL: ${bookmark.url || 'N/A'}
 Title: ${bookmark.title || 'N/A'}
 Source: ${bookmark.source || 'N/A'}
@@ -180,13 +164,11 @@ Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || '
 Tweet content: ${bookmark.description || 'N/A'}
 Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
 ` : ''}
-${mediaUrlsSection}
 
 USER INSTRUCTIONS:
 ${summaryPrompt?.value || ''}
 
-Please analyze all the provided content (including any images if present) and follow the user's instructions 
-while considering the bookmark context provided above.
+Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
 `;
 
         console.log(`Created templated system prompts with bookmark context for ${bookmark.id}`);
@@ -297,22 +279,8 @@ while considering the bookmark context provided above.
               processedText = bookmark.description;
             }
             
-            // Extract image URLs for X tweets if not already provided
-            let mediaUrls = bookmark.media_urls || [];
-            
-            // For X tweets, try to extract image URLs if none are provided
-            if (isXTweet && (!mediaUrls || mediaUrls.length === 0)) {
-              try {
-                console.log(`Attempting to extract image URLs from X tweet for tag generation: ${url}`);
-                mediaUrls = await extractXImageUrls(url);
-                console.log(`Extracted ${mediaUrls.length} image URLs from X tweet for tag generation`);
-              } catch (xError) {
-                console.error(`Error extracting X tweet image URLs for tag generation:`, xError);
-              }
-            }
-            
             // Pass the custom tagging prompt to the generateTags function
-            const tags = await generateTags(processedText || '', url, systemPrompts.taggingPrompt, mediaUrls);
+            const tags = await generateTags(processedText || '', url, systemPrompts.taggingPrompt);
             console.log(`Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(', ')}`);
             return tags;
           } catch (error) {
@@ -345,22 +313,8 @@ while considering the bookmark context provided above.
               processedText = bookmark.description;
             }
             
-            // Extract image URLs for X tweets if not already provided
-            let mediaUrls = bookmark.media_urls || [];
-            
-            // For X tweets, try to extract image URLs if none are provided
-            if (isXTweet && (!mediaUrls || mediaUrls.length === 0)) {
-              try {
-                console.log(`Attempting to extract image URLs from X tweet: ${url}`);
-                mediaUrls = await extractXImageUrls(url);
-                console.log(`Extracted ${mediaUrls.length} image URLs from X tweet`);
-              } catch (xError) {
-                console.error(`Error extracting X tweet image URLs:`, xError);
-              }
-            }
-            
             // Pass the custom summary prompt to the generateInsights function
-            const result = await generateInsights(url, processedText || '', insightDepth, systemPrompts.summaryPrompt, mediaUrls);
+            const result = await generateInsights(url, processedText || '', insightDepth, systemPrompts.summaryPrompt);
             console.log(`Insights generated for bookmark ${bookmarkId}. Summary length: ${result.summary.length}`);
             return result;
           } catch (error) {
