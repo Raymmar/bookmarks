@@ -24,6 +24,7 @@ import {
   generateInsights
 } from './content-processor';
 import { extractMetadata } from './metadata-extractor';
+import { extractXImageUrls } from './image-processor';
 
 export interface BookmarkCreationOptions {
   url: string;
