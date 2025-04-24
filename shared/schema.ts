@@ -76,6 +76,7 @@ export const bookmarks = pgTable("bookmarks", {
   reply_count: integer("reply_count"),  // Number of replies
   quote_count: integer("quote_count"),  // Number of quote tweets
   media_urls: text("media_urls").array(),  // URLs of media in the tweet
+  local_media_paths: text("local_media_paths").array(),  // Local paths to downloaded media files
 });
 
 // Collections table

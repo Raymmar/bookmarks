@@ -22,6 +22,7 @@ import {
 import crypto from 'crypto';
 import { URLSearchParams } from 'url';
 import { Client, auth } from 'twitter-api-sdk';
+import { processMediaUrls } from './media-downloader';
 
 /**
  * X API configuration
@@ -74,6 +75,12 @@ interface XTweet {
     urls?: Array<any>; // Using any to accommodate the SDK's structure
     mentions?: Array<any>;
     hashtags?: Array<any>;
+    media?: Array<{
+      media_url_https?: string;
+      media_url?: string;
+      url?: string;
+      type?: string;
+    }>;
   };
 }
 
@@ -437,7 +444,7 @@ export class XService {
   /**
    * Convert an X tweet to a bookmark
    */
-  convertTweetToBookmark(tweet: XTweet, author?: XUser): InsertBookmark {
+  async convertTweetToBookmark(tweet: XTweet, author?: XUser, accessToken?: string): Promise<InsertBookmark> {
     // Generate a normalized URL for the tweet
     const tweetUrl = `https://twitter.com/${author?.username || 'user'}/status/${tweet.id}`;
     
@@ -467,6 +474,24 @@ export class XService {
       });
     }
     
+    // Also check for media entities if available (photos, videos, etc.)
+    if (tweet.entities && tweet.entities.media) {
+      tweet.entities.media.forEach((media: any) => {
+        if (media.media_url_https) {
+          mediaUrls.push(media.media_url_https);
+        } else if (media.media_url) {
+          mediaUrls.push(media.media_url);
+        } else if (media.url) {
+          mediaUrls.push(media.url);
+        }
+      });
+    }
+    
+    // Download media files and get local paths
+    console.log(`Processing ${mediaUrls.length} media URLs for tweet ${tweet.id}`);
+    const localMediaPaths = await processMediaUrls(mediaUrls, accessToken);
+    console.log(`Downloaded ${localMediaPaths.length} media files for tweet ${tweet.id}`);
+    
     // Create a bookmark
     const bookmark: InsertBookmark = {
       url: tweetUrl,
@@ -489,6 +514,7 @@ export class XService {
         ? tweet.public_metrics.quote_count 
         : 0,
       media_urls: mediaUrls,
+      local_media_paths: localMediaPaths,
     };
     
     return bookmark;
@@ -534,12 +560,22 @@ export class XService {
       }
     } while (nextToken);
     
+    // Get access token for media downloads
+    const accessToken = await this.ensureValidToken(userId);
+    console.log(`Syncing ${allBookmarks.tweets.length} bookmarks from X.com for user ${userId}`);
+    
     // Process each bookmark
     for (const tweet of allBookmarks.tweets) {
       try {
         const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
-        const bookmarkData = this.convertTweetToBookmark(tweet, author);
-        bookmarkData.user_id = userId;
+        // Pass the access token to download media
+        let bookmarkData = await this.convertTweetToBookmark(tweet, author, accessToken);
+        
+        // Set user ID for the bookmark
+        bookmarkData = {
+          ...bookmarkData,
+          user_id: userId
+        };
         
         // Check if bookmark already exists
         const existingBookmark = await this.findExistingBookmark(userId, tweet.id);
