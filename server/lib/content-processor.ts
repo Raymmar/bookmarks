@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { storage } from "../storage";
 import { processAITags, TAG_SYSTEM_PROMPT } from "./tag-normalizer";
 
@@ -100,10 +101,14 @@ export async function generateInsights(
   customSystemPrompt?: string
 ): Promise<{ summary: string; sentiment: number; tags: string[]; relatedLinks: string[] }> {
   try {
-    // Determine if we should use direct URL analysis or content analysis
-    const useUrlDirectly = url && (!content || content.length < 100);
+    // Check if this is an X.com URL
+    const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
     
-    console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
+    // For X tweets, we should always use content-based analysis with our context-enriched prompt
+    // For other URLs, use URL-direct analysis if content is not available
+    const useUrlDirectly = !isXTweet && url && (!content || content.length < 100);
+    
+    console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
     
     // Basic system prompt to set context for the AI
     const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
@@ -136,7 +141,7 @@ export async function generateInsights(
     }
 
     // Prepare messages for the API call
-    const messages = [
+    const messages: ChatCompletionMessageParam[] = [
       {
         role: "system",
         content: systemPrompt
@@ -151,7 +156,7 @@ export async function generateInsights(
       });
     } else {
       // Use provided content (with length limit)
-      const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
+      const contentToAnalyze = content ? content.slice(0, 15000) : ""; // Increased limit for GPT-4o
       messages.push({
         role: "user",
         content: contentToAnalyze
@@ -267,9 +272,14 @@ export async function generateInsights(
  */
 export async function generateTags(content: string, url?: string, customSystemPrompt?: string): Promise<string[]> {
   try {
-    // Determine if we should use URL directly
-    const useUrlDirectly = url && (!content || content.length < 100);
-    console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis`);
+    // Check if this is an X.com URL
+    const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
+    
+    // For X tweets, we should always use content-based analysis with our context-enriched prompt
+    // For other URLs, use URL-direct analysis if content is not available
+    const useUrlDirectly = !isXTweet && url && (!content || content.length < 100);
+    
+    console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
     
     // Basic system prompt to set context for the AI
     const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
@@ -299,7 +309,7 @@ export async function generateTags(content: string, url?: string, customSystemPr
     }
 
     // Prepare messages for the API call
-    const messages = [
+    const messages: ChatCompletionMessageParam[] = [
       {
         role: "system",
         content: systemPrompt
