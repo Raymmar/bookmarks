@@ -712,15 +712,22 @@ export class XService {
     
     // If token expires in less than 5 minutes, refresh it
     if (expiresInMs < 5 * 60 * 1000 && credentials.refresh_token) {
-      // Refresh the token
-      const updated = await this.refreshAccessToken(credentials.refresh_token);
-      
-      // Update in database
-      await db.update(xCredentials)
-        .set(updated)
-        .where(eq(xCredentials.id, credentials.id));
-      
-      return updated.access_token as string;
+      try {
+        // Refresh the token
+        const updated = await this.refreshAccessToken(credentials.refresh_token);
+        
+        // Update in database
+        await db.update(xCredentials)
+          .set(updated)
+          .where(eq(xCredentials.id, credentials.id));
+        
+        return updated.access_token as string;
+      } catch (error) {
+        console.error('Error refreshing token:', error);
+        // If refresh fails, return existing token - it might still work
+        // Or the user needs to re-authenticate
+        return credentials.access_token;
+      }
     }
     
     return credentials.access_token;
@@ -730,11 +737,17 @@ export class XService {
    * Get X.com credentials for a user
    */
   private async getUserCredentials(userId: string): Promise<XCredentials | undefined> {
-    const [credentials] = await db.select()
-      .from(xCredentials)
-      .where(eq(xCredentials.user_id, userId));
-    
-    return credentials;
+    try {
+      const [credentials] = await db.select()
+        .from(xCredentials)
+        .where(eq(xCredentials.user_id, userId));
+      
+      return credentials;
+    } catch (error) {
+      console.error(`Error getting X credentials for user ${userId}:`, error);
+      // Return null if there's an error to prevent further issues
+      return undefined;
+    }
   }
 
   /**
