@@ -768,6 +768,33 @@ export class XService {
     
     return credentials;
   }
+  
+  /**
+   * Delete a user's X.com credentials - used when tokens are invalid
+   */
+  async deleteUserCredentials(userId: string): Promise<boolean> {
+    try {
+      console.log(`XService: Deleting X credentials for user ${userId}`);
+      
+      // Get the credentials first to have the ID
+      const credentials = await this.getUserCredentials(userId);
+      
+      if (!credentials) {
+        console.log(`XService: No credentials found for user ${userId}`);
+        return false;
+      }
+      
+      // Delete all credentials for this user
+      await db.delete(xCredentials)
+        .where(eq(xCredentials.user_id, userId));
+      
+      console.log(`XService: Successfully deleted X credentials for user ${userId}`);
+      return true;
+    } catch (error) {
+      console.error(`XService: Error deleting X credentials:`, error);
+      return false;
+    }
+  }
 
   /**
    * Generate a fixed code verifier for PKCE

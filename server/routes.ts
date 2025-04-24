@@ -1673,13 +1673,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const userId = (req.user as Express.User).id;
       
-      // Sync bookmarks using X service
-      const syncResult = await xService.syncBookmarks(userId);
-      
-      res.json({
-        success: true,
-        ...syncResult
-      });
+      try {
+        // Sync bookmarks using X service
+        const syncResult = await xService.syncBookmarks(userId);
+        
+        res.json({
+          success: true,
+          ...syncResult
+        });
+      } catch (syncError: any) {
+        // Check if this is a token error
+        if (syncError.message && (
+          syncError.message.includes('token was invalid') || 
+          syncError.message.includes('Failed to refresh token') ||
+          syncError.message.includes('User needs to reconnect')
+        )) {
+          console.log("X Sync: Detected invalid token error, telling client to reconnect");
+          
+          // Return a specific status to tell client to prompt for reconnection
+          return res.status(401).json({ 
+            error: "X.com authorization expired", 
+            action_required: "reconnect",
+            message: "Please reconnect your X.com account to continue syncing"
+          });
+        }
+        
+        // For other errors, return a generic error
+        throw syncError;
+      }
     } catch (error) {
       console.error("Error syncing X.com bookmarks:", error);
       res.status(500).json({ error: "Failed to sync X.com bookmarks" });

@@ -245,8 +245,29 @@ const XIntegrationPanel = () => {
   // Sync bookmarks from X.com
   const syncBookmarks = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/x/sync');
-      return response;
+      try {
+        const response = await fetch('/api/x/sync', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          // Check for auth error specifically
+          if (response.status === 401 && data.action_required === 'reconnect') {
+            throw new Error('auth_expired');
+          }
+          throw new Error(data.error || 'Failed to sync bookmarks');
+        }
+        
+        return data;
+      } catch (error) {
+        throw error;
+      }
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/bookmarks'] });
@@ -258,12 +279,28 @@ const XIntegrationPanel = () => {
         variant: "default"
       });
     },
-    onError: () => {
-      toast({
-        title: "Sync Failed",
-        description: "Could not sync X.com bookmarks",
-        variant: "destructive"
-      });
+    onError: (error: any) => {
+      console.error('Error syncing bookmarks:', error);
+      
+      // Check if this is an auth error
+      if (error.message === 'auth_expired') {
+        toast({
+          title: "Authentication Expired",
+          description: "Your X.com connection needs to be refreshed. Please reconnect.",
+          variant: "destructive",
+          action: (
+            <ToastAction altText="Reconnect" onClick={() => startAuth.mutate()}>
+              Reconnect
+            </ToastAction>
+          )
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: "Could not sync X.com bookmarks",
+          variant: "destructive"
+        });
+      }
     }
   });
 
