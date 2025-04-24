@@ -512,6 +512,8 @@ export class XService {
    * Sync bookmarks from X.com to our database
    */
   async syncBookmarks(userId: string): Promise<{ added: number, updated: number, errors: number }> {
+    console.log(`X Sync: Starting bookmark sync for user ${userId}`);
+    
     // Track statistics
     let added = 0;
     let updated = 0;
@@ -521,18 +523,54 @@ export class XService {
     let allBookmarks: { tweets: XTweet[], users: { [key: string]: XUser } } = { tweets: [], users: {} };
     let nextToken: string | undefined = undefined;
     
+    try {
+      // Check if user has valid X.com credentials
+      const credentials = await this.getUserCredentials(userId);
+      if (!credentials) {
+        console.error(`X Sync: User ${userId} is not connected to X.com`);
+        throw new Error('User is not connected to X.com');
+      }
+      console.log(`X Sync: Found credentials for user ${userId}, username: ${credentials.x_username}`);
+      
+      // Ensure token is still valid, refresh if needed
+      if (credentials.token_expires_at && credentials.token_expires_at < new Date()) {
+        console.log(`X Sync: Token expired, refreshing...`);
+        if (!credentials.refresh_token) {
+          console.error(`X Sync: No refresh token available for user ${userId}`);
+          throw new Error('No refresh token available to refresh expired access token');
+        }
+        
+        const refreshedCreds = await this.refreshAccessToken(credentials.refresh_token);
+        await storage.updateXCredentials(credentials.id, refreshedCreds);
+        console.log(`X Sync: Token refreshed successfully`);
+      }
+    } catch (error) {
+      console.error(`X Sync: Error checking or refreshing credentials:`, error);
+      return { added: 0, updated: 0, errors: 1 };
+    }
+    
+    // Fetch bookmarks with pagination
     do {
       try {
+        console.log(`X Sync: Fetching bookmarks${nextToken ? ' with pagination token' : ''}`);
         const result = await this.getBookmarks(userId, nextToken);
+        console.log(`X Sync: Fetched ${result.tweets.length} tweets and ${Object.keys(result.users).length} users`);
+        
         allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
         allBookmarks.users = { ...allBookmarks.users, ...result.users };
         nextToken = result.nextToken;
+        
+        if (nextToken) {
+          console.log(`X Sync: More bookmarks available, will paginate`);
+        }
       } catch (error) {
-        console.error('Error fetching bookmarks from X.com:', error);
+        console.error('X Sync: Error fetching bookmarks from X.com:', error);
         errors++;
         break;
       }
     } while (nextToken);
+    
+    console.log(`X Sync: Total fetched - ${allBookmarks.tweets.length} tweets and ${Object.keys(allBookmarks.users).length} users`);
     
     // Process each bookmark
     for (const tweet of allBookmarks.tweets) {
@@ -546,22 +584,30 @@ export class XService {
         
         if (existingBookmark) {
           // Update existing bookmark
+          console.log(`X Sync: Updating existing bookmark for tweet ${tweet.id}`);
           await storage.updateBookmark(existingBookmark.id, bookmarkData);
           updated++;
         } else {
           // Create new bookmark
+          console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
           await storage.createBookmark(bookmarkData);
           added++;
         }
       } catch (error) {
-        console.error(`Error processing tweet ${tweet.id}:`, error);
+        console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
         errors++;
       }
     }
     
     // Update last sync time
-    await this.updateLastSync(userId);
+    try {
+      console.log(`X Sync: Updating last sync time for user ${userId}`);
+      await this.updateLastSync(userId);
+    } catch (error) {
+      console.error(`X Sync: Error updating last sync time:`, error);
+    }
     
+    console.log(`X Sync: Finished - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
     return { added, updated, errors };
   }
 
