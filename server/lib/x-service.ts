@@ -12,6 +12,7 @@
 import { storage } from '../storage';
 import { db } from '../db';
 import { eq, and } from 'drizzle-orm';
+import { processMediaUrls } from './media-downloader';
 import type { Bookmark } from '@shared/schema';
 import { 
   xCredentials, XCredentials, InsertXCredentials, 
@@ -22,7 +23,6 @@ import {
 import crypto from 'crypto';
 import { URLSearchParams } from 'url';
 import { Client, auth } from 'twitter-api-sdk';
-import { processMediaUrls } from './media-downloader';
 
 /**
  * X API configuration
@@ -501,6 +501,7 @@ export class XService {
       source: 'x',
       date_saved: new Date(),
       user_id: null, // This will be filled in by the calling function
+      local_media_paths: localMediaPaths.length > 0 ? localMediaPaths : null,
       
       // X.com specific fields
       external_id: tweet.id,

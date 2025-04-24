@@ -7,16 +7,9 @@
  */
 
 import fetch from 'node-fetch';
-import fs from 'fs-extra';
 import path from 'path';
+import fs from 'fs-extra';
 import crypto from 'crypto';
-
-// Media storage configuration
-const MEDIA_DIR = path.join(process.cwd(), 'public', 'uploads', 'x-media');
-const MEDIA_BASE_URL = '/uploads/x-media';
-
-// Ensure media directory exists
-fs.ensureDirSync(MEDIA_DIR);
 
 /**
  * Interface for media file information
@@ -28,6 +21,15 @@ interface MediaFile {
 }
 
 /**
+ * Ensure the upload directory exists
+ */
+async function ensureUploadDirectory() {
+  const mediaDir = path.join(process.cwd(), 'public', 'uploads', 'x-media');
+  await fs.ensureDir(mediaDir);
+  return mediaDir;
+}
+
+/**
  * Download a media file from a URL and store it locally
  * 
  * @param url The URL of the media file to download
@@ -36,57 +38,58 @@ interface MediaFile {
  */
 export async function downloadMedia(url: string, accessToken?: string): Promise<MediaFile | null> {
   try {
-    // Skip if URL is empty or not a proper URL
-    if (!url || !url.startsWith('http')) {
-      console.warn(`Invalid media URL: ${url}`);
+    // Skip invalid URLs or URLs we don't want to download
+    if (!url || url.trim() === '' || !url.startsWith('http')) {
+      console.log(`Skipping invalid URL: ${url}`);
       return null;
     }
-
-    // Generate a unique filename based on the URL
+    
+    // Generate a unique filename
     const urlHash = crypto.createHash('md5').update(url).digest('hex');
     const fileExtension = getFileExtension(url);
     const filename = `${urlHash}${fileExtension}`;
-    const localFilePath = path.join(MEDIA_DIR, filename);
     
-    // Check if file already exists (to avoid re-downloading)
-    if (fs.existsSync(localFilePath)) {
-      console.log(`Media file already exists: ${localFilePath}`);
+    // Ensure the directory exists
+    const uploadDir = await ensureUploadDirectory();
+    const filePath = path.join(uploadDir, filename);
+    const publicPath = `/uploads/x-media/${filename}`;
+    
+    // Check if the file already exists
+    if (await fs.pathExists(filePath)) {
+      console.log(`Media file already exists for ${url}, skipping download`);
       return {
         originalUrl: url,
-        localPath: localFilePath,
-        publicUrl: `${MEDIA_BASE_URL}/${filename}`
+        localPath: filePath,
+        publicUrl: publicPath
       };
     }
-
+    
     console.log(`Downloading media from ${url}`);
     
-    // Set up fetch options for authenticated requests if needed
-    const fetchOptions: any = {};
+    // Set up request headers
+    const headers: Record<string, string> = {};
     if (accessToken) {
-      fetchOptions.headers = {
-        'Authorization': `Bearer ${accessToken}`
-      };
+      headers['Authorization'] = `Bearer ${accessToken}`;
     }
     
-    // Fetch the media file
-    const response = await fetch(url, fetchOptions);
+    // Download the file
+    const response = await fetch(url, { headers });
     
     if (!response.ok) {
-      console.error(`Failed to download media from ${url}: ${response.status} ${response.statusText}`);
+      console.error(`Failed to download media: ${response.status} ${response.statusText}`);
       return null;
     }
     
-    // Get the file as a buffer
+    // Create a writable stream to save the file
     const buffer = await response.buffer();
+    await fs.writeFile(filePath, buffer);
     
-    // Save the file
-    await fs.writeFile(localFilePath, buffer);
-    console.log(`Media file saved to ${localFilePath}`);
+    console.log(`Successfully downloaded media to ${filePath}`);
     
     return {
       originalUrl: url,
-      localPath: localFilePath,
-      publicUrl: `${MEDIA_BASE_URL}/${filename}`
+      localPath: filePath,
+      publicUrl: publicPath
     };
   } catch (error) {
     console.error(`Error downloading media from ${url}:`, error);
@@ -102,17 +105,24 @@ export async function downloadMedia(url: string, accessToken?: string): Promise<
  * @returns Array of local paths to the downloaded files
  */
 export async function processMediaUrls(urls: string[], accessToken?: string): Promise<string[]> {
-  if (!urls || !Array.isArray(urls) || urls.length === 0) {
+  if (!urls || urls.length === 0) {
     return [];
   }
   
+  console.log(`Processing ${urls.length} media URLs`);
+  
+  // Download all media files in parallel
   const downloadPromises = urls.map(url => downloadMedia(url, accessToken));
   const results = await Promise.all(downloadPromises);
   
-  // Filter out null results and extract public URLs
-  return results
+  // Filter out nulls and get the public paths
+  const localMediaPaths = results
     .filter((result): result is MediaFile => result !== null)
     .map(result => result.publicUrl);
+  
+  console.log(`Successfully downloaded ${localMediaPaths.length} out of ${urls.length} media files`);
+  
+  return localMediaPaths;
 }
 
 /**
@@ -122,21 +132,17 @@ export async function processMediaUrls(urls: string[], accessToken?: string): Pr
  * @returns The file extension, including the dot
  */
 function getFileExtension(url: string): string {
-  // Try to get file extension from URL
-  const urlPath = new URL(url).pathname;
-  const ext = path.extname(urlPath).toLowerCase();
-  
-  // If we found a valid extension, return it
-  if (ext && ext.length > 1 && ext.length <= 5) {
-    return ext;
+  // Try to extract the extension from the URL
+  const matches = url.match(/\.(jpg|jpeg|png|gif|webp|mp4|mov|avi)(\?.*)?$/i);
+  if (matches && matches[1]) {
+    return `.${matches[1].toLowerCase()}`;
   }
   
-  // For URLs without clear extensions, guess based on common patterns
-  if (url.includes('twimg.com')) {
-    // Twitter images often use .jpg format
-    return '.jpg';
+  // Check if the URL contains known image service patterns
+  if (url.includes('pbs.twimg.com') || url.includes('twitter.com')) {
+    return '.jpg'; // Twitter images are typically JPGs
   }
   
-  // Default to .bin for unknown file types
+  // Default to .bin for unknown types
   return '.bin';
 }
