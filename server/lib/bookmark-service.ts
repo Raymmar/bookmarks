@@ -117,7 +117,7 @@ export class BookmarkService {
   /**
    * System prompts for AI processing
    */
-  private async getSystemPrompts() {
+  private async getSystemPrompts(bookmark?: any) {
     try {
       // Get only the two system prompts we need (for tags and summaries)
       const [taggingPrompt, summaryPrompt] = await Promise.all([
@@ -125,9 +125,39 @@ export class BookmarkService {
         this.storage.getSetting("summary_prompt")
       ]);
       
+      // Create bookmark context if bookmark details are provided
+      let bookmarkContext = "";
+      if (bookmark) {
+        // Build a comprehensive context object with all available bookmark details
+        const contextObj = {
+          url: bookmark.url,
+          title: bookmark.title,
+          description: bookmark.description,
+          source: bookmark.source,
+          date_saved: bookmark.date_saved,
+          // Include twitter/X specific fields if available
+          ...(bookmark.external_id ? { external_id: bookmark.external_id } : {}),
+          ...(bookmark.author_username ? { author_username: bookmark.author_username } : {}),
+          ...(bookmark.author_name ? { author_name: bookmark.author_name } : {}),
+          ...(bookmark.like_count ? { like_count: bookmark.like_count } : {}),
+          ...(bookmark.repost_count ? { repost_count: bookmark.repost_count } : {}),
+          ...(bookmark.reply_count ? { reply_count: bookmark.reply_count } : {}),
+          ...(bookmark.quote_count ? { quote_count: bookmark.quote_count } : {})
+        };
+        
+        // Convert to a nicely formatted string
+        bookmarkContext = "\n\nBookmark Context:\n" + 
+          Object.entries(contextObj)
+            .filter(([_, value]) => value !== undefined && value !== null)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("\n");
+            
+        console.log(`Added bookmark context (${Object.keys(contextObj).length} fields) to system prompts`);
+      }
+      
       return {
-        taggingPrompt: taggingPrompt?.value,
-        summaryPrompt: summaryPrompt?.value
+        taggingPrompt: taggingPrompt?.value + (bookmarkContext || ""),
+        summaryPrompt: summaryPrompt?.value + (bookmarkContext || "")
       };
     } catch (error) {
       console.error("Error retrieving system prompts:", error);
