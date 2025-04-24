@@ -686,6 +686,26 @@ export default function GraphView() {
               visibleNodeTypes={visibleNodeTypes}
               onVisibleNodeTypesChange={setVisibleNodeTypes}
             />
+            
+            <div className="flex items-center space-x-2 ml-2">
+              <div className="flex flex-col">
+                <div className="flex items-center">
+                  <Switch 
+                    id="progressive-loading"
+                    checked={useProgressiveLoading}
+                    onCheckedChange={(checked) => {
+                      // Persist setting to localStorage
+                      localStorage.setItem('useProgressiveLoading', JSON.stringify(checked));
+                      setUseProgressiveLoading(checked);
+                    }}
+                  />
+                  <Label htmlFor="progressive-loading" className="ml-2 text-sm font-medium text-gray-700">
+                    Progressive Loading
+                  </Label>
+                </div>
+                <p className="text-xs text-gray-500">Loads bookmarks in batches</p>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -726,15 +746,30 @@ export default function GraphView() {
           ) : (
             // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
-              <ForceDirectedGraph
-                bookmarks={filteredBookmarks}
-                insightLevel={insightLevel}
-                onNodeClick={handleSelectBookmark}
-                onTagClick={handleTagClick}
-                onDomainClick={handleDomainSelection}
-                selectedBookmarkId={selectedBookmarkId}
-                visibleNodeTypes={visibleNodeTypes}
-              />
+              {useProgressiveLoading ? (
+                // Progressive loading graph
+                <ForceDirectedGraphProgressive
+                  initialBookmarks={filteredBookmarks.slice(0, 20)} // Start with most recent 20 bookmarks
+                  batchSize={15}
+                  insightLevel={insightLevel}
+                  onNodeClick={handleSelectBookmark}
+                  onTagClick={handleTagClick}
+                  onDomainClick={handleDomainSelection}
+                  selectedBookmarkId={selectedBookmarkId}
+                  visibleNodeTypes={visibleNodeTypes}
+                />
+              ) : (
+                // Regular graph that loads all bookmarks at once
+                <ForceDirectedGraph
+                  bookmarks={filteredBookmarks}
+                  insightLevel={insightLevel}
+                  onNodeClick={handleSelectBookmark}
+                  onTagClick={handleTagClick}
+                  onDomainClick={handleDomainSelection}
+                  selectedBookmarkId={selectedBookmarkId}
+                  visibleNodeTypes={visibleNodeTypes}
+                />
+              )}
             </div>
           )}
         </div>
