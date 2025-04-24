@@ -95,27 +95,32 @@ const XIntegrationPanel = () => {
     },
     onSuccess: () => {
       console.log("X OAuth: Successfully disconnected from X.com");
-      // No UI feedback needed since we'll reconnect immediately
+      
+      // Refresh connection status to show disconnected state
+      queryClient.invalidateQueries({ queryKey: ['/api/x/status'] });
+      
+      // Show a toast notification
+      toast({
+        title: "Disconnected from X.com",
+        description: "Your X.com connection has been removed. Wait a few minutes before reconnecting to avoid rate limits.",
+        variant: "default"
+      });
     },
     onError: (error) => {
       console.error("X OAuth: Failed to disconnect:", error);
-      // Continue with auth flow anyway
+      
+      toast({
+        title: "Disconnect Failed",
+        description: "Could not disconnect from X.com. Please try again.",
+        variant: "destructive"
+      });
     }
   });
 
   // Start X.com authorization flow
   const startAuth = useMutation({
     mutationFn: async () => {
-      // First try to force disconnect to ensure a clean slate
-      try {
-        console.log("X OAuth: Attempting to clean up existing credentials first");
-        await forceDisconnect.mutateAsync();
-      } catch (error) {
-        // Just log and continue even if this fails
-        console.warn("X OAuth: Could not clean up credentials, continuing anyway:", error);
-      }
-      
-      // Now start the actual auth flow
+      // Only start the auth flow (no forced disconnect)
       console.log("X OAuth: Starting authorization flow");
       const response = await apiRequest<{ authUrl: string }>('GET', '/api/x/auth');
       return response;
@@ -479,26 +484,47 @@ const XIntegrationPanel = () => {
                   )}
                 </Button>
                 
-                <Button 
-                  onClick={() => startAuth.mutate()} 
-                  disabled={startAuth.isPending}
-                  variant="outline"
-                  className="w-full"
-                >
-                  {startAuth.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Reconnecting...
-                    </>
-                  ) : (
-                    <>
-                      <Twitter className="mr-2 h-4 w-4" />
-                      Reconnect to X.com
-                    </>
-                  )}
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    onClick={() => startAuth.mutate()} 
+                    disabled={startAuth.isPending}
+                    variant="outline"
+                  >
+                    {startAuth.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Reconnecting...
+                      </>
+                    ) : (
+                      <>
+                        <Twitter className="mr-2 h-4 w-4" />
+                        Reconnect
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => forceDisconnect.mutate()} 
+                    disabled={forceDisconnect.isPending}
+                    variant="outline"
+                    className="border-destructive text-destructive hover:bg-destructive/10"
+                  >
+                    {forceDisconnect.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Disconnecting...
+                      </>
+                    ) : (
+                      <>
+                        <Twitter className="mr-2 h-4 w-4" />
+                        Disconnect
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
                 <p className="text-xs text-muted-foreground text-center">
-                  If syncing fails, try reconnecting to refresh your X.com access
+                  If you're hitting rate limits, use Disconnect and wait a few minutes before reconnecting
                 </p>
               </div>
             </TabsContent>
