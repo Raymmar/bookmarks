@@ -296,7 +296,9 @@ while considering the bookmark context provided above.
             }
             
             // Pass the custom tagging prompt to the generateTags function
-            const tags = await generateTags(processedText || '', url, systemPrompts.taggingPrompt);
+            // Include media URLs for multimodal analysis if available
+            const mediaUrls = bookmark.media_urls || [];
+            const tags = await generateTags(processedText || '', url, systemPrompts.taggingPrompt, mediaUrls);
             console.log(`Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(', ')}`);
             return tags;
           } catch (error) {
@@ -330,7 +332,9 @@ while considering the bookmark context provided above.
             }
             
             // Pass the custom summary prompt to the generateInsights function
-            const result = await generateInsights(url, processedText || '', insightDepth, systemPrompts.summaryPrompt);
+            // Include media URLs for multimodal analysis if available
+            const mediaUrls = bookmark.media_urls || [];
+            const result = await generateInsights(url, processedText || '', insightDepth, systemPrompts.summaryPrompt, mediaUrls);
             console.log(`Insights generated for bookmark ${bookmarkId}. Summary length: ${result.summary.length}`);
             return result;
           } catch (error) {
