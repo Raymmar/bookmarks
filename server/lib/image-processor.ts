@@ -97,29 +97,80 @@ export async function downloadAndConvertToBase64(imageUrl: string): Promise<stri
       method: 'GET',
       url: imageUrl,
       responseType: 'arraybuffer',
-      timeout: 5000, // 5 second timeout
+      timeout: 8000, // 8 second timeout (increased from 5s)
+      maxRedirects: 5, // Allow more redirects
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'image',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'cross-site'
       }
     });
     
-    // Save the image to a temporary file
+    // Check content type to ensure it's an image
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.startsWith('image/')) {
+      console.warn(`Downloaded content is not an image. Content-Type: ${contentType}`);
+    }
+    
+    // Save the raw image to a temporary file
     await writeFile(tempFilePath, response.data);
     console.log(`Downloaded image to ${tempFilePath}`);
     
-    // Process with sharp to ensure it's valid and optimize
-    const processedImageBuffer = await sharp(tempFilePath)
-      .resize({ width: 1024, height: 1024, fit: 'inside' }) // Resize if necessary
-      .jpeg({ quality: 80 }) // Compress
-      .toBuffer();
+    let base64Image: string;
     
-    // Convert to base64
-    const base64Image = processedImageBuffer.toString('base64');
-    console.log(`Successfully converted image to base64 (${base64Image.length} chars)`);
+    try {
+      // Try processing with sharp first
+      const processedImageBuffer = await sharp(tempFilePath)
+        .resize({ width: 1024, height: 1024, fit: 'inside' }) // Resize if necessary
+        .jpeg({ quality: 80 }) // Compress
+        .toBuffer();
+      
+      // Convert to base64
+      base64Image = processedImageBuffer.toString('base64');
+      console.log(`Successfully processed image with sharp (${base64Image.length} chars)`);
+    } catch (sharpError) {
+      // If sharp processing fails, try a direct base64 conversion of the raw image
+      console.warn(`Sharp processing failed, using direct base64 conversion: ${sharpError.message}`);
+      const rawImageBuffer = response.data;
+      base64Image = Buffer.from(rawImageBuffer).toString('base64');
+      console.log(`Direct base64 conversion completed (${base64Image.length} chars)`);
+      
+      // Attempt to determine mime type from response headers
+      let mimeType = 'image/jpeg'; // Default
+      if (contentType && contentType.includes('/')) {
+        mimeType = contentType;
+      }
+      
+      return `data:${mimeType};base64,${base64Image}`;
+    }
     
     return `data:image/jpeg;base64,${base64Image}`;
   } catch (error) {
     console.error(`Error downloading/processing image from ${imageUrl}:`, error);
+    
+    // If the URL doesn't work directly, try modifying it for common patterns
+    if (imageUrl.includes('twitter.com') || imageUrl.includes('x.com')) {
+      try {
+        // For X/Twitter URLs, try appending a format specifier
+        if (!imageUrl.includes('?format=') && !imageUrl.includes('&format=')) {
+          const newUrl = imageUrl.includes('?') 
+            ? `${imageUrl}&format=jpg` 
+            : `${imageUrl}?format=jpg`;
+          
+          console.log(`Retrying with modified URL: ${newUrl}`);
+          return downloadAndConvertToBase64(newUrl);
+        }
+      } catch (retryError) {
+        console.error(`Retry also failed:`, retryError);
+      }
+    }
+    
     return null;
   }
 }
@@ -127,12 +178,13 @@ export async function downloadAndConvertToBase64(imageUrl: string): Promise<stri
 /**
  * Process multiple image URLs and return only valid base64 images
  */
-export async function processImageUrls(imageUrls: string[]): Promise<string[]> {
+export async function processImageUrls(imageUrls: string[], contextLabel: string = ''): Promise<string[]> {
   if (!imageUrls || imageUrls.length === 0) {
     return [];
   }
   
-  console.log(`Processing ${imageUrls.length} image URLs`);
+  const logPrefix = contextLabel ? `[${contextLabel}] ` : '';
+  console.log(`${logPrefix}Processing ${imageUrls.length} image URLs: ${JSON.stringify(imageUrls)}`);
   
   // Process each URL in parallel
   const base64Promises = imageUrls.map(url => downloadAndConvertToBase64(url));
@@ -140,7 +192,16 @@ export async function processImageUrls(imageUrls: string[]): Promise<string[]> {
   
   // Filter out null results (failed downloads)
   const validBase64Images = base64Results.filter(result => result !== null) as string[];
-  console.log(`Successfully processed ${validBase64Images.length} of ${imageUrls.length} images`);
+  console.log(`${logPrefix}Successfully processed ${validBase64Images.length} of ${imageUrls.length} images`);
+  
+  if (validBase64Images.length === 0) {
+    console.warn(`${logPrefix}No images were successfully processed, check URL extraction and processing logic`);
+  } else {
+    // Log the first 50 chars of each base64 string to help debug
+    validBase64Images.forEach((base64, index) => {
+      console.log(`${logPrefix}Image ${index+1} base64 prefix: ${base64.substring(0, 50)}...`);
+    });
+  }
   
   return validBase64Images;
 }

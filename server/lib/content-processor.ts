@@ -156,9 +156,12 @@ export async function generateInsights(
     if (hasImages) {
       try {
         // Process and download images first
-        console.log(`Processing ${imageUrls.length} images for insights generation analysis`);
-        const processedImages = await processImageUrls(imageUrls);
-        console.log(`Successfully processed ${processedImages.length} of ${imageUrls.length} images for insights`);
+        console.log(`Processing ${imageUrls.length} images for insights generation analysis: ${JSON.stringify(imageUrls)}`);
+        const processedImages = await processImageUrls(imageUrls, 'Insights');
+        
+        if (processedImages.length === 0) {
+          console.warn(`No images were successfully processed for insights, falling back to text-only analysis`);
+        }
         
         // Create multimodal message content
         const multimodalContent: Array<any> = []; 
@@ -431,9 +434,12 @@ export async function generateTags(
     if (hasImages) {
       try {
         // Process and download images first
-        console.log(`Processing ${imageUrls.length} images for tag generation analysis`);
-        const processedImages = await processImageUrls(imageUrls);
-        console.log(`Successfully processed ${processedImages.length} of ${imageUrls.length} images for tag generation`);
+        console.log(`Processing ${imageUrls.length} images for tag generation analysis: ${JSON.stringify(imageUrls)}`);
+        const processedImages = await processImageUrls(imageUrls, 'TagGen');
+        
+        if (processedImages.length === 0) {
+          console.warn(`No images were successfully processed for tag generation, falling back to text-only tag generation`);
+        }
         
         // Create multimodal message content
         const multimodalContent: Array<any> = []; 
