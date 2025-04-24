@@ -53,6 +53,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to retrieve bookmarks" });
     }
   });
+  
+  // Paginated bookmarks API for progressive loading
+  app.get("/api/bookmarks/paginated", async (req, res) => {
+    try {
+      // Parse query parameters with defaults
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+      const sortBy = (req.query.sortBy as string) || 'date_saved';
+      const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'desc';
+      
+      // If user is authenticated, filter bookmarks by user_id
+      const userId = req.isAuthenticated() ? (req.user as Express.User).id : undefined;
+      
+      // Get paginated bookmarks with total count
+      const result = await storage.getBookmarksPaginated({
+        userId,
+        limit,
+        offset,
+        sortBy,
+        sortOrder
+      });
+      
+      // Populate the paginated bookmarks with related data
+      const populatedBookmarks = await Promise.all(
+        result.bookmarks.map(async (bookmark) => {
+          const notes = await storage.getNotesByBookmarkId(bookmark.id);
+          const highlights = await storage.getHighlightsByBookmarkId(bookmark.id);
+          const screenshots = await storage.getScreenshotsByBookmarkId(bookmark.id);
+          const insights = await storage.getInsightByBookmarkId(bookmark.id);
+          const tags = await storage.getTagsByBookmarkId(bookmark.id);
+          
+          return {
+            ...bookmark,
+            notes,
+            highlights,
+            screenshots,
+            insights,
+            tags
+          };
+        })
+      );
+      
+      // Return the paginated bookmarks with metadata
+      res.json({
+        bookmarks: populatedBookmarks,
+        total: result.total,
+        limit,
+        offset
+      });
+    } catch (error) {
+      console.error("Error retrieving paginated bookmarks:", error);
+      res.status(500).json({ error: "Failed to retrieve paginated bookmarks" });
+    }
+  });
 
   app.get("/api/bookmarks/:id", async (req, res) => {
     try {
