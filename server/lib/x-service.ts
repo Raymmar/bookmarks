@@ -501,7 +501,6 @@ export class XService {
       source: 'x',
       date_saved: new Date(),
       user_id: null, // This will be filled in by the calling function
-      local_media_paths: localMediaPaths.length > 0 ? localMediaPaths : null,
       
       // X.com specific fields
       external_id: tweet.id,
@@ -515,7 +514,7 @@ export class XService {
         ? tweet.public_metrics.quote_count 
         : 0,
       media_urls: mediaUrls,
-      local_media_paths: localMediaPaths,
+      local_media_paths: localMediaPaths.length > 0 ? localMediaPaths : null,
     };
     
     return bookmark;
