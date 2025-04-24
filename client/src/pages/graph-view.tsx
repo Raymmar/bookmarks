@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph-unpinned";
 import { SidebarPanel } from "@/components/sidebar-panel";
@@ -359,8 +359,36 @@ export default function GraphView() {
   // Get tags sorted by usage count for popular tags feature
   const tagsByCount = [...tags].sort((a, b) => b.count - a.count);
   
+  // State for progressive loading
+  const [loadLimit, setLoadLimit] = useState<number | null>(() => {
+    // Get saved preference from localStorage or default to limit=25
+    const savedLimit = localStorage.getItem('bookmarkLoadLimit');
+    return savedLimit ? parseInt(savedLimit) : 25;
+  });
+
+  // Update localStorage when load limit changes
+  useEffect(() => {
+    if (loadLimit !== null) {
+      localStorage.setItem('bookmarkLoadLimit', loadLimit.toString());
+    } else {
+      localStorage.removeItem('bookmarkLoadLimit');
+    }
+  }, [loadLimit]);
+
   // Determine which bookmarks to use based on whether a collection is selected
-  const activeBookmarks = selectedCollectionId ? collectionBookmarks : bookmarks;
+  const fullBookmarks = selectedCollectionId ? collectionBookmarks : bookmarks;
+  
+  // Apply limit to bookmarks if loadLimit is set
+  const activeBookmarks = useMemo(() => {
+    if (loadLimit === null) {
+      return fullBookmarks; // Load all bookmarks
+    }
+    
+    // Sort by date (newest first) and apply limit
+    return [...fullBookmarks]
+      .sort((a, b) => new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime())
+      .slice(0, loadLimit);
+  }, [fullBookmarks, loadLimit]);
   
   // Get bookmark tags using the bookmarksWithTags data
   const bookmarkTagsMap = new Map<string, string[]>();
