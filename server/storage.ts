@@ -34,13 +34,6 @@ export interface IStorage {
 
   // Bookmarks
   getBookmarks(userId?: string): Promise<Bookmark[]>;
-  getBookmarksPaginated(options: {
-    userId?: string;
-    limit?: number;
-    offset?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<{ bookmarks: Bookmark[]; total: number }>;
   getBookmark(id: string): Promise<Bookmark | undefined>;
   createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
   updateBookmark(id: string, bookmark: Partial<InsertBookmark>): Promise<Bookmark | undefined>;
@@ -326,52 +319,6 @@ export class MemStorage implements IStorage {
       );
     }
     return Array.from(this.bookmarks.values());
-  }
-  
-  async getBookmarksPaginated(options: {
-    userId?: string;
-    limit?: number;
-    offset?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<{ bookmarks: Bookmark[]; total: number }> {
-    const { userId, limit = 20, offset = 0, sortBy = 'date_saved', sortOrder = 'desc' } = options;
-    
-    // Get all bookmarks (or filtered by userId)
-    let allBookmarks = Array.from(this.bookmarks.values());
-    
-    if (userId) {
-      allBookmarks = allBookmarks.filter(bookmark => bookmark.user_id === userId);
-    }
-    
-    // Get total count before pagination
-    const total = allBookmarks.length;
-    
-    // Sort bookmarks
-    allBookmarks.sort((a, b) => {
-      if (sortBy === 'date_saved') {
-        const aTime = new Date(a.date_saved).getTime();
-        const bTime = new Date(b.date_saved).getTime();
-        return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
-      } else if (sortBy === 'updated_at') {
-        const aTime = a.updated_at ? new Date(a.updated_at).getTime() : new Date(a.date_saved).getTime();
-        const bTime = b.updated_at ? new Date(b.updated_at).getTime() : new Date(b.date_saved).getTime();
-        return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
-      } else if (sortBy === 'title') {
-        return sortOrder === 'desc'
-          ? b.title.localeCompare(a.title)
-          : a.title.localeCompare(b.title);
-      }
-      return 0;
-    });
-    
-    // Apply pagination
-    const paginatedBookmarks = allBookmarks.slice(offset, offset + limit);
-    
-    return {
-      bookmarks: paginatedBookmarks,
-      total
-    };
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
@@ -1095,54 +1042,6 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(bookmarks).where(eq(bookmarks.user_id, userId));
     }
     return await db.select().from(bookmarks);
-  }
-  
-  async getBookmarksPaginated(options: {
-    userId?: string;
-    limit?: number;
-    offset?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<{ bookmarks: Bookmark[]; total: number }> {
-    const { userId, limit = 20, offset = 0, sortBy = 'date_saved', sortOrder = 'desc' } = options;
-    
-    // Build the query based on options
-    let query = db.select().from(bookmarks);
-    
-    // Add userId filter if provided
-    if (userId) {
-      query = query.where(eq(bookmarks.user_id, userId));
-    }
-    
-    // Add sorting based on sortBy and sortOrder
-    if (sortBy === 'date_saved') {
-      query = sortOrder === 'desc' 
-        ? query.orderBy(desc(bookmarks.date_saved))
-        : query.orderBy(bookmarks.date_saved);
-    } else if (sortBy === 'updated_at') {
-      query = sortOrder === 'desc'
-        ? query.orderBy(desc(bookmarks.updated_at))
-        : query.orderBy(bookmarks.updated_at);
-    } else if (sortBy === 'title') {
-      query = sortOrder === 'desc'
-        ? query.orderBy(desc(bookmarks.title))
-        : query.orderBy(bookmarks.title);
-    }
-    
-    // Get total count
-    const countResult = await db.select({ count: sql`count(*)` }).from(bookmarks);
-    const total = Number(countResult[0].count);
-    
-    // Add pagination
-    query = query.limit(limit).offset(offset);
-    
-    // Execute the query
-    const paginatedBookmarks = await query;
-    
-    return {
-      bookmarks: paginatedBookmarks,
-      total
-    };
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
