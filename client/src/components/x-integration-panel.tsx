@@ -360,7 +360,7 @@ const XIntegrationPanel = () => {
                 </>
               ) : (
                 <>
-                  <Twitter className="mr-2 h-4 w-4" />
+                  <ExternalLink className="mr-2 h-4 w-4" />
                   Connect to X.com
                 </>
               )}
@@ -416,7 +416,7 @@ const XIntegrationPanel = () => {
                     </>
                   ) : (
                     <>
-                      <Twitter className="mr-2 h-4 w-4" />
+                      <ExternalLink className="mr-2 h-4 w-4" />
                       Re-authenticate with X.com
                     </>
                   )}
