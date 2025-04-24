@@ -139,9 +139,9 @@ export class BookmarkService {
 MEDIA CONTENT:
 The bookmark contains ${bookmark.media_urls.length} image(s) that are attached to this message.
 
-IMPORTANT ABOUT IMAGES: You have multimodal capabilities and will receive these images directly in this API call.
-You should analyze the visual content of each attached image and explicitly describe what you see in them.
-Include specific visual details from the images in your response - describe notable people, objects, text, or scenes visible in the images.
+IMPORTANT ABOUT IMAGES: You have multimodal capabilities and will receive encoded images directly in this API call.
+You should analyze the visual content of each attached image and explicitly describe what you see in them in order to use the image information in your response for additional context to the users prompts. You should not describe the images in a generic way, but rather describe them in detail.
+Include specific visual details from the images in your response - describe notable people, objects, text, or scenes visible in the images. graphics, memes, or other visual content should be described and interpreted in order to add context for the bookmark summary. 
 ` : '';
         
         // Build template strings with the bookmark data inserted
