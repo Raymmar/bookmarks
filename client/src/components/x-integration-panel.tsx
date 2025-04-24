@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -74,9 +75,47 @@ const XIntegrationPanel = () => {
     refetchOnWindowFocus: false
   });
 
+  // Force disconnect from X.com
+  const forceDisconnect = useMutation({
+    mutationFn: async () => {
+      console.log("X OAuth: Force disconnecting from X.com");
+      const response = await fetch('/api/x/disconnect', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to disconnect from X.com');
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      console.log("X OAuth: Successfully disconnected from X.com");
+      // No UI feedback needed since we'll reconnect immediately
+    },
+    onError: (error) => {
+      console.error("X OAuth: Failed to disconnect:", error);
+      // Continue with auth flow anyway
+    }
+  });
+
   // Start X.com authorization flow
   const startAuth = useMutation({
     mutationFn: async () => {
+      // First try to force disconnect to ensure a clean slate
+      try {
+        console.log("X OAuth: Attempting to clean up existing credentials first");
+        await forceDisconnect.mutateAsync();
+      } catch (error) {
+        // Just log and continue even if this fails
+        console.warn("X OAuth: Could not clean up credentials, continuing anyway:", error);
+      }
+      
+      // Now start the actual auth flow
       console.log("X OAuth: Starting authorization flow");
       const response = await apiRequest<{ authUrl: string }>('GET', '/api/x/auth');
       return response;

@@ -1664,6 +1664,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Disconnect from X.com (delete credentials)
+  app.post("/api/x/disconnect", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userId = (req.user as Express.User).id;
+      
+      // Delete credentials
+      await xService.deleteUserCredentials(userId);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting from X.com:", error);
+      res.status(500).json({ error: "Failed to disconnect from X.com" });
+    }
+  });
+  
   // Sync bookmarks from X.com
   app.post("/api/x/sync", async (req, res) => {
     try {
