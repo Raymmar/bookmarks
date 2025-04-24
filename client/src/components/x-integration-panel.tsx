@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCw, FolderPlus, Link, Cable } from "lucide-react";
+import { Loader2, RefreshCw, FolderPlus, Link, Cable, Twitter } from "lucide-react";
 
 // Type definitions
 interface XConnectionStatus {
