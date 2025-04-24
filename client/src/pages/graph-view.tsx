@@ -732,9 +732,9 @@ export default function GraphView() {
                   <SelectValue placeholder="Show" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="25">Recent 25</SelectItem>
-                  <SelectItem value="50">Recent 50</SelectItem>
-                  <SelectItem value="100">Recent 100</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
                   <SelectItem value="all">Show All</SelectItem>
                 </SelectContent>
               </Select>
@@ -779,9 +779,9 @@ export default function GraphView() {
           ) : (
             // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
-              {/* Display load indicator when showing limited bookmarks */}
+              {/* Display load indicator when showing limited bookmarks - positioned at bottom right corner of the canvas */}
               {loadLimit !== null && fullBookmarks.length > loadLimit && (
-                <div className="absolute top-4 right-4 z-10 bg-white/80 backdrop-blur-sm py-1 px-3 text-xs rounded-full border shadow-sm">
+                <div className="absolute bottom-4 right-4 z-10 bg-white/80 backdrop-blur-sm py-1 px-3 text-xs rounded-full border shadow-sm">
                   Showing {Math.min(loadLimit, filteredBookmarks.length)} of {fullBookmarks.length} bookmarks
                 </div>
               )}
