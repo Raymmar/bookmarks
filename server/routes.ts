@@ -1059,6 +1059,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get bookmarks in this collection
       const bookmarks = await storage.getBookmarksByCollectionId(collection.id);
       
+      if (bookmarks.length === 0) {
+        return res.json([]);
+      }
+      
+      // Get all bookmark IDs
+      const bookmarkIds = bookmarks.map(bookmark => bookmark.id);
+      
+      // Get all bookmark tags in a single batch
+      const bookmarkTagsMap = await storage.getAllBookmarkTags(bookmarkIds);
+      
       // Populate the bookmarks with related data (same as /api/bookmarks endpoint)
       const populatedBookmarks = await Promise.all(
         bookmarks.map(async (bookmark) => {
@@ -1072,7 +1082,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes,
             highlights,
             screenshots,
-            insights
+            insights,
+            tags: bookmarkTagsMap[bookmark.id] || [] // Add tags from the batch query
           };
         })
       );
@@ -1128,6 +1139,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Convert the map values back to an array
       const uniqueBookmarks = Array.from(allBookmarks.values());
       
+      if (uniqueBookmarks.length === 0) {
+        return res.json([]);
+      }
+      
+      // Get all bookmark IDs
+      const bookmarkIds = uniqueBookmarks.map(bookmark => bookmark.id);
+      
+      // Get all bookmark tags in a single batch
+      const bookmarkTagsMap = await storage.getAllBookmarkTags(bookmarkIds);
+      
       // Populate the bookmarks with related data
       const populatedBookmarks = await Promise.all(
         uniqueBookmarks.map(async (bookmark) => {
@@ -1141,7 +1162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes,
             highlights,
             screenshots,
-            insights
+            insights,
+            tags: bookmarkTagsMap[bookmark.id] || [] // Add tags from the batch query
           };
         })
       );
