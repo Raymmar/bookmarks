@@ -7,6 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { 
+  Command, 
+  CommandEmpty, 
+  CommandGroup, 
+  CommandInput, 
+  CommandItem 
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/components/ui/popover";
+import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { X, LayoutGrid, Network, Search, ChevronUp, ChevronDown, BookmarkPlus, SearchX } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -716,28 +729,84 @@ export default function GraphView() {
               onVisibleNodeTypesChange={setVisibleNodeTypes}
             />
             
-            {/* Load limit controls */}
+            {/* Load limit controls with combobox allowing custom values */}
             <div className="flex items-center">
-              <Select
-                value={loadLimit === null ? "all" : loadLimit.toString()}
-                onValueChange={(value) => {
-                  if (value === "all") {
-                    setLoadLimit(null);
-                  } else {
-                    setLoadLimit(Number(value));
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[100px] h-9">
-                  <SelectValue placeholder="Show" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                  <SelectItem value="all">Show All</SelectItem>
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-[130px] h-9 justify-between"
+                  >
+                    {loadLimit === null ? "Show All" : `Show ${loadLimit}`}
+                    <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Enter a number..."
+                      onValueChange={(value) => {
+                        // Allow only numbers in the input
+                        const numValue = value.replace(/\D/g, '');
+                        if (numValue && !isNaN(Number(numValue))) {
+                          setLoadLimit(Number(numValue));
+                        }
+                      }} 
+                    />
+                    <CommandEmpty>Enter a custom limit or choose below</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={() => setLoadLimit(25)}
+                        className="cursor-pointer"
+                      >
+                        <CheckIcon
+                          className={`mr-2 h-4 w-4 ${
+                            loadLimit === 25 ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        <span>25</span>
+                      </CommandItem>
+                      <CommandItem
+                        onSelect={() => setLoadLimit(50)}
+                        className="cursor-pointer"
+                      >
+                        <CheckIcon
+                          className={`mr-2 h-4 w-4 ${
+                            loadLimit === 50 ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        <span>50</span>
+                      </CommandItem>
+                      <CommandItem
+                        onSelect={() => setLoadLimit(100)}
+                        className="cursor-pointer"
+                      >
+                        <CheckIcon
+                          className={`mr-2 h-4 w-4 ${
+                            loadLimit === 100 ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        <span>100</span>
+                      </CommandItem>
+                      <CommandItem
+                        onSelect={() => setLoadLimit(null)}
+                        className="cursor-pointer"
+                      >
+                        <CheckIcon
+                          className={`mr-2 h-4 w-4 ${
+                            loadLimit === null ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        <span>Show All</span>
+                      </CommandItem>
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <span className="ml-2 text-xs text-gray-500">
+                ({fullBookmarks.length} total)
+              </span>
             </div>
           </div>
         </div>
@@ -779,12 +848,7 @@ export default function GraphView() {
           ) : (
             // Always show graph in the main content area - removed the viewMode === "graph" conditional
             <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
-              {/* Display load indicator when showing limited bookmarks - positioned at bottom right corner of the canvas */}
-              {loadLimit !== null && fullBookmarks.length > loadLimit && (
-                <div className="absolute bottom-4 right-4 z-10 bg-white/80 backdrop-blur-sm py-1 px-3 text-xs rounded-full border shadow-sm">
-                  Showing {Math.min(loadLimit, filteredBookmarks.length)} of {fullBookmarks.length} bookmarks
-                </div>
-              )}
+              {/* Removed the floating bookmark count indicator */}
               <ForceDirectedGraph
                 bookmarks={filteredBookmarks}
                 insightLevel={insightLevel}
