@@ -268,9 +268,14 @@ export async function generateInsights(
 }
 
 /**
- * Generate tags from content or URL
+ * Generate tags from content or URL, potentially including image analysis
  */
-export async function generateTags(content: string, url?: string, customSystemPrompt?: string): Promise<string[]> {
+export async function generateTags(
+  content: string, 
+  url?: string, 
+  customSystemPrompt?: string, 
+  imageUrls?: string[]
+): Promise<string[]> {
   try {
     // Check if this is an X.com URL
     const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
@@ -279,10 +284,12 @@ export async function generateTags(content: string, url?: string, customSystemPr
     // For other URLs, use URL-direct analysis if content is not available
     const useUrlDirectly = !isXTweet && url && (!content || content.length < 100);
     
-    console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
+    // Log whether we're using images
+    const hasImages = imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0;
+    console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}${hasImages ? ' with image analysis' : ''}`);
     
     // Basic system prompt to set context for the AI
-    const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
+    const baseSystemPrompt = "You will receive content details about a user submitted bookmark, which may include text and/or images. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
     
     // Get custom system prompt
     let userSystemPrompt;
@@ -316,19 +323,63 @@ export async function generateTags(content: string, url?: string, customSystemPr
       }
     ];
     
-    // Add content or URL as user message with NO additional instructions
-    if (useUrlDirectly && url) {
+    // For multimodal analysis (with images)
+    if (hasImages) {
+      // Create multimodal message content
+      const multimodalContent: Array<any> = []; 
+      
+      // Add text content first
+      if (content && content.trim().length > 0) {
+        multimodalContent.push({
+          type: "text",
+          text: content.slice(0, 15000) // Limit content length
+        });
+      } else if (url) {
+        multimodalContent.push({
+          type: "text",
+          text: `Please analyze the following URL and images: ${url}`
+        });
+      }
+      
+      // Add image URLs to the content
+      if (imageUrls.length > 0) {
+        console.log(`Including ${imageUrls.length} images in tag generation analysis`);
+        
+        // Add each image
+        for (const imageUrl of imageUrls) {
+          if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim().length > 0) {
+            multimodalContent.push({
+              type: "image_url",
+              image_url: {
+                url: imageUrl
+              }
+            });
+          }
+        }
+      }
+      
+      // Add the multimodal content as user message
       messages.push({
         role: "user",
-        content: url
+        content: multimodalContent
       });
-    } else {
-      // Use provided content (with length limit)
-      const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
-      messages.push({
-        role: "user",
-        content: contentToAnalyze
-      });
+    } 
+    // Standard text-only analysis
+    else {
+      // Add content or URL as user message with NO additional instructions
+      if (useUrlDirectly && url) {
+        messages.push({
+          role: "user",
+          content: url
+        });
+      } else {
+        // Use provided content (with length limit)
+        const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
+        messages.push({
+          role: "user",
+          content: contentToAnalyze
+        });
+      }
     }
 
     console.log(`Sending request to OpenAI for tag generation${url ? ` for URL: ${url}` : ''}`);

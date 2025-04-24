@@ -130,11 +130,23 @@ export class BookmarkService {
         // Flag to identify X tweets specifically
         const isXTweet = bookmark.source === 'x';
         
+        // Check if the bookmark has media URLs
+        const hasMediaUrls = bookmark.media_urls && Array.isArray(bookmark.media_urls) && bookmark.media_urls.length > 0;
+        
+        // Media URLs section for the template
+        const mediaUrlsSection = hasMediaUrls ? `
+MEDIA CONTENT:
+${bookmark.media_urls.map((url: string, index: number) => `Image ${index + 1}: ${url}`).join('\n')}
+
+NOTE ON MEDIA: You have multimodal capabilities. If the bookmark contains image URLs listed above, 
+analyze each image to extract additional context that will help with classification and summarization.
+` : '';
+        
         // Build template strings with the bookmark data inserted
         const templateBase = `
 You are analyzing a bookmark from the AtmosphereAI platform.
 
-BOOKMARK DATA:
+BOOKMARK CONTEXT:
 URL: ${bookmark.url || 'N/A'}
 Title: ${bookmark.title || 'N/A'}
 Source: ${bookmark.source || 'N/A'}
@@ -144,17 +156,19 @@ Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || '
 Tweet content: ${bookmark.description || 'N/A'}
 Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
 ` : ''}
+${mediaUrlsSection}
 
 USER INSTRUCTIONS:
 ${taggingPrompt?.value || ''}
 
-Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
+Please analyze all the provided content (including any images if present) and follow the user's instructions 
+while considering the bookmark context provided above.
 `;
 
         const summaryTemplateBase = `
 You are analyzing a bookmark from the AtmosphereAI platform.
 
-BOOKMARK DATA:
+BOOKMARK CONTEXT:
 URL: ${bookmark.url || 'N/A'}
 Title: ${bookmark.title || 'N/A'}
 Source: ${bookmark.source || 'N/A'}
@@ -164,11 +178,13 @@ Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || '
 Tweet content: ${bookmark.description || 'N/A'}
 Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
 ` : ''}
+${mediaUrlsSection}
 
 USER INSTRUCTIONS:
 ${summaryPrompt?.value || ''}
 
-Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
+Please analyze all the provided content (including any images if present) and follow the user's instructions 
+while considering the bookmark context provided above.
 `;
 
         console.log(`Created templated system prompts with bookmark context for ${bookmark.id}`);
