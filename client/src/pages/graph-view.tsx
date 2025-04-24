@@ -376,7 +376,13 @@ export default function GraphView() {
   const [loadLimit, setLoadLimit] = useState<number | null>(() => {
     // Get saved preference from localStorage or default to limit=25
     const savedLimit = localStorage.getItem('bookmarkLoadLimit');
-    return savedLimit ? parseInt(savedLimit) : 25;
+    
+    if (!savedLimit) return 25; // Default value
+    if (savedLimit === 'all') return null; // "Show All" setting
+    
+    // Try to parse as number
+    const numValue = parseInt(savedLimit);
+    return !isNaN(numValue) ? numValue : 25; // Fallback to default if not a valid number
   });
 
   // Update localStorage when load limit changes
@@ -384,7 +390,8 @@ export default function GraphView() {
     if (loadLimit !== null) {
       localStorage.setItem('bookmarkLoadLimit', loadLimit.toString());
     } else {
-      localStorage.removeItem('bookmarkLoadLimit');
+      // For 'Show All' option, store a special value
+      localStorage.setItem('bookmarkLoadLimit', 'all');
     }
   }, [loadLimit]);
 
