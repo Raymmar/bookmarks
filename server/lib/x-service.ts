@@ -12,7 +12,6 @@
 import { storage } from '../storage';
 import { db } from '../db';
 import { eq, and } from 'drizzle-orm';
-import { processMediaUrls } from './media-downloader';
 import type { Bookmark } from '@shared/schema';
 import { 
   xCredentials, XCredentials, InsertXCredentials, 
@@ -75,12 +74,6 @@ interface XTweet {
     urls?: Array<any>; // Using any to accommodate the SDK's structure
     mentions?: Array<any>;
     hashtags?: Array<any>;
-    media?: Array<{
-      media_url_https?: string;
-      media_url?: string;
-      url?: string;
-      type?: string;
-    }>;
   };
 }
 
@@ -299,10 +292,9 @@ export class XService {
       if (tokenResult.token.expires_at) {
         expiresAt = new Date(tokenResult.token.expires_at);
       } else {
-        // Default to 30 days if no expiration is provided
-        // This avoids requiring frequent re-authentication
+        // Default to 2 hours if no expiration is provided
         expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
+        expiresAt.setSeconds(expiresAt.getSeconds() + 7200);
       }
       
       // Create updated credentials
@@ -445,7 +437,7 @@ export class XService {
   /**
    * Convert an X tweet to a bookmark
    */
-  async convertTweetToBookmark(tweet: XTweet, author?: XUser, accessToken?: string): Promise<InsertBookmark> {
+  convertTweetToBookmark(tweet: XTweet, author?: XUser): InsertBookmark {
     // Generate a normalized URL for the tweet
     const tweetUrl = `https://twitter.com/${author?.username || 'user'}/status/${tweet.id}`;
     
@@ -475,24 +467,6 @@ export class XService {
       });
     }
     
-    // Also check for media entities if available (photos, videos, etc.)
-    if (tweet.entities && tweet.entities.media) {
-      tweet.entities.media.forEach((media: any) => {
-        if (media.media_url_https) {
-          mediaUrls.push(media.media_url_https);
-        } else if (media.media_url) {
-          mediaUrls.push(media.media_url);
-        } else if (media.url) {
-          mediaUrls.push(media.url);
-        }
-      });
-    }
-    
-    // Download media files and get local paths
-    console.log(`Processing ${mediaUrls.length} media URLs for tweet ${tweet.id}`);
-    const localMediaPaths = await processMediaUrls(mediaUrls, accessToken);
-    console.log(`Downloaded ${localMediaPaths.length} media files for tweet ${tweet.id}`);
-    
     // Create a bookmark
     const bookmark: InsertBookmark = {
       url: tweetUrl,
@@ -515,7 +489,6 @@ export class XService {
         ? tweet.public_metrics.quote_count 
         : 0,
       media_urls: mediaUrls,
-      local_media_paths: localMediaPaths.length > 0 ? localMediaPaths : null,
     };
     
     return bookmark;
@@ -561,22 +534,12 @@ export class XService {
       }
     } while (nextToken);
     
-    // Get access token for media downloads
-    const accessToken = await this.ensureValidToken(userId);
-    console.log(`Syncing ${allBookmarks.tweets.length} bookmarks from X.com for user ${userId}`);
-    
     // Process each bookmark
     for (const tweet of allBookmarks.tweets) {
       try {
         const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
-        // Pass the access token to download media
-        let bookmarkData = await this.convertTweetToBookmark(tweet, author, accessToken);
-        
-        // Set user ID for the bookmark
-        bookmarkData = {
-          ...bookmarkData,
-          user_id: userId
-        };
+        const bookmarkData = this.convertTweetToBookmark(tweet, author);
+        bookmarkData.user_id = userId;
         
         // Check if bookmark already exists
         const existingBookmark = await this.findExistingBookmark(userId, tweet.id);
@@ -713,22 +676,15 @@ export class XService {
     
     // If token expires in less than 5 minutes, refresh it
     if (expiresInMs < 5 * 60 * 1000 && credentials.refresh_token) {
-      try {
-        // Refresh the token
-        const updated = await this.refreshAccessToken(credentials.refresh_token);
-        
-        // Update in database
-        await db.update(xCredentials)
-          .set(updated)
-          .where(eq(xCredentials.id, credentials.id));
-        
-        return updated.access_token as string;
-      } catch (error) {
-        console.error('Error refreshing token:', error);
-        // If refresh fails, return existing token - it might still work
-        // Or the user needs to re-authenticate
-        return credentials.access_token;
-      }
+      // Refresh the token
+      const updated = await this.refreshAccessToken(credentials.refresh_token);
+      
+      // Update in database
+      await db.update(xCredentials)
+        .set(updated)
+        .where(eq(xCredentials.id, credentials.id));
+      
+      return updated.access_token as string;
     }
     
     return credentials.access_token;
@@ -738,17 +694,11 @@ export class XService {
    * Get X.com credentials for a user
    */
   private async getUserCredentials(userId: string): Promise<XCredentials | undefined> {
-    try {
-      const [credentials] = await db.select()
-        .from(xCredentials)
-        .where(eq(xCredentials.user_id, userId));
-      
-      return credentials;
-    } catch (error) {
-      console.error(`Error getting X credentials for user ${userId}:`, error);
-      // Return null if there's an error to prevent further issues
-      return undefined;
-    }
+    const [credentials] = await db.select()
+      .from(xCredentials)
+      .where(eq(xCredentials.user_id, userId));
+    
+    return credentials;
   }
 
   /**

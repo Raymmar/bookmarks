@@ -842,44 +842,19 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             </div>
             
             {/* Tweet media (if any) */}
-            {((bookmark.local_media_paths && bookmark.local_media_paths.length > 0) || 
-              (bookmark.media_urls && bookmark.media_urls.length > 0)) && (
+            {bookmark.media_urls && bookmark.media_urls.length > 0 && (
               <div className="mb-4">
-                {/* Display local media files if available */}
-                {bookmark.local_media_paths && bookmark.local_media_paths.map((path, index) => (
-                  <div key={`local-${index}`} className="mb-2 overflow-hidden rounded-lg border border-gray-200">
-                    {/* Display images directly */}
-                    {(path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png') || 
-                      path.endsWith('.gif') || path.endsWith('.webp')) ? (
-                      <img 
-                        src={path} 
-                        alt={`Media ${index + 1} from ${bookmark.title}`}
-                        className="w-full h-auto max-h-96 object-contain"
-                      />
-                    ) : (
-                      // For non-image files, provide a download link
-                      <a 
-                        href={path} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="block bg-gray-50 p-3 text-sm text-primary hover:underline"
-                      >
-                        View Media File {index + 1}
-                      </a>
-                    )}
-                  </div>
-                ))}
-                
-                {/* If no local media, fallback to original URLs */}
-                {(!bookmark.local_media_paths || bookmark.local_media_paths.length === 0) && 
-                  bookmark.media_urls && bookmark.media_urls.map((url, index) => (
+                {bookmark.media_urls.map((url, index) => (
                   <a 
-                    key={`url-${index}`} 
+                    key={index} 
                     href={url} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="block mb-2 overflow-hidden rounded-lg border border-gray-200"
                   >
+                    {/* For images, we could display them directly, 
+                        but since we don't know the content type from the URL alone,
+                        we just show the link for now */}
                     <div className="bg-gray-50 p-3 text-sm text-primary hover:underline truncate">
                       {url}
                     </div>
