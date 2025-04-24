@@ -757,6 +757,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // New endpoint to get all bookmark tags in a single request
+  app.get("/api/bookmarks-tags", async (req, res) => {
+    try {
+      // Extract bookmark IDs from query parameters if provided
+      const bookmarkIds = req.query.ids ? (req.query.ids as string).split(",") : undefined;
+      
+      // Get all bookmark tags
+      const bookmarkTagsMap = await storage.getAllBookmarkTags(bookmarkIds);
+      res.json(bookmarkTagsMap);
+    } catch (error) {
+      console.error("Error retrieving all bookmark tags:", error);
+      res.status(500).json({ error: "Failed to retrieve bookmark tags" });
+    }
+  });
+  
   app.get("/api/tags/:tagId/bookmarks", async (req, res) => {
     try {
       const bookmarks = await storage.getBookmarksByTagId(req.params.tagId);

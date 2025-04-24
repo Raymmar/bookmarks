@@ -105,33 +105,42 @@ export default function GraphView() {
     queryKey: ["/api/tags"],
   });
 
-  // Fetch bookmark-tag associations for each bookmark
+  // Fetch bookmark-tag associations using the optimized batch endpoint
   const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags, refetch: refetchBookmarkTags } = useQuery<BookmarkWithTags[]>({
     queryKey: ["/api/bookmarks-with-tags"],
     enabled: !isLoadingBookmarks && !isLoadingTags,
     queryFn: async () => {
-      // Create a map to store tags for each bookmark
-      const bookmarkTagsMap = new Map<string, Tag[]>();
-      
-      // For each bookmark, fetch its tags
-      for (const bookmark of bookmarks) {
-        try {
-          const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
-          if (response.ok) {
-            const bookmarkTags = await response.json();
-            bookmarkTagsMap.set(bookmark.id, bookmarkTags);
-          }
-        } catch (error) {
-          console.error(`Error fetching tags for bookmark ${bookmark.id}:`, error);
-          bookmarkTagsMap.set(bookmark.id, []);
+      try {
+        // Get all bookmark IDs to fetch
+        const bookmarkIds = bookmarks.map(bookmark => bookmark.id);
+        
+        if (bookmarkIds.length === 0) {
+          return [];
         }
+        
+        // Fetch all bookmark tags in a single request using the batch endpoint
+        const response = await fetch(`/api/bookmarks-tags${bookmarkIds.length > 0 ? `?ids=${bookmarkIds.join(',')}` : ''}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch bookmark tags: ${response.statusText}`);
+        }
+        
+        // Map of bookmarkId -> Tag[]
+        const bookmarkTagsMap = await response.json();
+        
+        // Combine bookmarks with their tags
+        return bookmarks.map(bookmark => ({
+          ...bookmark,
+          tags: bookmarkTagsMap[bookmark.id] || []
+        }));
+      } catch (error) {
+        console.error("Error fetching batch bookmark tags:", error);
+        // Return bookmarks with empty tags if the request fails
+        return bookmarks.map(bookmark => ({
+          ...bookmark,
+          tags: []
+        }));
       }
-      
-      // Combine bookmarks with their tags
-      return bookmarks.map(bookmark => ({
-        ...bookmark,
-        tags: bookmarkTagsMap.get(bookmark.id) || []
-      }));
     }
   });
   

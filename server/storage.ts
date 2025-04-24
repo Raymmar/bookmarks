@@ -89,6 +89,7 @@ export interface IStorage {
   
   // BookmarkTags
   getTagsByBookmarkId(bookmarkId: string): Promise<Tag[]>;
+  getAllBookmarkTags(bookmarkIds?: string[]): Promise<{[bookmarkId: string]: Tag[]}>;
   getBookmarksByTagId(tagId: string): Promise<Bookmark[]>;
   addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag>;
   removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean>;
@@ -620,6 +621,33 @@ export class MemStorage implements IStorage {
     
     const tagIds = bookmarkTagsEntries.map(bt => bt.tag_id);
     return tagIds.map(id => this.tags.get(id)!).filter(Boolean);
+  }
+  
+  async getAllBookmarkTags(bookmarkIds?: string[]): Promise<{[bookmarkId: string]: Tag[]}> {
+    // Create a map to store tags for each bookmark
+    const bookmarkTagsMap: {[bookmarkId: string]: Tag[]} = {};
+    
+    // Get all bookmark-tag relationships, filtering by bookmark IDs if provided
+    const filteredBookmarkTags = Array.from(this.bookmarkTags.values()).filter(bt => {
+      if (bookmarkIds && bookmarkIds.length > 0) {
+        return bookmarkIds.includes(bt.bookmark_id);
+      }
+      return true;
+    });
+    
+    // Group tags by bookmark ID
+    for (const bt of filteredBookmarkTags) {
+      const tag = this.tags.get(bt.tag_id);
+      if (!tag) continue;
+      
+      if (!bookmarkTagsMap[bt.bookmark_id]) {
+        bookmarkTagsMap[bt.bookmark_id] = [];
+      }
+      
+      bookmarkTagsMap[bt.bookmark_id].push(tag);
+    }
+    
+    return bookmarkTagsMap;
   }
   
   async getBookmarksByTagId(tagId: string): Promise<Bookmark[]> {
@@ -1322,6 +1350,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bookmarkTags.bookmark_id, bookmarkId));
     
     return joinResult.map(result => result.tag);
+  }
+  
+  async getAllBookmarkTags(bookmarkIds?: string[]): Promise<{[bookmarkId: string]: Tag[]}> {
+    // Create a map to store tags for each bookmark
+    const bookmarkTagsMap: {[bookmarkId: string]: Tag[]} = {};
+    
+    // Construct the query to get all bookmark-tag relationships
+    let query = db
+      .select({
+        bookmarkId: bookmarkTags.bookmark_id,
+        tag: tags
+      })
+      .from(bookmarkTags)
+      .innerJoin(tags, eq(bookmarkTags.tag_id, tags.id));
+    
+    // If specific bookmark IDs are provided, filter by those
+    if (bookmarkIds && bookmarkIds.length > 0) {
+      query = query.where(inArray(bookmarkTags.bookmark_id, bookmarkIds));
+    }
+    
+    // Execute the query
+    const results = await query;
+    
+    // Process the results into a map
+    for (const result of results) {
+      if (!bookmarkTagsMap[result.bookmarkId]) {
+        bookmarkTagsMap[result.bookmarkId] = [];
+      }
+      bookmarkTagsMap[result.bookmarkId].push(result.tag);
+    }
+    
+    return bookmarkTagsMap;
   }
   
   async getBookmarksByTagId(tagId: string): Promise<Bookmark[]> {
