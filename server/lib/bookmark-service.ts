@@ -198,9 +198,9 @@ export class BookmarkService {
       
       console.log(`Processing bookmark ${bookmarkId} for URL: ${url}`);
       
-      // Get system prompts to include in AI requests
-      const systemPrompts = await this.getSystemPrompts();
-      console.log(`Retrieved system prompts for AI processing: ${JSON.stringify(systemPrompts, null, 2)}`);
+      // Get system prompts to include in AI requests, passing bookmark details for context
+      const systemPrompts = await this.getSystemPrompts(bookmark);
+      console.log(`Retrieved system prompts for AI processing with bookmark context`);
       
       // We use the URL directly for both insights and tag generation
       // Process tasks in parallel for efficiency
