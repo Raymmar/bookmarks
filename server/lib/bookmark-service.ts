@@ -125,39 +125,64 @@ export class BookmarkService {
         this.storage.getSetting("summary_prompt")
       ]);
       
-      // Create bookmark context if bookmark details are provided
-      let bookmarkContext = "";
+      // Create structured system prompts with bookmark context if available
       if (bookmark) {
-        // Build a comprehensive context object with all available bookmark details
-        const contextObj = {
-          url: bookmark.url,
-          title: bookmark.title,
-          description: bookmark.description,
-          source: bookmark.source,
-          date_saved: bookmark.date_saved,
-          // Include twitter/X specific fields if available
-          ...(bookmark.external_id ? { external_id: bookmark.external_id } : {}),
-          ...(bookmark.author_username ? { author_username: bookmark.author_username } : {}),
-          ...(bookmark.author_name ? { author_name: bookmark.author_name } : {}),
-          ...(bookmark.like_count ? { like_count: bookmark.like_count } : {}),
-          ...(bookmark.repost_count ? { repost_count: bookmark.repost_count } : {}),
-          ...(bookmark.reply_count ? { reply_count: bookmark.reply_count } : {}),
-          ...(bookmark.quote_count ? { quote_count: bookmark.quote_count } : {})
-        };
+        // Flag to identify X tweets specifically
+        const isXTweet = bookmark.source === 'x';
         
-        // Convert to a nicely formatted string
-        bookmarkContext = "\n\nBookmark Context:\n" + 
-          Object.entries(contextObj)
-            .filter(([_, value]) => value !== undefined && value !== null)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join("\n");
-            
-        console.log(`Added bookmark context (${Object.keys(contextObj).length} fields) to system prompts`);
+        // Build template strings with the bookmark data inserted
+        const templateBase = `
+You are analyzing a bookmark from the AtmosphereAI platform.
+
+BOOKMARK DATA:
+URL: ${bookmark.url || 'N/A'}
+Title: ${bookmark.title || 'N/A'}
+Source: ${bookmark.source || 'N/A'}
+${bookmark.description ? `Description: ${bookmark.description}` : ''}
+${isXTweet ? `
+Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || 'unknown'})
+Tweet content: ${bookmark.description || 'N/A'}
+Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
+` : ''}
+
+USER INSTRUCTIONS:
+${taggingPrompt?.value || ''}
+
+Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
+`;
+
+        const summaryTemplateBase = `
+You are analyzing a bookmark from the AtmosphereAI platform.
+
+BOOKMARK DATA:
+URL: ${bookmark.url || 'N/A'}
+Title: ${bookmark.title || 'N/A'}
+Source: ${bookmark.source || 'N/A'}
+${bookmark.description ? `Description: ${bookmark.description}` : ''}
+${isXTweet ? `
+Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || 'unknown'})
+Tweet content: ${bookmark.description || 'N/A'}
+Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
+` : ''}
+
+USER INSTRUCTIONS:
+${summaryPrompt?.value || ''}
+
+Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
+`;
+
+        console.log(`Created templated system prompts with bookmark context for ${bookmark.id}`);
+        
+        return {
+          taggingPrompt: templateBase,
+          summaryPrompt: summaryTemplateBase
+        };
       }
       
+      // If no bookmark, return the original prompts
       return {
-        taggingPrompt: taggingPrompt?.value + (bookmarkContext || ""),
-        summaryPrompt: summaryPrompt?.value + (bookmarkContext || "")
+        taggingPrompt: taggingPrompt?.value,
+        summaryPrompt: summaryPrompt?.value
       };
     } catch (error) {
       console.error("Error retrieving system prompts:", error);
