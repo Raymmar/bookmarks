@@ -149,8 +149,7 @@ Format your response as valid JSON with these exact keys:
 {
   "summary": "your detailed summary",
   "sentiment": number,
-  "tags": ["array of relevant tags"],
-  "relatedLinks": ["array of related links"]
+  "tags": ["array of relevant tags"]
 }`;
     
     // Add URL and depth level context to the system prompt
@@ -266,8 +265,7 @@ Format your response as valid JSON with these exact keys:
       return {
         summary,
         sentiment,
-        tags,
-        relatedLinks
+        tags
       };
     } catch (parseError) {
       console.error("Error parsing insights result:", parseError);
@@ -275,8 +273,7 @@ Format your response as valid JSON with these exact keys:
       return {
         summary: resultText.length > 1000 ? resultText.slice(0, 1000) + "..." : resultText,
         sentiment: 5,
-        tags: [],
-        relatedLinks: []
+        tags: []
       };
     }
   } catch (error) {
@@ -284,8 +281,7 @@ Format your response as valid JSON with these exact keys:
     return {
       summary: "Failed to generate insights",
       sentiment: 5,
-      tags: [],
-      relatedLinks: []
+      tags: []
     };
   }
 }
