@@ -400,7 +400,7 @@ ${summaryPrompt?.value || ''}
               summary: insights.summary,
               sentiment: insights.sentiment,
               depth_level: insightDepth,
-              related_links: insights.relatedLinks || []
+              related_links: [] // No more related links
             });
           } else {
             console.log(`Creating new insights for bookmark ${bookmarkId}`);
@@ -409,7 +409,7 @@ ${summaryPrompt?.value || ''}
               summary: insights.summary,
               sentiment: insights.sentiment,
               depth_level: insightDepth,
-              related_links: insights.relatedLinks || []
+              related_links: [] // No more related links
             });
           }
           

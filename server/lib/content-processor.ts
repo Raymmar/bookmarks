@@ -99,7 +99,7 @@ export async function generateInsights(
   content?: string,
   depthLevel: number = 1,
   customSystemPrompt?: string
-): Promise<{ summary: string; sentiment: number; tags: string[]; relatedLinks: string[] }> {
+): Promise<{ summary: string; sentiment: number; tags: string[] }> {
   try {
     // Check if this is an X.com URL
     const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
