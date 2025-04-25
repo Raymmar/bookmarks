@@ -135,13 +135,13 @@ export async function generateInsights(
 ANALYSIS APPROACH:
 1. First, carefully examine the content to identify core concepts and themes
 2. Next, consider second-order implications and connections not explicitly stated
-3. Then, evaluate how this information relates to broader fields or domains
+3. Then, evaluate how this information relates to broader fields or domains that might not be explicitly mentioned.
 4. Finally, synthesize a comprehensive analysis that goes beyond surface-level understanding
 
 Your response MUST include:
 - A concise yet nuanced summary (250-500 words)
 - A sentiment score (0-10)
-- A comprehensive set of tags that capture both explicit and implicit topics
+- 3-5 tags that capture both explicit and implicit topics
 
 User Instructions: ${userSystemPrompt}
 
@@ -331,6 +331,12 @@ TAGGING APPROACH:
 2. Next, derive conceptual tags that represent higher-level themes 
 3. Then, determine field/domain tags that classify the content area
 4. Finally, identify technology, methodology, or specialized terminology tags
+
+TAG FORMATING:
+- Output should be a JSON array of tag strings
+- Tags should be concise, unique, and relevant
+- No multi-word tags (single word tags only)
+- Tags should be in lowercase
 
 Consider both:
 - Surface-level topics (explicitly mentioned)
