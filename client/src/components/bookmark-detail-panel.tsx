@@ -961,25 +961,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 {bookmark.insights.summary}
               </p>
               
-              {bookmark.insights.related_links && bookmark.insights.related_links.length > 0 && (
-                <div>
-                  <h5 className="text-xs font-medium text-gray-600 mb-1">Related Links</h5>
-                  <ul className="text-sm text-blue-600 space-y-1">
-                    {bookmark.insights.related_links.map((link: string, index: number) => (
-                      <li key={index}>
-                        <a 
-                          href={link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="hover:underline truncate block"
-                        >
-                          {link}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+
             </div>
           ) : (
             <div className="text-sm text-gray-500 italic">
