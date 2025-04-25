@@ -133,6 +133,10 @@ export class BookmarkService {
         // Build template strings with the bookmark data inserted
         const templateBase = `
 You are analyzing a bookmark from the AtmosphereAI platform.
+You are a powerful context assistant tasked with helping the user extract insights from bookmarks and provided context.
+Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
+Think deeply about the content in the tweet, and spend some time trying to understand the intent and purpose of the bookmark. 
+If there are issues discussed, or mentions in the content which are not detailed enough, try to search for additional details and contextualize the content in detail.
 
 BOOKMARK DATA:
 URL: ${bookmark.url || 'N/A'}
@@ -167,8 +171,6 @@ Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} 
 
 USER INSTRUCTIONS:
 ${summaryPrompt?.value || ''}
-
-Please analyze this content and follow the user's instructions while considering the bookmark context provided above.
 `;
 
         console.log(`Created templated system prompts with bookmark context for ${bookmark.id}`);
