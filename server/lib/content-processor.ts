@@ -334,9 +334,11 @@ TAGGING APPROACH:
 
 TAG FORMATING:
 - Output should be a JSON array of tag strings
-- Tags should be concise, unique, and relevant
-- No multi-word tags (single word tags only)
+- Tags must be SINGLE WORDS ONLY - no spaces allowed
+- Tags should be concise, unique, and relevant 
 - Tags should be in lowercase
+- Maximum of 5 tags allowed
+- Avoid obscure or highly technical terms
 
 Consider both:
 - Surface-level topics (explicitly mentioned)
@@ -358,20 +360,21 @@ User Instructions: ${userSystemPrompt}`;
       }
     ];
     
-    // Add content or URL as user message with NO additional instructions
+    // Add content or URL as user message with reinforcement of single-word requirement
+    let userContent = '';
+    
     if (useUrlDirectly && url) {
-      messages.push({
-        role: "user",
-        content: url
-      });
+      userContent = url;
     } else {
       // Use provided content (with length limit)
-      const contentToAnalyze = content.slice(0, 15000); // Increased limit for GPT-4o
-      messages.push({
-        role: "user",
-        content: contentToAnalyze
-      });
+      userContent = content.slice(0, 15000); // Increased limit for GPT-4o
     }
+    
+    // Add the content plus a reminder about single-word tags
+    messages.push({
+      role: "user",
+      content: `${userContent}\n\nIMPORTANT: Return ONLY single-word tags. No spaces allowed in tags.`
+    });
 
     console.log(`Sending request to OpenAI for tag generation${url ? ` for URL: ${url}` : ''}`);
 
