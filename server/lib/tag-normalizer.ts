@@ -150,8 +150,10 @@ export function deduplicateTags(tags: string[]): string[] {
     normalizedTags.push(...filteredTags);
   }
   
-  // Remove exact duplicates using a Set
-  const uniqueTags = [...new Set(normalizedTags)];
+  // Remove exact duplicates using Array.filter for uniqueness
+  const uniqueTags = normalizedTags.filter((tag, index, self) => 
+    self.indexOf(tag) === index
+  );
   
   // Handle semantic duplicates (more complex)
   const result: string[] = [];
@@ -184,13 +186,27 @@ export function deduplicateTags(tags: string[]): string[] {
  * @param rawTags Raw tags array from AI or user input
  * @returns Array of high-quality normalized tags
  */
+// Constants for tag validation
+export const MAX_TAGS_PER_BOOKMARK = 5;
+export const COMMON_TAGS = [
+  'ai', 'data', 'tech', 'business', 'startup', 'science', 'productivity', 
+  'programming', 'python', 'javascript', 'react', 'node', 'web', 'cloud', 
+  'design', 'ux', 'marketing', 'analytics', 'security', 'development',
+  'research', 'innovation', 'learning', 'education', 'finance', 'crypto',
+  'health', 'media', 'social', 'mobile', 'gaming', 'career', 'leadership'
+];
+
+/**
+ * Process, normalize, and limit AI-generated tags
+ * Enforces single-word tags and limits quantity
+ */
 export function processAITags(rawTags: string[]): string[] {
   if (!rawTags || !Array.isArray(rawTags)) return [];
   
   console.log("Tag normalization started with raw tags:", rawTags);
   
   // Filter out obviously invalid tags
-  const filteredTags = rawTags.filter(tag => {
+  let filteredTags = rawTags.filter(tag => {
     if (!tag || typeof tag !== 'string') return false;
     if (tag.trim().length < 2) return false; // Too short to be meaningful
     if (tag.trim().length > 50) return false; // Too long to be a reasonable tag
@@ -198,10 +214,54 @@ export function processAITags(rawTags: string[]): string[] {
     return true;
   });
   
-  console.log("After initial filtering:", filteredTags);
+  // Split multi-word tags into separate single-word tags
+  const singleWordTags: string[] = [];
+  filteredTags.forEach(tag => {
+    const normalized = normalizeTag(tag);
+    // If it contains spaces, split it
+    if (normalized.includes(' ')) {
+      const words = normalized.split(' ');
+      // Only add words that are meaningful (longer than 2 chars)
+      words.forEach(word => {
+        if (word.length >= 3) {
+          singleWordTags.push(word);
+        }
+      });
+    } else {
+      singleWordTags.push(normalized);
+    }
+  });
+  
+  // Add the single-word tags to our filtered list
+  filteredTags = filteredTags.concat(singleWordTags);
+  
+  // Normalize all tags
+  filteredTags = filteredTags.map(tag => normalizeTag(tag));
+  
+  // Remove tags with spaces (multi-word tags)
+  filteredTags = filteredTags.filter(tag => !tag.includes(' '));
+  
+  console.log("After splitting to single words:", filteredTags);
+  
+  // Prioritize common tags over obscure ones
+  const prioritizedTags = filteredTags.sort((a, b) => {
+    const aIsCommon = COMMON_TAGS.includes(a);
+    const bIsCommon = COMMON_TAGS.includes(b);
+    
+    if (aIsCommon && !bIsCommon) return -1;
+    if (!aIsCommon && bIsCommon) return 1;
+    
+    // For non-common tags, prefer shorter ones
+    return a.length - b.length;
+  });
   
   // Normalize and deduplicate
-  const result = deduplicateTags(filteredTags);
+  let result = deduplicateTags(prioritizedTags);
+  
+  // Limit to max number of tags
+  if (result.length > MAX_TAGS_PER_BOOKMARK) {
+    result = result.slice(0, MAX_TAGS_PER_BOOKMARK);
+  }
   
   console.log("After normalization and deduplication:", result);
   
@@ -212,19 +272,23 @@ export function processAITags(rawTags: string[]): string[] {
  * Enhanced system prompt for AI tag generation to improve consistency
  */
 export const TAG_SYSTEM_PROMPT = `You are an AI assistant that extracts relevant tags from content. 
-Generate 3-7 tags that accurately represent the main topics and themes of the given content.
+Generate 3-5 SINGLE WORD tags that accurately represent the main topics and themes of the content.
 
 IMPORTANT RULES FOR TAG GENERATION:
-1. Tags should be lowercase
-2. Use single words or short 2-3 word phrases 
-3. Avoid redundant tags (e.g. don't include both "javascript" and "js")
-4. Don't use special characters or punctuation
-5. Prefer established category names over unusual terms
-6. If multiple similar concepts exist, choose the most common term
+1. ONLY use single word tags - no phrases, no compound words with spaces
+2. Tags should be lowercase
+3. Avoid obscure or highly specific tags
+4. No special characters or punctuation
+5. Prefer common, recognizable category names 
+6. Choose familiar terms over specialized jargon
+7. When multiple related concepts exist, pick the most general one
 
 You must respond with a JSON object in the following format:
 {
-  "tags": ["tag1", "tag2", "tag3"]
+  "tags": ["word1", "word2", "word3", "word4", "word5"]
 }
 
-The tags should capture the main topics in the content while following the rules above.`;
+Examples of good tags: "tech", "ai", "productivity", "design", "science", "marketing"
+Examples of BAD tags: "artificial intelligence" (use "ai" instead), "web development" (use "web" instead)
+
+The tags should capture the main topics while strictly following the single-word requirement.`;
