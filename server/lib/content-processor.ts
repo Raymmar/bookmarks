@@ -110,8 +110,8 @@ export async function generateInsights(
     
     console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
     
-    // Basic system prompt to set context for the AI
-    const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
+    // Enhanced system prompt to set context for the AI and guide deeper analysis
+    const baseSystemPrompt = "You are an expert research assistant analyzing content for the Atmosphere AI platform. Your task is to provide deep, nuanced analysis that goes beyond surface-level understanding.";
     
     // Get custom system prompt
     let userSystemPrompt;
@@ -129,8 +129,29 @@ export async function generateInsights(
       console.log("Retrieved custom summary prompt from storage for insights generation");
     }
     
-    // Combine base prompt with user prompt
-    let systemPrompt = `${baseSystemPrompt}\n\nUser Instructions: ${userSystemPrompt}`;
+    // Construct a multi-stage analysis system prompt but maintain expected output format
+    let systemPrompt = `${baseSystemPrompt}
+
+ANALYSIS APPROACH:
+1. First, carefully examine the content to identify core concepts and themes
+2. Next, consider second-order implications and connections not explicitly stated
+3. Then, evaluate how this information relates to broader fields or domains
+4. Finally, synthesize a comprehensive analysis that goes beyond surface-level understanding
+
+Your response MUST include:
+- A concise yet nuanced summary (250-500 words)
+- A sentiment score (0-10)
+- A comprehensive set of tags that capture both explicit and implicit topics
+
+User Instructions: ${userSystemPrompt}
+
+Format your response as valid JSON with these exact keys:
+{
+  "summary": "your detailed summary",
+  "sentiment": number,
+  "tags": ["array of relevant tags"],
+  "relatedLinks": ["array of related links"]
+}`;
     
     // Add URL and depth level context to the system prompt
     if (url) {
