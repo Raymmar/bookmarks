@@ -189,7 +189,9 @@ Format your response as valid JSON with these exact keys:
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: messages,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      temperature: 0.2,  // Lower temperature for more detailed, focused analysis
+      max_tokens: 2500   // Increase token limit for more detailed responses
     });
 
     const resultText = response.choices[0].message.content || "{}";
@@ -302,8 +304,8 @@ export async function generateTags(content: string, url?: string, customSystemPr
     
     console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
     
-    // Basic system prompt to set context for the AI
-    const baseSystemPrompt = "You will receive a URL along with details about a user submitted bookmark. Follow the user's instructions precisely and format your response as JSON to be properly parsed as a reply.";
+    // Enhanced system prompt to set context for the AI and guide deeper tag analysis
+    const baseSystemPrompt = "You are an expert research assistant identifying tags for content in the Atmosphere AI platform. Your task is to provide deep, comprehensive tagging that captures both explicit and implicit topics.";
     
     // Get custom system prompt
     let userSystemPrompt;
@@ -321,8 +323,21 @@ export async function generateTags(content: string, url?: string, customSystemPr
       console.log("Retrieved custom tagging prompt from storage");
     }
     
-    // Combine base prompt with user prompt
-    let systemPrompt = `${baseSystemPrompt}\n\nUser Instructions: ${userSystemPrompt}`;
+    // Combine base prompt with user prompt with enhanced tagging approach
+    let systemPrompt = `${baseSystemPrompt}
+
+TAGGING APPROACH:
+1. First, identify explicit main topics directly mentioned in the content
+2. Next, derive conceptual tags that represent higher-level themes 
+3. Then, determine field/domain tags that classify the content area
+4. Finally, identify technology, methodology, or specialized terminology tags
+
+Consider both:
+- Surface-level topics (explicitly mentioned)
+- Deep conceptual connections (implicitly related)
+- Industry-specific categorization 
+
+User Instructions: ${userSystemPrompt}`;
     
     // Add URL context to the system prompt if available
     if (url) {
@@ -357,7 +372,9 @@ export async function generateTags(content: string, url?: string, customSystemPr
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: messages,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      temperature: 0.2,  // Lower temperature for more consistent, focused tag generation
+      max_tokens: 1500   // Increase token limit for more comprehensive tagging
     });
 
     const resultText = response.choices[0].message.content || "{}";
@@ -411,8 +428,8 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
   try {
     const contentToSummarize = content.slice(0, 8000); // Limit content to avoid token limits
     
-    // Basic system prompt to set context for the AI
-    const baseSystemPrompt = "You will receive content from a user submitted bookmark. Follow the user's instructions precisely.";
+    // Enhanced system prompt to set context for the AI
+    const baseSystemPrompt = "You are an expert research assistant creating summaries for the Atmosphere AI platform. Your task is to provide concise yet nuanced summaries that capture both explicit content and implicit significance.";
     
     // Get custom system prompt
     let userSystemPrompt;
@@ -431,7 +448,20 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
     }
     
     // Combine base prompt with user prompt
-    const systemPrompt = `${baseSystemPrompt}\n\nUser Instructions: ${userSystemPrompt}`;
+    const systemPrompt = `${baseSystemPrompt}
+
+SUMMARIZATION APPROACH:
+1. First, identify the core message and main points of the content
+2. Next, extract key supporting details and evidence
+3. Then, identify any implicit significance, implications, or context
+4. Finally, create a concise summary that balances coverage with brevity
+
+Your summary should:
+- Capture both explicit information and implicit significance
+- Maintain the original author's perspective while highlighting key insights
+- Prioritize accuracy and avoid introducing information not in the original
+
+User Instructions: ${userSystemPrompt}`;
 
     const response = await openai.chat.completions.create({
       model: MODEL,
@@ -445,7 +475,9 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
           content: contentToSummarize
         }
       ],
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      temperature: 0.2,  // Lower temperature for more focused, detailed analysis
+      max_tokens: 2000   // Increase token limit for more comprehensive summaries
     });
 
     return response.choices[0].message.content || "No summary generated";
@@ -627,24 +659,34 @@ export async function generateChatResponse(
       }
     }
     
-    // Send query to OpenAI
+    // Send query to OpenAI with enhanced system prompt
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: [
         {
           role: "system",
-          content: `You are an AI assistant that helps users explore and understand their bookmarked content. 
-          You have access to the following bookmarks (with their summaries and highlights).
-          ${filterInfo ? `The user has applied the following filters to narrow down the bookmarks: \n${filterInfo}` : ''}
-          Answer the user's question based on this information. If asked about filters or tags, mention the filters that have been applied.
+          content: `You are an expert research assistant that helps users explore and understand their bookmarked content with deep, insightful analysis.
+
+ANALYSIS APPROACH:
+1. First, examine the content carefully to identify main points and themes
+2. Next, consider connections between different bookmarks and sources
+3. Then, evaluate how the information relates to the user's specific query
+4. Finally, synthesize a comprehensive response that provides value beyond surface-level information
+
+You have access to the following bookmarks (with their summaries, highlights, and tags):
+${filterInfo ? `The user has applied the following filters to narrow down the bookmarks: \n${filterInfo}` : ''}
+
+Answer the user's question based on this information, providing thoughtful analysis that draws connections, identifies patterns, and extracts deeper insights. If asked about filters or tags, mention the filters that have been applied.
           
-          ${context}`
+${context}`
         },
         {
           role: "user",
           content: query
         }
-      ]
+      ],
+      temperature: 0.3,  // Lower temperature for more focused, detailed analysis
+      max_tokens: 1500   // Increase token limit for more comprehensive responses
     });
     
     return response.choices[0].message.content || "I couldn't generate a response. Please try a different question.";
