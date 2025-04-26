@@ -347,9 +347,6 @@ export async function generateTags(content: string, url?: string, customSystemPr
     
     console.log(`Generating tags using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
     
-    // Enhanced system prompt to set context for the AI and guide deeper tag analysis
-    const baseSystemPrompt = "You are an expert research assistant identifying tags for content in the Atmosphere AI platform. Your task is to provide deep, comprehensive tagging that captures both explicit and implicit topics.";
-    
     // Get custom system prompt
     let userSystemPrompt;
     
