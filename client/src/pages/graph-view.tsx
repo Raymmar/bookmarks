@@ -1173,7 +1173,7 @@ export default function GraphView() {
       </div>
       
       {/* Right Sidebar Panel - Now always show it on larger screens */}
-      <div className="hidden lg:block w-80 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
+      <div className="hidden lg:block w-120 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
         <SidebarPanel
           bookmarks={sortedBookmarks}
           selectedBookmark={selectedBookmark}

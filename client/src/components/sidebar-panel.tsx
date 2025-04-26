@@ -28,38 +28,33 @@ interface BookmarkCardProps {
 }
 
 function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
-  const [tags, setTags] = useState<Tag[]>([]);
-  
-  // Fetch tags for this bookmark
-  useEffect(() => {
-    const fetchTags = async () => {
-      try {
-        const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
-        if (response.ok) {
-          const bookmarkTags = await response.json();
-          setTags(bookmarkTags);
-        }
-      } catch (error) {
-        console.error("Error fetching tags for bookmark:", error);
-      }
-    };
+  // Function to fix X.com image URLs
+  const fixTwitterImageUrl = (url: string): string => {
+    // If it's already a pbs.twimg.com URL, return it as is
+    if (url.includes('pbs.twimg.com')) {
+      return url;
+    }
     
-    fetchTags();
-  }, [bookmark.id]);
-  
-  // Prepare tag names for display
-  const tagNames = tags.map(tag => tag.name);
-  // Get system tags if they exist in the tags array
-  const systemTags = tags.filter(tag => tag.type === 'system').map(tag => tag.name);
-  const allTags = [...tagNames]; // Use only the tags from the API
+    // Try to extract the image ID from the URL
+    const twitterImgRegex = /https?:\/\/(pbs\.)?twimg\.com\/media\/([A-Za-z0-9_-]+)\.\w+(\?.+)?/;
+    const match = url.match(twitterImgRegex);
+    
+    if (match && match[2]) {
+      // Rebuild the URL to use pbs.twimg.com with format=jpg to ensure compatibility
+      return `https://pbs.twimg.com/media/${match[2]}?format=jpg&name=large`;
+    }
+    
+    // Return the original URL if we couldn't transform it
+    return url;
+  };
   
   // Check if the bookmark has media (from X.com, screenshots, etc.)
   const hasMedia = (bookmark.media_urls && bookmark.media_urls.length > 0) || (bookmark.screenshots && bookmark.screenshots.length > 0);
   
-  // Function to get the first available media URL
+  // Function to get the first available media URL with proper formatting
   const getMediaUrl = () => {
     if (bookmark.media_urls && bookmark.media_urls.length > 0) {
-      return bookmark.media_urls[0];
+      return fixTwitterImageUrl(bookmark.media_urls[0]);
     }
     if (bookmark.screenshots && bookmark.screenshots.length > 0) {
       return bookmark.screenshots[0].image_url;
@@ -71,7 +66,7 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   
   return (
     <div 
-      className={`rounded-lg border cursor-pointer transition-all duration-300 ease-in-out overflow-hidden flex flex-col shadow-sm hover:shadow-md ${
+      className={`rounded-lg border cursor-pointer transition-all duration-300 ease-in-out overflow-hidden shadow-sm hover:shadow-md ${
         isSelected
           ? "bg-primary-50 border-primary" 
           : "bg-white border-gray-200 hover:border-gray-300"
@@ -80,11 +75,12 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
     >
       {/* Media section (if available) */}
       {mediaUrl && (
-        <div className="relative aspect-video w-full overflow-hidden">
+        <div className="w-full overflow-hidden">
           <img 
             src={mediaUrl} 
-            alt="Bookmark media"
-            className="object-cover w-full h-full"
+            alt=""
+            className="w-full object-cover"
+            loading="lazy"
             onError={(e) => {
               // Hide the image if it fails to load
               (e.target as HTMLImageElement).style.display = 'none';
@@ -93,28 +89,9 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
         </div>
       )}
       
-      {/* Content section */}
-      <div className="p-3 flex-1 flex flex-col">
-        <h3 className="font-medium mb-1 line-clamp-2">{bookmark.title}</h3>
-        <p className="text-xs text-gray-500 truncate mb-2">{bookmark.url}</p>
-        
-        {/* Show up to 3 tags if available */}
-        {allTags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-auto">
-            {allTags.slice(0, 3).map((tag, idx) => (
-              <Badge 
-                key={`card-tag-${idx}`} 
-                variant="secondary" 
-                className="text-xs px-1.5 py-0.5"
-              >
-                {tag}
-              </Badge>
-            ))}
-            {allTags.length > 3 && (
-              <span className="text-xs text-gray-400">+{allTags.length - 3}</span>
-            )}
-          </div>
-        )}
+      {/* Content section - minimized for grid view */}
+      <div className="p-2">
+        <h3 className="text-sm font-medium line-clamp-1">{bookmark.title}</h3>
       </div>
     </div>
   );
@@ -220,7 +197,7 @@ export function SidebarPanel({
             No bookmarks found. Try adjusting your filters.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 auto-rows-auto transition-all masonry-grid">
+          <div className="masonry-grid">
             {bookmarks.map((bookmark) => {
               // Type assertion to ensure TypeScript recognizes bookmark properties
               const typedBookmark = bookmark as unknown as {
@@ -229,21 +206,8 @@ export function SidebarPanel({
                 screenshots?: Array<{image_url: string}>;
               };
               
-              // Determine if the bookmark has media for potential larger span
-              const hasMedia = (typedBookmark.media_urls && typedBookmark.media_urls.length > 0) || 
-                              (typedBookmark.screenshots && typedBookmark.screenshots.length > 0);
-              
-              // Some bookmarks with media could span both columns for visual variety
-              // Use a deterministic approach based on bookmark ID to maintain consistency
-              const firstChar = typedBookmark.id.charAt(0);
-              const charCode = firstChar.charCodeAt(0);
-              const shouldSpanWide = hasMedia && charCode % 5 === 0;
-              
               return (
-                <div 
-                  key={typedBookmark.id} 
-                  className={`transition-all duration-300 ease-in-out ${shouldSpanWide ? 'col-span-2' : ''}`}
-                >
+                <div key={typedBookmark.id}>
                   <BookmarkCard
                     bookmark={bookmark}
                     isSelected={selectedBookmark ? 
