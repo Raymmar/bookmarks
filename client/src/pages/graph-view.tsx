@@ -1030,7 +1030,14 @@ export default function GraphView() {
                 minSize={layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 60 : 20}
                 className="h-full"
               >
-                <div className={`flex h-full w-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'min-w-[720px]' : ''}`}>
+                <div className={`flex h-full w-full ${
+                  // Only apply min-width when detail panel is newly opened, not when user manually adjusts
+                  layoutPreferences.preferences.showDetailPanel && 
+                  getSelectedBookmark() && 
+                  !layoutPreferences.preferences.userSetGridWidth 
+                  ? 'min-w-[720px]' 
+                  : ''
+                }`}>
                   {/* Detail panel (conditionally shown on left side) */}
                   {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
                     <div className="w-1/2 min-w-[360px] border-r border-gray-200 bg-white overflow-auto">
