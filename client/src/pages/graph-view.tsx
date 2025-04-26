@@ -892,50 +892,57 @@ export default function GraphView() {
         </div>
         
         {/* Filters display at the bottom of the graph area */}
-        <div className="flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
-          {/* Toggle button integrated with the header when drawer is open, positioned absolutely when closed */}
-          {!tagDrawerOpen && (
-            <button
-              onClick={toggleTagDrawer}
-              aria-label="Open tag drawer"
-              className="absolute right-0 top-0 bottom-0 bg-transparent p-1 flex items-center justify-center hover:bg-gray-200 z-10"
-            >
+        <div className="relative flex flex-col w-full bg-white border-t border-gray-200 px-4 py-2">
+          {/* Absolute positioned toggle button - always visible and positioned relative to parent with padding */}
+          <button
+            onClick={toggleTagDrawer}
+            aria-label={tagDrawerOpen ? "Close tag drawer" : "Open tag drawer"}
+            className={`absolute right-0 ${
+              tagDrawerOpen 
+                ? 'top-2 bg-gray-100 p-1 flex items-center justify-center z-20' 
+                : 'top-0 bottom-0 bg-transparent p-1 flex items-center justify-center'
+            } hover:bg-gray-200 z-10`}
+          >
             {(() => {
-              // All available tags excluding those that are selected
-              const availableTags = allTags.filter(tag => !selectedTags.includes(tag));
-              
-              // Calculate how many tags are visible in the single row
-              const visibleTagLimit = visibleTagsCount;
-              
-              // Get the exact tags that are visible in the single row (non-selected popular tags)
-              const visibleNonSelectedTags = popularTags
-                .filter(tag => !selectedTags.includes(tag))
-                .slice(0, visibleTagLimit);
-              
-              // Get the exact tag names that are visible
-              const visibleTagNames = visibleNonSelectedTags.map(tag => tag);
-              
-              // Calculate how many unique tags are actually hidden by counting tags that:
-              // 1. Are not selected (already filtered in availableTags)
-              // 2. Are not visible in the single row
-              const hiddenTagsCount = availableTags
-                .filter(tag => !visibleTagNames.includes(tag))
-                .length;
-              
-              if (hiddenTagsCount > 0) {
-                return (
-                  <div className="flex items-center">
-                    <span className="text-xs mr-1 font-medium">+{hiddenTagsCount}</span>
-                    <ChevronUp className="h-4 w-4 text-gray-700" />
-                  </div>
-                );
+              // Calculate hidden tags count if drawer is closed
+              if (!tagDrawerOpen) {
+                // All available tags excluding those that are selected
+                const availableTags = allTags.filter(tag => !selectedTags.includes(tag));
+                
+                // Calculate how many tags are visible in the single row
+                const visibleTagLimit = visibleTagsCount;
+                
+                // Get the exact tags that are visible in the single row (non-selected popular tags)
+                const visibleNonSelectedTags = popularTags
+                  .filter(tag => !selectedTags.includes(tag))
+                  .slice(0, visibleTagLimit);
+                
+                // Get the exact tag names that are visible
+                const visibleTagNames = visibleNonSelectedTags.map(tag => tag);
+                
+                // Calculate how many unique tags are actually hidden by counting tags that:
+                // 1. Are not selected (already filtered in availableTags)
+                // 2. Are not visible in the single row
+                const hiddenTagsCount = availableTags
+                  .filter(tag => !visibleTagNames.includes(tag))
+                  .length;
+                
+                if (hiddenTagsCount > 0) {
+                  return (
+                    <div className="flex items-center">
+                      <span className="text-xs mr-1 font-medium">+{hiddenTagsCount}</span>
+                      <ChevronUp className="h-4 w-4 text-gray-700" />
+                    </div>
+                  );
+                }
               }
               
-              // Default icon for closed drawer
-              return <ChevronUp className="h-4 w-4 text-gray-700" />;
+              // Default icons based on drawer state
+              return tagDrawerOpen ? 
+                <ChevronDown className="h-4 w-4 text-gray-700" /> : 
+                <ChevronUp className="h-4 w-4 text-gray-700" />;
             })()}
-            </button>
-          )}
+          </button>
           
           {/* Bookmark filter indicator if a bookmark is selected */}
           {selectedBookmarkId && (
@@ -1049,7 +1056,7 @@ export default function GraphView() {
           >
             {/* Header with system tags toggle when drawer is open */}
             {tagDrawerOpen && (
-              <div className="w-full flex justify-between items-center mb-2 sticky top-0 z-10 bg-white py-2 border-b border-gray-200 px-1">
+              <div className="w-full flex justify-between items-center mb-2 sticky top-0 z-10 bg-white py-2 border-b border-gray-200 pr-6">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-700">Tags</span>
                   <Badge variant="outline" className="text-xs bg-gray-50">
@@ -1061,7 +1068,7 @@ export default function GraphView() {
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1 text-xs">
                     <span className="text-gray-500">System tags</span>
                     <button 
@@ -1081,21 +1088,12 @@ export default function GraphView() {
                   {selectedTags.length > 0 && (
                     <Badge 
                       variant="secondary"
-                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center ml-2"
                       onClick={() => setSelectedTags([])}
                     >
                       Clear All <X className="h-3 w-3 ml-1" />
                     </Badge>
                   )}
-                  
-                  {/* Close button integrated in the header */}
-                  <button
-                    onClick={toggleTagDrawer}
-                    aria-label="Close tag drawer"
-                    className="flex items-center justify-center p-1 bg-gray-100 hover:bg-gray-200 rounded"
-                  >
-                    <ChevronDown className="h-4 w-4 text-gray-700" />
-                  </button>
                 </div>
               </div>
             )}
