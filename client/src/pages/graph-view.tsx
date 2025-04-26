@@ -971,10 +971,10 @@ export default function GraphView() {
               {/* Grid panel */}
               <ResizablePanel 
                 defaultSize={layoutPreferences.preferences.gridWidth} 
-                minSize={20}
+                minSize={layoutPreferences.preferences.showDetailPanel ? 40 : 20}
                 className="h-full"
               >
-                <div className="flex h-full">
+                <div className="flex h-full w-full">
                   {/* Bookmark grid with adjustable columns */}
                   <div className={`h-full ${layoutPreferences.preferences.showDetailPanel ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
                     <BookmarkGrid
