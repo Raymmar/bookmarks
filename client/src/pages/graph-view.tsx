@@ -976,11 +976,7 @@ export default function GraphView() {
               >
                 <div className="flex h-full">
                   {/* Bookmark grid with adjustable columns */}
-                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel ? 'w-1/2' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
-                    <div className="h-14 border-b border-gray-200 px-3 flex items-center justify-between">
-                      <h2 className="text-lg font-semibold">Bookmarks</h2>
-                    </div>
-                    
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
                     <BookmarkGrid
                       bookmarks={sortedBookmarks}
                       selectedBookmarkId={selectedBookmarkId}
@@ -991,7 +987,7 @@ export default function GraphView() {
                   
                   {/* Detail panel (conditionally shown) */}
                   {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
-                    <div className="w-1/2 border-l border-gray-200 bg-white overflow-auto">
+                    <div className="w-1/2 min-w-[400px] border-l border-gray-200 bg-white overflow-auto">
                       <BookmarkDetailPanel
                         bookmark={getSelectedBookmark()}
                         onClose={() => {
