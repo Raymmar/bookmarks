@@ -747,14 +747,18 @@ export default function GraphView() {
           return {
             gridWidth: 40, // 40% for grid, 60% for graph by default
             showDetailPanel: false, // Hidden by default
-            userSetGridWidth: null, // Track user's manual width adjustments
+            gridWidthWithDetail: 60, // Width to use when detail is open
+            gridWidthWithoutDetail: 40, // Width to use when detail is closed
+            lastSetWidth: null, // Track the last width manually set by user
           };
         }
       }
       return {
         gridWidth: 40,
         showDetailPanel: false,
-        userSetGridWidth: null, // Track user's manual width adjustments
+        gridWidthWithDetail: 60, // Width to use when detail is open
+        gridWidthWithoutDetail: 40, // Width to use when detail is closed  
+        lastSetWidth: null, // Track the last width manually set by user
       };
     });
 
@@ -765,11 +769,18 @@ export default function GraphView() {
 
     // Update grid width
     const setGridWidth = (width: number) => {
-      setPreferences((prev: any) => ({
-        ...prev,
-        gridWidth: Math.max(20, Math.min(80, width)), // Restrict between 20% and 80%
-        userSetGridWidth: Math.max(20, Math.min(80, width)), // Also store as user's manual width
-      }));
+      setPreferences((prev: any) => {
+        const boundedWidth = Math.max(20, Math.min(80, width)); // Restrict between 20% and 80%
+        return {
+          ...prev,
+          gridWidth: boundedWidth,
+          lastSetWidth: boundedWidth, // Remember the last width user manually set
+          // Update the appropriate state memory depending on whether detail panel is open
+          ...(prev.showDetailPanel 
+              ? { gridWidthWithDetail: boundedWidth } 
+              : { gridWidthWithoutDetail: boundedWidth })
+        };
+      });
     };
 
     // Toggle detail panel
@@ -777,20 +788,25 @@ export default function GraphView() {
       setPreferences((prev: any) => {
         const newShowDetailPanel = show !== undefined ? show : !prev.showDetailPanel;
         
-        // If we're showing the detail panel and there's a stored user width, use it
-        if (newShowDetailPanel && prev.userSetGridWidth) {
+        if (newShowDetailPanel) {
+          // If we're opening the detail panel
+          // Use the stored width for detail view, or fallback to last manually set width
+          const preferredDetailWidth = prev.gridWidthWithDetail || prev.lastSetWidth || 60;
           return {
             ...prev,
-            showDetailPanel: newShowDetailPanel,
-            // Use the user's manually set width when re-opening
-            gridWidth: prev.userSetGridWidth
+            showDetailPanel: true,
+            gridWidth: preferredDetailWidth
+          };
+        } else {
+          // If we're closing the detail panel
+          // Use the stored width for non-detail view, or fallback to last manually set width
+          const preferredNormalWidth = prev.gridWidthWithoutDetail || prev.lastSetWidth || 40;
+          return {
+            ...prev,
+            showDetailPanel: false,
+            gridWidth: preferredNormalWidth
           };
         }
-        
-        return {
-          ...prev,
-          showDetailPanel: newShowDetailPanel,
-        };
       });
     };
 
@@ -1031,10 +1047,12 @@ export default function GraphView() {
                 className="h-full"
               >
                 <div className={`flex h-full w-full ${
-                  // Only apply min-width when detail panel is newly opened, not when user manually adjusts
+                  // Only apply min-width when detail panel is newly opened and we don't have a user preference
                   layoutPreferences.preferences.showDetailPanel && 
                   getSelectedBookmark() && 
-                  !layoutPreferences.preferences.userSetGridWidth 
+                  // If we don't have a lastSetWidth or specifically set gridWidthWithDetail, use 720px min-width
+                  !layoutPreferences.preferences.lastSetWidth && 
+                  !layoutPreferences.preferences.gridWidthWithDetail
                   ? 'min-w-[720px]' 
                   : ''
                 }`}>
