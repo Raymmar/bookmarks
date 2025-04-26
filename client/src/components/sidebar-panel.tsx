@@ -49,8 +49,9 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   
   // Prepare tag names for display
   const tagNames = tags.map(tag => tag.name);
-  const systemTags = bookmark.system_tags || [];
-  const allTags = [...tagNames, ...systemTags];
+  // Get system tags if they exist in the tags array
+  const systemTags = tags.filter(tag => tag.type === 'system').map(tag => tag.name);
+  const allTags = [...tagNames]; // Use only the tags from the API
   
   // Check if the bookmark has media (from X.com, screenshots, etc.)
   const hasMedia = (bookmark.media_urls && bookmark.media_urls.length > 0) || (bookmark.screenshots && bookmark.screenshots.length > 0);
@@ -219,16 +220,38 @@ export function SidebarPanel({
             No bookmarks found. Try adjusting your filters.
           </div>
         ) : (
-          <div className="flex flex-col space-y-3 transition-all">
-            {bookmarks.map(bookmark => (
-              <div key={bookmark.id} className="transition-all duration-300 ease-in-out">
-                <BookmarkCard
-                  bookmark={bookmark}
-                  isSelected={selectedBookmark ? selectedBookmark.id === bookmark.id : false}
-                  onClick={() => onSelectBookmark(bookmark.id)}
-                />
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-3 auto-rows-auto transition-all">
+            {bookmarks.map((bookmark) => {
+              // Type assertion to ensure TypeScript recognizes bookmark properties
+              const typedBookmark = bookmark as unknown as {
+                id: string;
+                media_urls?: string[];
+                screenshots?: Array<{image_url: string}>;
+              };
+              
+              // Determine if the bookmark has media for potential larger span
+              const hasMedia = (typedBookmark.media_urls && typedBookmark.media_urls.length > 0) || 
+                              (typedBookmark.screenshots && typedBookmark.screenshots.length > 0);
+              
+              // Some bookmarks with media could span both columns for visual variety
+              // Use a deterministic approach based on bookmark ID to maintain consistency
+              const firstChar = typedBookmark.id.charAt(0);
+              const charCode = firstChar.charCodeAt(0);
+              const shouldSpanWide = hasMedia && charCode % 5 === 0;
+              
+              return (
+                <div 
+                  key={typedBookmark.id} 
+                  className={`transition-all duration-300 ease-in-out ${shouldSpanWide ? 'col-span-2' : ''}`}
+                >
+                  <BookmarkCard
+                    bookmark={bookmark}
+                    isSelected={selectedBookmark ? selectedBookmark.id === typedBookmark.id : false}
+                    onClick={() => onSelectBookmark(typedBookmark.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
