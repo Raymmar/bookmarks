@@ -747,12 +747,14 @@ export default function GraphView() {
           return {
             gridWidth: 40, // 40% for grid, 60% for graph by default
             showDetailPanel: false, // Hidden by default
+            userSetGridWidth: null, // Track user's manual width adjustments
           };
         }
       }
       return {
         gridWidth: 40,
         showDetailPanel: false,
+        userSetGridWidth: null, // Track user's manual width adjustments
       };
     });
 
@@ -766,15 +768,30 @@ export default function GraphView() {
       setPreferences((prev: any) => ({
         ...prev,
         gridWidth: Math.max(20, Math.min(80, width)), // Restrict between 20% and 80%
+        userSetGridWidth: Math.max(20, Math.min(80, width)), // Also store as user's manual width
       }));
     };
 
     // Toggle detail panel
     const toggleDetailPanel = (show?: boolean) => {
-      setPreferences((prev: any) => ({
-        ...prev,
-        showDetailPanel: show !== undefined ? show : !prev.showDetailPanel,
-      }));
+      setPreferences((prev: any) => {
+        const newShowDetailPanel = show !== undefined ? show : !prev.showDetailPanel;
+        
+        // If we're showing the detail panel and there's a stored user width, use it
+        if (newShowDetailPanel && prev.userSetGridWidth) {
+          return {
+            ...prev,
+            showDetailPanel: newShowDetailPanel,
+            // Use the user's manually set width when re-opening
+            gridWidth: prev.userSetGridWidth
+          };
+        }
+        
+        return {
+          ...prev,
+          showDetailPanel: newShowDetailPanel,
+        };
+      });
     };
 
     return {
