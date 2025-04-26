@@ -99,7 +99,8 @@ export async function generateInsights(
   url: string,
   content?: string,
   depthLevel: number = 1,
-  customSystemPrompt?: string
+  customSystemPrompt?: string,
+  mediaUrls?: string[]
 ): Promise<{ summary: string; sentiment: number; tags: string[] }> {
   try {
     // Check if this is an X.com URL
@@ -109,7 +110,15 @@ export async function generateInsights(
     // For other URLs, use URL-direct analysis if content is not available
     const useUrlDirectly = !isXTweet && url && (!content || content.length < 100);
     
-    console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}`);
+    // Check for X.com media URLs - these will be included in the prompt
+    const hasMediaUrls = Boolean(
+      mediaUrls && 
+      Array.isArray(mediaUrls) && 
+      mediaUrls.length > 0 && 
+      mediaUrls.some(url => typeof url === 'string' && url.includes('pbs.twimg.com'))
+    );
+    
+    console.log(`Generating insights using ${useUrlDirectly ? 'URL-based' : 'content-based'} analysis${isXTweet ? ' (X tweet)' : ''}${hasMediaUrls ? ' with media' : ''}`);
     
     // Enhanced system prompt to set context for the AI and guide deeper analysis
     const baseSystemPrompt = "You are an expert research assistant analyzing content for the Atmosphere AI platform. Your task is to provide deep, nuanced analysis that goes beyond surface-level understanding.";
@@ -160,6 +169,11 @@ Format your response as valid JSON with these exact keys:
     if (depthLevel > 1) {
       systemPrompt += `\n\nAnalyze at depth level: ${depthLevel} (1-4 scale)`;
     }
+    
+    // Add instructions for X.com tweets with media
+    if (isXTweet && hasMediaUrls) {
+      systemPrompt += `\n\nThis content contains media (images) from X.com. Please analyze both the text content and the images to provide a comprehensive understanding. Describe the significance of the images and how they relate to the text content in your summary.`;
+    }
 
     // Prepare messages for the API call
     const messages: ChatCompletionMessageParam[] = [
@@ -169,19 +183,66 @@ Format your response as valid JSON with these exact keys:
       }
     ];
     
-    // Add content or URL as user message with NO additional instructions
-    if (useUrlDirectly) {
-      messages.push({
-        role: "user",
-        content: url
-      });
+    // For X.com tweets with media images, use the multi-modal capabilities of GPT-4o
+    if (isXTweet && hasMediaUrls && mediaUrls) {
+      // Filter to only include Twitter image URLs
+      const twitterImageUrls = mediaUrls.filter(url => 
+        typeof url === 'string' && url.includes('pbs.twimg.com')
+      );
+      
+      if (twitterImageUrls.length > 0) {
+        console.log(`Including ${twitterImageUrls.length} image URLs in the analysis request`);
+        
+        // Create a multimodal content array that includes both text and images
+        const multiModalContent: Array<{
+          type: "text" | "image_url";
+          text?: string;
+          image_url?: { url: string };
+        }> = [
+          {
+            type: "text",
+            text: content || url || "Please analyze the attached images and provide insights."
+          }
+        ];
+        
+        // Add each image URL to the content
+        twitterImageUrls.forEach(imageUrl => {
+          multiModalContent.push({
+            type: "image_url",
+            image_url: {
+              url: imageUrl
+            }
+          });
+        });
+        
+        // Add the multimodal content to the messages
+        messages.push({
+          role: "user",
+          content: multiModalContent
+        });
+      } else {
+        // Fallback to text-only if somehow filtering removed all URLs
+        const contentToAnalyze = content ? content.slice(0, 15000) : "";
+        messages.push({
+          role: "user",
+          content: contentToAnalyze || url
+        });
+      }
     } else {
-      // Use provided content (with length limit)
-      const contentToAnalyze = content ? content.slice(0, 15000) : ""; // Increased limit for GPT-4o
-      messages.push({
-        role: "user",
-        content: contentToAnalyze
-      });
+      // Standard text-only mode for non-X.com content or X.com without media
+      if (useUrlDirectly) {
+        messages.push({
+          role: "user",
+          content: url
+        });
+      } else {
+        // Use provided content (with length limit)
+        const contentToAnalyze = content ? content.slice(0, 15000) : ""; // Increased limit for GPT-4o
+        messages.push({
+          role: "user",
+          content: contentToAnalyze
+        });
+      }
     }
 
     console.log(`Sending request to OpenAI for insights on ${url}`);

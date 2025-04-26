@@ -130,6 +130,24 @@ export class BookmarkService {
         // Flag to identify X tweets specifically
         const isXTweet = bookmark.source === 'x';
         
+        // Prepare media URLs section if available (for X tweets)
+        let mediaSection = '';
+        if (isXTweet && bookmark.media_urls && Array.isArray(bookmark.media_urls) && bookmark.media_urls.length > 0) {
+          // Filter for only Twitter/X image URLs
+          const twitterImageUrls = bookmark.media_urls.filter(url => 
+            typeof url === 'string' && url.includes('pbs.twimg.com')
+          );
+          
+          if (twitterImageUrls.length > 0) {
+            mediaSection = `
+Tweet media URLs:
+${twitterImageUrls.map(url => `- ${url}`).join('\n')}
+
+Media Instructions: The tweet contains images which you need to analyze in relation to the tweet content. Please describe the image(s) significance and how they relate to the tweet message.
+`;
+          }
+        }
+        
         // Build template strings with the bookmark data inserted
         const templateBase = `
 
@@ -144,6 +162,7 @@ ${isXTweet ? `
 Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || 'unknown'})
 Tweet content: ${bookmark.description || 'N/A'}
 Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
+${mediaSection}
 ` : ''}
 
 USER INSTRUCTIONS:
@@ -164,6 +183,7 @@ ${isXTweet ? `
 Tweet by: ${bookmark.author_name || 'Unknown'} (@${bookmark.author_username || 'unknown'})
 Tweet content: ${bookmark.description || 'N/A'}
 Tweet metrics: ${bookmark.like_count || 0} likes, ${bookmark.repost_count || 0} reposts, ${bookmark.reply_count || 0} replies
+${mediaSection}
 ` : ''}
 
 USER INSTRUCTIONS:
@@ -312,8 +332,27 @@ ${summaryPrompt?.value || ''}
               processedText = bookmark.description;
             }
             
-            // Pass the custom summary prompt to the generateInsights function
-            const result = await generateInsights(url, processedText || '', insightDepth, systemPrompts.summaryPrompt);
+            // For X.com tweets with media, pass the media_urls to the insights generator
+            let mediaUrls = [];
+            if (isXTweet && bookmark.media_urls && Array.isArray(bookmark.media_urls) && bookmark.media_urls.length > 0) {
+              // Filter for only pbs.twimg.com URLs
+              mediaUrls = bookmark.media_urls.filter((url: string) => 
+                typeof url === 'string' && url.includes('pbs.twimg.com')
+              );
+              
+              if (mediaUrls.length > 0) {
+                console.log(`Found ${mediaUrls.length} Twitter image URLs to include in the analysis`);
+              }
+            }
+            
+            // Pass the custom summary prompt and media URLs to the generateInsights function
+            const result = await generateInsights(
+              url, 
+              processedText || '', 
+              insightDepth, 
+              systemPrompts.summaryPrompt,
+              mediaUrls.length > 0 ? mediaUrls : undefined
+            );
             console.log(`Insights generated for bookmark ${bookmarkId}. Summary length: ${result.summary.length}`);
             return result;
           } catch (error) {
