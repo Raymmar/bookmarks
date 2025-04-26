@@ -195,6 +195,7 @@ Format your response as valid JSON with these exact keys:
       
       if (twitterImageUrls.length > 0) {
         console.log(`Including ${twitterImageUrls.length} image URLs in the analysis request`);
+        console.log(`Image URLs being sent to OpenAI: ${JSON.stringify(twitterImageUrls)}`);
         
         // Create a multimodal content array that includes both text and images
         const multiModalContent: Array<{
@@ -210,6 +211,7 @@ Format your response as valid JSON with these exact keys:
         
         // Add each image URL to the content
         twitterImageUrls.forEach(imageUrl => {
+          console.log(`Adding image URL to multimodal content: ${imageUrl}`);
           multiModalContent.push({
             type: "image_url",
             image_url: {
@@ -221,8 +223,10 @@ Format your response as valid JSON with these exact keys:
         // Add the multimodal content to the messages
         messages.push({
           role: "user",
-          content: multiModalContent
+          content: multiModalContent as any // Temporary type assertion to avoid TypeScript error
         });
+        
+        console.log(`Multimodal request prepared with ${multiModalContent.length} content parts (${multiModalContent.length - 1} images)`);
       } else {
         // Fallback to text-only if somehow filtering removed all URLs
         const contentToAnalyze = content ? content.slice(0, 15000) : "";
