@@ -212,88 +212,127 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     setIsProcessingAi(true);
     setAiProcessingStatus('processing');
     
+    // Store these references for cleanup
+    let pollingInterval: ReturnType<typeof setInterval> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
+    // Function to clean up timers
+    const cleanupTimers = () => {
+      if (pollingInterval) clearInterval(pollingInterval);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+    
     try {
-      await apiRequest("POST", `/api/bookmarks/${bookmark.id}/process`, {
+      // Start the AI processing
+      const processResponse = await apiRequest("POST", `/api/bookmarks/${bookmark.id}/process`, {
         insightDepth: 2 // Request deeper insights
       });
+      
+      console.log("AI processing initiated with response:", processResponse);
       
       toast({
         title: "AI processing started",
         description: "The AI analysis has been triggered and will run in the background",
       });
       
-      // Poll for status updates
-      const checkInterval = setInterval(async () => {
+      // Function to update the UI with new insights and tags
+      const updateUIWithResults = async () => {
         try {
+          // Clean up the timers first
+          cleanupTimers();
+          
+          // Update the status
+          setAiProcessingStatus('completed');
+          setIsProcessingAi(false);
+          
+          // Refresh bookmark data and fetch insights
+          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+          queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+          
+          // Fetch the updated insights
+          const insightsResponse = await fetch(`/api/bookmarks/${bookmark.id}/insights`);
+          let insightsData = null;
+          if (insightsResponse.ok) {
+            insightsData = await insightsResponse.json();
+            console.log("Fetched insights data:", insightsData);
+          }
+          
+          // Fetch the updated tags
+          const tagsResponse = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+          let tagsData = null;
+          if (tagsResponse.ok) {
+            tagsData = await tagsResponse.json();
+            console.log("Fetched tags data:", tagsData);
+            // Update the tags directly in state
+            setTags(tagsData);
+          }
+          
+          // Update the bookmark with new insights if available
+          if (bookmark && insightsData) {
+            // Create a new bookmark object with the updated insights
+            const updatedBookmark = {
+              ...bookmark,
+              insights: insightsData,
+              ai_processing_status: 'completed' as any
+            };
+            // Update the bookmark ref
+            setBookmark(updatedBookmark);
+          }
+          
+          console.log("Optimistically updated bookmark with insights and tags from AI processing");
+          
+          // Notify the graph about the new tags for immediate visual updates
+          if (tagsData && Array.isArray(tagsData)) {
+            tagsData.forEach(tag => {
+              // Dispatch a custom event for each tag to update the graph
+              const event = new CustomEvent('tagChanged', { 
+                detail: { 
+                  bookmarkId: bookmark.id,
+                  tagId: tag.id,
+                  tagName: tag.name,
+                  action: 'add'
+                } 
+              });
+              document.dispatchEvent(event);
+            });
+          }
+          
+          toast({
+            title: "AI processing complete",
+            description: "The bookmark has been analyzed and insights are now available",
+          });
+        } catch (error) {
+          console.error("Error updating UI with AI processing results:", error);
+          setAiProcessingStatus('failed');
+          setIsProcessingAi(false);
+          
+          toast({
+            title: "Error updating results",
+            description: "There was an error fetching the results. Please try again.",
+            variant: "destructive"
+          });
+        }
+      };
+      
+      // Poll for status updates
+      pollingInterval = setInterval(async () => {
+        try {
+          if (!bookmark) {
+            cleanupTimers();
+            return;
+          }
+          
+          console.log("Checking AI processing status...");
           const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
+          
           if (response.ok) {
             const statusData = await response.json();
+            console.log("Processing status response:", statusData);
             
             if (statusData.aiProcessingComplete) {
-              clearInterval(checkInterval);
-              setAiProcessingStatus('completed');
-              setIsProcessingAi(false);
-              
-              // Refresh bookmark data and fetch insights
-              queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-              queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}`] });
-              queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
-              
-              // Also fetch insights and tags directly to update the UI without a page refresh
-              try {
-                // Fetch the updated insights
-                const insightsResponse = await fetch(`/api/bookmarks/${bookmark.id}/insights`);
-                let insightsData = null;
-                if (insightsResponse.ok) {
-                  insightsData = await insightsResponse.json();
-                }
-                
-                // Fetch the updated tags
-                const tagsResponse = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
-                let tagsData = null;
-                if (tagsResponse.ok) {
-                  tagsData = await tagsResponse.json();
-                  // Update the tags directly in state
-                  setTags(tagsData);
-                }
-                
-                // Update the bookmark with new insights
-                if (bookmark && insightsData) {
-                  // Create a new bookmark object with the updated insights
-                  const updatedBookmark = {
-                    ...bookmark,
-                    insights: insightsData
-                  };
-                  // Update the bookmark ref
-                  setBookmark(updatedBookmark);
-                }
-                
-                // Log that we've updated everything optimistically
-                console.log("Optimistically updated bookmark with insights and tags from AI processing");
-                
-                // Notify the graph about the new tags for immediate visual updates
-                if (tagsData && Array.isArray(tagsData)) {
-                  tagsData.forEach(tag => {
-                    // Dispatch a custom event for each tag to update the graph
-                    const event = new CustomEvent('tagChanged', { 
-                      detail: { 
-                        bookmarkId: bookmark.id,
-                        tagId: tag.id,
-                        tagName: tag.name,
-                        action: 'add'
-                      } 
-                    });
-                    document.dispatchEvent(event);
-                  });
-                }
-              } catch (error) {
-                console.error("Error fetching insights or tags after processing:", error);
-              }
-              
-              toast({
-                title: "AI processing complete",
-                description: "The bookmark has been analyzed and insights are now available",
-              });
+              // If processing is complete, update the UI
+              updateUIWithResults();
             }
           }
         } catch (error) {
@@ -301,20 +340,23 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         }
       }, 5000); // Check every 5 seconds
       
-      // Clear interval after 60 seconds (timeout)
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        if (aiProcessingStatus === 'processing') {
+      // Set timeout to prevent endless polling (timeout after 120 seconds)
+      timeoutId = setTimeout(() => {
+        console.log("AI processing timeout reached");
+        cleanupTimers();
+        
+        // Check current status (using state reference rather than closure reference)
+        if (document.getElementById(`ai-processing-${bookmark.id}`)) {
           setAiProcessingStatus('failed');
           setIsProcessingAi(false);
           
           toast({
-            title: "AI processing timed out",
-            description: "The AI analysis is taking longer than expected. Try again later.",
-            variant: "destructive"
+            title: "AI processing taking longer than expected",
+            description: "Processing continues in the background. Check back later or refresh the page.",
+            variant: "default"
           });
         }
-      }, 60000);
+      }, 120000); // Extended to 2 minutes for larger images
       
     } catch (error) {
       console.error("Error triggering AI processing:", error);
@@ -539,13 +581,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       const now = new Date().toISOString();
       
       // Create the optimistically updated bookmark with current timestamp
+      // Type-safe conversion: Convert the ISO string to a Date object for state update
       const optimisticBookmark = {
         ...bookmark,
         ...updateData,
-        updated_at: now
+        updated_at: new Date(now) // Use Date object for local state to match Bookmark type
       };
       
-      // Update the local state
+      // Update the local state with properly typed bookmark
       setBookmark(optimisticBookmark);
       
       // Get current bookmarks from the cache
@@ -558,10 +601,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       if (sortOrder === 'recently_updated') {
         // For recently_updated sort, create a new sorted list with the updated bookmark at the top
         const filteredBookmarks = currentBookmarks.filter(b => b.id !== bookmark.id);
-        const sortedBookmarks = [optimisticBookmark, ...filteredBookmarks];
+        // Cast optimisticBookmark as Bookmark to ensure proper typing
+        const sortedBookmarks = [optimisticBookmark as Bookmark, ...filteredBookmarks];
         
         // Update the cache with the reordered list in a single operation
-        queryClient.setQueryData(["/api/bookmarks"], sortedBookmarks);
+        queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], sortedBookmarks);
       } else {
         // For other sort orders, just update the bookmark in the current list without resorting
         queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], 
