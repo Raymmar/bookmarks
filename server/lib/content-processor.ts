@@ -3,53 +3,6 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { storage } from "../storage";
 import { processAITags } from "./tag-normalizer";
 
-/**
- * Enhanced system prompt for AI tag generation to improve consistency
- */
-export const TAG_SYSTEM_PROMPT = `You are an AI assistant that extracts relevant tags from content. 
-Generate 3-5 SINGLE WORD tags that accurately represent the main topics and themes of the content.
-
-TAGGING APPROACH:
-1. First, identify explicit main topics directly mentioned in the content
-2. Next, derive conceptual tags that represent higher-level themes 
-3. Then, determine field/domain tags that classify the content area
-4. Finally, identify technology, methodology, or specialized terminology tags
-
-TAG FORMATING:
-- Output should be a JSON array of tag strings
-- Tags must be SINGLE WORDS ONLY - no spaces allowed
-- Do not duplicate tags or concepts
-- Tags should be concise, unique, and relevant 
-- Tags should be in lowercase
-- Maximum of 5 tags allowed
-- Avoid obscure or highly technical terms
-
-Consider both:
-- Surface-level topics (explicitly mentioned)
-- Deep conceptual connections (implicitly related)
-- Industry-specific categorization 
-
-IMPORTANT RULES FOR TAG GENERATION:
-1. ONLY use single word tags - no phrases, no compound words with spaces
-2. Tags should be lowercase
-3. Avoid obscure or highly specific tags
-4. No special characters or punctuation
-5. Prefer common, recognizable category names 
-6. Choose familiar terms over specialized jargon
-7. When multiple related concepts exist, pick the most general one
-8. Do not strong concepts like "open source" into two tags like "open" and "source"
-9. Do not duplicate tags. We should never see "version" and "versioning" as separate tags. 
-
-You must respond with a JSON object in the following format:
-{
-  "tags": ["word1", "word2", "word3", "word4", "word5"]
-}
-
-Examples of good tags: "tech", "ai", "productivity", "design", "science", "marketing" 
-Examples of BAD tags: "artificial intelligence" (use "ai" instead), "web development" (use "web" instead) "open source" (use "opensource" instead), "versioning" (use "version" instead) "data science" (use "data" instead) "machine learning" (use "ml" instead)
-
-The tags should capture the main topics while strictly following the single-word requirement.`;
-
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const MODEL = "gpt-4o";
 
@@ -332,6 +285,53 @@ Format your response as valid JSON with these exact keys:
     };
   }
 }
+
+/**
+ * Enhanced system prompt for AI tag generation to improve consistency
+ */
+export const TAG_SYSTEM_PROMPT = `You are an AI assistant that extracts relevant tags from content. 
+Generate 3-5 SINGLE WORD tags that accurately represent the main topics and themes of the content.
+
+TAGGING APPROACH:
+1. First, identify explicit main topics directly mentioned in the content
+2. Next, derive conceptual tags that represent higher-level themes 
+3. Then, determine field/domain tags that classify the content area
+4. Finally, identify technology, methodology, or specialized terminology tags
+
+TAG FORMATING:
+- Output should be a JSON array of tag strings
+- Tags must be SINGLE WORDS ONLY - no spaces allowed
+- Do not duplicate tags or concepts
+- Tags should be concise, unique, and relevant 
+- Tags should be in lowercase
+- Maximum of 5 tags allowed
+- Avoid obscure or highly technical terms
+
+Consider both:
+- Surface-level topics (explicitly mentioned)
+- Deep conceptual connections (implicitly related)
+- Industry-specific categorization 
+
+IMPORTANT RULES FOR TAG GENERATION:
+1. ONLY use single word tags - no phrases, no compound words with spaces
+2. Tags should be lowercase
+3. Avoid obscure or highly specific tags
+4. No special characters or punctuation
+5. Prefer common, recognizable category names 
+6. Choose familiar terms over specialized jargon
+7. When multiple related concepts exist, pick the most general one
+8. Do not strong concepts like "open source" into two tags like "open" and "source"
+9. Do not duplicate tags. We should never see "version" and "versioning" as separate tags. 
+
+You must respond with a JSON object in the following format:
+{
+  "tags": ["word1", "word2", "word3", "word4", "word5"]
+}
+
+Examples of good tags: "tech", "ai", "productivity", "design", "science", "marketing" 
+Examples of BAD tags: "artificial intelligence" (use "ai" instead), "web development" (use "web" instead) "open source" (use "opensource" instead), "versioning" (use "version" instead) "data science" (use "data" instead) "machine learning" (use "ml" instead)
+
+The tags should capture the main topics while strictly following the single-word requirement.`;
 
 /**
  * Generate tags from content or URL
