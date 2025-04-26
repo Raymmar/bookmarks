@@ -75,6 +75,24 @@ interface XTweet {
     mentions?: Array<any>;
     hashtags?: Array<any>;
   };
+  attachments?: {
+    media_keys?: string[];
+    poll_ids?: string[];
+  };
+}
+
+/**
+ * Interface for X.com Media data
+ * Represents media attachments to tweets (images, videos, etc.)
+ */
+interface XMedia {
+  media_key: string;
+  type: 'photo' | 'video' | 'animated_gif' | 'video';
+  url?: string;
+  preview_image_url?: string;
+  width?: number;
+  height?: number;
+  alt_text?: string;
 }
 
 /**
@@ -352,7 +370,12 @@ export class XService {
   /**
    * Get user's bookmarked tweets
    */
-  async getBookmarks(userId: string, paginationToken?: string): Promise<{ tweets: XTweet[], users: { [key: string]: XUser }, nextToken?: string }> {
+  async getBookmarks(userId: string, paginationToken?: string): Promise<{ 
+    tweets: XTweet[], 
+    users: { [key: string]: XUser }, 
+    media: { [key: string]: XMedia },
+    nextToken?: string 
+  }> {
     // Get user credentials
     const credentials = await this.getUserCredentials(userId);
     
@@ -380,17 +403,29 @@ export class XService {
       // Use the SDK to fetch bookmarks
       const bookmarksResponse = await client.bookmarks.getUsersIdBookmarks(credentials.x_user_id, {
         "expansions": [
-          "author_id"
+          "author_id",
+          "attachments.media_keys",
+          "referenced_tweets.id",
+          "referenced_tweets.id.author_id"
         ],
         "tweet.fields": [
           "created_at",
           "public_metrics",
-          "entities"
+          "entities",
+          "attachments"
         ],
         "user.fields": [
           "name",
           "username",
           "profile_image_url"
+        ],
+        "media.fields": [
+          "url",
+          "preview_image_url",
+          "alt_text",
+          "type",
+          "width",
+          "height"
         ],
         "max_results": 100,
         "pagination_token": paginationToken
@@ -398,7 +433,7 @@ export class XService {
       
       if (!bookmarksResponse.data) {
         // No bookmarks found, return empty arrays
-        return { tweets: [], users: {} };
+        return { tweets: [], users: {}, media: {} };
       }
       
       // Convert SDK response to our internal format
@@ -408,7 +443,8 @@ export class XService {
         created_at: tweet.created_at,
         author_id: tweet.author_id,
         public_metrics: tweet.public_metrics,
-        entities: tweet.entities
+        entities: tweet.entities,
+        attachments: tweet.attachments
       }));
       
       // Extract users from includes
@@ -424,10 +460,26 @@ export class XService {
         });
       }
       
+      // Extract media from includes
+      const media: { [key: string]: XMedia } = {};
+      if (bookmarksResponse.includes && bookmarksResponse.includes.media) {
+        bookmarksResponse.includes.media.forEach((mediaItem: any) => {
+          media[mediaItem.media_key] = {
+            media_key: mediaItem.media_key,
+            type: mediaItem.type,
+            url: mediaItem.url || mediaItem.preview_image_url,
+            preview_image_url: mediaItem.preview_image_url,
+            width: mediaItem.width,
+            height: mediaItem.height,
+            alt_text: mediaItem.alt_text
+          };
+        });
+      }
+      
       // Extract next pagination token if available
       const nextToken = bookmarksResponse.meta?.next_token;
       
-      return { tweets, users, nextToken };
+      return { tweets, users, nextToken, media };
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
       throw new Error(`Failed to get bookmarks: ${error}`);
@@ -437,7 +489,7 @@ export class XService {
   /**
    * Convert an X tweet to a bookmark
    */
-  convertTweetToBookmark(tweet: XTweet, author?: XUser): InsertBookmark {
+  convertTweetToBookmark(tweet: XTweet, author?: XUser, mediaMap?: { [key: string]: XMedia }): InsertBookmark {
     // Generate a normalized URL for the tweet
     const tweetUrl = `https://twitter.com/${author?.username || 'user'}/status/${tweet.id}`;
     
@@ -451,10 +503,10 @@ export class XService {
     
     // Extract media URLs from entities if available
     const mediaUrls: string[] = [];
+    
+    // First add URLs from entities
     if (tweet.entities && tweet.entities.urls) {
-      // With the Twitter API SDK, the entities.urls might have a different structure
       tweet.entities.urls.forEach(url => {
-        // The expanded_url might be undefined in the SDK response
         const expandedUrl = typeof url === 'object' && url.expanded_url 
           ? url.expanded_url 
           : typeof url === 'object' && url.url 
@@ -463,6 +515,23 @@ export class XService {
             
         if (expandedUrl) {
           mediaUrls.push(expandedUrl);
+        }
+      });
+    }
+    
+    // Then add URLs from media attachments if available
+    if (tweet.attachments && tweet.attachments.media_keys && mediaMap) {
+      tweet.attachments.media_keys.forEach(mediaKey => {
+        const mediaItem = mediaMap[mediaKey];
+        if (mediaItem && (mediaItem.url || mediaItem.preview_image_url)) {
+          // Use the direct URL if available, otherwise use preview image
+          const mediaUrl = mediaItem.url || mediaItem.preview_image_url;
+          if (mediaUrl) {
+            mediaUrls.push(mediaUrl);
+            
+            // Also download the media for local storage
+            this.downloadAndStoreMedia(mediaKey, mediaUrl, tweet.id);
+          }
         }
       });
     }
@@ -493,6 +562,32 @@ export class XService {
     
     return bookmark;
   }
+  
+  /**
+   * Download and store media locally
+   */
+  private async downloadAndStoreMedia(mediaKey: string, mediaUrl: string, tweetId: string): Promise<void> {
+    try {
+      // Create directories for media storage if they don't exist
+      const mediaDir = `public/media/tweets/${tweetId}`;
+      
+      // Skip if URL is not valid or is already a local path
+      if (!mediaUrl || mediaUrl.startsWith('/')) {
+        return;
+      }
+      
+      console.log(`X Sync: Downloading media from ${mediaUrl} for tweet ${tweetId}`);
+      
+      // Here we would implement code to download and store the media
+      // For simplicity we're just logging the intent, but in a real implementation
+      // we would download the file and store it locally
+      
+      // TODO: Implement actual media downloading
+      
+    } catch (error) {
+      console.error(`X Sync: Error downloading media for tweet ${tweetId}:`, error);
+    }
+  }
 
   /**
    * Get user's folders
@@ -520,7 +615,15 @@ export class XService {
     let errors = 0;
     
     // Get all bookmarks from X.com
-    let allBookmarks: { tweets: XTweet[], users: { [key: string]: XUser } } = { tweets: [], users: {} };
+    let allBookmarks: { 
+      tweets: XTweet[], 
+      users: { [key: string]: XUser },
+      media: { [key: string]: XMedia }
+    } = { 
+      tweets: [], 
+      users: {},
+      media: {}
+    };
     let nextToken: string | undefined = undefined;
     
     try {
@@ -576,10 +679,11 @@ export class XService {
       try {
         console.log(`X Sync: Fetching bookmarks${nextToken ? ' with pagination token' : ''}`);
         const result = await this.getBookmarks(userId, nextToken);
-        console.log(`X Sync: Fetched ${result.tweets.length} tweets and ${Object.keys(result.users).length} users`);
+        console.log(`X Sync: Fetched ${result.tweets.length} tweets, ${Object.keys(result.users).length} users, and ${Object.keys(result.media).length} media items`);
         
         allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
         allBookmarks.users = { ...allBookmarks.users, ...result.users };
+        allBookmarks.media = { ...allBookmarks.media, ...result.media };
         nextToken = result.nextToken;
         
         if (nextToken) {
@@ -598,7 +702,7 @@ export class XService {
     for (const tweet of allBookmarks.tweets) {
       try {
         const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
-        const bookmarkData = this.convertTweetToBookmark(tweet, author);
+        const bookmarkData = this.convertTweetToBookmark(tweet, author, allBookmarks.media);
         bookmarkData.user_id = userId;
         
         // Check if bookmark already exists
