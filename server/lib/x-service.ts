@@ -84,7 +84,7 @@ interface XTweet {
     poll_ids?: string[];
   };
   // Track local media files downloaded for this tweet
-  local_media?: {
+  local_media: {
     original_url: string;
     local_path: string;
     media_key: string;
@@ -455,7 +455,9 @@ export class XService {
         author_id: tweet.author_id,
         public_metrics: tweet.public_metrics,
         entities: tweet.entities,
-        attachments: tweet.attachments
+        attachments: tweet.attachments,
+        // Initialize local_media as empty array for each tweet
+        local_media: []
       }));
       
       // Extract users from includes
