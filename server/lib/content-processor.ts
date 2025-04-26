@@ -366,15 +366,14 @@ export async function generateTags(content: string, url?: string, customSystemPr
       console.log("Retrieved custom tagging prompt from storage");
     }
     
-    // Combine base prompt with user prompt with enhanced tagging approach
-    // If no custom prompt is provided, use our enhanced TAG_SYSTEM_PROMPT
-    let systemPrompt;
-    if (!userSystemPrompt) {
-      systemPrompt = TAG_SYSTEM_PROMPT;
-    } else {
-      systemPrompt = `${baseSystemPrompt}
+    // Always use our TAG_SYSTEM_PROMPT, and add the user's custom prompt if provided
+    let systemPrompt = TAG_SYSTEM_PROMPT;
+    
+    // Add user instructions if they exist
+    if (userSystemPrompt) {
+      systemPrompt += `
 
-User Instructions: ${userSystemPrompt}`;
+Additional User Instructions: ${userSystemPrompt}`;
     }
     
     // Add URL context to the system prompt if available
