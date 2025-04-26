@@ -67,6 +67,11 @@ export default function GraphView() {
     const saved = localStorage.getItem('tagDrawerOpen');
     return saved ? JSON.parse(saved) : false;
   });
+  // State to toggle showing system-generated tags
+  const [showSystemTags, setShowSystemTags] = useState<boolean>(() => {
+    const saved = localStorage.getItem('showSystemTags');
+    return saved ? JSON.parse(saved) : false;
+  });
   // Container ref to measure available width for tag drawer
   const tagContainerRef = useRef<HTMLDivElement>(null);
   // State to track visible tags in closed drawer (calculated based on container width)
@@ -366,11 +371,23 @@ export default function GraphView() {
     }, 100);
   };
   
-  // Extract all unique tags from the normalized tags system
-  const allTags = tags.map(tag => tag.name).sort();
+  // Filter tags based on type
+  const userTags = tags.filter(tag => tag.type === "user");
+  const systemTags = tags.filter(tag => tag.type === "system");
+  
+  // Separate user and system tag names
+  const userTagNames = userTags.map(tag => tag.name).sort();
+  const systemTagNames = systemTags.map(tag => tag.name).sort();
+  
+  // All tags combined based on the showSystemTags toggle
+  const allTags = showSystemTags 
+    ? [...userTagNames, ...systemTagNames].sort()
+    : [...userTagNames].sort();
   
   // Get tags sorted by usage count for popular tags feature
-  const tagsByCount = [...tags].sort((a, b) => b.count - a.count);
+  const tagsByCount = showSystemTags
+    ? [...tags].sort((a, b) => b.count - a.count)
+    : [...userTags].sort((a, b) => b.count - a.count);
   
   // State for progressive loading
   const [loadLimit, setLoadLimit] = useState<number | null>(() => {
@@ -658,6 +675,14 @@ export default function GraphView() {
     if (!newState) {
       setVisibleTagsCount(calculateVisibleTagCount());
     }
+  };
+  
+  // Function to toggle showing system tags
+  const toggleSystemTags = () => {
+    const newState = !showSystemTags;
+    setShowSystemTags(newState);
+    // Save state to localStorage
+    localStorage.setItem('showSystemTags', JSON.stringify(newState));
   };
   
   // Get popular tags by using our sorted tagsByCount list
@@ -983,23 +1008,31 @@ export default function GraphView() {
           {!tagDrawerOpen && selectedTags.length > 0 && (
             <div className="mb-2 flex items-center flex-wrap gap-1">
               <span className="text-sm text-gray-600 mr-1">Tags:</span>
-              {selectedTags.map((tag, index) => (
-                <Badge 
-                  key={`selected-${tag}-${index}`}
-                  variant="default"
-                  className="cursor-pointer bg-primary hover:bg-primary/90"
-                  onClick={() => toggleTagSelection(tag)}
-                >
-                  {tag}
-                  <X 
-                    className="h-3 w-3 ml-1" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTagSelection(tag);
-                    }}
-                  />
-                </Badge>
-              ))}
+              {selectedTags.map((tag, index) => {
+                // Check if tag is system or user tag
+                const tagObj = tags.find(t => t.name === tag);
+                const isSystemTag = tagObj?.type === "system";
+                
+                return (
+                  <Badge 
+                    key={`selected-${tag}-${index}`}
+                    variant="default"
+                    className={`cursor-pointer ${
+                      isSystemTag ? 'bg-violet-600 hover:bg-violet-700' : 'bg-primary hover:bg-primary/90'
+                    }`}
+                    onClick={() => toggleTagSelection(tag)}
+                  >
+                    {tag}
+                    <X 
+                      className="h-3 w-3 ml-1" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTagSelection(tag);
+                      }}
+                    />
+                  </Badge>
+                );
+              })}
               
               {/* Clear All button when multiple tags are selected */}
               {selectedTags.length > 1 && (
@@ -1014,36 +1047,94 @@ export default function GraphView() {
             </div>
           )}
           
-          {/* Tags drawer - minimal version */}
-          <div ref={tagContainerRef} className="flex flex-wrap gap-1 items-center">
+          {/* Tags drawer - with max height and scrolling */}
+          <div 
+            ref={tagContainerRef} 
+            className={`flex flex-wrap gap-1 items-start ${
+              tagDrawerOpen ? 'max-h-[300px] overflow-y-auto' : ''
+            }`}
+          >
+            {/* System tags toggle when drawer is open */}
+            {tagDrawerOpen && (
+              <div className="w-full flex justify-between items-center mb-2 sticky top-0 z-10 bg-white py-1 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">Tags</span>
+                  <Badge variant="outline" className="text-xs bg-gray-50">
+                    {userTagNames.length} user tag{userTagNames.length !== 1 ? 's' : ''}
+                  </Badge>
+                  {showSystemTags && (
+                    <Badge variant="outline" className="text-xs bg-gray-50">
+                      {systemTagNames.length} system tag{systemTagNames.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={toggleSystemTags}
+                  >
+                    {showSystemTags ? 'Hide System Tags' : 'Show System Tags'}
+                  </Button>
+                  
+                  {selectedTags.length > 0 && (
+                    <Badge 
+                      variant="secondary"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                      onClick={() => setSelectedTags([])}
+                    >
+                      Clear All <X className="h-3 w-3 ml-1" />
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* Tags display - different behavior based on drawer state */}
             {(() => {
-              // When drawer is open, show all tags
+              // When drawer is open, show all tags with type distinction
               if (tagDrawerOpen) {
-                return allTags.map((tag, index) => (
-                  <Badge 
-                    key={`tag-${tag}-${index}`}
-                    variant={selectedTags.includes(tag) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleTagSelection(tag)}
-                  >
-                    {tag}
-                    {selectedTags.includes(tag) && (
-                      <X 
-                        className="h-3 w-3 ml-1" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleTagSelection(tag);
-                        }}
-                      />
-                    )}
-                  </Badge>
-                ));
+                // Get all tags from our database with their type information
+                const tagsWithType = allTags.map(tagName => {
+                  const tagObj = tags.find(t => t.name === tagName);
+                  return {
+                    name: tagName,
+                    type: tagObj?.type || 'user'
+                  };
+                });
+                
+                return tagsWithType.map((tag, index) => {
+                  const isSelected = selectedTags.includes(tag.name);
+                  const isSystemTag = tag.type === 'system';
+                  
+                  return (
+                    <Badge 
+                      key={`tag-${tag.name}-${index}`}
+                      variant={isSelected ? "default" : "outline"}
+                      className={`cursor-pointer ${
+                        isSelected 
+                          ? isSystemTag ? 'bg-violet-600 hover:bg-violet-700' : 'bg-primary hover:bg-primary/90'
+                          : isSystemTag ? 'text-violet-700 border-violet-200 hover:bg-violet-50' : ''
+                      }`}
+                      onClick={() => toggleTagSelection(tag.name)}
+                    >
+                      {tag.name}
+                      {isSelected && (
+                        <X 
+                          className="h-3 w-3 ml-1" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTagSelection(tag.name);
+                          }}
+                        />
+                      )}
+                    </Badge>
+                  );
+                });
               } 
               
               // When drawer is closed, limit to calculated number of visible tags
-              // First take selected tags that should always be visible
-              const visibleTags = [];
               // Calculate how many slots we have for non-selected tags
               const visibleTagLimit = visibleTagsCount;
               // Filter popular tags that aren't already selected
@@ -1051,34 +1142,25 @@ export default function GraphView() {
               // Take only as many as will fit in one row
               const limitedTags = availableTags.slice(0, visibleTagLimit);
               
-              // Calculate the number of hidden tags (all tags minus visible tags)
-              const hiddenTagsCount = allTags.filter(tag => !selectedTags.includes(tag)).length - limitedTags.length;
-              
-              // Return the badges for visible tags
-              return limitedTags.map((tag, index) => (
-                <Badge 
-                  key={`tag-${tag}-${index}`}
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => toggleTagSelection(tag)}
-                >
-                  {tag}
-                </Badge>
-              ));
+              // Return the badges for visible tags with type distinction
+              return limitedTags.map((tagName, index) => {
+                const tagObj = tags.find(t => t.name === tagName);
+                const isSystemTag = tagObj?.type === 'system';
+                
+                return (
+                  <Badge 
+                    key={`tag-${tagName}-${index}`}
+                    variant="outline"
+                    className={`cursor-pointer ${
+                      isSystemTag ? 'text-violet-700 border-violet-200 hover:bg-violet-50' : ''
+                    }`}
+                    onClick={() => toggleTagSelection(tagName)}
+                  >
+                    {tagName}
+                  </Badge>
+                );
+              });
             })()}
-            
-            {/* Clear All button when drawer is open and tags are selected */}
-            {tagDrawerOpen && selectedTags.length > 0 && (
-              <Badge 
-                variant="secondary"
-                className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
-                onClick={() => setSelectedTags([])}
-              >
-                Clear All <X className="h-3 w-3 ml-1" />
-              </Badge>
-            )}
-            
-            {/* Tag count badge has been moved to the toggle button */}
           </div>
         </div>
       </div>
