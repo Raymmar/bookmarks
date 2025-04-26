@@ -774,6 +774,13 @@ export default function GraphView() {
       layoutPreferences.toggleDetailPanel(true);
     }
   }, [selectedBookmarkId]);
+  
+  // When the component mounts, make sure detail panel is hidden if no bookmark is selected
+  useEffect(() => {
+    if (!selectedBookmarkId && layoutPreferences.preferences.showDetailPanel) {
+      layoutPreferences.toggleDetailPanel(false);
+    }
+  }, []);
 
   return (
     <div className="flex flex-1 h-full w-full">
@@ -971,12 +978,12 @@ export default function GraphView() {
               {/* Grid panel */}
               <ResizablePanel 
                 defaultSize={layoutPreferences.preferences.gridWidth} 
-                minSize={layoutPreferences.preferences.showDetailPanel ? 60 : 20}
+                minSize={layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 60 : 20}
                 className="h-full"
               >
-                <div className={`flex h-full w-full ${layoutPreferences.preferences.showDetailPanel ? 'min-w-[720px]' : ''}`}>
+                <div className={`flex h-full w-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'min-w-[720px]' : ''}`}>
                   {/* Bookmark grid with adjustable columns */}
-                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
                     <BookmarkGrid
                       bookmarks={sortedBookmarks}
                       selectedBookmarkId={selectedBookmarkId}
