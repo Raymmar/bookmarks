@@ -16,76 +16,38 @@ export function BookmarkGrid({
   isLoading,
 }: BookmarkGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [columnCount, setColumnCount] = useState<1 | 2 | 3>(2); // Default to 2 columns
+  const [breakpointCols, setBreakpointCols] = useState(2);
   
-  // Determine if detail view is open
-  const [isDetailViewOpen, setIsDetailViewOpen] = useState<boolean>(false);
+  // Constants for minimum and maximum card widths (in pixels)
+  const MIN_CARD_WIDTH = 300;
+  const MAX_CARD_WIDTH = 360;
+  const GRID_GAP = 12; // 0.75rem = 12px
   
-  // Load preferences on component mount
-  useEffect(() => {
-    try {
-      const savedPrefs = localStorage.getItem('gridColumnPreferences');
-      if (savedPrefs) {
-        const prefs = JSON.parse(savedPrefs);
-        // Start with the appropriate column count based on detail view
-        setColumnCount(isDetailViewOpen ? prefs.detailColumnCount : prefs.columnCount);
-      }
-    } catch (e) {
-      console.error('Failed to load grid preferences:', e);
-    }
-  }, [isDetailViewOpen]);
-  
-  // Effect to calculate appropriate number of columns based on container width
+  // Effect to calculate optimal number of columns based on container width
   useEffect(() => {
     const calculateColumns = () => {
       if (!containerRef.current) return;
       
       const containerWidth = containerRef.current.clientWidth;
       
-      // Use simple breakpoints to determine column count
-      let newColumnCount: 1 | 2 | 3;
+      // Calculate how many columns can fit
+      const maxPossibleColumns = Math.floor((containerWidth + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP));
       
-      if (containerWidth < 600) {
-        newColumnCount = 1;
-      } else if (containerWidth < 1000) {
-        newColumnCount = 2;
-      } else {
-        newColumnCount = 3;
-      }
+      // Ensure at least 1 column, at most 5 columns
+      // Using a higher max column count for better space utilization
+      const columns = Math.max(1, Math.min(5, maxPossibleColumns));
       
-      // Only update if column count changed
-      if (newColumnCount !== columnCount) {
-        setColumnCount(newColumnCount);
-        
-        // Save this preference based on whether detail view is open
-        try {
-          const savedPrefs = localStorage.getItem('gridColumnPreferences');
-          const prefs = savedPrefs ? JSON.parse(savedPrefs) : {
-            columnCount: 2,
-            detailColumnCount: 1
-          };
-          
-          // Update the appropriate column count (normal or detail)
-          if (isDetailViewOpen) {
-            prefs.detailColumnCount = newColumnCount;
-          } else {
-            prefs.columnCount = newColumnCount;
-          }
-          
-          localStorage.setItem('gridColumnPreferences', JSON.stringify(prefs));
-        } catch (e) {
-          console.error('Failed to save grid preferences:', e);
-        }
-      }
+      setBreakpointCols(columns);
     };
     
-    // Calculate on mount and when container width changes
+    // Calculate on mount
     calculateColumns();
     
     // Recalculate when window is resized
     window.addEventListener('resize', calculateColumns);
     
-    // Use ResizeObserver to detect container width changes from panel resizing
+    // Create a ResizeObserver to watch for container width changes
+    // This handles when the user drags the panel divider
     const resizeObserver = new ResizeObserver(calculateColumns);
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
@@ -95,39 +57,7 @@ export function BookmarkGrid({
       window.removeEventListener('resize', calculateColumns);
       resizeObserver.disconnect();
     };
-  }, [containerRef, columnCount, isDetailViewOpen]);
-  
-  // Effect to detect when detail view opens/closes
-  useEffect(() => {
-    const detectDetailPanel = () => {
-      // Check for presence of detail panel in DOM
-      const detailPanelOpen = document.querySelector('div[class*="w-1/2"][class*="border-r"]') !== null;
-      
-      if (detailPanelOpen !== isDetailViewOpen) {
-        setIsDetailViewOpen(detailPanelOpen);
-        
-        // Apply saved preferences for this view mode
-        try {
-          const savedPrefs = localStorage.getItem('gridColumnPreferences');
-          if (savedPrefs) {
-            const prefs = JSON.parse(savedPrefs);
-            setColumnCount(detailPanelOpen ? prefs.detailColumnCount : prefs.columnCount);
-          } else {
-            // Default values if no preferences saved
-            setColumnCount(detailPanelOpen ? 1 : 2);
-          }
-        } catch (e) {
-          console.error('Failed to load detail view preferences:', e);
-        }
-      }
-    };
-    
-    // Run on mount and set an interval to check periodically
-    detectDetailPanel();
-    const intervalId = setInterval(detectDetailPanel, 500);
-    
-    return () => clearInterval(intervalId);
-  }, [isDetailViewOpen]);
+  }, []);
 
   return (
     <div className="p-3 overflow-auto h-full" ref={containerRef}>
@@ -144,7 +74,7 @@ export function BookmarkGrid({
         </div>
       ) : (
         <Masonry
-          breakpointCols={columnCount}
+          breakpointCols={breakpointCols}
           className="masonry-grid"
           columnClassName="masonry-grid-column"
         >
