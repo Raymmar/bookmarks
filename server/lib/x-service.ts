@@ -22,6 +22,10 @@ import {
 import crypto from 'crypto';
 import { URLSearchParams } from 'url';
 import { Client, auth } from 'twitter-api-sdk';
+import fetch from 'node-fetch';
+import fs from 'fs';
+import path from 'path';
+import { promisify } from 'util';
 
 /**
  * X API configuration
@@ -79,6 +83,13 @@ interface XTweet {
     media_keys?: string[];
     poll_ids?: string[];
   };
+  // Track local media files downloaded for this tweet
+  local_media?: {
+    original_url: string;
+    local_path: string;
+    media_key: string;
+    type: string;
+  }[];
 }
 
 /**
@@ -565,27 +576,86 @@ export class XService {
   
   /**
    * Download and store media locally
+   * Returns the local path to the downloaded file, or null if download failed
    */
-  private async downloadAndStoreMedia(mediaKey: string, mediaUrl: string, tweetId: string): Promise<void> {
+  private async downloadAndStoreMedia(mediaKey: string, mediaUrl: string, tweetId: string, mediaType: string = 'photo'): Promise<string | null> {
     try {
       // Create directories for media storage if they don't exist
       const mediaDir = `public/media/tweets/${tweetId}`;
       
       // Skip if URL is not valid or is already a local path
       if (!mediaUrl || mediaUrl.startsWith('/')) {
-        return;
+        return null;
       }
       
       console.log(`X Sync: Downloading media from ${mediaUrl} for tweet ${tweetId}`);
       
-      // Here we would implement code to download and store the media
-      // For simplicity we're just logging the intent, but in a real implementation
-      // we would download the file and store it locally
+      // Ensure the directory exists
+      const mkdir = promisify(fs.mkdir);
       
-      // TODO: Implement actual media downloading
+      try {
+        await mkdir(mediaDir, { recursive: true });
+      } catch (mkdirError) {
+        console.error(`X Sync: Error creating media directory for tweet ${tweetId}:`, mkdirError);
+        return null;
+      }
       
+      // Get file extension from URL or default based on media type
+      let fileExt;
+      try {
+        const urlPath = new URL(mediaUrl).pathname;
+        fileExt = path.extname(urlPath);
+      } catch (urlError) {
+        // If URL parsing fails, use default extension based on media type
+        fileExt = '';
+      }
+      
+      // Set default extension based on media type if not found in URL
+      if (!fileExt) {
+        switch(mediaType) {
+          case 'photo':
+            fileExt = '.jpg';
+            break;
+          case 'video':
+            fileExt = '.mp4';
+            break;
+          case 'animated_gif':
+            fileExt = '.gif';
+            break;
+          default:
+            fileExt = '.jpg';
+        }
+      }
+      
+      // Create a unique filename based on the media key
+      const fileName = `${mediaKey}${fileExt}`;
+      const filePath = path.join(mediaDir, fileName);
+      
+      // Download the media file
+      try {
+        const response = await fetch(mediaUrl);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        // Save the file
+        const buffer = await response.buffer();
+        await fs.promises.writeFile(filePath, buffer);
+        
+        console.log(`X Sync: Successfully downloaded media to ${filePath}`);
+        
+        // Create a relative URL that can be used in the app
+        const relativeUrl = `/media/tweets/${tweetId}/${fileName}`;
+        
+        return relativeUrl;
+      } catch (fetchError) {
+        console.error(`X Sync: Error fetching media from ${mediaUrl}:`, fetchError);
+        return null;
+      }
     } catch (error) {
       console.error(`X Sync: Error downloading media for tweet ${tweetId}:`, error);
+      return null;
     }
   }
 
@@ -696,7 +766,7 @@ export class XService {
       }
     } while (nextToken);
     
-    console.log(`X Sync: Total fetched - ${allBookmarks.tweets.length} tweets and ${Object.keys(allBookmarks.users).length} users`);
+    console.log(`X Sync: Total fetched - ${allBookmarks.tweets.length} tweets, ${Object.keys(allBookmarks.users).length} users, and ${Object.keys(allBookmarks.media).length} media items`);
     
     // Process each bookmark
     for (const tweet of allBookmarks.tweets) {
