@@ -20,7 +20,7 @@ export function BookmarkGrid({
   // Constants for minimum and maximum card widths (in pixels)
   const MIN_CARD_WIDTH = 360;
   const MAX_CARD_WIDTH = 480;
-  const GRID_GAP = 8; // 0.5rem = 8px
+  const GRID_GAP = 16; // 1rem = 16px
   
   // Effect to calculate columns based on container width
   useEffect(() => {
@@ -67,11 +67,10 @@ export function BookmarkGrid({
     };
   }, []);
   
-  // Generate the grid styles based on the auto-calculated columns
-  const gridStyle = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-    gap: '0.5rem',
+  // Set up masonry grid styles - column layout instead of grid for masonry effect
+  const masonryStyle = {
+    columnCount: columns,
+    columnGap: '1rem',
   };
 
   return (
@@ -88,7 +87,7 @@ export function BookmarkGrid({
           No bookmarks found. Try adjusting your filters.
         </div>
       ) : (
-        <div style={gridStyle}>
+        <div style={masonryStyle} className="masonry-grid">
           {bookmarks.map((bookmark) => {
             return (
               <BookmarkCard
@@ -112,9 +111,13 @@ interface BookmarkCardProps {
 }
 
 function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
+  const hasImage = bookmark.media_urls && 
+                  bookmark.media_urls.length > 0 && 
+                  bookmark.media_urls.some(url => url.includes('pbs.twimg.com'));
+
   return (
     <div 
-      className={`cursor-pointer bg-white overflow-hidden border border-gray-200 rounded-md hover:shadow-md transition-shadow ${
+      className={`cursor-pointer bg-white overflow-hidden border border-gray-200 rounded-xl hover:shadow-md transition-all mb-4 inline-block w-full break-inside-avoid ${
         isSelected
           ? "ring-2 ring-primary" 
           : ""
@@ -122,13 +125,10 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
       onClick={onClick}
     >
       {/* Media section */}
-      {bookmark.media_urls && bookmark.media_urls.length > 0 && (
+      {hasImage && (
         <div className="overflow-hidden">
           {bookmark.media_urls
-            .filter(url => 
-              // Only include Twitter/X media URLs (skip local paths and other URLs)
-              url.includes('pbs.twimg.com')
-            )
+            ?.filter(url => url.includes('pbs.twimg.com'))
             .slice(0, 1) // Only show the first image in the card
             .map((url, index) => (
               <div 
@@ -151,13 +151,16 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
         </div>
       )}
       
-      {/* Title section */}
-      <div className="p-3">
-        <h3 className="text-sm font-medium line-clamp-2 mb-1">{bookmark.title}</h3>
-        {bookmark.url && (
-          <p className="text-xs text-gray-500 truncate">
-            {new URL(bookmark.url).hostname.replace(/^www\./, '')}
-          </p>
+      {/* Title section - only show on hover if there's an image */}
+      <div className={`relative ${hasImage ? 'group' : ''}`}>
+        {hasImage ? (
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent text-white">
+            <h3 className="text-sm font-medium line-clamp-2">{bookmark.title}</h3>
+          </div>
+        ) : (
+          <div className="p-3">
+            <h3 className="text-sm font-medium line-clamp-3">{bookmark.title}</h3>
+          </div>
         )}
       </div>
     </div>

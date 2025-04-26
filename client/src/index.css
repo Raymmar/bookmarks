@@ -15,8 +15,7 @@
 /* Custom styles for the Pinterest-style masonry grid */
 @layer components {
   .masonry-grid {
-    column-count: 2;  /* 2 columns as requested */
-    column-gap: 10px;
+    /* Column settings are controlled dynamically via inline styles */
     padding: 0;
     margin: 0;
     width: 100%;
@@ -24,9 +23,9 @@
   
   .masonry-grid > div {
     break-inside: avoid;
-    margin-bottom: 10px;
+    margin-bottom: 1rem;
     display: block;
-    border-radius: 8px;
+    border-radius: 0.75rem;
     overflow: hidden;
     background-color: white;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -45,6 +44,12 @@
     width: 100%;
     height: auto;
     vertical-align: middle;
+    object-fit: cover;
+  }
+  
+  /* Improved hover effect for text on image cards */
+  .masonry-grid .group:hover .group-hover\:opacity-100 {
+    opacity: 1;
   }
   
   /* Fade-in animation for cards */
@@ -58,6 +63,7 @@
   }
   
   /* Different animation delays for a staggered effect */
-  .masonry-grid > div:nth-child(2n + 1) { animation-delay: 0.0s; }
-  .masonry-grid > div:nth-child(2n + 2) { animation-delay: 0.1s; }
+  .masonry-grid > div:nth-child(3n + 1) { animation-delay: 0.0s; }
+  .masonry-grid > div:nth-child(3n + 2) { animation-delay: 0.05s; }
+  .masonry-grid > div:nth-child(3n + 3) { animation-delay: 0.1s; }
 }
