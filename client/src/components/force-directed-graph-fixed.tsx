@@ -1327,7 +1327,7 @@ export function ForceDirectedGraph({ bookmarks, insightLevel, onNodeClick, onTag
       
       <svg 
         ref={svgRef} 
-        className="w-full h-full"
+        className="w-full h-full bg-gray-50 rounded-md"
       />
     </div>
   );
