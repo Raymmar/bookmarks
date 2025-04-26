@@ -17,7 +17,10 @@ import { Bookmark } from "@shared/types";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState("cards");
+  const [viewMode, setViewMode] = useState<string>(() => {
+    const savedViewMode = localStorage.getItem('bookmarkViewMode');
+    return savedViewMode || "cards";
+  });
   const [sortOrder, setSortOrder] = useState("newest");
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [insightLevel, setInsightLevel] = useState(1);
