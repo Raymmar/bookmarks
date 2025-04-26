@@ -28,59 +28,6 @@ interface BookmarkCardProps {
 }
 
 function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
-  // Function to fix X.com image URLs for better display
-  const fixTwitterImageUrl = (url: string): string => {
-    // Skip if the URL is empty or not a string
-    if (!url || typeof url !== 'string') {
-      return '';
-    }
-    
-    // If it's already a properly formatted pbs.twimg.com URL, return it as is
-    if (url.includes('pbs.twimg.com') && url.includes('format=')) {
-      return url;
-    }
-    
-    // Handle various Twitter/X image URL formats
-    
-    // Pattern 1: Standard media URLs
-    // Example: https://pbs.twimg.com/media/ABC123.jpg
-    const mediaRegex = /https?:\/\/(pbs\.)?twimg\.com\/media\/([A-Za-z0-9_-]+)(\.\w+)?(\?.+)?/;
-    const mediaMatch = url.match(mediaRegex);
-    
-    if (mediaMatch && mediaMatch[2]) {
-      return `https://pbs.twimg.com/media/${mediaMatch[2]}?format=jpg&name=large`;
-    }
-    
-    // Pattern 2: Profile images
-    // Example: https://pbs.twimg.com/profile_images/123456789/avatar.jpg
-    const profileRegex = /https?:\/\/(pbs\.)?twimg\.com\/profile_images\/([A-Za-z0-9_/-]+)(\.\w+)?(\?.+)?/;
-    const profileMatch = url.match(profileRegex);
-    
-    if (profileMatch) {
-      // For profile images, we'll just ensure it uses https
-      return url.replace(/^http:/, 'https:');
-    }
-    
-    // Return the original URL for any other case
-    return url;
-  };
-  
-  // Check if the bookmark has media (from X.com, screenshots, etc.)
-  const hasMedia = (bookmark.media_urls && bookmark.media_urls.length > 0) || (bookmark.screenshots && bookmark.screenshots.length > 0);
-  
-  // Function to get the first available media URL with proper formatting
-  const getMediaUrl = () => {
-    if (bookmark.media_urls && bookmark.media_urls.length > 0) {
-      return fixTwitterImageUrl(bookmark.media_urls[0]);
-    }
-    if (bookmark.screenshots && bookmark.screenshots.length > 0) {
-      return bookmark.screenshots[0].image_url;
-    }
-    return null;
-  };
-  
-  const mediaUrl = getMediaUrl();
-  
   return (
     <div 
       className={`cursor-pointer bg-white overflow-hidden ${
@@ -90,33 +37,38 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
       }`}
       onClick={onClick}
     >
-      {/* Media section (if available) */}
-      {mediaUrl && (
-        <div className="w-full overflow-hidden bg-gray-50">
-          <img 
-            src={mediaUrl} 
-            alt=""
-            className="w-full object-cover"
-            loading="lazy"
-            onLoad={(e) => {
-              // Check image dimensions after loading and apply a max-height constraint for very tall images
-              const img = e.target as HTMLImageElement;
-              if (img.naturalHeight > img.naturalWidth * 1.5) {
-                // For very tall images, constrain height to a reasonable size
-                img.style.maxHeight = '300px';
-                img.style.objectPosition = 'top';
-              }
-            }}
-            onError={(e) => {
-              // Hide the image if it fails to load
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
+      {/* Media section - Exactly the same as in the detail panel */}
+      {bookmark.media_urls && bookmark.media_urls.length > 0 && (
+        <div className="overflow-hidden">
+          {bookmark.media_urls
+            .filter(url => 
+              // Only include Twitter/X media URLs (skip local paths and other URLs)
+              url.includes('pbs.twimg.com')
+            )
+            .slice(0, 1) // Only show the first image in the card
+            .map((url, index) => (
+              <div 
+                key={index}
+                className="overflow-hidden"
+              >
+                <img 
+                  src={url} 
+                  alt=""
+                  className="w-full h-auto object-cover"
+                  loading="lazy"
+                  onError={(e) => {
+                    // If image fails to load, hide it
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </div>
+            ))}
         </div>
       )}
       
-      {/* Content section - minimized for grid view */}
-      <div className="px-2 py-1.5">
+      {/* Title section */}
+      <div className="px-2 py-2">
         <h3 className="text-xs font-medium line-clamp-1">{bookmark.title}</h3>
       </div>
     </div>

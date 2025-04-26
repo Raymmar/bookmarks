@@ -15,8 +15,8 @@
 /* Custom styles for the Pinterest-style masonry grid */
 @layer components {
   .masonry-grid {
-    column-count: 3;  /* 3 columns for wider sidebar */
-    column-gap: 6px;
+    column-count: 2;  /* 2 columns as requested */
+    column-gap: 10px;
     padding: 0;
     margin: 0;
     width: 100%;
@@ -24,17 +24,18 @@
   
   .masonry-grid > div {
     break-inside: avoid;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
     display: block;
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   
   .masonry-grid > div:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
   
   /* Better image handling */
@@ -57,7 +58,6 @@
   }
   
   /* Different animation delays for a staggered effect */
-  .masonry-grid > div:nth-child(3n + 1) { animation-delay: 0.0s; }
-  .masonry-grid > div:nth-child(3n + 2) { animation-delay: 0.1s; }
-  .masonry-grid > div:nth-child(3n + 3) { animation-delay: 0.2s; }
+  .masonry-grid > div:nth-child(2n + 1) { animation-delay: 0.0s; }
+  .masonry-grid > div:nth-child(2n + 2) { animation-delay: 0.1s; }
 }
