@@ -504,8 +504,8 @@ export class XService {
    * This method is async because it downloads media files
    */
   async convertTweetToBookmark(tweet: XTweet, author?: XUser, mediaMap?: { [key: string]: XMedia }): Promise<InsertBookmark> {
-    // Generate a normalized URL for the tweet
-    const tweetUrl = `https://twitter.com/${author?.username || 'user'}/status/${tweet.id}`;
+    // Generate a normalized URL for the tweet using x.com instead of twitter.com
+    const tweetUrl = `https://x.com/${author?.username || 'user'}/status/${tweet.id}`;
     
     // Use the first part of the tweet as the title (up to 100 chars)
     const title = tweet.text.length > 100 
