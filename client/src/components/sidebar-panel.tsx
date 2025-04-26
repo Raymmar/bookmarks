@@ -28,23 +28,40 @@ interface BookmarkCardProps {
 }
 
 function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
-  // Function to fix X.com image URLs
+  // Function to fix X.com image URLs for better display
   const fixTwitterImageUrl = (url: string): string => {
-    // If it's already a pbs.twimg.com URL, return it as is
-    if (url.includes('pbs.twimg.com')) {
+    // Skip if the URL is empty or not a string
+    if (!url || typeof url !== 'string') {
+      return '';
+    }
+    
+    // If it's already a properly formatted pbs.twimg.com URL, return it as is
+    if (url.includes('pbs.twimg.com') && url.includes('format=')) {
       return url;
     }
     
-    // Try to extract the image ID from the URL
-    const twitterImgRegex = /https?:\/\/(pbs\.)?twimg\.com\/media\/([A-Za-z0-9_-]+)\.\w+(\?.+)?/;
-    const match = url.match(twitterImgRegex);
+    // Handle various Twitter/X image URL formats
     
-    if (match && match[2]) {
-      // Rebuild the URL to use pbs.twimg.com with format=jpg to ensure compatibility
-      return `https://pbs.twimg.com/media/${match[2]}?format=jpg&name=large`;
+    // Pattern 1: Standard media URLs
+    // Example: https://pbs.twimg.com/media/ABC123.jpg
+    const mediaRegex = /https?:\/\/(pbs\.)?twimg\.com\/media\/([A-Za-z0-9_-]+)(\.\w+)?(\?.+)?/;
+    const mediaMatch = url.match(mediaRegex);
+    
+    if (mediaMatch && mediaMatch[2]) {
+      return `https://pbs.twimg.com/media/${mediaMatch[2]}?format=jpg&name=large`;
     }
     
-    // Return the original URL if we couldn't transform it
+    // Pattern 2: Profile images
+    // Example: https://pbs.twimg.com/profile_images/123456789/avatar.jpg
+    const profileRegex = /https?:\/\/(pbs\.)?twimg\.com\/profile_images\/([A-Za-z0-9_/-]+)(\.\w+)?(\?.+)?/;
+    const profileMatch = url.match(profileRegex);
+    
+    if (profileMatch) {
+      // For profile images, we'll just ensure it uses https
+      return url.replace(/^http:/, 'https:');
+    }
+    
+    // Return the original URL for any other case
     return url;
   };
   
@@ -66,21 +83,30 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   
   return (
     <div 
-      className={`rounded-lg border cursor-pointer transition-all duration-300 ease-in-out overflow-hidden shadow-sm hover:shadow-md ${
+      className={`cursor-pointer bg-white overflow-hidden ${
         isSelected
-          ? "bg-primary-50 border-primary" 
-          : "bg-white border-gray-200 hover:border-gray-300"
+          ? "ring-2 ring-primary" 
+          : ""
       }`}
       onClick={onClick}
     >
       {/* Media section (if available) */}
       {mediaUrl && (
-        <div className="w-full overflow-hidden">
+        <div className="w-full overflow-hidden bg-gray-50">
           <img 
             src={mediaUrl} 
             alt=""
             className="w-full object-cover"
             loading="lazy"
+            onLoad={(e) => {
+              // Check image dimensions after loading and apply a max-height constraint for very tall images
+              const img = e.target as HTMLImageElement;
+              if (img.naturalHeight > img.naturalWidth * 1.5) {
+                // For very tall images, constrain height to a reasonable size
+                img.style.maxHeight = '300px';
+                img.style.objectPosition = 'top';
+              }
+            }}
             onError={(e) => {
               // Hide the image if it fails to load
               (e.target as HTMLImageElement).style.display = 'none';
@@ -90,8 +116,8 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
       )}
       
       {/* Content section - minimized for grid view */}
-      <div className="p-2">
-        <h3 className="text-sm font-medium line-clamp-1">{bookmark.title}</h3>
+      <div className="px-2 py-1.5">
+        <h3 className="text-xs font-medium line-clamp-1">{bookmark.title}</h3>
       </div>
     </div>
   );
@@ -184,7 +210,7 @@ export function SidebarPanel({
         </div>
       </div>
       
-      <div className="p-4 overflow-auto">
+      <div className="p-3 overflow-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="text-center">

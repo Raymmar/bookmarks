@@ -16,7 +16,7 @@
 @layer components {
   .masonry-grid {
     column-count: 3;  /* 3 columns for wider sidebar */
-    column-gap: 8px;
+    column-gap: 6px;
     padding: 0;
     margin: 0;
     width: 100%;
@@ -24,10 +24,17 @@
   
   .masonry-grid > div {
     break-inside: avoid;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     display: block;
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .masonry-grid > div:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   }
   
   /* Better image handling */
@@ -36,6 +43,7 @@
     display: block;
     width: 100%;
     height: auto;
+    vertical-align: middle;
   }
   
   /* Fade-in animation for cards */
