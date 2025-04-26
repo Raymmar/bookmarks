@@ -899,7 +899,7 @@ export default function GraphView() {
             aria-label={tagDrawerOpen ? "Close tag drawer" : "Open tag drawer"}
             className={`absolute right-0 ${
               tagDrawerOpen 
-                ? 'top-0 bg-gray-100 p-1 flex items-center justify-center' 
+                ? 'top-2 bg-gray-100 p-1 flex items-center justify-center z-20' 
                 : 'top-0 bottom-0 bg-transparent p-1 flex items-center justify-center'
             } hover:bg-gray-200 z-10`}
           >
@@ -1054,9 +1054,9 @@ export default function GraphView() {
               tagDrawerOpen ? 'max-h-[300px] overflow-y-auto' : ''
             }`}
           >
-            {/* System tags toggle when drawer is open */}
+            {/* Header with system tags toggle when drawer is open */}
             {tagDrawerOpen && (
-              <div className="w-full flex justify-between items-center mb-2 sticky top-0 z-10 bg-white py-1 border-b border-gray-200">
+              <div className="w-full flex justify-between items-center mb-2 sticky top-0 z-10 bg-white py-2 border-b border-gray-200 pr-6">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-700">Tags</span>
                   <Badge variant="outline" className="text-xs bg-gray-50">
@@ -1069,19 +1069,26 @@ export default function GraphView() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={toggleSystemTags}
-                  >
-                    {showSystemTags ? 'Hide System Tags' : 'Show System Tags'}
-                  </Button>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-gray-500">System tags</span>
+                    <button 
+                      onClick={toggleSystemTags}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        showSystemTags ? 'bg-violet-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          showSystemTags ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
                   
                   {selectedTags.length > 0 && (
                     <Badge 
                       variant="secondary"
-                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 flex items-center ml-2"
                       onClick={() => setSelectedTags([])}
                     >
                       Clear All <X className="h-3 w-3 ml-1" />
