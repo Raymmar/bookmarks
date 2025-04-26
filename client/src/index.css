@@ -52,6 +52,11 @@
     opacity: 1;
   }
   
+  /* Enhanced text shadow for better readability on all backgrounds */
+  .masonry-grid h3 {
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  
   /* Fade-in animation for cards */
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
