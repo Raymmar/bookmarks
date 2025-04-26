@@ -48,19 +48,35 @@ export default function GraphView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [insightLevel, setInsightLevel] = useState(1);
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
+  // Initialize filter settings from localStorage with fallbacks
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
-  const [tagMode, setTagMode] = useState<"any" | "all">("any");
-  const [viewMode, setViewMode] = useState<"grid" | "graph">("graph");
+  const [tagMode, setTagMode] = useState<"any" | "all">(() => {
+    const savedTagMode = localStorage.getItem('bookmarkTagMode');
+    return savedTagMode === "all" ? "all" : "any";
+  });
+  const [viewMode, setViewMode] = useState<"grid" | "graph">(() => {
+    const savedViewMode = localStorage.getItem('bookmarkViewMode');
+    return savedViewMode === "grid" ? "grid" : "graph";
+  });
   // Initialize sortOrder from localStorage with fallback to "newest"
   const [sortOrder, setSortOrder] = useState<string>(() => {
     const savedSort = localStorage.getItem('bookmarkSortOrder');
     return savedSort ? savedSort : "newest";
   });
-  const [dateRange, setDateRange] = useState("all");
-  const [sources, setSources] = useState<string[]>(["extension", "web", "import", "x"]);
-  const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(["bookmark", "domain", "tag"]);
+  const [dateRange, setDateRange] = useState(() => {
+    const savedDateRange = localStorage.getItem('bookmarkDateRange');
+    return savedDateRange || "all";
+  });
+  const [sources, setSources] = useState<string[]>(() => {
+    const savedSources = localStorage.getItem('bookmarkSources');
+    return savedSources ? JSON.parse(savedSources) : ["extension", "web", "import", "x"];
+  });
+  const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[]>(() => {
+    const savedNodeTypes = localStorage.getItem('bookmarkVisibleNodeTypes');
+    return savedNodeTypes ? JSON.parse(savedNodeTypes) : ["bookmark", "domain", "tag"];
+  });
   // Add Bookmark dialog state
   const [addBookmarkOpen, setAddBookmarkOpen] = useState(false);
   // Drawer state with localStorage persistence
@@ -812,11 +828,23 @@ export default function GraphView() {
               selectedTags={selectedTags}
               onTagsChange={setSelectedTags}
               dateRange={dateRange}
-              onDateRangeChange={setDateRange}
+              onDateRangeChange={(value) => {
+                // Persist date range to localStorage
+                localStorage.setItem('bookmarkDateRange', value);
+                setDateRange(value);
+              }}
               sources={sources}
-              onSourcesChange={setSources}
+              onSourcesChange={(values) => {
+                // Persist sources to localStorage
+                localStorage.setItem('bookmarkSources', JSON.stringify(values));
+                setSources(values);
+              }}
               tagMode={tagMode}
-              onTagModeChange={setTagMode}
+              onTagModeChange={(value) => {
+                // Persist tag mode to localStorage
+                localStorage.setItem('bookmarkTagMode', value);
+                setTagMode(value);
+              }}
               sortOrder={sortOrder}
               onSortOrderChange={(value) => {
                 // Persist sort order to localStorage
@@ -824,7 +852,11 @@ export default function GraphView() {
                 setSortOrder(value);
               }}
               visibleNodeTypes={visibleNodeTypes}
-              onVisibleNodeTypesChange={setVisibleNodeTypes}
+              onVisibleNodeTypesChange={(nodeTypes) => {
+                // Persist node types to localStorage
+                localStorage.setItem('bookmarkVisibleNodeTypes', JSON.stringify(nodeTypes));
+                setVisibleNodeTypes(nodeTypes);
+              }}
             />
             
             {/* Load limit controls with combobox allowing custom values */}
