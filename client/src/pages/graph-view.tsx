@@ -736,39 +736,29 @@ export default function GraphView() {
   
   // Prepare the layout preferences hook here
   const layoutPreferences = (() => {
-    const DEFAULT_DETAIL_WIDTH = 60;
-    const DEFAULT_NORMAL_WIDTH = 40;
-    
     const [preferences, setPreferences] = useState(() => {
       // Initialize from localStorage or use defaults
       const savedPrefs = localStorage.getItem('layoutPreferences');
       if (savedPrefs) {
         try {
-          const parsedPrefs = JSON.parse(savedPrefs);
-          return {
-            gridWidth: parsedPrefs.gridWidth || DEFAULT_NORMAL_WIDTH,
-            showDetailPanel: false, // Always start with detail panel closed
-            detailOpenWidth: parsedPrefs.detailOpenWidth || DEFAULT_DETAIL_WIDTH,
-            detailClosedWidth: parsedPrefs.detailClosedWidth || DEFAULT_NORMAL_WIDTH,
-            isUserAdjusted: false // Set to true when user manually resizes
-          };
+          return JSON.parse(savedPrefs);
         } catch (e) {
           console.error('Failed to parse saved layout preferences:', e);
           return {
-            gridWidth: DEFAULT_NORMAL_WIDTH,
-            showDetailPanel: false,
-            detailOpenWidth: DEFAULT_DETAIL_WIDTH,
-            detailClosedWidth: DEFAULT_NORMAL_WIDTH,
-            isUserAdjusted: false
+            gridWidth: 40, // 40% for grid, 60% for graph by default
+            showDetailPanel: false, // Hidden by default
+            gridWidthWithDetail: 60, // Width to use when detail is open
+            gridWidthWithoutDetail: 40, // Width to use when detail is closed
+            lastSetWidth: null, // Track the last width manually set by user
           };
         }
       }
       return {
-        gridWidth: DEFAULT_NORMAL_WIDTH,
+        gridWidth: 40,
         showDetailPanel: false,
-        detailOpenWidth: DEFAULT_DETAIL_WIDTH,
-        detailClosedWidth: DEFAULT_NORMAL_WIDTH,
-        isUserAdjusted: false
+        gridWidthWithDetail: 60, // Width to use when detail is open
+        gridWidthWithoutDetail: 40, // Width to use when detail is closed  
+        lastSetWidth: null, // Track the last width manually set by user
       };
     });
 
@@ -777,50 +767,44 @@ export default function GraphView() {
       localStorage.setItem('layoutPreferences', JSON.stringify(preferences));
     }, [preferences]);
 
-    // Update grid width - called when user manually resizes
+    // Update grid width
     const setGridWidth = (width: number) => {
-      setPreferences((prev) => {
+      setPreferences((prev: any) => {
         const boundedWidth = Math.max(20, Math.min(80, width)); // Restrict between 20% and 80%
-        
-        // Store the new width in the appropriate state variable based on detail panel status
-        if (prev.showDetailPanel) {
-          return {
-            ...prev,
-            gridWidth: boundedWidth,
-            detailOpenWidth: boundedWidth,
-            isUserAdjusted: true
-          };
-        } else {
-          return {
-            ...prev,
-            gridWidth: boundedWidth,
-            detailClosedWidth: boundedWidth,
-            isUserAdjusted: true
-          };
-        }
+        return {
+          ...prev,
+          gridWidth: boundedWidth,
+          lastSetWidth: boundedWidth, // Remember the last width user manually set
+          // Update the appropriate state memory depending on whether detail panel is open
+          ...(prev.showDetailPanel 
+              ? { gridWidthWithDetail: boundedWidth } 
+              : { gridWidthWithoutDetail: boundedWidth })
+        };
       });
     };
 
-    // Toggle detail panel - preserves proper width for each state
+    // Toggle detail panel
     const toggleDetailPanel = (show?: boolean) => {
-      setPreferences((prev) => {
+      setPreferences((prev: any) => {
         const newShowDetailPanel = show !== undefined ? show : !prev.showDetailPanel;
         
         if (newShowDetailPanel) {
-          // Opening the detail panel - use the remembered detail width
+          // If we're opening the detail panel
+          // Use the stored width for detail view, or fallback to last manually set width
+          const preferredDetailWidth = prev.gridWidthWithDetail || prev.lastSetWidth || 60;
           return {
             ...prev,
             showDetailPanel: true,
-            gridWidth: prev.detailOpenWidth,
-            isUserAdjusted: false // Reset on toggle
+            gridWidth: preferredDetailWidth
           };
         } else {
-          // Closing the detail panel - use the remembered normal width
+          // If we're closing the detail panel
+          // Use the stored width for non-detail view, or fallback to last manually set width
+          const preferredNormalWidth = prev.gridWidthWithoutDetail || prev.lastSetWidth || 40;
           return {
             ...prev,
             showDetailPanel: false,
-            gridWidth: prev.detailClosedWidth,
-            isUserAdjusted: false // Reset on toggle
+            gridWidth: preferredNormalWidth
           };
         }
       });
@@ -1059,10 +1043,19 @@ export default function GraphView() {
               {/* Grid panel */}
               <ResizablePanel 
                 defaultSize={layoutPreferences.preferences.gridWidth} 
-                minSize={20} // Always allow at least 20% width
+                minSize={layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 60 : 20}
                 className="h-full"
               >
-                <div className="flex h-full w-full">
+                <div className={`flex h-full w-full ${
+                  // Only apply min-width when detail panel is newly opened and we don't have a user preference
+                  layoutPreferences.preferences.showDetailPanel && 
+                  getSelectedBookmark() && 
+                  // If we don't have a lastSetWidth or specifically set gridWidthWithDetail, use 720px min-width
+                  !layoutPreferences.preferences.lastSetWidth && 
+                  !layoutPreferences.preferences.gridWidthWithDetail
+                  ? 'min-w-[720px]' 
+                  : ''
+                }`}>
                   {/* Detail panel (conditionally shown on left side) */}
                   {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
                     <div className="w-1/2 min-w-[360px] border-r border-gray-200 bg-white overflow-auto">
