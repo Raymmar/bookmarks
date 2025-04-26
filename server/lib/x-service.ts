@@ -532,6 +532,7 @@ export class XService {
     }
     
     // Always initialize/reset the local media array
+    // The if/else is redundant, but keeping for clarity
     tweet.local_media = [];
     
     // Then add URLs from media attachments if available

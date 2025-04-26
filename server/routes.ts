@@ -1742,7 +1742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mediaDir = 'public/media/tweets';
       
       // Check if directory exists and list tweet folders
-      let tweetFolders = [];
+      let tweetFolders: string[] = [];
       if (fs.existsSync(mediaDir)) {
         try {
           tweetFolders = fs.readdirSync(mediaDir);
@@ -1752,7 +1752,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get info about downloaded media files
-      const mediaInfo = {
+      const mediaInfo: {
+        folders: number;
+        mediaFiles: number;
+        details: Record<string, { fileCount: number; files: string[] }>;
+      } = {
         folders: tweetFolders.length,
         mediaFiles: 0,
         details: {}
