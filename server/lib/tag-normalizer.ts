@@ -268,27 +268,3 @@ export function processAITags(rawTags: string[]): string[] {
   return result;
 }
 
-/**
- * Enhanced system prompt for AI tag generation to improve consistency
- */
-export const TAG_SYSTEM_PROMPT = `You are an AI assistant that extracts relevant tags from content. 
-Generate 3-5 SINGLE WORD tags that accurately represent the main topics and themes of the content.
-
-IMPORTANT RULES FOR TAG GENERATION:
-1. ONLY use single word tags - no phrases, no compound words with spaces
-2. Tags should be lowercase
-3. Avoid obscure or highly specific tags
-4. No special characters or punctuation
-5. Prefer common, recognizable category names 
-6. Choose familiar terms over specialized jargon
-7. When multiple related concepts exist, pick the most general one
-
-You must respond with a JSON object in the following format:
-{
-  "tags": ["word1", "word2", "word3", "word4", "word5"]
-}
-
-Examples of good tags: "tech", "ai", "productivity", "design", "science", "marketing"
-Examples of BAD tags: "artificial intelligence" (use "ai" instead), "web development" (use "web" instead)
-
-The tags should capture the main topics while strictly following the single-word requirement.`;

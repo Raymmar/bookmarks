@@ -133,10 +133,10 @@ export async function generateInsights(
     let systemPrompt = `${baseSystemPrompt}
 
 ANALYSIS APPROACH:
-1. First, carefully examine the content to identify core concepts and themes
-2. Next, consider second-order implications and connections not explicitly stated
-3. Then, evaluate how this information relates to broader fields or domains that might not be explicitly mentioned.
-4. Finally, synthesize a comprehensive analysis that goes beyond surface-level understanding
+First, carefully examine the content to identify core concepts and themes
+Next, consider second-order implications and connections not explicitly stated
+Then, evaluate how this information relates to broader fields or domains that might not be explicitly mentioned.
+Finally, synthesize a comprehensive analysis that goes beyond surface-level understanding without regurgitating or restating the original content.
 
 Your response MUST include:
 - A concise yet nuanced summary (250-500 words)
@@ -322,25 +322,6 @@ export async function generateTags(content: string, url?: string, customSystemPr
     // Combine base prompt with user prompt with enhanced tagging approach
     let systemPrompt = `${baseSystemPrompt}
 
-TAGGING APPROACH:
-1. First, identify explicit main topics directly mentioned in the content
-2. Next, derive conceptual tags that represent higher-level themes 
-3. Then, determine field/domain tags that classify the content area
-4. Finally, identify technology, methodology, or specialized terminology tags
-
-TAG FORMATING:
-- Output should be a JSON array of tag strings
-- Tags must be SINGLE WORDS ONLY - no spaces allowed
-- Tags should be concise, unique, and relevant 
-- Tags should be in lowercase
-- Maximum of 5 tags allowed
-- Avoid obscure or highly technical terms
-
-Consider both:
-- Surface-level topics (explicitly mentioned)
-- Deep conceptual connections (implicitly related)
-- Industry-specific categorization 
-
 User Instructions: ${userSystemPrompt}`;
     
     // Add URL context to the system prompt if available
@@ -457,9 +438,13 @@ export async function summarizeContent(content: string, customSystemPrompt?: str
 
 SUMMARIZATION APPROACH:
 1. First, identify the core message and main points of the content
-2. Next, extract key supporting details and evidence
-3. Then, identify any implicit significance, implications, or context
-4. Finally, create a concise summary that balances coverage with brevity
+2. Next, extract key supporting details and evidence by doingn some deep research
+3. Then, identify any implicit significance, related knowledge, or context to bring back for the summary
+4. Finally, create a concise summary that balances coverage with brevity without simply repeating back any of the original content
+
+SUMMARY RULES
+- Never assume to know anything about the bookmark. If you do not know it, or cannot look it up. 
+- Never use "likely", "suggests", or similar words in your summary.
 
 Your summary should:
 - Capture both explicit information and implicit significance
@@ -482,7 +467,7 @@ User Instructions: ${userSystemPrompt}`;
       ],
       response_format: { type: "json_object" },
       temperature: 0.2,  // Lower temperature for more focused, detailed analysis
-      max_tokens: 2000   // Increase token limit for more comprehensive summaries
+      max_tokens: 5000   // Increase token limit for more comprehensive summaries
     });
 
     return response.choices[0].message.content || "No summary generated";
