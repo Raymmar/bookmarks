@@ -151,7 +151,7 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
           
           {/* Overlay title for image cards - shows on hover */}
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent h-3/5 flex flex-col justify-end text-white">
-            <h3 className="text-sm font-medium line-clamp-2 drop-shadow-sm">{bookmark.title}</h3>
+            <h3 className="text-sm font-medium line-clamp-2">{bookmark.title}</h3>
           </div>
         </div>
       )}
