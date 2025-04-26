@@ -16,13 +16,14 @@ console.log("OpenAI initialized with API key:", process.env.OPENAI_API_KEY ? "AP
 
 interface ProcessedContent {
   text: string;
+  html: string;
   readingTime: number;
 }
 
 /**
  * Processes HTML content to extract readable text
  */
-export async function processContent(contentHtml: string): Promise<{ text: string; html: string; readingTime: number }> {
+export async function processContent(contentHtml: string): Promise<ProcessedContent> {
   console.log("Starting content processing...");
   
   if (!contentHtml) {
@@ -237,9 +238,9 @@ Format your response as valid JSON with these exact keys:
       
       // First do basic cleaning
       const cleanedTags = rawTags
-        .filter(tag => tag && typeof tag === 'string')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
+        .filter((tag: any) => tag && typeof tag === 'string')
+        .map((tag: string) => tag.trim())
+        .filter((tag: string) => tag.length > 0);
         
       // Then apply enhanced tag normalization with deduplication
       const tags = processAITags(cleanedTags);
