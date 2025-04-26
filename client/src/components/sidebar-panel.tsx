@@ -52,17 +52,69 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   const systemTags = bookmark.system_tags || [];
   const allTags = [...tagNames, ...systemTags];
   
+  // Check if the bookmark has media (from X.com, screenshots, etc.)
+  const hasMedia = (bookmark.media_urls && bookmark.media_urls.length > 0) || (bookmark.screenshots && bookmark.screenshots.length > 0);
+  
+  // Function to get the first available media URL
+  const getMediaUrl = () => {
+    if (bookmark.media_urls && bookmark.media_urls.length > 0) {
+      return bookmark.media_urls[0];
+    }
+    if (bookmark.screenshots && bookmark.screenshots.length > 0) {
+      return bookmark.screenshots[0].image_url;
+    }
+    return null;
+  };
+  
+  const mediaUrl = getMediaUrl();
+  
   return (
     <div 
-      className={`p-3 rounded-lg border cursor-pointer transition-all duration-300 ease-in-out ${
+      className={`rounded-lg border cursor-pointer transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${
         isSelected
           ? "bg-primary-50 border-primary" 
           : "bg-white border-gray-200 hover:border-gray-300"
       }`}
       onClick={onClick}
     >
-      <h3 className="font-medium mb-1 line-clamp-1">{bookmark.title}</h3>
-      <p className="text-xs text-gray-500 truncate">{bookmark.url}</p>
+      {/* Media section (if available) */}
+      {mediaUrl && (
+        <div className="relative aspect-video w-full overflow-hidden">
+          <img 
+            src={mediaUrl} 
+            alt="Bookmark media"
+            className="object-cover w-full h-full"
+            onError={(e) => {
+              // Hide the image if it fails to load
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Content section */}
+      <div className="p-3 flex-1 flex flex-col">
+        <h3 className="font-medium mb-1 line-clamp-2">{bookmark.title}</h3>
+        <p className="text-xs text-gray-500 truncate mb-2">{bookmark.url}</p>
+        
+        {/* Show up to 3 tags if available */}
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-auto">
+            {allTags.slice(0, 3).map((tag, idx) => (
+              <Badge 
+                key={`card-tag-${idx}`} 
+                variant="secondary" 
+                className="text-xs px-1.5 py-0.5"
+              >
+                {tag}
+              </Badge>
+            ))}
+            {allTags.length > 3 && (
+              <span className="text-xs text-gray-400">+{allTags.length - 3}</span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
