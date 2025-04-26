@@ -212,6 +212,20 @@ export function FilterControls({
               </div>
             </div>
             
+            <div>
+              <h3 className="text-xs font-medium text-gray-700 mb-2">Sort Order</h3>
+              <Select value={sortOrder} onValueChange={onSortOrderChange}>
+                <SelectTrigger className="w-full text-xs h-8">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="recently_updated">Recently Updated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             {filtersActive && (
               <Button
                 variant="ghost"
