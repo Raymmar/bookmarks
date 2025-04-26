@@ -121,12 +121,12 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
         isSelected
           ? "ring-2 ring-primary" 
           : ""
-      }`}
+      } ${hasImage ? 'group' : ''}`}
       onClick={onClick}
     >
       {/* Media section */}
       {hasImage && (
-        <div className="overflow-hidden">
+        <div className="overflow-hidden relative">
           {bookmark.media_urls
             ?.filter(url => url.includes('pbs.twimg.com'))
             .slice(0, 1) // Only show the first image in the card
@@ -148,21 +148,20 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
                 />
               </div>
             ))}
-        </div>
-      )}
-      
-      {/* Title section - only show on hover if there's an image */}
-      <div className={`relative ${hasImage ? 'group' : ''}`}>
-        {hasImage ? (
+          
+          {/* Overlay title for image cards - shows on hover */}
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent text-white">
             <h3 className="text-sm font-medium line-clamp-2">{bookmark.title}</h3>
           </div>
-        ) : (
-          <div className="p-3">
-            <h3 className="text-sm font-medium line-clamp-3">{bookmark.title}</h3>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
+      
+      {/* Title section for cards without images */}
+      {!hasImage && (
+        <div className="p-3">
+          <h3 className="text-sm font-medium line-clamp-3">{bookmark.title}</h3>
+        </div>
+      )}
     </div>
   );
 }
