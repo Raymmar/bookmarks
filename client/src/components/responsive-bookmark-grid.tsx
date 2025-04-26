@@ -1,11 +1,11 @@
 import { Bookmark } from "@shared/types";
+import { useState, useEffect, useRef } from "react";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
-  columns: number;
 }
 
 export function BookmarkGrid({
@@ -13,9 +13,61 @@ export function BookmarkGrid({
   selectedBookmarkId,
   onSelectBookmark,
   isLoading,
-  columns = 2,
 }: BookmarkGridProps) {
-  // Generate the grid styles based on the number of columns
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState(2);
+  
+  // Constants for minimum and maximum card widths (in pixels)
+  const MIN_CARD_WIDTH = 360;
+  const MAX_CARD_WIDTH = 480;
+  const GRID_GAP = 8; // 0.5rem = 8px
+  
+  // Effect to calculate columns based on container width
+  useEffect(() => {
+    const calculateColumns = () => {
+      if (!containerRef.current) return;
+      
+      const containerWidth = containerRef.current.clientWidth;
+      
+      // Calculate how many cards can fit based on min/max constraints
+      // Subtract gap space from available width before calculating
+      const availableWidth = containerWidth - GRID_GAP;
+      
+      // Calculate ideal columns based on minimum width
+      const maxPossibleColumns = Math.floor(availableWidth / MIN_CARD_WIDTH);
+      
+      // Ensure at least 1 column, at most 4 columns
+      const idealColumns = Math.max(1, Math.min(4, maxPossibleColumns));
+      
+      // If the resulting card width would be too large, add another column
+      const cardWidth = availableWidth / idealColumns;
+      if (cardWidth > MAX_CARD_WIDTH && idealColumns < 4) {
+        setColumns(idealColumns + 1);
+      } else {
+        setColumns(idealColumns);
+      }
+    };
+    
+    // Calculate on mount
+    calculateColumns();
+    
+    // Recalculate when window is resized
+    window.addEventListener('resize', calculateColumns);
+    
+    // Create a ResizeObserver to watch for container width changes
+    // This handles when the user drags the panel divider
+    const resizeObserver = new ResizeObserver(calculateColumns);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', calculateColumns);
+      resizeObserver.disconnect();
+    };
+  }, []);
+  
+  // Generate the grid styles based on the auto-calculated columns
   const gridStyle = {
     display: 'grid',
     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
@@ -23,7 +75,7 @@ export function BookmarkGrid({
   };
 
   return (
-    <div className="p-3 overflow-auto h-full">
+    <div className="p-3 overflow-auto h-full" ref={containerRef}>
       {isLoading ? (
         <div className="flex items-center justify-center h-32">
           <div className="text-center">

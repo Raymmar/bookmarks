@@ -730,14 +730,12 @@ export default function GraphView() {
           console.error('Failed to parse saved layout preferences:', e);
           return {
             gridWidth: 40, // 40% for grid, 60% for graph by default
-            gridColumns: 2, // 2 columns by default
             showDetailPanel: false, // Hidden by default
           };
         }
       }
       return {
         gridWidth: 40,
-        gridColumns: 2,
         showDetailPanel: false,
       };
     });
@@ -749,23 +747,15 @@ export default function GraphView() {
 
     // Update grid width
     const setGridWidth = (width: number) => {
-      setPreferences(prev => ({
+      setPreferences((prev: any) => ({
         ...prev,
         gridWidth: Math.max(20, Math.min(80, width)), // Restrict between 20% and 80%
       }));
     };
 
-    // Update grid columns
-    const setGridColumns = (columns: number) => {
-      setPreferences(prev => ({
-        ...prev,
-        gridColumns: Math.max(1, Math.min(4, columns)), // Restrict between 1 and 4 columns
-      }));
-    };
-
     // Toggle detail panel
     const toggleDetailPanel = (show?: boolean) => {
-      setPreferences(prev => ({
+      setPreferences((prev: any) => ({
         ...prev,
         showDetailPanel: show !== undefined ? show : !prev.showDetailPanel,
       }));
@@ -774,7 +764,6 @@ export default function GraphView() {
     return {
       preferences,
       setGridWidth,
-      setGridColumns,
       toggleDetailPanel,
     };
   })();
@@ -990,20 +979,6 @@ export default function GraphView() {
                   <div className={`h-full ${layoutPreferences.preferences.showDetailPanel ? 'w-1/2' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
                     <div className="h-14 border-b border-gray-200 px-3 flex items-center justify-between">
                       <h2 className="text-lg font-semibold">Bookmarks</h2>
-                      <div className="flex items-center space-x-2">
-                        {/* Column controls */}
-                        <div className="flex border rounded overflow-hidden">
-                          {[1, 2, 3, 4].map(cols => (
-                            <button
-                              key={cols}
-                              className={`px-2 py-1 text-sm ${layoutPreferences.preferences.gridColumns === cols ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
-                              onClick={() => layoutPreferences.setGridColumns(cols)}
-                            >
-                              {cols}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
                     </div>
                     
                     <BookmarkGrid
@@ -1011,7 +986,6 @@ export default function GraphView() {
                       selectedBookmarkId={selectedBookmarkId}
                       onSelectBookmark={handleSelectBookmark}
                       isLoading={isLoading}
-                      columns={layoutPreferences.preferences.gridColumns}
                     />
                   </div>
                   

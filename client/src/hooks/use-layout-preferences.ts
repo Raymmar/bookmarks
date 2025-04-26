@@ -2,13 +2,11 @@ import { useState, useEffect } from 'react';
 
 interface LayoutPreferences {
   gridWidth: number;  // Percentage of width allocated to grid (remaining is for graph)
-  gridColumns: number; // Number of columns in the grid (1-4)
   showDetailPanel: boolean; // Whether to show the detail panel
 }
 
 const DEFAULT_PREFERENCES: LayoutPreferences = {
   gridWidth: 40, // 40% for grid, 60% for graph by default
-  gridColumns: 2, // 2 columns by default
   showDetailPanel: false, // Hidden by default
 };
 
@@ -40,14 +38,6 @@ export function useLayoutPreferences() {
     }));
   };
 
-  // Update grid columns
-  const setGridColumns = (columns: number) => {
-    setPreferences(prev => ({
-      ...prev,
-      gridColumns: Math.max(1, Math.min(4, columns)), // Restrict between 1 and 4 columns
-    }));
-  };
-
   // Toggle detail panel
   const toggleDetailPanel = (show?: boolean) => {
     setPreferences(prev => ({
@@ -59,7 +49,6 @@ export function useLayoutPreferences() {
   return {
     preferences,
     setGridWidth,
-    setGridColumns,
     toggleDetailPanel,
   };
 }
