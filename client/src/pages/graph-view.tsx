@@ -529,7 +529,77 @@ export default function GraphView() {
   });
   
   // Filtered bookmarks now come from either regular bookmarks or collection bookmarks
-  const filteredBookmarks = combinedBookmarksWithTags;
+  let filteredBookmarks = combinedBookmarksWithTags;
+  
+  // If a bookmark is selected, only show related bookmarks
+  if (selectedBookmarkId) {
+    const selectedBookmark = combinedBookmarksWithTags.find(b => b.id === selectedBookmarkId);
+    
+    if (selectedBookmark) {
+      // Get the selected bookmark's tags, URL domain, and other identifying info
+      const selectedTags = selectedBookmark.tags.map(tag => tag.name);
+      let selectedDomain = '';
+      try {
+        selectedDomain = new URL(selectedBookmark.url).hostname.replace(/^www\./, '');
+      } catch (e) {
+        console.error("Error parsing URL:", e);
+      }
+      
+      // Find related bookmarks that:
+      // 1. Share tags with the selected bookmark
+      // 2. Are from the same domain
+      // 3. Have related content based on insights
+      // 4. Are the selected bookmark itself
+      filteredBookmarks = combinedBookmarksWithTags.filter(bookmark => {
+        // Always include the selected bookmark
+        if (bookmark.id === selectedBookmarkId) {
+          return true;
+        }
+        
+        // Check for shared tags
+        const bookmarkTags = bookmark.tags.map(tag => tag.name);
+        const hasCommonTags = bookmarkTags.some(tag => selectedTags.includes(tag));
+        
+        // Check for same domain
+        let bookmarkDomain = '';
+        try {
+          bookmarkDomain = new URL(bookmark.url).hostname.replace(/^www\./, '');
+        } catch (e) {
+          // Skip URL parsing errors silently
+        }
+        const isSameDomain = bookmarkDomain && bookmarkDomain === selectedDomain;
+        
+        // Check for AI-identified relationships through insights (if available)
+        // Look for related links/content connections (checking if bookmark's URL appears in selected's insights)
+        let hasContentRelationship = false;
+        
+        // Check if selected bookmark has insights with related links
+        if (selectedBookmark.insights && selectedBookmark.insights.related_links && 
+            selectedBookmark.insights.related_links.length > 0) {
+          // See if the current bookmark's URL is mentioned in the selected bookmark's related links
+          hasContentRelationship = selectedBookmark.insights.related_links.some(link => 
+            bookmark.url && link.includes(bookmark.url)
+          );
+        }
+        
+        // Also check the reverse - if the current bookmark mentions the selected bookmark
+        if (!hasContentRelationship && bookmark.insights && bookmark.insights.related_links && 
+            bookmark.insights.related_links.length > 0) {
+          hasContentRelationship = bookmark.insights.related_links.some(link => 
+            selectedBookmark.url && link.includes(selectedBookmark.url)
+          );
+        }
+        
+        // Include if it has common tags, same domain, or content relationship
+        return hasCommonTags || isSameDomain || hasContentRelationship;
+      });
+      
+      // If no related bookmarks found (only the selected one), show all bookmarks
+      if (filteredBookmarks.length <= 1) {
+        filteredBookmarks = combinedBookmarksWithTags;
+      }
+    }
+  }
   
   // Sort bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
