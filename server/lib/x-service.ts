@@ -499,8 +499,9 @@ export class XService {
 
   /**
    * Convert an X tweet to a bookmark
+   * This method is async because it downloads media files
    */
-  convertTweetToBookmark(tweet: XTweet, author?: XUser, mediaMap?: { [key: string]: XMedia }): InsertBookmark {
+  async convertTweetToBookmark(tweet: XTweet, author?: XUser, mediaMap?: { [key: string]: XMedia }): Promise<InsertBookmark> {
     // Generate a normalized URL for the tweet
     const tweetUrl = `https://twitter.com/${author?.username || 'user'}/status/${tweet.id}`;
     
@@ -530,21 +531,50 @@ export class XService {
       });
     }
     
+    // Always initialize/reset the local media array
+    tweet.local_media = [];
+    
     // Then add URLs from media attachments if available
     if (tweet.attachments && tweet.attachments.media_keys && mediaMap) {
-      tweet.attachments.media_keys.forEach(mediaKey => {
+      // Use Promise.all to process all media downloads in parallel
+      const mediaPromises = tweet.attachments.media_keys.map(async (mediaKey) => {
         const mediaItem = mediaMap[mediaKey];
         if (mediaItem && (mediaItem.url || mediaItem.preview_image_url)) {
           // Use the direct URL if available, otherwise use preview image
           const mediaUrl = mediaItem.url || mediaItem.preview_image_url;
           if (mediaUrl) {
+            // Add the original URL to mediaUrls
             mediaUrls.push(mediaUrl);
             
-            // Also download the media for local storage
-            this.downloadAndStoreMedia(mediaKey, mediaUrl, tweet.id);
+            // Download the media for local storage
+            const localPath = await this.downloadAndStoreMedia(
+              mediaKey, 
+              mediaUrl, 
+              tweet.id, 
+              mediaItem.type
+            );
+            
+            // If download was successful, store the local path
+            if (localPath) {
+              // Add to local media files for this tweet
+              tweet.local_media.push({
+                original_url: mediaUrl,
+                local_path: localPath,
+                media_key: mediaKey,
+                type: mediaItem.type
+              });
+              
+              // Also add the local path to mediaUrls for the bookmark
+              mediaUrls.push(localPath);
+              
+              console.log(`X Sync: Added local media ${localPath} for tweet ${tweet.id}`);
+            }
           }
         }
       });
+      
+      // Wait for all media downloads to complete
+      await Promise.all(mediaPromises);
     }
     
     // Create a bookmark
@@ -772,8 +802,15 @@ export class XService {
     for (const tweet of allBookmarks.tweets) {
       try {
         const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
-        const bookmarkData = this.convertTweetToBookmark(tweet, author, allBookmarks.media);
+        
+        // Convert tweet to bookmark (now async to handle media downloads)
+        const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
         bookmarkData.user_id = userId;
+        
+        // Log if we downloaded any media
+        if (tweet.local_media && tweet.local_media.length > 0) {
+          console.log(`X Sync: Downloaded ${tweet.local_media.length} media files for tweet ${tweet.id}`);
+        }
         
         // Check if bookmark already exists
         const existingBookmark = await this.findExistingBookmark(userId, tweet.id);
