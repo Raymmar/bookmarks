@@ -15,6 +15,7 @@ import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 import { bookmarkService } from "./lib/bookmark-service";
 import { setupAuth } from "./auth";
 import { xService } from "./lib/x-service";
+import fs from "fs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -1691,6 +1692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = (req.user as Express.User).id;
+      console.log('Starting X.com bookmark sync for user:', userId);
       
       try {
         // Sync bookmarks using X service
@@ -1723,6 +1725,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing X.com bookmarks:", error);
       res.status(500).json({ error: "Failed to sync X.com bookmarks" });
+    }
+  });
+  
+  // X.com media test route
+  app.get("/api/x/media-test", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userId = (req.user as Express.User).id;
+      console.log('Testing X.com media download functionality for user:', userId);
+      
+      // Provide summary of public media folder
+      const mediaDir = 'public/media/tweets';
+      
+      // Check if directory exists and list tweet folders
+      let tweetFolders = [];
+      if (fs.existsSync(mediaDir)) {
+        try {
+          tweetFolders = fs.readdirSync(mediaDir);
+        } catch (e) {
+          console.error('Error reading media directory:', e);
+        }
+      }
+      
+      // Get info about downloaded media files
+      const mediaInfo = {
+        folders: tweetFolders.length,
+        mediaFiles: 0,
+        details: {}
+      };
+      
+      // Check individual tweet folders for media files
+      for (const tweetId of tweetFolders) {
+        const tweetDir = `${mediaDir}/${tweetId}`;
+        try {
+          if (fs.statSync(tweetDir).isDirectory()) {
+            const mediaFiles = fs.readdirSync(tweetDir);
+            mediaInfo.mediaFiles += mediaFiles.length;
+            mediaInfo.details[tweetId] = {
+              fileCount: mediaFiles.length,
+              files: mediaFiles
+            };
+          }
+        } catch (e) {
+          console.error(`Error reading media files for tweet ${tweetId}:`, e);
+        }
+      }
+      
+      res.json({
+        message: 'Media download test',
+        mediaFolderExists: fs.existsSync(mediaDir),
+        mediaInfo,
+        userId
+      });
+    } catch (error) {
+      console.error("Error testing X.com media download:", error);
+      res.status(500).json({ error: "Failed to test X.com media download" });
     }
   });
   
