@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ForceDirectedGraph } from "@/components/force-directed-graph-unpinned";
-import { SidebarPanel } from "@/components/sidebar-panel";
 import { FilterControls } from "@/components/filter-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger
 } from "@/components/ui/popover";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { X, LayoutGrid, Network, Search, ChevronUp, ChevronDown, BookmarkPlus, SearchX } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -26,6 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Bookmark } from "@shared/types";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
+import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
+import { BookmarkGrid } from "@/components/responsive-bookmark-grid";
 import { useCollectionBookmarksForGraph, useMultiCollectionBookmarksForGraph } from "@/hooks/use-collection-queries";
 
 // Tag interfaces
@@ -349,7 +351,9 @@ export default function GraphView() {
   const isLoading = isLoadingBookmarks || isLoadingTags || isLoadingBookmarkTags || 
                   isLoadingSingleCollection || isLoadingMultiCollections;
   
-  const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
+  const getSelectedBookmark = () => {
+    return bookmarks.find(b => b.id === selectedBookmarkId);
+  };
   
   // When a bookmark is selected, center it in the graph
   const handleSelectBookmark = (id: string) => {
@@ -714,16 +718,82 @@ export default function GraphView() {
     }
   };
   
+  // Prepare the layout preferences hook here
+  const layoutPreferences = (() => {
+    const [preferences, setPreferences] = useState(() => {
+      // Initialize from localStorage or use defaults
+      const savedPrefs = localStorage.getItem('layoutPreferences');
+      if (savedPrefs) {
+        try {
+          return JSON.parse(savedPrefs);
+        } catch (e) {
+          console.error('Failed to parse saved layout preferences:', e);
+          return {
+            gridWidth: 40, // 40% for grid, 60% for graph by default
+            gridColumns: 2, // 2 columns by default
+            showDetailPanel: false, // Hidden by default
+          };
+        }
+      }
+      return {
+        gridWidth: 40,
+        gridColumns: 2,
+        showDetailPanel: false,
+      };
+    });
+
+    // Save preferences to localStorage whenever they change
+    useEffect(() => {
+      localStorage.setItem('layoutPreferences', JSON.stringify(preferences));
+    }, [preferences]);
+
+    // Update grid width
+    const setGridWidth = (width: number) => {
+      setPreferences(prev => ({
+        ...prev,
+        gridWidth: Math.max(20, Math.min(80, width)), // Restrict between 20% and 80%
+      }));
+    };
+
+    // Update grid columns
+    const setGridColumns = (columns: number) => {
+      setPreferences(prev => ({
+        ...prev,
+        gridColumns: Math.max(1, Math.min(4, columns)), // Restrict between 1 and 4 columns
+      }));
+    };
+
+    // Toggle detail panel
+    const toggleDetailPanel = (show?: boolean) => {
+      setPreferences(prev => ({
+        ...prev,
+        showDetailPanel: show !== undefined ? show : !prev.showDetailPanel,
+      }));
+    };
+
+    return {
+      preferences,
+      setGridWidth,
+      setGridColumns,
+      toggleDetailPanel,
+    };
+  })();
+
+  // When a bookmark is selected, show the detail panel
+  useEffect(() => {
+    if (selectedBookmarkId) {
+      layoutPreferences.toggleDetailPanel(true);
+    }
+  }, [selectedBookmarkId]);
+
   return (
     <div className="flex flex-1 h-full w-full">
       {/* Main content column */}
       <div className="flex-1 flex flex-col h-full w-full">
-        {/* Header section removed as it's no longer necessary */}
-        
-        {/* Search and filters section - without tags */}
+        {/* Unified navigation bar */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 w-full">
           {/* Search input and filter row */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1">
               <Input
                 type="text"
@@ -841,7 +911,7 @@ export default function GraphView() {
         </div>
         
         {/* Content section */}
-        <div className="flex-1 bg-gray-50 p-4 overflow-hidden w-full">
+        <div className="flex-1 bg-gray-50 overflow-hidden w-full">
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -875,19 +945,101 @@ export default function GraphView() {
               </div>
             </div>
           ) : (
-            // Always show graph in the main content area - removed the viewMode === "graph" conditional
-            <div className="h-full border border-gray-200 rounded-lg overflow-hidden bg-white">
-              {/* Removed the floating bookmark count indicator */}
-              <ForceDirectedGraph
-                bookmarks={filteredBookmarks}
-                insightLevel={insightLevel}
-                onNodeClick={handleSelectBookmark}
-                onTagClick={handleTagClick}
-                onDomainClick={handleDomainSelection}
-                selectedBookmarkId={selectedBookmarkId}
-                visibleNodeTypes={visibleNodeTypes}
-              />
-            </div>
+            // Use ResizablePanelGroup for layout
+            <ResizablePanelGroup 
+              direction="horizontal" 
+              className="h-full rounded-lg overflow-hidden"
+              onLayout={(sizes) => {
+                // Only handle the resize if we have two panels (sizes array has length 2)
+                if (sizes.length === 2) {
+                  const gridWidth = Math.round(sizes[1]);
+                  layoutPreferences.setGridWidth(gridWidth);
+                }
+              }}
+            >
+              {/* Graph panel */}
+              <ResizablePanel 
+                defaultSize={100 - layoutPreferences.preferences.gridWidth} 
+                minSize={20}
+                className="h-full"
+              >
+                <div className="h-full border border-gray-200 overflow-hidden bg-white">
+                  <ForceDirectedGraph
+                    bookmarks={filteredBookmarks}
+                    insightLevel={insightLevel}
+                    onNodeClick={handleSelectBookmark}
+                    onTagClick={handleTagClick}
+                    onDomainClick={handleDomainSelection}
+                    selectedBookmarkId={selectedBookmarkId}
+                    visibleNodeTypes={visibleNodeTypes}
+                  />
+                </div>
+              </ResizablePanel>
+              
+              {/* Resizable handle with visual indicator */}
+              <ResizableHandle withHandle />
+              
+              {/* Grid panel */}
+              <ResizablePanel 
+                defaultSize={layoutPreferences.preferences.gridWidth} 
+                minSize={20}
+                className="h-full"
+              >
+                <div className="flex h-full">
+                  {/* Bookmark grid with adjustable columns */}
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel ? 'w-1/2' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
+                    <div className="h-14 border-b border-gray-200 px-3 flex items-center justify-between">
+                      <h2 className="text-lg font-semibold">Bookmarks</h2>
+                      <div className="flex items-center space-x-2">
+                        {/* Column controls */}
+                        <div className="flex border rounded overflow-hidden">
+                          {[1, 2, 3, 4].map(cols => (
+                            <button
+                              key={cols}
+                              className={`px-2 py-1 text-sm ${layoutPreferences.preferences.gridColumns === cols ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                              onClick={() => layoutPreferences.setGridColumns(cols)}
+                            >
+                              {cols}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <BookmarkGrid
+                      bookmarks={sortedBookmarks}
+                      selectedBookmarkId={selectedBookmarkId}
+                      onSelectBookmark={handleSelectBookmark}
+                      isLoading={isLoading}
+                      columns={layoutPreferences.preferences.gridColumns}
+                    />
+                  </div>
+                  
+                  {/* Detail panel (conditionally shown) */}
+                  {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
+                    <div className="w-1/2 border-l border-gray-200 bg-white overflow-auto">
+                      <BookmarkDetailPanel
+                        bookmark={getSelectedBookmark()}
+                        onClose={() => {
+                          setSelectedBookmarkId(null);
+                          layoutPreferences.toggleDetailPanel(false);
+                          
+                          // Only trigger zoom-out when explicitly closing detail view
+                          // with no new selection being made
+                          setTimeout(() => {
+                            // This event will be handled by the graph component to reset view
+                            const event = new CustomEvent('centerFullGraph', { 
+                              detail: { source: 'closeDetail' } 
+                            });
+                            document.dispatchEvent(event);
+                          }, 50);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
           )}
         </div>
         
@@ -963,7 +1115,7 @@ export default function GraphView() {
                   }, 50);
                 }}
               >
-                {selectedBookmark?.title || 'Bookmark'}
+                {getSelectedBookmark()?.title || 'Bookmark'}
                 <X 
                   className="h-3 w-3 ml-1" 
                   onClick={(e) => {
@@ -1170,35 +1322,6 @@ export default function GraphView() {
             })()}
           </div>
         </div>
-      </div>
-      
-      {/* Right Sidebar Panel - Now always show it on larger screens */}
-      <div className="hidden lg:block w-120 border-l border-gray-200 bg-white overflow-y-auto h-full flex-shrink-0">
-        <SidebarPanel
-          bookmarks={sortedBookmarks}
-          selectedBookmark={selectedBookmark}
-          onSelectBookmark={handleSelectBookmark}
-          onCloseDetail={() => {
-            setSelectedBookmarkId(null);
-            
-            // Only trigger zoom-out when explicitly closing detail view
-            // with no new selection being made
-            setTimeout(() => {
-              // This event will be handled by the graph component to reset view
-              const event = new CustomEvent('centerFullGraph', { 
-                detail: { source: 'closeDetail' } 
-              });
-              document.dispatchEvent(event);
-            }, 50);
-          }}
-          isLoading={isLoading}
-          sortOrder={sortOrder}
-          onSortChange={(value) => {
-            // Persist sort order to localStorage
-            localStorage.setItem('bookmarkSortOrder', value);
-            setSortOrder(value);
-          }}
-        />
       </div>
 
       {/* Add Bookmark Dialog */}
