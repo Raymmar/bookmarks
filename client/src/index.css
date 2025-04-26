@@ -18,11 +18,11 @@
   .masonry-grid {
     display: flex;
     width: 100%;
-    margin-left: -1rem; /* Adjust for the gutter */
+    margin-left: -0.75rem; /* Slightly smaller gutter to optimize space */
   }
   
   .masonry-grid-column {
-    padding-left: 1rem; /* Gutter size */
+    padding-left: 0.75rem; /* Gutter size */
     background-clip: padding-box;
   }
   

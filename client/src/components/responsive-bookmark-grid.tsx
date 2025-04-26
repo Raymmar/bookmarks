@@ -19,9 +19,9 @@ export function BookmarkGrid({
   const [breakpointCols, setBreakpointCols] = useState(2);
   
   // Constants for minimum and maximum card widths (in pixels)
-  const MIN_CARD_WIDTH = 360;
-  const MAX_CARD_WIDTH = 480;
-  const GRID_GAP = 16; // 1rem = 16px
+  const MIN_CARD_WIDTH = 300;
+  const MAX_CARD_WIDTH = 360;
+  const GRID_GAP = 12; // 0.75rem = 12px
   
   // Effect to calculate optimal number of columns based on container width
   useEffect(() => {
@@ -33,8 +33,9 @@ export function BookmarkGrid({
       // Calculate how many columns can fit
       const maxPossibleColumns = Math.floor((containerWidth + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP));
       
-      // Ensure at least 1 column, at most 4 columns
-      const columns = Math.max(1, Math.min(4, maxPossibleColumns));
+      // Ensure at least 1 column, at most 5 columns
+      // Using a higher max column count for better space utilization
+      const columns = Math.max(1, Math.min(5, maxPossibleColumns));
       
       setBreakpointCols(columns);
     };
