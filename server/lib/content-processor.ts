@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/resources/chat/completions";
 import { storage } from "../storage";
 import { processAITags } from "./tag-normalizer";
 
@@ -197,33 +197,39 @@ Format your response as valid JSON with these exact keys:
         console.log(`Including ${twitterImageUrls.length} image URLs in the analysis request`);
         console.log(`Image URLs being sent to OpenAI: ${JSON.stringify(twitterImageUrls)}`);
         
-        // Create a multimodal content array that includes both text and images
-        const multiModalContent: Array<{
-          type: "text" | "image_url";
-          text?: string;
-          image_url?: { url: string };
-        }> = [
+        // Create a multimodal content array with proper typing for OpenAI SDK
+        const multiModalContent: ChatCompletionContentPart[] = [
           {
             type: "text",
             text: content || url || "Please analyze the attached images and provide insights."
-          }
+          } as ChatCompletionContentPart
         ];
         
         // Add each image URL to the content
-        twitterImageUrls.forEach(imageUrl => {
-          console.log(`Adding image URL to multimodal content: ${imageUrl}`);
-          multiModalContent.push({
-            type: "image_url",
-            image_url: {
-              url: imageUrl
+        for (const imageUrl of twitterImageUrls) {
+          try {
+            console.log(`Adding image URL to multimodal content: ${imageUrl}`);
+            
+            // Ensure imageUrl is a valid URL string
+            if (typeof imageUrl === 'string' && imageUrl.startsWith('https://')) {
+              multiModalContent.push({
+                type: "image_url",
+                image_url: {
+                  url: imageUrl
+                }
+              } as ChatCompletionContentPart);
+            } else {
+              console.warn(`Skipping invalid image URL: ${imageUrl}`);
             }
-          });
-        });
+          } catch (error) {
+            console.error(`Error adding image URL to multimodal content: ${error}`);
+          }
+        }
         
-        // Add the multimodal content to the messages
+        // Add the multimodal content to the messages with proper typing
         messages.push({
           role: "user",
-          content: multiModalContent as any // Temporary type assertion to avoid TypeScript error
+          content: multiModalContent
         });
         
         console.log(`Multimodal request prepared with ${multiModalContent.length} content parts (${multiModalContent.length - 1} images)`);
