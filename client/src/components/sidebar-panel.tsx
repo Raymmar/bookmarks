@@ -71,7 +71,7 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   
   return (
     <div 
-      className={`rounded-lg border cursor-pointer transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${
+      className={`rounded-lg border cursor-pointer transition-all duration-300 ease-in-out overflow-hidden flex flex-col shadow-sm hover:shadow-md ${
         isSelected
           ? "bg-primary-50 border-primary" 
           : "bg-white border-gray-200 hover:border-gray-300"
@@ -220,7 +220,7 @@ export function SidebarPanel({
             No bookmarks found. Try adjusting your filters.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 auto-rows-auto transition-all">
+          <div className="grid grid-cols-2 gap-3 auto-rows-auto transition-all masonry-grid">
             {bookmarks.map((bookmark) => {
               // Type assertion to ensure TypeScript recognizes bookmark properties
               const typedBookmark = bookmark as unknown as {
@@ -246,7 +246,8 @@ export function SidebarPanel({
                 >
                   <BookmarkCard
                     bookmark={bookmark}
-                    isSelected={selectedBookmark ? selectedBookmark.id === typedBookmark.id : false}
+                    isSelected={selectedBookmark ? 
+                      (selectedBookmark as unknown as {id: string}).id === typedBookmark.id : false}
                     onClick={() => onSelectBookmark(typedBookmark.id)}
                   />
                 </div>
