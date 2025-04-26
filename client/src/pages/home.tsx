@@ -21,7 +21,10 @@ export default function Home() {
     const savedViewMode = localStorage.getItem('bookmarkViewMode');
     return savedViewMode || "cards";
   });
-  const [sortOrder, setSortOrder] = useState("newest");
+  const [sortOrder, setSortOrder] = useState<string>(() => {
+    const savedSort = localStorage.getItem('bookmarkSortOrder');
+    return savedSort || "newest";
+  });
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [insightLevel, setInsightLevel] = useState(1);
   const queryClient = useQueryClient();
@@ -101,7 +104,11 @@ export default function Home() {
           
           <div className="flex items-center space-x-2">
             <div className="relative">
-              <Select value={viewMode} onValueChange={setViewMode}>
+              <Select value={viewMode} onValueChange={(value) => {
+                // Persist view mode to localStorage
+                localStorage.setItem('bookmarkViewMode', value);
+                setViewMode(value);
+              }}>
                 <SelectTrigger className="pl-3 pr-8 py-2">
                   <SelectValue placeholder="View mode" />
                 </SelectTrigger>
@@ -129,7 +136,11 @@ export default function Home() {
             </div>
             
             <div className="relative">
-              <Select value={sortOrder} onValueChange={setSortOrder}>
+              <Select value={sortOrder} onValueChange={(value) => {
+                // Persist sort order to localStorage
+                localStorage.setItem('bookmarkSortOrder', value);
+                setSortOrder(value);
+              }}>
                 <SelectTrigger className="pl-3 pr-8 py-2">
                   <SelectValue placeholder="Sort order" />
                 </SelectTrigger>
@@ -163,7 +174,11 @@ export default function Home() {
           </div>
         ) : (
           <>
-            <Tabs value={viewMode} onValueChange={setViewMode} className="space-y-4">
+            <Tabs value={viewMode} onValueChange={(value) => {
+              // Persist view mode to localStorage
+              localStorage.setItem('bookmarkViewMode', value);
+              setViewMode(value);
+            }} className="space-y-4">
               <div className="hidden">
                 <TabsList>
                   <TabsTrigger value="cards">Cards</TabsTrigger>
