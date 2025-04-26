@@ -971,10 +971,10 @@ export default function GraphView() {
               {/* Grid panel */}
               <ResizablePanel 
                 defaultSize={layoutPreferences.preferences.gridWidth} 
-                minSize={layoutPreferences.preferences.showDetailPanel ? 40 : 20}
+                minSize={layoutPreferences.preferences.showDetailPanel ? 60 : 20}
                 className="h-full"
               >
-                <div className="flex h-full w-full">
+                <div className={`flex h-full w-full ${layoutPreferences.preferences.showDetailPanel ? 'min-w-[720px]' : ''}`}>
                   {/* Bookmark grid with adjustable columns */}
                   <div className={`h-full ${layoutPreferences.preferences.showDetailPanel ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
                     <BookmarkGrid
@@ -987,7 +987,7 @@ export default function GraphView() {
                   
                   {/* Detail panel (conditionally shown) */}
                   {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
-                    <div className="w-1/2 min-w-[400px] border-l border-gray-200 bg-white overflow-auto">
+                    <div className="w-1/2 min-w-[360px] border-l border-gray-200 bg-white overflow-auto">
                       <BookmarkDetailPanel
                         bookmark={getSelectedBookmark()}
                         onClose={() => {
