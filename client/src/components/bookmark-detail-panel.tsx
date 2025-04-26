@@ -973,7 +973,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             {aiProcessingStatus === 'processing' && (
               <div className="flex items-center text-xs text-amber-600">
                 <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                Processing...
+                <span id={`ai-processing-${bookmark.id}`}>Processing...</span>
               </div>
             )}
             {aiProcessingStatus === 'completed' && bookmark.insights?.summary && (
@@ -1023,7 +1023,23 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           ) : (
             <div className="text-sm text-gray-500 italic">
               {aiProcessingStatus === 'pending' && "AI hasn't analyzed this content yet. Click 'Analyze Content' to start."}
-              {aiProcessingStatus === 'processing' && "AI is currently analyzing this content..."}
+              {aiProcessingStatus === 'processing' && (
+                <>
+                  <div className="flex items-center mb-2">
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin text-amber-600" />
+                    <span className="text-amber-700">AI is analyzing this content...</span>
+                  </div>
+                  
+                  {/* Show placeholder loading state for better UX */}
+                  <div className="mt-3 animate-pulse">
+                    <div className="h-3 bg-gray-200 rounded w-full mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-5/6 mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-4/6 mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-full mb-1"></div>
+                    <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                </>
+              )}
               {aiProcessingStatus === 'completed' && "No insights available. Try re-analyzing the content."}
               {aiProcessingStatus === 'failed' && "AI analysis failed. Please try again."}
             </div>
