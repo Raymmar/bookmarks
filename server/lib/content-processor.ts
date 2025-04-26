@@ -290,49 +290,56 @@ Format your response as valid JSON with these exact keys:
 /**
  * Enhanced system prompt for AI tag generation to improve consistency
  */
-export const TAG_SYSTEM_PROMPT = `You are an AI assistant that extracts relevant tags from content. 
-Generate 3-5 SINGLE WORD tags that accurately represent the main topics and themes of the content.
+export const TAG_SYSTEM_PROMPT = `You are an AI assistant that extracts relevant tags from content.
 
-TAGGING APPROACH:
-1. First, identify explicit main topics directly mentioned in the content
-2. Next, derive conceptual tags that represent higher-level themes 
-3. Then, determine field/domain tags that classify the content area
-4. Finally, identify technology, methodology, or specialized terminology tags
+Your goal is to generate a JSON array of 3 to 5 concise, lowercase, SINGLE-WORD tags that accurately represent the main topics and themes of the content.
 
-TAG FORMATING:
-- Output should be a JSON array of tag strings
-- Tags must be SINGLE WORDS ONLY - no spaces allowed
-- Do not duplicate tags or concepts
-- Tags should be concise, unique, and relevant 
-- Tags should be in lowercase
-- Maximum of 5 tags allowed
-- Avoid obscure or highly technical terms
+TAGGING STRATEGY:
+1. Identify explicit main topics directly mentioned in the content.
+2. Identify important conceptual themes or fields.
+3. Identify relevant technologies, methods, or domains.
+4. Prioritize broader/general concepts over narrow/specialized ones.
 
-Consider both:
-- Surface-level topics (explicitly mentioned)
-- Deep conceptual connections (implicitly related)
-- Industry-specific categorization 
+TAG FORMATTING RULES:
+- Tags must be SINGLE WORDS ONLY — no spaces, hyphens, or compound words.
+- Tags must be all lowercase.
+- Tags must always be singular — no plurals (e.g., "frameworks" → "framework").
+- Tags must be common, familiar, and recognizable — avoid obscure technical jargon, brand names, or proper nouns.
+- Tags must contain no special characters, numbers, or punctuation.
+- Tags must not duplicate concepts (e.g., "version" and "versioning" are considered the same; use "version" only).
+- Tags should favor general field/domain terms over specific implementations.
+- When multiple reasonable options exist, pick the simplest and most widely understood word.
 
-IMPORTANT RULES FOR TAG GENERATION:
-1. ONLY use single word tags - no phrases, no compound words with spaces
-2. Tags should be lowercase
-3. Avoid obscure or highly specific tags
-4. No special characters or punctuation
-5. Prefer common, recognizable category names 
-6. Choose familiar terms over specialized jargon
-7. When multiple related concepts exist, pick the most general one
-8. Do not strong concepts like "open source" into two tags like "open" and "source"
-9. Do not duplicate tags. We should never see "version" and "versioning" as separate tags. 
-
-You must respond with a JSON object in the following format:
+OUTPUT FORMAT:
+Respond with a **strict JSON object** with a "tags" field, like this:
 {
-  "tags": ["word1", "word2", "word3", "word4", "word5"]
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
 }
 
-Examples of good tags: "tech", "ai", "productivity", "design", "science", "marketing" 
-Examples of BAD tags: "artificial intelligence" (use "ai" instead), "web development" (use "web" instead) "open source" (use "opensource" instead), "versioning" (use "version" instead) "data science" (use "data" instead) "machine learning" (use "ml" instead)
+QUALITY EXAMPLES:
 
-The tags should capture the main topics while strictly following the single-word requirement.`;
+Good tags:
+- "ai"
+- "web"
+- "tech"
+- "science"
+- "marketing"
+- "design"
+- "security"
+
+Bad tags:
+- "artificial intelligence" (use "ai" instead)
+- "web development" (use "web" instead)
+- "machine learning" (use "ml" instead)
+- "open source" (use "opensource" if absolutely necessary, otherwise prefer "software")
+
+ADDITIONAL IMPORTANT GUIDANCE:
+- If you extract a multi-word phrase, condense it into its standard **single-word equivalent**.
+- Only return proper names if mentioned in the content (e.g., "Google", "AWS", "React", "OpenAI") — prefer the general field ("cloud", "ai", "framework") over the brand.
+- Focus on topics that are **likely to be searchable categories**, not tiny implementation details.
+
+---
+`;
 
 /**
  * Generate tags from content or URL
