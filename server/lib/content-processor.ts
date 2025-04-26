@@ -147,6 +147,9 @@ First, carefully examine the content to identify core concepts and themes
 Next, consider second-order implications and connections not explicitly stated
 Then, evaluate how this information relates to broader fields or domains that might not be explicitly mentioned.
 Finally, synthesize a comprehensive analysis that goes beyond surface-level understanding without regurgitating or restating the original content.
+Your analysis should leverage the associated image for increased understanding.
+The image will almost always be more relevant than the text of the post as it will represent the idea being expressed in the post. 
+Your job is to read the image, understand the idea being expressed, and then write a summary that includes the idea expressed in the image as well as the text of the post.
 
 Your response MUST include:
 - A concise yet nuanced summary (250-500 words)
@@ -172,7 +175,7 @@ Format your response as valid JSON with these exact keys:
     
     // Add instructions for X.com tweets with media
     if (isXTweet && hasMediaUrls) {
-      systemPrompt += `\n\nThis content contains media (images) from X.com. Please analyze both the text content and the images to provide a comprehensive understanding. Describe the significance of the images and how they relate to the text content in your summary.`;
+      systemPrompt += `\n\nThis content contains media (images) from X.com. Please analyze both the text content and the images to provide a comprehensive understanding. Use this undestanding of the image to help contextualize the images and how they relate to the post and summary.`;
     }
 
     // Prepare messages for the API call
