@@ -14,15 +14,20 @@
 
 /* Custom styles for the Pinterest-style masonry grid */
 @layer components {
+  /* react-masonry-css styles */
   .masonry-grid {
-    /* Column settings are controlled dynamically via inline styles */
-    padding: 0;
-    margin: 0;
+    display: flex;
     width: 100%;
+    margin-left: -1rem; /* Adjust for the gutter */
   }
   
-  .masonry-grid > div {
-    break-inside: avoid;
+  .masonry-grid-column {
+    padding-left: 1rem; /* Gutter size */
+    background-clip: padding-box;
+  }
+  
+  /* Individual bookmark card styles */
+  .masonry-grid-column > div {
     margin-bottom: 1rem;
     display: block;
     border-radius: 0.75rem;
@@ -32,7 +37,7 @@
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   
-  .masonry-grid > div:hover {
+  .masonry-grid-column > div:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
@@ -63,12 +68,12 @@
     to { opacity: 1; transform: translateY(0); }
   }
   
-  .masonry-grid > div {
+  .masonry-grid-column > div {
     animation: fadeIn 0.3s ease-out forwards;
   }
   
   /* Different animation delays for a staggered effect */
-  .masonry-grid > div:nth-child(3n + 1) { animation-delay: 0.0s; }
-  .masonry-grid > div:nth-child(3n + 2) { animation-delay: 0.05s; }
-  .masonry-grid > div:nth-child(3n + 3) { animation-delay: 0.1s; }
+  .masonry-grid-column > div:nth-child(3n + 1) { animation-delay: 0.0s; }
+  .masonry-grid-column > div:nth-child(3n + 2) { animation-delay: 0.05s; }
+  .masonry-grid-column > div:nth-child(3n + 3) { animation-delay: 0.1s; }
 }

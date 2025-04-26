@@ -1,5 +1,6 @@
 import { Bookmark } from "@shared/types";
 import { useState, useEffect, useRef } from "react";
+import Masonry from "react-masonry-css";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
@@ -15,37 +16,27 @@ export function BookmarkGrid({
   isLoading,
 }: BookmarkGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [columns, setColumns] = useState(2);
+  const [breakpointCols, setBreakpointCols] = useState(2);
   
   // Constants for minimum and maximum card widths (in pixels)
   const MIN_CARD_WIDTH = 360;
   const MAX_CARD_WIDTH = 480;
   const GRID_GAP = 16; // 1rem = 16px
   
-  // Effect to calculate columns based on container width
+  // Effect to calculate optimal number of columns based on container width
   useEffect(() => {
     const calculateColumns = () => {
       if (!containerRef.current) return;
       
       const containerWidth = containerRef.current.clientWidth;
       
-      // Calculate how many cards can fit based on min/max constraints
-      // Subtract gap space from available width before calculating
-      const availableWidth = containerWidth - GRID_GAP;
-      
-      // Calculate ideal columns based on minimum width
-      const maxPossibleColumns = Math.floor(availableWidth / MIN_CARD_WIDTH);
+      // Calculate how many columns can fit
+      const maxPossibleColumns = Math.floor((containerWidth + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP));
       
       // Ensure at least 1 column, at most 4 columns
-      const idealColumns = Math.max(1, Math.min(4, maxPossibleColumns));
+      const columns = Math.max(1, Math.min(4, maxPossibleColumns));
       
-      // If the resulting card width would be too large, add another column
-      const cardWidth = availableWidth / idealColumns;
-      if (cardWidth > MAX_CARD_WIDTH && idealColumns < 4) {
-        setColumns(idealColumns + 1);
-      } else {
-        setColumns(idealColumns);
-      }
+      setBreakpointCols(columns);
     };
     
     // Calculate on mount
@@ -66,12 +57,6 @@ export function BookmarkGrid({
       resizeObserver.disconnect();
     };
   }, []);
-  
-  // Set up masonry grid styles - column layout instead of grid for masonry effect
-  const masonryStyle = {
-    columnCount: columns,
-    columnGap: '1rem',
-  };
 
   return (
     <div className="p-3 overflow-auto h-full" ref={containerRef}>
@@ -87,18 +72,20 @@ export function BookmarkGrid({
           No bookmarks found. Try adjusting your filters.
         </div>
       ) : (
-        <div style={masonryStyle} className="masonry-grid">
-          {bookmarks.map((bookmark) => {
-            return (
-              <BookmarkCard
-                key={bookmark.id}
-                bookmark={bookmark}
-                isSelected={selectedBookmarkId === bookmark.id}
-                onClick={() => onSelectBookmark(bookmark.id)}
-              />
-            );
-          })}
-        </div>
+        <Masonry
+          breakpointCols={breakpointCols}
+          className="masonry-grid"
+          columnClassName="masonry-grid-column"
+        >
+          {bookmarks.map((bookmark) => (
+            <BookmarkCard
+              key={bookmark.id}
+              bookmark={bookmark}
+              isSelected={selectedBookmarkId === bookmark.id}
+              onClick={() => onSelectBookmark(bookmark.id)}
+            />
+          ))}
+        </Masonry>
       )}
     </div>
   );
