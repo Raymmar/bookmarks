@@ -982,19 +982,9 @@ export default function GraphView() {
                 className="h-full"
               >
                 <div className={`flex h-full w-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'min-w-[720px]' : ''}`}>
-                  {/* Bookmark grid with adjustable columns */}
-                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
-                    <BookmarkGrid
-                      bookmarks={sortedBookmarks}
-                      selectedBookmarkId={selectedBookmarkId}
-                      onSelectBookmark={handleSelectBookmark}
-                      isLoading={isLoading}
-                    />
-                  </div>
-                  
-                  {/* Detail panel (conditionally shown) */}
+                  {/* Detail panel (conditionally shown on left side) */}
                   {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
-                    <div className="w-1/2 min-w-[360px] border-l border-gray-200 bg-white overflow-auto">
+                    <div className="w-1/2 min-w-[360px] border-r border-gray-200 bg-white overflow-auto">
                       <BookmarkDetailPanel
                         bookmark={getSelectedBookmark()}
                         onClose={() => {
@@ -1014,6 +1004,16 @@ export default function GraphView() {
                       />
                     </div>
                   )}
+                  
+                  {/* Bookmark grid (always on right) */}
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
+                    <BookmarkGrid
+                      bookmarks={sortedBookmarks}
+                      selectedBookmarkId={selectedBookmarkId}
+                      onSelectBookmark={handleSelectBookmark}
+                      isLoading={isLoading}
+                    />
+                  </div>
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
