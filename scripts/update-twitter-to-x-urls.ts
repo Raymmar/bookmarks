@@ -7,7 +7,7 @@
 
 import { db } from '../server/db';
 import * as schema from '../shared/schema';
-import { eq, like } from 'drizzle-orm';
+import { eq, like, sql } from 'drizzle-orm';
 
 /**
  * Main migration function to update Twitter URLs to X URLs
@@ -17,7 +17,7 @@ async function updateTwitterToXUrls() {
 
   try {
     // Count how many bookmarks have twitter.com URLs
-    const countResult = await db.select({ count: db.fn.count() })
+    const countResult = await db.select({ count: sql`count(*)` })
       .from(schema.bookmarks)
       .where(like(schema.bookmarks.url, 'https://twitter.com/%'));
 
@@ -39,33 +39,39 @@ async function updateTwitterToXUrls() {
 
     console.log(`Retrieved ${bookmarksToUpdate.length} bookmarks to update`);
 
-    // Process each bookmark
+    // Process bookmarks in batches to avoid timeouts
     let updated = 0;
     let errors = 0;
-
-    for (const bookmark of bookmarksToUpdate) {
-      try {
-        // Replace twitter.com with x.com in the URL
-        const newUrl = bookmark.url.replace('https://twitter.com/', 'https://x.com/');
-        
-        // Update the bookmark
-        await db.update(schema.bookmarks)
-          .set({ 
-            url: newUrl,
-            updated_at: new Date() 
-          })
-          .where(eq(schema.bookmarks.id, bookmark.id));
-        
-        updated++;
-        
-        // Log progress periodically
-        if (updated % 20 === 0 || updated === bookmarksToUpdate.length) {
-          console.log(`Updated ${updated}/${bookmarksToUpdate.length} bookmarks`);
+    const batchSize = 20;
+    
+    // Create batches of bookmarks to process
+    for (let i = 0; i < bookmarksToUpdate.length; i += batchSize) {
+      const batch = bookmarksToUpdate.slice(i, i + batchSize);
+      console.log(`Processing batch ${i/batchSize + 1} (${i} to ${Math.min(i + batchSize, bookmarksToUpdate.length)})`);
+      
+      // Process this batch
+      for (const bookmark of batch) {
+        try {
+          // Replace twitter.com with x.com in the URL
+          const newUrl = bookmark.url.replace('https://twitter.com/', 'https://x.com/');
+          
+          // Update the bookmark
+          await db.update(schema.bookmarks)
+            .set({ 
+              url: newUrl,
+              updated_at: new Date() 
+            })
+            .where(eq(schema.bookmarks.id, bookmark.id));
+          
+          updated++;
+        } catch (error) {
+          console.error(`Error updating bookmark ${bookmark.id}:`, error);
+          errors++;
         }
-      } catch (error) {
-        console.error(`Error updating bookmark ${bookmark.id}:`, error);
-        errors++;
       }
+      
+      // Log progress after each batch
+      console.log(`Updated ${updated}/${bookmarksToUpdate.length} bookmarks`);
     }
 
     console.log('Migration complete');
@@ -80,17 +86,15 @@ async function updateTwitterToXUrls() {
   }
 }
 
-// Only run the function if this script is executed directly
-if (require.main === module) {
-  updateTwitterToXUrls()
-    .then(() => {
-      console.log('Migration completed successfully');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('Migration failed:', error);
-      process.exit(1);
-    });
-}
+// Run the function
+updateTwitterToXUrls()
+  .then(() => {
+    console.log('Migration completed successfully');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Migration failed:', error);
+    process.exit(1);
+  });
 
 export { updateTwitterToXUrls };
