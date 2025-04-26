@@ -192,8 +192,23 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           if (response.ok) {
             const statusData = await response.json();
             
-            if (statusData.aiProcessingComplete) {
-              setAiProcessingStatus('completed');
+            // If the API indicates processing is in progress, update the UI regardless of what we think
+            if (statusData.aiProcessingInProgress) {
+              // Only show processing status if we're not already showing completed
+              if (aiProcessingStatus !== 'completed') {
+                setAiProcessingStatus('processing');
+                setIsProcessingAi(true);
+              }
+            } else if (statusData.aiProcessingComplete) {
+              // If completed, update UI state and refresh bookmark data
+              if (aiProcessingStatus !== 'completed') {
+                setAiProcessingStatus('completed');
+                setIsProcessingAi(false);
+                
+                // Refresh bookmark data to show latest insights
+                queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}`] });
+                queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+              }
             }
           }
         } catch (error) {
@@ -203,7 +218,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       
       checkProcessingStatus();
     }
-  }, [bookmark, tags]);
+  }, [bookmark, tags, aiProcessingStatus, queryClient]);
   
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
@@ -241,67 +256,94 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           // Clean up the timers first
           cleanupTimers();
           
+          // Add a short delay to ensure backend processing is complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
           // Update the status
           setAiProcessingStatus('completed');
           setIsProcessingAi(false);
           
-          // Refresh bookmark data and fetch insights
-          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-          queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}`] });
-          queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
-          
-          // Fetch the updated insights
-          const insightsResponse = await fetch(`/api/bookmarks/${bookmark.id}/insights`);
-          let insightsData = null;
-          if (insightsResponse.ok) {
-            insightsData = await insightsResponse.json();
-            console.log("Fetched insights data:", insightsData);
+          // Fetch bookmark data with the new insights
+          const bookmarkResponse = await fetch(`/api/bookmarks/${bookmark.id}`);
+          if (!bookmarkResponse.ok) {
+            throw new Error(`Error fetching updated bookmark: ${bookmarkResponse.statusText}`);
           }
+          
+          const updatedBookmark = await bookmarkResponse.json();
+          console.log("Fetched updated bookmark with insights:", updatedBookmark);
+          
+          // Update local state with the new data
+          setBookmark(updatedBookmark);
+          
+          // Optimistically update the cache
+          queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], 
+            (oldBookmarks = []) => oldBookmarks.map(b => 
+              b.id === bookmark.id ? updatedBookmark : b
+            )
+          );
           
           // Fetch the updated tags
           const tagsResponse = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
-          let tagsData = null;
           if (tagsResponse.ok) {
-            tagsData = await tagsResponse.json();
+            const tagsData = await tagsResponse.json();
             console.log("Fetched tags data:", tagsData);
+            
             // Update the tags directly in state
             setTags(tagsData);
-          }
-          
-          // Update the bookmark with new insights if available
-          if (bookmark && insightsData) {
-            // Create a new bookmark object with the updated insights
-            const updatedBookmark = {
-              ...bookmark,
-              insights: insightsData,
-              ai_processing_status: 'completed' as any
-            };
-            // Update the bookmark ref
-            setBookmark(updatedBookmark);
-          }
-          
-          console.log("Optimistically updated bookmark with insights and tags from AI processing");
-          
-          // Notify the graph about the new tags for immediate visual updates
-          if (tagsData && Array.isArray(tagsData)) {
-            tagsData.forEach(tag => {
-              // Dispatch a custom event for each tag to update the graph
-              const event = new CustomEvent('tagChanged', { 
-                detail: { 
-                  bookmarkId: bookmark.id,
-                  tagId: tag.id,
-                  tagName: tag.name,
-                  action: 'add'
-                } 
+            
+            // Notify the graph about the new tags for immediate visual updates
+            if (tagsData && Array.isArray(tagsData)) {
+              const systemTags = tagsData.filter(tag => tag.type === 'system');
+              
+              // Update the tags-bookmark relationship in the cache
+              if (tagsData.length > 0) {
+                queryClient.setQueryData(["/api/bookmarks-tags"], 
+                  (oldData: any = {}) => ({
+                    ...oldData,
+                    [bookmark.id]: tagsData.map(tag => tag.id)
+                  })
+                );
+              }
+              
+              // Dispatch events for each tag for the graph visualization
+              tagsData.forEach(tag => {
+                const event = new CustomEvent('tagChanged', { 
+                  detail: { 
+                    bookmarkId: bookmark.id,
+                    tagId: tag.id,
+                    tagName: tag.name,
+                    action: 'add'
+                  } 
+                });
+                document.dispatchEvent(event);
               });
-              document.dispatchEvent(event);
-            });
+              
+              // Add special message about the number of AI generated tags
+              if (systemTags.length > 0) {
+                toast({
+                  title: "AI processing complete",
+                  description: `Generated ${systemTags.length} tags and insights for your bookmark`,
+                  variant: "default",
+                });
+              }
+            }
           }
           
-          toast({
-            title: "AI processing complete",
-            description: "The bookmark has been analyzed and insights are now available",
+          console.log("Successfully updated UI with insights and tags from AI processing");
+          
+          // After a short delay, invalidate queries to ensure everything is in sync
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks-tags"] });
+          }, 500);
+          
+          // Signal that an insight update has occurred
+          const insightEvent = new CustomEvent('bookmarkInsightsUpdated', { 
+            detail: { bookmarkId: bookmark.id } 
           });
+          document.dispatchEvent(insightEvent);
+          
         } catch (error) {
           console.error("Error updating UI with AI processing results:", error);
           setAiProcessingStatus('failed');
@@ -309,7 +351,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           
           toast({
             title: "Error updating results",
-            description: "There was an error fetching the results. Please try again.",
+            description: "Could not fetch the updated insights. Try refreshing the page.",
             variant: "destructive"
           });
         }
@@ -319,6 +361,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       pollingInterval = setInterval(async () => {
         try {
           if (!bookmark) {
+            cleanupTimers();
+            return;
+          }
+          
+          // Skip checking if we're not in processing state anymore
+          if (aiProcessingStatus !== 'processing') {
             cleanupTimers();
             return;
           }
@@ -333,30 +381,54 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             if (statusData.aiProcessingComplete) {
               // If processing is complete, update the UI
               updateUIWithResults();
+            } else if (statusData.aiProcessingFailed) {
+              // If processing explicitly failed, update UI
+              cleanupTimers();
+              setAiProcessingStatus('failed');
+              setIsProcessingAi(false);
+              
+              toast({
+                title: "AI processing failed",
+                description: "There was an error processing this content. Please try again.",
+                variant: "destructive"
+              });
             }
           }
         } catch (error) {
           console.error("Error checking processing status:", error);
+          // Don't change UI state on network errors - just continue polling
         }
-      }, 5000); // Check every 5 seconds
+      }, 3000); // Check every 3 seconds for more responsive updates
       
-      // Set timeout to prevent endless polling (timeout after 120 seconds)
+      // Set timeout to prevent endless polling (timeout after 2 minutes)
       timeoutId = setTimeout(() => {
         console.log("AI processing timeout reached");
         cleanupTimers();
         
-        // Check current status (using state reference rather than closure reference)
-        if (document.getElementById(`ai-processing-${bookmark.id}`)) {
+        // Check if we're still in processing state
+        if (aiProcessingStatus === 'processing') {
           setAiProcessingStatus('failed');
           setIsProcessingAi(false);
           
+          // Provide helpful feedback about the timeout
           toast({
             title: "AI processing taking longer than expected",
-            description: "Processing continues in the background. Check back later or refresh the page.",
+            description: bookmark.media_urls && bookmark.media_urls.length > 0
+              ? "Processing media content may take extra time. Check back later or refresh the page."
+              : "Processing continues in the background. Check back later or refresh the page.",
             variant: "default"
           });
+          
+          // Even on timeout, try to update UI once more after a short delay
+          // This handles race conditions where the processing completes right when the timeout fires
+          setTimeout(() => {
+            queryClient.invalidateQueries({ 
+              queryKey: [`/api/bookmarks/${bookmark.id}`],
+              exact: true
+            });
+          }, 2000);
         }
-      }, 120000); // Extended to 2 minutes for larger images
+      }, 120000); // 2 minutes timeout
       
     } catch (error) {
       console.error("Error triggering AI processing:", error);
