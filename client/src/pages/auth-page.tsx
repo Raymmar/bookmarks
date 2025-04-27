@@ -41,12 +41,12 @@ const AuthPage = () => {
     const formData = new FormData(e.currentTarget);
     const username = formData.get("username") as string;
     const password = formData.get("password") as string;
-    const email = formData.get("email") as string || null;
+    const email = formData.get("email") as string;
 
-    if (!username || !password) {
+    if (!username || !password || !email) {
       toast({
         title: "Error",
-        description: "Please enter both username and password",
+        description: "Please enter username, password, and email",
         variant: "destructive",
       });
       return;
@@ -111,8 +111,8 @@ const AuthPage = () => {
                       <Input id="new-username" name="username" required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email (optional)</Label>
-                      <Input id="email" name="email" type="email" />
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" name="email" type="email" required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="new-password">Password</Label>

@@ -43,7 +43,7 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   username: text("username").notNull().unique(),
-  email: text("email").unique(),
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
