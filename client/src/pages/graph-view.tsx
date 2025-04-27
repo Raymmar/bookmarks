@@ -550,17 +550,23 @@ export default function GraphView() {
   // Sort bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
     if (sortOrder === "newest") {
-      // For X.com/Twitter bookmarks, use created_at date when available
-      const aDate = a.created_at && a.source === 'x' ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
-      const bDate = b.created_at && b.source === 'x' ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
-      return bDate - aDate;
+      // Sort by date saved (bookmark creation date)
+      return new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime();
     } else if (sortOrder === "oldest") {
-      // For X.com/Twitter bookmarks, use created_at date when available
-      const aDate = a.created_at && a.source === 'x' ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
-      const bDate = b.created_at && b.source === 'x' ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+      // Sort by date saved (bookmark creation date)
+      return new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime();
+    } else if (sortOrder === "created_newest") {
+      // Sort by creation date (content creation date)
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+      return bDate - aDate;
+    } else if (sortOrder === "created_oldest") {
+      // Sort by creation date (content creation date)
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
       return aDate - bDate;
-    } else if (sortOrder === "recently_updated") {
-      // First compare updated_at timestamps
+    } else if (sortOrder === "updated_newest") {
+      // Sort by updated_at timestamp
       const aUpdated = a.updated_at ? new Date(a.updated_at).getTime() : new Date(a.date_saved).getTime();
       const bUpdated = b.updated_at ? new Date(b.updated_at).getTime() : new Date(b.date_saved).getTime();
       return bUpdated - aUpdated;
