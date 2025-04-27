@@ -96,23 +96,53 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username, password, and email are required" });
       }
 
+      // Check if username already exists
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
+      
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(req.body.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
 
+      // Create the user with hashed password
       const hashedPassword = await hashPassword(req.body.password);
       const user = await storage.createUser({
         username: req.body.username,
         password: hashedPassword,
-        email: req.body.email
+        email: req.body.email,
+        email_verified: false
       });
 
+      // Import email service here to avoid circular dependency
+      const { emailService } = await import("./services/email");
+      
+      // Generate verification token and set it in the database
+      const token = emailService.generateToken();
+      const expiryTimeInMs = 24 * 60 * 60 * 1000; // 24 hours
+      
+      await storage.setVerificationToken(user.id, token, expiryTimeInMs);
+      
+      // Send verification email
+      try {
+        await emailService.sendVerificationEmail(user, token);
+      } catch (emailError) {
+        console.error("Failed to send verification email:", emailError);
+        // We continue with the registration even if email sending fails
+      }
+
+      // Log the user in
       req.login(user, (err) => {
         if (err) return next(err);
         // Don't send password to client
         const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        res.status(201).json({
+          ...userWithoutPassword,
+          message: "Registration successful. Please check your email to verify your account."
+        });
       });
     } catch (err) {
       next(err);

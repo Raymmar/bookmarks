@@ -960,6 +960,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
   
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+  
   async createUser(user: InsertUser): Promise<User> {
     const [newUser] = await db
       .insert(users)
@@ -980,6 +985,108 @@ export class DatabaseStorage implements IStorage {
   async deleteUser(id: string): Promise<boolean> {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result.length > 0;
+  }
+  
+  // Email verification methods
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.verification_token, token));
+    return user || undefined;
+  }
+  
+  async setVerificationToken(userId: string, token: string, expiresIn: number): Promise<boolean> {
+    // Calculate expiration date (current time + expiresIn in milliseconds)
+    const expires = new Date(Date.now() + expiresIn);
+    
+    const [updatedUser] = await db
+      .update(users)
+      .set({ 
+        verification_token: token, 
+        verification_expires: expires,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+      
+    return !!updatedUser;
+  }
+  
+  async verifyEmail(token: string): Promise<User | undefined> {
+    // Find user with this token
+    const user = await this.getUserByVerificationToken(token);
+    if (!user) return undefined;
+    
+    // Check if token is expired
+    if (user.verification_expires && new Date(user.verification_expires) < new Date()) {
+      return undefined;
+    }
+    
+    // Verify the email by updating the user
+    const [updatedUser] = await db
+      .update(users)
+      .set({ 
+        email_verified: true,
+        verification_token: null,
+        verification_expires: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, user.id))
+      .returning();
+      
+    return updatedUser || undefined;
+  }
+  
+  // Password reset methods
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.reset_token, token));
+    return user || undefined;
+  }
+  
+  async setResetToken(userId: string, token: string, expiresIn: number): Promise<boolean> {
+    // Calculate expiration date (current time + expiresIn in milliseconds)
+    const expires = new Date(Date.now() + expiresIn);
+    
+    const [updatedUser] = await db
+      .update(users)
+      .set({ 
+        reset_token: token, 
+        reset_expires: expires,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+      
+    return !!updatedUser;
+  }
+  
+  async resetPassword(token: string, newPassword: string): Promise<boolean> {
+    // Find user with this token
+    const user = await this.getUserByResetToken(token);
+    if (!user) return false;
+    
+    // Check if token is expired
+    if (user.reset_expires && new Date(user.reset_expires) < new Date()) {
+      return false;
+    }
+    
+    // Reset the password by updating the user
+    const [updatedUser] = await db
+      .update(users)
+      .set({ 
+        password: newPassword,
+        reset_token: null,
+        reset_expires: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, user.id))
+      .returning();
+      
+    return !!updatedUser;
   }
   
   // Collections
