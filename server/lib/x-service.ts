@@ -572,7 +572,21 @@ export class XService {
       
       const data = await response.json() as any;
       
-      console.log(`X Folders: Folder API response:`, JSON.stringify(data, null, 2).substring(0, 500));
+      // Log the full API response structure to help debug pagination
+      console.log(`X Folders: Folder API full response structure:`, {
+        hasData: !!data.data,
+        dataLength: data.data ? data.data.length : 0,
+        hasIncludes: !!data.includes,
+        includesKeys: data.includes ? Object.keys(data.includes) : [],
+        hasMeta: !!data.meta,
+        metaKeys: data.meta ? Object.keys(data.meta) : [],
+        metaContent: data.meta ? data.meta : {},
+        hasErrors: !!data.errors,
+        errors: data.errors,
+        responseKeys: Object.keys(data)
+      });
+      
+      console.log(`X Folders: Folder API response sample:`, JSON.stringify(data, null, 2).substring(0, 500));
       
       // The folder-specific endpoint returns data in a different format
       // It might just return tweet IDs rather than full tweet objects with metadata
@@ -643,6 +657,15 @@ export class XService {
       
       // Extract next pagination token if available
       const nextToken = data.meta?.next_token;
+      
+      // Log detailed information about the pagination
+      console.log(`X Folders: Pagination info:`, {
+        tweetCount: tweets.length,
+        hasMeta: !!data.meta,
+        metaFields: data.meta ? Object.keys(data.meta) : [],
+        hasNextToken: !!nextToken,
+        nextToken: nextToken || 'none'
+      });
       
       console.log(`X Folders: Found ${tweets.length} bookmarks in folder ${folderId}`);
       return { tweets, users, nextToken, media };
