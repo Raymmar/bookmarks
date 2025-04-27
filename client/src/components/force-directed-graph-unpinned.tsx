@@ -1232,7 +1232,7 @@ export function ForceDirectedGraph({
       {/* Node info panel - fixed position in bottom left corner */}
       <div 
         id="tooltip" 
-        className="absolute bottom-4 left-4 bg-white p-3 rounded-md shadow-lg text-sm pointer-events-none opacity-0 transition-opacity z-50 min-w-[200px] border border-gray-200 text-left"
+        className="absolute bottom-4 left-4 right-4 bg-white p-3 rounded-md shadow-lg text-sm pointer-events-none opacity-0 transition-opacity z-50 min-w-[200px] border border-gray-200 text-left"
       >
         <div className="text-xs uppercase text-gray-400 font-semibold mb-1">Node Information</div>
       </div>
