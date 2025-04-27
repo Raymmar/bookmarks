@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCw, FolderPlus, Link, Cable, Twitter, Download } from "lucide-react";
+import { Loader2, RefreshCw, FolderPlus, Link, Cable, Twitter, Download, DownloadCloud } from "lucide-react";
 
 // Type definitions
 interface XConnectionStatus {
@@ -342,6 +342,87 @@ const XIntegrationPanel = () => {
       }
     }
   });
+  
+  // Sync bookmarks from a specific X.com folder
+  const syncFolderBookmarks = useMutation({
+    mutationFn: async (folderId: string) => {
+      try {
+        console.log(`Syncing bookmarks from folder: ${folderId}`);
+        const response = await fetch(`/api/x/sync/folder/${folderId}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          // Check for auth error specifically
+          if (response.status === 401 && data.action_required === 'reconnect') {
+            throw new Error('auth_expired');
+          }
+          
+          // Check for folder not found error
+          if (response.status === 404 && data.error === 'Folder not found for this user') {
+            throw new Error('folder_not_found');
+          }
+          
+          throw new Error(data.error || 'Failed to sync folder bookmarks');
+        }
+        
+        return data;
+      } catch (error) {
+        throw error;
+      }
+    },
+    onSuccess: (data, folderId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bookmarks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/x/status'] });
+      
+      // Find the folder name for better user feedback
+      const folderName = folders?.find(f => f.id === folderId)?.name || folderId;
+      
+      toast({
+        title: "Folder Bookmarks Synced",
+        description: `Synced "${folderName}" folder: Added ${data.added} new bookmarks, updated ${data.updated} existing bookmarks.`,
+        variant: "default"
+      });
+    },
+    onError: (error: any, folderId) => {
+      console.error(`Error syncing folder ${folderId} bookmarks:`, error);
+      
+      // Find the folder name for better user feedback
+      const folderName = folders?.find(f => f.id === folderId)?.name || folderId;
+      
+      // Check if this is an auth error
+      if (error.message === 'auth_expired') {
+        toast({
+          title: "Authentication Expired",
+          description: "Your X.com connection needs to be refreshed. Please reconnect.",
+          variant: "destructive",
+          action: (
+            <ToastAction altText="Reconnect" onClick={() => startAuth.mutate()}>
+              Reconnect
+            </ToastAction>
+          )
+        });
+      } else if (error.message === 'folder_not_found') {
+        toast({
+          title: "Folder Not Found",
+          description: `Could not find the folder "${folderName}" in your X.com account.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: `Could not sync bookmarks from "${folderName}" folder`,
+          variant: "destructive"
+        });
+      }
+    }
+  });
 
   // Map folder to collection
   const mapFolder = useMutation({
@@ -581,23 +662,45 @@ const XIntegrationPanel = () => {
                             </p>
                           )}
                         </div>
-                        <Button 
-                          size="sm" 
-                          variant={folder.mapped ? "outline" : "default"}
-                          onClick={() => openMappingDialog(folder)}
-                        >
-                          {folder.mapped ? (
-                            <>
-                              <Link className="mr-1 h-3 w-3" />
-                              Remap
-                            </>
-                          ) : (
-                            <>
-                              <FolderPlus className="mr-1 h-3 w-3" />
-                              Map to Collection
-                            </>
+                        <div className="flex gap-2">
+                          {folder.mapped && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => syncFolderBookmarks.mutate(folder.id)}
+                              disabled={syncFolderBookmarks.isPending && syncFolderBookmarks.variables === folder.id}
+                            >
+                              {syncFolderBookmarks.isPending && syncFolderBookmarks.variables === folder.id ? (
+                                <>
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  Syncing...
+                                </>
+                              ) : (
+                                <>
+                                  <DownloadCloud className="mr-1 h-3 w-3" />
+                                  Sync Folder
+                                </>
+                              )}
+                            </Button>
                           )}
-                        </Button>
+                          <Button 
+                            size="sm" 
+                            variant={folder.mapped ? "outline" : "default"}
+                            onClick={() => openMappingDialog(folder)}
+                          >
+                            {folder.mapped ? (
+                              <>
+                                <Link className="mr-1 h-3 w-3" />
+                                Remap
+                              </>
+                            ) : (
+                              <>
+                                <FolderPlus className="mr-1 h-3 w-3" />
+                                Map to Collection
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
