@@ -10,7 +10,7 @@ const VerifyEmail = () => {
   const [match, params] = useRoute('/verify-email');
   const [, navigate] = useLocation();
   
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'already-verified'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
   
   useEffect(() => {
@@ -46,16 +46,26 @@ const VerifyEmail = () => {
           }, 2000);
         } else {
           let errorMessage = 'Failed to verify your email. The token may be invalid or expired.';
+          let isAlreadyVerified = false;
+          
           try {
             const errorData = await response.json();
             if (errorData && errorData.message) {
               errorMessage = errorData.message;
+              
+              // Check if the error message indicates the token was already used
+              if (errorMessage.toLowerCase().includes('invalid') || 
+                  errorMessage.toLowerCase().includes('expired')) {
+                isAlreadyVerified = true;
+                errorMessage = "This verification link has already been used or has expired. If you've already verified your email, please log in. Otherwise, request a new verification link.";
+              }
             }
           } catch (parseError) {
             console.error('Error parsing error response:', parseError);
           }
           
-          setStatus('error');
+          // Set whether this is a regular error or an already-verified case
+          setStatus(isAlreadyVerified ? 'already-verified' : 'error');
           setMessage(errorMessage);
         }
       } catch (error) {
@@ -100,6 +110,14 @@ const VerifyEmail = () => {
               <AlertDescription>{message}</AlertDescription>
             </Alert>
           )}
+          
+          {status === 'already-verified' && (
+            <Alert className="bg-yellow-100/70 border-yellow-400 mb-4">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <AlertTitle>Already Verified</AlertTitle>
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between">
           {status === 'success' && (
@@ -108,7 +126,7 @@ const VerifyEmail = () => {
             </Button>
           )}
           
-          {status === 'error' && (
+          {(status === 'error' || status === 'already-verified') && (
             <div className="w-full space-y-2">
               <Button 
                 variant="outline" 
