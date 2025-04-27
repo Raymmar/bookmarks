@@ -75,39 +75,7 @@ const XIntegrationPanel = () => {
     refetchOnWindowFocus: false
   });
 
-  // Function to force refresh folders from API
-  const forceRefreshFolders = async () => {
-    toast({
-      title: "Refreshing folders",
-      description: "Fetching all folders from X.com with pagination...",
-    });
-    
-    try {
-      // Manually fetch with force=true parameter
-      await queryClient.fetchQuery({
-        queryKey: ['/api/x/folders'],
-        queryFn: async () => {
-          const response = await fetch('/api/x/folders?force=true');
-          if (!response.ok) {
-            throw new Error('Failed to refresh folders');
-          }
-          return response.json();
-        }
-      });
-      
-      toast({
-        title: "Folders refreshed",
-        description: "Successfully fetched all folders from X.com",
-      });
-    } catch (error) {
-      console.error("Error force refreshing folders:", error);
-      toast({
-        title: "Refresh failed",
-        description: "Failed to refresh folders. Rate limits may apply.",
-        variant: "destructive"
-      });
-    }
-  };
+
 
   // Force disconnect from X.com
   const forceDisconnect = useMutation({
