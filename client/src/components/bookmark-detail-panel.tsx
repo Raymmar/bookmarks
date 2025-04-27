@@ -211,6 +211,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const handleTriggerAiProcessing = async () => {
     if (!bookmark) return;
     
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to use AI analysis features",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsProcessingAi(true);
     setAiProcessingStatus('processing');
     
@@ -400,6 +410,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const handleCollectionChange = async (collectionId: string) => {
     if (!bookmark) return;
     
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to manage collections",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Special case: "remove" action for removing from collection
     if (collectionId === "remove") {
       try {
@@ -471,6 +491,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const handleAddTag = async (tagId: string) => {
     if (!bookmark) return;
     
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to add tags to bookmarks",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmittingTag(true);
     
     try {
@@ -521,6 +551,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   // Creating a new tag and adding it to the bookmark
   const handleCreateAndAddTag = async () => {
     if (!newTagText.trim() || !bookmark) return;
+    
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to create and add tags",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsSubmittingTag(true);
     
@@ -577,6 +617,20 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   // Handle updating bookmark fields
   const handleUpdateBookmark = async (updateData: Partial<Bookmark>) => {
     if (!bookmark) return;
+
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to update bookmark information",
+        variant: "destructive",
+      });
+      // Revert any visual changes
+      if (initialBookmark) {
+        setBookmark(initialBookmark);
+      }
+      return;
+    }
     
     try {
       // Immediately set the updated_at timestamp to the current time for optimistic updates
@@ -674,6 +728,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const handleRemoveTag = async (tagId: string) => {
     if (!bookmark) return;
     
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to remove tags from bookmarks",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Find the tag to remove
     const tagToRemove = tags.find(tag => tag.id === tagId);
     if (!tagToRemove) return;
@@ -736,6 +800,19 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
 
   const handleAddNote = async () => {
     if (!newNote.trim() || !bookmark) return;
+    
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to add notes to bookmarks",
+        variant: "destructive",
+      });
+      // Clear the note input and close the form
+      setNewNote("");
+      setIsAddingNote(false);
+      return;
+    }
     
     setIsSubmitting(true);
     
