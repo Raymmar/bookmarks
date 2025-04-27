@@ -30,13 +30,35 @@ const VerifyEmail = () => {
         const response = await apiRequest('GET', `/api/email/verify?token=${token}`);
         
         if (response.ok) {
-          setStatus('success');
           const data = await response.json();
+          setStatus('success');
           setMessage(data.message || 'Your email has been successfully verified!');
+          
+          // If the user was automatically logged in by the server,
+          // redirect to home page after a short delay
+          if (data.user) {
+            setTimeout(() => {
+              navigate('/');
+            }, 2000);
+          } else {
+            // If no auto-login, redirect to auth page after a short delay
+            setTimeout(() => {
+              navigate('/auth');
+            }, 2000);
+          }
         } else {
-          const errorData = await response.json();
+          let errorMessage = 'Failed to verify your email. The token may be invalid or expired.';
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.message) {
+              errorMessage = errorData.message;
+            }
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+          
           setStatus('error');
-          setMessage(errorData.message || 'Failed to verify your email. The token may be invalid or expired.');
+          setMessage(errorMessage);
         }
       } catch (error) {
         console.error('Error verifying email:', error);
@@ -46,7 +68,7 @@ const VerifyEmail = () => {
     };
     
     verifyEmail();
-  }, []);
+  }, [navigate]);
   
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
