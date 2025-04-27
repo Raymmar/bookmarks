@@ -292,7 +292,8 @@ export class MemStorage implements IStorage {
         }
       }
       
-      // Then remove any bookmarks in this collection
+      // Then remove bookmark-collection associations (but NOT the bookmarks themselves)
+      // This just deletes the relationship records in collectionBookmarks table
       for (const cb of this.collectionBookmarks.values()) {
         if (cb.collection_id === id) {
           this.collectionBookmarks.delete(cb.id);
@@ -1193,7 +1194,8 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(xFolders.collection_id, id));
       
-      // Then remove any bookmarks in this collection
+      // Then remove bookmark-collection associations (but NOT the bookmarks themselves)
+      // This just deletes the relationship records in collectionBookmarks table
       await db.delete(collectionBookmarks)
         .where(eq(collectionBookmarks.collection_id, id));
       
