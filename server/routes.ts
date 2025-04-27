@@ -1820,5 +1820,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync bookmarks from a specific X.com folder
+  app.post("/api/x/sync/folder/:folderId", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userId = (req.user as Express.User).id;
+      const folderId = req.params.folderId;
+      
+      if (!folderId) {
+        return res.status(400).json({ error: "Folder ID is required" });
+      }
+      
+      console.log(`Starting folder-specific sync for user: ${userId}, folder: ${folderId}`);
+      
+      try {
+        // Sync bookmarks from the specific folder
+        const syncResult = await xService.syncBookmarksFromSpecificFolder(userId, folderId);
+        
+        res.json({
+          success: true,
+          ...syncResult
+        });
+      } catch (syncError: any) {
+        // Check if this is a token error
+        if (syncError.message && (
+          syncError.message.includes('token was invalid') || 
+          syncError.message.includes('User is not connected') ||
+          syncError.message.includes('token is invalid')
+        )) {
+          return res.status(401).json({
+            error: "X authentication expired",
+            action_required: "reconnect",
+            message: syncError.message
+          });
+        }
+        
+        // Specific folder error
+        if (syncError.message === 'Folder not found') {
+          return res.status(404).json({ error: "Folder not found for this user" });
+        }
+        
+        throw syncError;
+      }
+    } catch (error: any) {
+      console.error(`Error syncing X folder ${req.params.folderId}:`, error);
+      return res.status(500).json({ 
+        error: 'Failed to sync folder',
+        message: error.message
+      });
+    }
+  });
+
   return httpServer;
 }
