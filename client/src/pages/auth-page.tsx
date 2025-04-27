@@ -18,6 +18,7 @@ const AuthPage = () => {
   const [activeTab, setActiveTab] = useState<string>("login");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   // Redirect to home if user is already logged in
   if (user) {
@@ -58,7 +59,12 @@ const AuthPage = () => {
       return;
     }
 
-    registerMutation.mutate({ username, password, email });
+    registerMutation.mutate({ username, password, email }, {
+      onSuccess: () => {
+        setRegistrationSuccess(true);
+        setActiveTab("login"); // Switch to login tab after successful registration
+      }
+    });
   };
 
   // Function to send verification email
@@ -155,6 +161,15 @@ const AuthPage = () => {
                           <CheckCircle className="h-4 w-4 text-primary" />
                           <AlertDescription>
                             Verification email sent! Please check your inbox.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      {registrationSuccess && (
+                        <Alert className="bg-primary/10 border-primary">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                          <AlertDescription>
+                            Registration successful! Please check your email to verify your account before logging in.
                           </AlertDescription>
                         </Alert>
                       )}

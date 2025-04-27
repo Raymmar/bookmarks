@@ -54,7 +54,7 @@ export class EmailService {
   private fromEmail: string;
   private baseUrl: string;
 
-  constructor(fromEmail: string = 'no-reply@atmosphere.app', baseUrl: string = '') {
+  constructor(fromEmail: string = 'raymmar@gmail.com', baseUrl: string = '') {
     this.fromEmail = fromEmail;
     // Default to the current domain if no baseUrl provided
     this.baseUrl = baseUrl || (process.env.PUBLIC_URL || 'https://atmospr.replit.app');

@@ -121,13 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
-      refetchUser();
-      
+    onSuccess: (data: any) => {
+      // Don't set the user data since we're not auto-logging in
+      // User needs to verify their email first
       toast({
         title: "Registration successful",
-        description: `Welcome, ${user.username}!`,
+        description: "Please check your email to verify your account before logging in."
       });
     },
     onError: (error: Error) => {
