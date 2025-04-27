@@ -918,7 +918,8 @@ export class XService {
       
     } catch (error) {
       console.error('X Folders: Error fetching all folders:', error);
-      throw error;
+      // Return empty array on error to avoid breaking the application
+      return [];
     }
   }
 
