@@ -1382,14 +1382,26 @@ export class XService {
     console.log(`X Sync: Syncing bookmarks from folder "${folder.name}" (${folder.id})`);
     
     let nextToken: string | undefined = undefined;
+    let retryCount = 0;
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 second base delay between requests
     
     try {
       // Fetch bookmarks from this folder with pagination
       do {
         try {
+          // Add a delay before each request to avoid rate limits
+          // Exponential backoff if we've had to retry
+          const delay = baseDelay * Math.pow(1.5, retryCount);
+          console.log(`X Sync: Waiting ${delay}ms before fetching bookmarks from folder ${folder.id}`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
           console.log(`X Sync: Fetching bookmarks from folder ${folder.id}${nextToken ? ' with pagination token' : ''}`);
           const result = await this.getBookmarksFromFolder(userId, folder.id, nextToken);
           console.log(`X Sync: Fetched ${result.tweets.length} tweets from folder ${folder.id}`);
+          
+          // Reset retry count on successful request
+          retryCount = 0;
           
           // Add the tweets, users, and media to our collection
           allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
@@ -1415,9 +1427,31 @@ export class XService {
           if (nextToken) {
             console.log(`X Sync: More bookmarks available in folder ${folder.id}, will paginate`);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error(`X Sync: Error fetching bookmarks from folder ${folder.id}:`, error);
-          break;
+          
+          // Check if it's a rate limit error (429)
+          if (error.message && error.message.includes('429')) {
+            retryCount++;
+            
+            if (retryCount <= maxRetries) {
+              console.log(`X Sync: Rate limit hit, retry attempt ${retryCount}/${maxRetries} after delay`);
+              
+              // Larger delay for rate limit errors
+              const rateLimitDelay = baseDelay * Math.pow(3, retryCount); // Exponential backoff
+              console.log(`X Sync: Waiting ${rateLimitDelay}ms before retrying...`);
+              await new Promise(resolve => setTimeout(resolve, rateLimitDelay));
+              
+              // Continue the loop without advancing to the next page
+              continue;
+            } else {
+              console.log(`X Sync: Maximum retry attempts (${maxRetries}) reached for rate limit, stopping pagination`);
+              break;
+            }
+          } else {
+            // For other errors, stop pagination
+            break;
+          }
         }
       } while (nextToken);
       
