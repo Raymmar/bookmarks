@@ -28,9 +28,20 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
+  
+  // Email verification
+  getUserByVerificationToken(token: string): Promise<User | undefined>;
+  setVerificationToken(userId: string, token: string, expiresIn: number): Promise<boolean>;
+  verifyEmail(token: string): Promise<User | undefined>;
+  
+  // Password reset
+  getUserByResetToken(token: string): Promise<User | undefined>;
+  setResetToken(userId: string, token: string, expiresIn: number): Promise<boolean>;
+  resetPassword(token: string, newPassword: string): Promise<boolean>;
 
   // Bookmarks
   getBookmarks(userId?: string): Promise<Bookmark[]>;

@@ -47,6 +47,11 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
+  email_verified: boolean("email_verified").default(false).notNull(),
+  verification_token: text("verification_token"),
+  verification_expires: timestamp("verification_expires"),
+  reset_token: text("reset_token"),
+  reset_expires: timestamp("reset_expires"),
 });
 
 // Bookmarks table
