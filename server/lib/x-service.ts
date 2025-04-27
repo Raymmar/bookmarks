@@ -1539,6 +1539,131 @@ export class XService {
     
     return bookmark;
   }
+  
+  /**
+   * Sync bookmarks from a specific X.com folder
+   * This is exposed to API consumers for manual folder syncing
+   */
+  async syncBookmarksFromSpecificFolder(userId: string, folderId: string): Promise<{ added: number, updated: number, errors: number }> {
+    console.log(`X Sync: Starting folder-specific sync for user ${userId}, folder ${folderId}`);
+    
+    let added = 0;
+    let updated = 0;
+    let errors = 0;
+    
+    try {
+      // First, validate that the folder exists for this user
+      const [folderData] = await db.select()
+        .from(xFolders)
+        .where(
+          and(
+            eq(xFolders.user_id, userId),
+            eq(xFolders.x_folder_id, folderId)
+          )
+        );
+      
+      if (!folderData) {
+        console.error(`X Sync: Folder ${folderId} not found for user ${userId}`);
+        throw new Error(`Folder not found`);
+      }
+      
+      console.log(`X Sync: Found folder "${folderData.x_folder_name}" (${folderId}) for user ${userId}`);
+      
+      // Create a wrapper that matches our standard bookmark collection format
+      let folderBookmarks: { 
+        tweets: XTweet[], 
+        users: { [key: string]: XUser },
+        media: { [key: string]: XMedia },
+        folderTweetMap: Map<string, Set<string>>
+      } = { 
+        tweets: [], 
+        users: {},
+        media: {},
+        folderTweetMap: new Map<string, Set<string>>()
+      };
+      
+      // Create a cache to hold existing bookmark metadata for more efficient updates
+      const existingBookmarkCache = await this.getExistingXBookmarks(userId);
+      
+      // Fetch bookmarks for this specific folder
+      const folder: XFolderData = {
+        id: folderData.x_folder_id,
+        name: folderData.x_folder_name
+      };
+      
+      // Use our existing folder sync function to get all the bookmarks
+      await this.syncBookmarksFromFolder(userId, folder, folderBookmarks, existingBookmarkCache);
+      
+      console.log(`X Sync: Fetched ${folderBookmarks.tweets.length} tweets from folder ${folderId}`);
+      
+      // Process each bookmark
+      const processedTweetIds = new Set<string>();
+      
+      for (const tweet of folderBookmarks.tweets) {
+        try {
+          // Skip if we've already processed this tweet
+          if (processedTweetIds.has(tweet.id)) {
+            continue;
+          }
+          
+          processedTweetIds.add(tweet.id);
+          const author = tweet.author_id ? folderBookmarks.users[tweet.author_id] : undefined;
+          
+          // Check if bookmark already exists in our cache
+          const existingBookmark = existingBookmarkCache.get(tweet.id);
+          
+          if (existingBookmark) {
+            // Bookmark exists - only update engagement metrics
+            console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
+            
+            // Extract just the engagement metrics
+            const updateData: Partial<InsertBookmark> = {
+              like_count: tweet.public_metrics?.like_count,
+              repost_count: tweet.public_metrics?.retweet_count,
+              reply_count: tweet.public_metrics?.reply_count,
+              quote_count: tweet.public_metrics?.quote_count
+            };
+            
+            // Update only the engagement metrics for the existing bookmark
+            await storage.updateBookmark(existingBookmark.id, updateData);
+            updated++;
+          } else {
+            // This is a new bookmark - create it with all data
+            console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
+            
+            // Convert tweet to full bookmark
+            const bookmarkData = await this.convertTweetToBookmark(tweet, author, folderBookmarks.media);
+            bookmarkData.user_id = userId;
+            
+            // Create the new bookmark
+            const newBookmark = await storage.createBookmark(bookmarkData);
+            added++;
+            
+            // Check if this folder has a collection mapping
+            if (folderData.collection_id) {
+              console.log(`X Sync: Adding bookmark ${newBookmark.id} to collection ${folderData.collection_id}`);
+              
+              // Add the bookmark to the mapped collection
+              await storage.addBookmarkToCollection(folderData.collection_id, newBookmark.id);
+            }
+          }
+        } catch (error) {
+          console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
+          errors++;
+        }
+      }
+      
+      // Update last sync time for the folder
+      await storage.updateXFolderLastSync(folderData.id);
+      
+      console.log(`X Sync: Finished folder sync - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
+      return { added, updated, errors };
+      
+    } catch (error) {
+      console.error(`X Sync: Error syncing folder ${folderId}:`, error);
+      throw error;
+    }
+  }
 
   /**
    * Create a new folder mapping
