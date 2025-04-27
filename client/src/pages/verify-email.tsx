@@ -103,8 +103,8 @@ const VerifyEmail = () => {
         </CardContent>
         <CardFooter className="flex justify-between">
           {status === 'success' && (
-            <Button className="w-full" onClick={() => navigate('/')}>
-              Go to Dashboard
+            <Button className="w-full" onClick={() => navigate('/auth')}>
+              Log in to continue
             </Button>
           )}
           
