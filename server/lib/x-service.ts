@@ -1350,7 +1350,8 @@ export class XService {
   }
   
   /**
-   * Ensure a folder has a corresponding collection in our system
+   * Ensure a folder has a corresponding entry in our system
+   * Only updates sync times for existing mappings, does not auto-create collections
    */
   private async ensureFolderCollection(userId: string, folder: XFolderData): Promise<void> {
     try {
@@ -1369,12 +1370,38 @@ export class XService {
         await storage.updateXFolderLastSync(existingMapping.id);
         console.log(`X Sync: Updated last sync time for folder "${folder.name}" (${folder.id})`);
       } else {
-        // Create a new collection for this folder
-        console.log(`X Sync: Creating new collection for folder "${folder.name}" (${folder.id})`);
-        await this.createCollectionFromFolder(userId, folder);
+        // We found a folder that doesn't have a mapping yet
+        // Just log it, don't automatically create a collection
+        console.log(`X Sync: Found unmapped folder "${folder.name}" (${folder.id})`);
+        
+        // Check if we already have a record of this folder
+        const [existingFolder] = await db.select()
+          .from(xFolders)
+          .where(
+            and(
+              eq(xFolders.user_id, userId),
+              eq(xFolders.x_folder_id, folder.id)
+            )
+          );
+        
+        if (!existingFolder) {
+          // Create folder entry without mapping it to a collection
+          const newMapping: InsertXFolder = {
+            user_id: userId,
+            x_folder_id: folder.id,
+            x_folder_name: folder.name,
+            // No collection mapping
+            collection_id: null,
+            // Set last sync time
+            last_sync_at: new Date()
+          };
+          
+          await storage.createXFolder(newMapping);
+          console.log(`X Sync: Created folder record without collection mapping for "${folder.name}" (${folder.id})`);
+        }
       }
     } catch (error) {
-      console.error(`X Sync: Error ensuring folder collection for ${folder.id}:`, error);
+      console.error(`X Sync: Error ensuring folder entry for ${folder.id}:`, error);
     }
   }
 
