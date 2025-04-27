@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCw, FolderPlus, Link, Cable, Twitter, DownloadCloud } from "lucide-react";
+import { Loader2, RefreshCw, FolderPlus, Link, Cable, Twitter } from "lucide-react";
 
 // Type definitions
 interface XConnectionStatus {
@@ -74,8 +74,6 @@ const XIntegrationPanel = () => {
     retry: false,
     refetchOnWindowFocus: false
   });
-
-
 
   // Force disconnect from X.com
   const forceDisconnect = useMutation({
@@ -569,37 +567,21 @@ const XIntegrationPanel = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-medium">Your X.com Folders</h3>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => refetchFolders()}
-                        disabled={isLoadingFolders}
-                        title="Refresh from cache"
-                      >
-                        {isLoadingFolders ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3 w-3" />
-                        )}
-                        <span className="ml-2 hidden sm:inline">
-                          {isLoadingFolders ? "Loading..." : "Refresh"}
-                        </span>
-                      </Button>
-                      
-                      <Button 
-                        variant="default" 
-                        size="sm" 
-                        onClick={() => forceRefreshFolders()}
-                        disabled={isLoadingFolders}
-                        title="Force refresh from X.com API with pagination"
-                      >
-                        <DownloadCloud className="h-3 w-3" />
-                        <span className="ml-2 hidden sm:inline">
-                          Force Refresh All
-                        </span>
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => refetchFolders()}
+                      disabled={isLoadingFolders}
+                    >
+                      {isLoadingFolders ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      <span className="ml-2">
+                        {isLoadingFolders ? "Loading..." : "Refresh"}
+                      </span>
+                    </Button>
                   </div>
                   
                   <Separator />

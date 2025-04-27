@@ -1742,12 +1742,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = (req.user as Express.User).id;
-      // Check if force refresh is requested by the client
-      const forceRefresh = req.query.force === 'true';
       
       try {
         // Get all folders with pagination from X.com
-        const allFolders = await xService.getAllFolders(userId, forceRefresh);
+        const allFolders = await xService.getAllFolders(userId);
         
         if (allFolders.length === 0) {
           console.log("No X.com folders found or API doesn't support folders yet");
