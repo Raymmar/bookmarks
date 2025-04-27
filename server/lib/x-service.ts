@@ -912,10 +912,14 @@ export class XService {
     let nextToken: string | undefined = undefined;
     let retryCount = 0;
     const maxRetries = 3;
+    let pageCount = 0;
     
     try {
       do {
         try {
+          pageCount++;
+          console.log(`X Folders: Fetching page ${pageCount} of folders${nextToken ? ' with pagination token' : ''}`);
+          
           // Get a batch of folders
           const result = await this.getFolders(userId, nextToken);
           
@@ -940,17 +944,32 @@ export class XService {
           // Add folders to our collection
           allFolders = [...allFolders, ...result.folders];
           
+          // Save previous token for debugging
+          const prevToken = nextToken;
+          
           // Update the pagination token for the next request
           nextToken = result.nextToken;
           
-          // If we got folders but we're at the end, log it
+          // Log pagination status
+          if (nextToken) {
+            console.log(`X Folders: More folders available, next token: ${nextToken.substring(0, 10)}...`);
+          }
+          
+          // If we got folders but no next token, we're at the end
           if (result.folders.length > 0 && !nextToken) {
             console.log(`X Folders: Retrieved all ${allFolders.length} folders successfully`);
           }
           
+          // If we get the same token twice, we're stuck in a loop - break
+          if (prevToken && prevToken === nextToken) {
+            console.log(`X Folders: Detected same pagination token twice, breaking pagination loop`);
+            break;
+          }
+          
           // Add a delay between pages to avoid rate limiting
           if (nextToken) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log(`X Folders: Waiting 1500ms before fetching next page`);
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         } catch (pageError) {
           console.error('X Folders: Error fetching page:', pageError);
@@ -968,6 +987,7 @@ export class XService {
         }
       } while (nextToken || (retryCount > 0 && retryCount <= maxRetries)); // Continue until there are no more pages or max retries reached
       
+      console.log(`X Folders: Pagination complete, returning ${allFolders.length} total folders from ${pageCount} pages`);
       return allFolders;
       
     } catch (error) {

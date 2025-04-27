@@ -237,7 +237,7 @@ const XIntegrationPanel = () => {
   });
 
   // Handle authorization callback
-  const handleAuthCallback = useCallback(async (code: string, verifier: string, state?: string) => {
+  const handleAuthCallback = useCallback(async (code: string, verifier: string, state: string | null) => {
     try {
       console.log("X OAuth Callback: Received auth code, sending to server");
       console.log("Code length:", code.length);
