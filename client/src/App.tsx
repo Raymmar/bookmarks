@@ -11,6 +11,8 @@ import AiChat from "@/pages/ai-chat";
 import Settings from "@/pages/settings";
 import XIntegration from "@/pages/x-integration";
 import AuthPage from "@/pages/auth-page";
+import VerifyEmail from "@/pages/verify-email";
+import ResetPassword from "@/pages/reset-password";
 import MainLayout from "@/layouts/main-layout";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -24,6 +26,8 @@ function Router() {
       <ProtectedRoute path="/settings" component={Settings} />
       <ProtectedRoute path="/x-integration" component={XIntegration} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/verify-email" component={VerifyEmail} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route component={NotFound} />
     </Switch>
   );
