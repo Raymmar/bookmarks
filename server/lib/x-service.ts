@@ -904,10 +904,40 @@ export class XService {
   
   /**
    * Get all user's bookmark folders from X.com
-   * This method handles pagination internally and returns all folders
+   * First checks database for stored folders, then fetches from API only if needed
    * Includes rate limiting protection with exponential backoff
    */
-  async getAllFolders(userId: string): Promise<XFolderData[]> {
+  async getAllFolders(userId: string, forceRefresh = false): Promise<XFolderData[]> {
+    console.log(`X Folders: Getting all folders for user ${userId}, forceRefresh=${forceRefresh}`);
+    
+    // First, try to get folders from database if not forcing refresh
+    if (!forceRefresh) {
+      try {
+        // Check if we have recently synced folders in the database
+        console.log(`X Folders: Checking database for stored folders`);
+        const storedFolders = await storage.getStoredXFolders(userId);
+        
+        if (storedFolders && storedFolders.length > 0) {
+          // Convert database folders to the format expected by the API
+          const folderData: XFolderData[] = storedFolders.map(folder => ({
+            id: folder.x_folder_id,
+            name: folder.x_folder_name
+          }));
+          
+          console.log(`X Folders: Found ${folderData.length} folders in database, using cached data`);
+          return folderData;
+        }
+        
+        console.log(`X Folders: No stored folders found, fetching from API`);
+      } catch (dbError) {
+        console.error('X Folders: Error fetching folders from database:', dbError);
+        // Continue to fetch from API if database fails
+      }
+    } else {
+      console.log(`X Folders: Force refresh requested, skipping database check`);
+    }
+    
+    // If we get here, we need to fetch from the API
     let allFolders: XFolderData[] = [];
     let nextToken: string | undefined = undefined;
     let retryCount = 0;
@@ -918,7 +948,7 @@ export class XService {
       do {
         try {
           pageCount++;
-          console.log(`X Folders: Fetching page ${pageCount} of folders${nextToken ? ' with pagination token' : ''}`);
+          console.log(`X Folders: Fetching page ${pageCount} of folders from API${nextToken ? ' with pagination token' : ''}`);
           
           // Get a batch of folders
           const result = await this.getFolders(userId, nextToken);
@@ -957,7 +987,7 @@ export class XService {
           
           // If we got folders but no next token, we're at the end
           if (result.folders.length > 0 && !nextToken) {
-            console.log(`X Folders: Retrieved all ${allFolders.length} folders successfully`);
+            console.log(`X Folders: Retrieved all ${allFolders.length} folders successfully from API`);
           }
           
           // If we get the same token twice, we're stuck in a loop - break
@@ -987,13 +1017,76 @@ export class XService {
         }
       } while (nextToken || (retryCount > 0 && retryCount <= maxRetries)); // Continue until there are no more pages or max retries reached
       
-      console.log(`X Folders: Pagination complete, returning ${allFolders.length} total folders from ${pageCount} pages`);
+      console.log(`X Folders: Pagination complete, retrieved ${allFolders.length} total folders from ${pageCount} pages`);
+      
+      // Store folders in database for future use
+      if (allFolders.length > 0) {
+        await this.storeFoldersInDatabase(userId, allFolders);
+      }
+      
       return allFolders;
       
     } catch (error) {
       console.error('X Folders: Error fetching all folders:', error);
       // Return empty array on error to avoid breaking the application
       return [];
+    }
+  }
+  
+  /**
+   * Store folders in database for future use
+   */
+  private async storeFoldersInDatabase(userId: string, folders: XFolderData[]): Promise<void> {
+    try {
+      console.log(`X Folders: Storing ${folders.length} folders in database for user ${userId}`);
+      
+      // First, get existing mappings to preserve collection associations
+      const existingMappings = await storage.getXFoldersByUserId(userId);
+      const existingMappingsMap = new Map<string, string | null>();
+      
+      // Create a map of folder ID to collection ID
+      existingMappings.forEach(mapping => {
+        existingMappingsMap.set(mapping.x_folder_id, mapping.collection_id);
+      });
+      
+      // For each folder, update or insert it into the database
+      for (const folder of folders) {
+        // Check if folder already exists in database
+        const existingMapping = existingMappings.find(m => m.x_folder_id === folder.id);
+        
+        if (existingMapping) {
+          // Update existing folder
+          console.log(`X Folders: Updating existing folder mapping for ${folder.name} (${folder.id})`);
+          
+          await storage.updateXFolder(existingMapping.id, {
+            x_folder_name: folder.name,
+            // Keep existing collection mapping
+            collection_id: existingMapping.collection_id,
+            // Update last sync time
+            last_sync_at: new Date()
+          });
+        } else {
+          // Create new folder mapping
+          console.log(`X Folders: Creating new folder mapping for ${folder.name} (${folder.id})`);
+          
+          const newMapping: InsertXFolder = {
+            user_id: userId,
+            x_folder_id: folder.id,
+            x_folder_name: folder.name,
+            // No collection mapping yet
+            collection_id: null,
+            // Set last sync time
+            last_sync_at: new Date()
+          };
+          
+          await storage.createXFolder(newMapping);
+        }
+      }
+      
+      console.log(`X Folders: Successfully stored all folders in database`);
+    } catch (error) {
+      console.error('X Folders: Error storing folders in database:', error);
+      // Don't throw, just log error to avoid breaking the application
     }
   }
 

@@ -130,6 +130,8 @@ export interface IStorage {
   updateXCredentials(id: string, credentials: Partial<XCredentials>): Promise<XCredentials | undefined>;
   createXFolder(folder: InsertXFolder): Promise<XFolder>;
   getXFoldersByUserId(userId: string): Promise<XFolder[]>;
+  getStoredXFolders(userId: string): Promise<XFolder[]>;
+  updateXFolder(id: string, folderUpdate: Partial<XFolder>): Promise<XFolder | undefined>;
   updateXFolderLastSync(id: string): Promise<XFolder | undefined>;
   findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined>;
 }
@@ -913,6 +915,25 @@ export class MemStorage implements IStorage {
     return Array.from(this.xFolders.values()).filter(
       folder => folder.user_id === userId
     );
+  }
+  
+  async getStoredXFolders(userId: string): Promise<XFolder[]> {
+    // For memory storage, this is the same as getXFoldersByUserId
+    return this.getXFoldersByUserId(userId);
+  }
+  
+  async updateXFolder(id: string, folderUpdate: Partial<XFolder>): Promise<XFolder | undefined> {
+    const folder = this.xFolders.get(id);
+    if (!folder) return undefined;
+    
+    const updatedFolder: XFolder = {
+      ...folder,
+      ...folderUpdate,
+      updated_at: new Date()
+    };
+    
+    this.xFolders.set(id, updatedFolder);
+    return updatedFolder;
   }
   
   async updateXFolderLastSync(id: string): Promise<XFolder | undefined> {
