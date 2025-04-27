@@ -1221,7 +1221,7 @@ export default function GraphView() {
                     key={`selected-${tag}-${index}`}
                     variant="default"
                     className={`cursor-pointer ${
-                      isSystemTag ? 'bg-violet-600 hover:bg-violet-700' : 'bg-primary hover:bg-primary/90'
+                      isSystemTag ? 'bg-primary hover:bg-primary/90' : 'bg-primary hover:bg-primary/90'
                     }`}
                     onClick={() => toggleTagSelection(tag)}
                   >
@@ -1277,7 +1277,7 @@ export default function GraphView() {
                     <button 
                       onClick={toggleSystemTags}
                       className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        showSystemTags ? 'bg-violet-600' : 'bg-gray-200'
+                        showSystemTags ? 'bg-primary' : 'bg-gray-200'
                       }`}
                     >
                       <span
@@ -1324,8 +1324,8 @@ export default function GraphView() {
                       variant={isSelected ? "default" : "outline"}
                       className={`cursor-pointer ${
                         isSelected 
-                          ? isSystemTag ? 'bg-violet-600 hover:bg-violet-700' : 'bg-primary hover:bg-primary/90'
-                          : isSystemTag ? 'text-violet-700 border-violet-200 hover:bg-violet-50' : ''
+                          ? 'bg-primary hover:bg-primary/90'
+                          : isSystemTag ? 'text-primary border-primary/20 hover:bg-primary/5' : ''
                       }`}
                       onClick={() => toggleTagSelection(tag.name)}
                     >
@@ -1362,7 +1362,7 @@ export default function GraphView() {
                     key={`tag-${tagName}-${index}`}
                     variant="outline"
                     className={`cursor-pointer ${
-                      isSystemTag ? 'text-violet-700 border-violet-200 hover:bg-violet-50' : ''
+                      isSystemTag ? 'text-primary border-primary/20 hover:bg-primary/5' : ''
                     }`}
                     onClick={() => toggleTagSelection(tagName)}
                   >
