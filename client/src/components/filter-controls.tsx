@@ -219,9 +219,11 @@ export function FilterControls({
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="newest">Newest First</SelectItem>
-                  <SelectItem value="oldest">Oldest First</SelectItem>
-                  <SelectItem value="recently_updated">Recently Updated</SelectItem>
+                  <SelectItem value="newest">Newest Saved</SelectItem>
+                  <SelectItem value="oldest">Oldest Saved</SelectItem>
+                  <SelectItem value="created_newest">Newest Created</SelectItem>
+                  <SelectItem value="created_oldest">Oldest Created</SelectItem>
+                  <SelectItem value="updated_newest">Recently Updated</SelectItem>
                 </SelectContent>
               </Select>
             </div>
