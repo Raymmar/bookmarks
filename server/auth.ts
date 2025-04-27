@@ -69,7 +69,10 @@ export function setupAuth(app: Express) {
       try {
         const user = await storage.getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
+          return done(null, false, { message: "Invalid credentials" });
+        } else if (!user.email_verified) {
+          // User exists but email is not verified
+          return done(null, false, { message: "Email not verified. Please check your inbox for verification email." });
         } else {
           return done(null, user);
         }
@@ -134,15 +137,12 @@ export function setupAuth(app: Express) {
         // We continue with the registration even if email sending fails
       }
 
-      // Log the user in
-      req.login(user, (err) => {
-        if (err) return next(err);
-        // Don't send password to client
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json({
-          ...userWithoutPassword,
-          message: "Registration successful. Please check your email to verify your account."
-        });
+      // Don't log the user in automatically - require email verification first
+      // Remove password from response
+      const { password: userPass, ...userWithoutPassword } = user;
+      res.status(201).json({
+        ...userWithoutPassword,
+        message: "Registration successful. Please check your email to verify your account before logging in."
       });
     } catch (err) {
       next(err);
@@ -152,7 +152,11 @@ export function setupAuth(app: Express) {
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err, user, info) => {
       if (err) return next(err);
-      if (!user) return res.status(401).json({ message: "Invalid credentials" });
+      if (!user) {
+        // Return the specific error message from the authentication strategy
+        const message = info?.message || "Invalid credentials";
+        return res.status(401).json({ message });
+      }
       
       req.login(user, (err) => {
         if (err) return next(err);
