@@ -136,32 +136,12 @@ const AuthPage = () => {
       </div>
 
       {/* Right side: Hero section */}
-      <div className="hidden md:flex flex-1 bg-gradient-to-br from-primary/10 to-primary/30 flex-col items-center justify-center p-12 text-center">
+      <div className="hidden md:flex flex-1 bg-gradient-to-br from-primary/30 to-secondary/50 flex-col items-center justify-center p-12 text-left">
         <div className="max-w-md space-y-6">
-          <h1 className="text-4xl font-bold tracking-tight">Bookmark Manager</h1>
-          <p className="text-lg">
-            Your intelligent bookmark management platform. Organize, visualize, and explore your digital content with AI-powered insights.
+          <h1 className="text-6xl font-bold"> Turn your doom scrolling into deep insights</h1>
+          <p className="text-xl">
+           Atmosphere is an AI powered bookmark manager designed to extract key insights from the obscure nuggets you find while scrolling online.
           </p>
-          <div className="flex flex-col space-y-3">
-            <div className="flex items-center space-x-2">
-              <div className="bg-primary text-primary-foreground rounded-full p-1 w-8 h-8 flex items-center justify-center">
-                ✓
-              </div>
-              <p className="text-left">Visualize bookmarks with network graphs</p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="bg-primary text-primary-foreground rounded-full p-1 w-8 h-8 flex items-center justify-center">
-                ✓
-              </div>
-              <p className="text-left">AI-powered content analysis and tagging</p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="bg-primary text-primary-foreground rounded-full p-1 w-8 h-8 flex items-center justify-center">
-                ✓
-              </div>
-              <p className="text-left">Organize with collections and smart filters</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
