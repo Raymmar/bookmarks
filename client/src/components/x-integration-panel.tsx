@@ -436,7 +436,7 @@ const XIntegrationPanel = () => {
                 </>
               ) : (
                 <>
-                  <Twitter className="mr-2 h-4 w-4" />
+                  <Loader2 className="mr-2 h-4 w-4" />
                   Connect to X.com
                 </>
               )}
@@ -450,15 +450,6 @@ const XIntegrationPanel = () => {
             </TabsList>
             
             <TabsContent value="bookmarks" className="py-4">
-              <div className="rounded-md bg-green-50 dark:bg-green-900/20 p-4 mb-4">
-                <h3 className="font-medium text-green-800 dark:text-green-300">Enhanced Sync Available</h3>
-                <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                  We've improved the bookmark sync to get more of your X.com bookmarks, including those in folders.
-                </p>
-                <p className="text-xs text-green-600 dark:text-green-500 mt-2">
-                  The sync process now preserves your custom titles and descriptions for existing bookmarks.
-                </p>
-              </div>
                 
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground">
@@ -502,7 +493,7 @@ const XIntegrationPanel = () => {
                     </>
                   ) : (
                     <>
-                      <Twitter className="mr-2 h-4 w-4" />
+                      <Loader2 className="mr-2 h-4 w-4" />
                       Reconnect to X.com
                     </>
                   )}
@@ -521,15 +512,6 @@ const XIntegrationPanel = () => {
             </TabsContent>
             
             <TabsContent value="folders" className="py-4">
-              <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-4 mb-4">
-                <h3 className="font-medium text-blue-800 dark:text-blue-300">Folder Support Now Available</h3>
-                <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
-                  We now support importing bookmarks from X.com folders. Map your folders to collections to keep your bookmarks organized.
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-500 mt-2">
-                  When you sync, we'll fetch bookmarks from all your folders and import them into their mapped collections.
-                </p>
-              </div>
               
               {isLoadingFolders ? (
                 <div className="flex justify-center py-6">
@@ -566,7 +548,7 @@ const XIntegrationPanel = () => {
               ) : (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium">Your X.com Folders</h3>
+                    <h3 className="text-sm font-medium">Your Folders</h3>
                     <Button 
                       variant="outline" 
                       size="sm" 
