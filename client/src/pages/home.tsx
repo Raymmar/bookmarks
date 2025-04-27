@@ -55,9 +55,17 @@ export default function Home() {
 
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
     if (sortOrder === "newest") {
-      return new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime();
+      // For X.com/Twitter bookmarks, use created_at date when available
+      // Fall back to date_saved for other bookmarks
+      const aDate = a.created_at && a.source === 'x' ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+      const bDate = b.created_at && b.source === 'x' ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+      return bDate - aDate;
     } else if (sortOrder === "oldest") {
-      return new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime();
+      // For X.com/Twitter bookmarks, use created_at date when available
+      // Fall back to date_saved for other bookmarks
+      const aDate = a.created_at && a.source === 'x' ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+      const bDate = b.created_at && b.source === 'x' ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+      return aDate - bDate;
     }
     return 0;
   });

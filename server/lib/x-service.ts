@@ -1682,12 +1682,16 @@ export class XService {
             // Bookmark exists - only update engagement metrics
             console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
             
-            // Extract just the engagement metrics
+            // Extract just the engagement metrics and add created_at if missing
             const updateData: Partial<InsertBookmark> = {
               like_count: tweet.public_metrics?.like_count,
               repost_count: tweet.public_metrics?.retweet_count,
               reply_count: tweet.public_metrics?.reply_count,
-              quote_count: tweet.public_metrics?.quote_count
+              quote_count: tweet.public_metrics?.quote_count,
+              // Only update created_at if it's not already set and the tweet has a creation date
+              created_at: (!existingBookmark.created_at && tweet.created_at) 
+                ? new Date(tweet.created_at) 
+                : undefined
             };
             
             // Update only the engagement metrics for the existing bookmark
