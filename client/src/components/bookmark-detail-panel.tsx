@@ -1116,8 +1116,24 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               variant="ghost" 
               size="sm" 
               className="h-6 text-xs text-primary font-medium"
-              onClick={() => setIsAddingTag(true)}
+              onClick={() => {
+                if (!user) {
+                  toast({
+                    title: "Authentication required",
+                    description: "Please log in to add tags to bookmarks",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setIsAddingTag(true);
+              }}
+              title={!user ? "Login required to add tags" : "Add tags"}
             >
+              {!user && (
+                <span className="inline-flex items-center">
+                  <LockIcon className="h-3 w-3 mr-1" />
+                </span>
+              )}
               + Add Tag
             </Button>
           </div>
@@ -1218,7 +1234,18 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                   variant="ghost"
                   size="sm"
                   className="h-4 w-4 p-0 hover:bg-indigo-200 rounded-full"
-                  onClick={() => handleRemoveTag(tag.id)}
+                  onClick={() => {
+                    if (!user) {
+                      toast({
+                        title: "Authentication required",
+                        description: "Please log in to remove tags from bookmarks",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    handleRemoveTag(tag.id);
+                  }}
+                  title={!user ? "Login required to remove tags" : "Remove tag"}
                 >
                   <X className="h-2 w-2" />
                 </Button>
@@ -1259,8 +1286,24 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               variant="ghost" 
               size="sm" 
               className="h-6 text-xs text-primary font-medium"
-              onClick={() => setIsAddingNote(true)}
+              onClick={() => {
+                if (!user) {
+                  toast({
+                    title: "Authentication required",
+                    description: "Please log in to add notes to bookmarks",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setIsAddingNote(true);
+              }}
+              title={!user ? "Login required to add notes" : "Add note"}
             >
+              {!user && (
+                <span className="inline-flex items-center">
+                  <LockIcon className="h-3 w-3 mr-1" />
+                </span>
+              )}
               + Add Note
             </Button>
           </div>
@@ -1332,15 +1375,23 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-medium text-gray-700">Collection</h4>
             <div className="flex items-center">
+              {!user && (
+                <span title="Login required to manage collections">
+                  <LockIcon className="h-3 w-3 mr-1 text-gray-500" />
+                </span>
+              )}
               <FolderIcon className="h-3.5 w-3.5 mr-2 text-gray-500" />
             </div>
           </div>
           <div className="mb-2">
-            <Select onValueChange={handleCollectionChange}>
-              <SelectTrigger className="w-full">
+            <Select 
+              onValueChange={handleCollectionChange}
+              disabled={!user}
+            >
+              <SelectTrigger className="w-full" title={!user ? "Login required to manage collections" : ""}>
                 <SelectValue placeholder={bookmarkCollections.length > 0 
                   ? `${bookmarkCollections.length} collection${bookmarkCollections.length !== 1 ? 's' : ''}` 
-                  : "Select a collection"} 
+                  : !user ? "Login to manage collections" : "Select a collection"} 
                 />
               </SelectTrigger>
               <SelectContent>
