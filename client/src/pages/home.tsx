@@ -55,17 +55,26 @@ export default function Home() {
 
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
     if (sortOrder === "newest") {
-      // For X.com/Twitter bookmarks, use created_at date when available
-      // Fall back to date_saved for other bookmarks
-      const aDate = a.created_at && a.source === 'x' ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
-      const bDate = b.created_at && b.source === 'x' ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
-      return bDate - aDate;
+      // Sort by date saved (bookmark creation date)
+      return new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime();
     } else if (sortOrder === "oldest") {
-      // For X.com/Twitter bookmarks, use created_at date when available
-      // Fall back to date_saved for other bookmarks
-      const aDate = a.created_at && a.source === 'x' ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
-      const bDate = b.created_at && b.source === 'x' ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+      // Sort by date saved (bookmark creation date)
+      return new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime();
+    } else if (sortOrder === "created_newest") {
+      // Sort by creation date (content creation date)
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+      return bDate - aDate;
+    } else if (sortOrder === "created_oldest") {
+      // Sort by creation date (content creation date)
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
       return aDate - bDate;
+    } else if (sortOrder === "updated_newest") {
+      // Sort by updated_at timestamp
+      const aUpdated = a.updated_at ? new Date(a.updated_at).getTime() : new Date(a.date_saved).getTime();
+      const bUpdated = b.updated_at ? new Date(b.updated_at).getTime() : new Date(b.date_saved).getTime();
+      return bUpdated - aUpdated;
     }
     return 0;
   });
@@ -153,8 +162,11 @@ export default function Home() {
                   <SelectValue placeholder="Sort order" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="newest">Sort: Newest</SelectItem>
-                  <SelectItem value="oldest">Sort: Oldest</SelectItem>
+                  <SelectItem value="newest">Sort: Newest Saved</SelectItem>
+                  <SelectItem value="oldest">Sort: Oldest Saved</SelectItem>
+                  <SelectItem value="created_newest">Sort: Newest Created</SelectItem>
+                  <SelectItem value="created_oldest">Sort: Oldest Created</SelectItem>
+                  <SelectItem value="updated_newest">Sort: Recently Updated</SelectItem>
                   <SelectItem value="relevant">Sort: Most Relevant</SelectItem>
                 </SelectContent>
               </Select>
