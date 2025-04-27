@@ -54,8 +54,14 @@ export class EmailService {
   private fromEmail: string;
   private baseUrl: string;
 
-  constructor(fromEmail: string = 'noreply@atmosphere.app', baseUrl: string = '') {
-    this.fromEmail = fromEmail;
+  constructor(fromEmail: string = '', baseUrl: string = '') {
+    // Use the environment variable or fall back to provided value
+    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || fromEmail;
+    
+    if (!this.fromEmail) {
+      console.warn('WARNING: SENDGRID_FROM_EMAIL environment variable is not set');
+    }
+    
     // Default to the current domain if no baseUrl provided
     this.baseUrl = baseUrl || (process.env.PUBLIC_URL || 'https://atmospr.replit.app');
   }
