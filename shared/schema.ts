@@ -65,6 +65,8 @@ export const bookmarks = pgTable("bookmarks", {
   vector_embedding: text("vector_embedding").array(),
   date_saved: timestamp("date_saved").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
+  // Optional creation date for external content (when available from source)
+  created_at: timestamp("created_at"),  // When the content was originally created (e.g., tweet date)
   source: text("source", { enum: ["extension", "web", "import", "x"] }).notNull(),
   // AI processing status to track the workflow
   ai_processing_status: text("ai_processing_status", { 

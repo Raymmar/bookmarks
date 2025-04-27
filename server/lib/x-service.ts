@@ -765,6 +765,8 @@ export class XService {
       content_html: null,
       source: 'x',
       date_saved: new Date(),
+      // Store the original tweet creation date when available
+      created_at: tweet.created_at ? new Date(tweet.created_at) : undefined,
       user_id: null, // This will be filled in by the calling function
       
       // X.com specific fields
