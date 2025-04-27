@@ -729,6 +729,9 @@ export class XService {
     };
     let nextToken: string | undefined = undefined;
     
+    // Create a cache to hold existing bookmark metadata for more efficient updates
+    const existingBookmarkCache = new Map<string, Bookmark>();
+    
     try {
       // Check if user has valid X.com credentials
       const credentials = await this.getUserCredentials(userId);
@@ -772,8 +775,21 @@ export class XService {
           };
         }
       }
+      
+      // Fetch existing bookmarks for this user to avoid duplicates and optimize updates
+      const existingXBookmarks = await this.getExistingXBookmarks(userId);
+      console.log(`X Sync: Found ${existingXBookmarks.size} existing X.com bookmarks`);
+      
+      // For each existing bookmark, store it in our cache so we can access it quickly later
+      // Convert keys() to array to avoid TypeScript error with Map iterator
+      Array.from(existingXBookmarks.keys()).forEach(bookmarkId => {
+        const bookmark = existingXBookmarks.get(bookmarkId);
+        if (bookmark) {
+          existingBookmarkCache.set(bookmarkId, bookmark);
+        }
+      });
     } catch (error) {
-      console.error(`X Sync: Error checking credentials:`, error);
+      console.error(`X Sync: Error checking credentials or fetching existing bookmarks:`, error);
       return { added: 0, updated: 0, errors: 1 };
     }
     
@@ -806,26 +822,39 @@ export class XService {
       try {
         const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
         
-        // Convert tweet to bookmark (now async to handle media downloads)
-        const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
-        bookmarkData.user_id = userId;
-        
-        // Log if we downloaded any media
-        if (tweet.local_media && tweet.local_media.length > 0) {
-          console.log(`X Sync: Downloaded ${tweet.local_media.length} media files for tweet ${tweet.id}`);
-        }
-        
-        // Check if bookmark already exists
-        const existingBookmark = await this.findExistingBookmark(userId, tweet.id);
+        // Check if bookmark already exists in our cache
+        const existingBookmark = existingBookmarkCache.get(tweet.id);
         
         if (existingBookmark) {
-          // Update existing bookmark
-          console.log(`X Sync: Updating existing bookmark for tweet ${tweet.id}`);
-          await storage.updateBookmark(existingBookmark.id, bookmarkData);
+          // Bookmark exists - only update engagement metrics, preserving user customizations
+          console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
+          
+          // Extract just the engagement metrics
+          // Note: updated_at isn't part of InsertBookmark, we handle this at the database level
+          const updateData: Partial<InsertBookmark> = {
+            like_count: tweet.public_metrics?.like_count,
+            repost_count: tweet.public_metrics?.retweet_count,
+            reply_count: tweet.public_metrics?.reply_count,
+            quote_count: tweet.public_metrics?.quote_count
+          };
+          
+          // Update only the engagement metrics for the existing bookmark
+          await storage.updateBookmark(existingBookmark.id, updateData);
           updated++;
         } else {
-          // Create new bookmark
+          // This is a new bookmark - create it with all data
           console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
+          
+          // Convert tweet to full bookmark (now async to handle media downloads)
+          const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
+          bookmarkData.user_id = userId;
+          
+          // Log if we downloaded any media
+          if (tweet.local_media && tweet.local_media.length > 0) {
+            console.log(`X Sync: Downloaded ${tweet.local_media.length} media files for tweet ${tweet.id}`);
+          }
+          
+          // Create the new bookmark
           await storage.createBookmark(bookmarkData);
           added++;
         }
@@ -981,6 +1010,36 @@ export class XService {
       .where(eq(xCredentials.user_id, userId));
     
     return credentials;
+  }
+  
+  /**
+   * Fetch all existing X.com bookmarks for a user
+   * This builds a cache of tweet_id -> bookmark mappings to optimize the sync process
+   * Returns a Map where the key is the tweet ID (external_id) and the value is the bookmark
+   */
+  private async getExistingXBookmarks(userId: string): Promise<Map<string, Bookmark>> {
+    console.log(`X Sync: Fetching existing X.com bookmarks for user ${userId}`);
+    
+    const xBookmarks = await db.select()
+      .from(bookmarks)
+      .where(
+        and(
+          eq(bookmarks.user_id, userId),
+          eq(bookmarks.source, 'x')
+        )
+      );
+    
+    // Create a Map for O(1) lookups during sync
+    const bookmarkMap = new Map<string, Bookmark>();
+    
+    for (const bookmark of xBookmarks) {
+      if (bookmark.external_id) {
+        bookmarkMap.set(bookmark.external_id, bookmark);
+      }
+    }
+    
+    console.log(`X Sync: Found ${bookmarkMap.size} existing X.com bookmarks`);
+    return bookmarkMap;
   }
   
   /**
