@@ -598,15 +598,16 @@ export class XService {
       
       // Since we need to get the actual tweets from these IDs, we need to call the main bookmarks API
       // with each tweet ID to get full details
-      // For now, let's handle the case where the response includes basic tweet objects
       
       // Convert API response to our internal format - handle both ID-only and full object cases
+      // For ID-only responses, we'll mark these with a needsFetching flag to get full content later
       const tweets = data.data.map((item: any) => {
         // If the item is just an ID string
         if (typeof item === 'string') {
           return {
             id: item,
-            text: `Tweet ${item}`, // Placeholder text
+            text: '', // Empty text - will be filled later in processTweetAfterSync
+            needsFetching: true, // Mark that this tweet needs its full content fetched
             // Initialize local_media as empty array for each tweet
             local_media: []
           };
@@ -615,7 +616,7 @@ export class XService {
         // If the item is a tweet object
         return {
           id: item.id,
-          text: item.text || `Tweet ${item.id}`, // Use text if available or placeholder
+          text: item.text || '', // Use text if available or empty string
           created_at: item.created_at,
           author_id: item.author_id,
           public_metrics: item.public_metrics,
@@ -1223,28 +1224,10 @@ export class XService {
         }
       });
       
-      // Step 1: Try to fetch folders with pagination (this will use the undocumented API endpoint)
-      try {
-        console.log(`X Sync: Attempting to fetch all folders for user ${userId}`);
-        const allFolders = await this.getAllFolders(userId);
-        
-        if (allFolders.length > 0) {
-          console.log(`X Sync: Found ${allFolders.length} folders using pagination, syncing bookmarks from each folder`);
-          
-          // For each folder, fetch bookmarks and add them to allBookmarks
-          for (const folder of allFolders) {
-            console.log(`X Sync: Processing folder ${folder.name} (${folder.id})`);
-            // Pass allBookmarks including folderTweetMap for tracking folder-tweet associations
-            await this.syncBookmarksFromFolder(userId, folder, allBookmarks, existingBookmarkCache);
-          }
-        } else {
-          console.log(`X Sync: No folders found or folder API not available`);
-        }
-      } catch (folderError) {
-        // If folder API fails, just log the error and continue with main bookmarks
-        console.error(`X Sync: Error fetching or processing folders:`, folderError);
-        console.log(`X Sync: Continuing with main bookmarks sync`);
-      }
+      // Skip folder sync during main bookmark sync to avoid rate limits
+      console.log(`X Sync: Skipping folder sync during main bookmark sync to avoid rate limits`);
+      console.log(`X Sync: Users can sync individual folders using the folder-specific sync buttons`);
+      console.log(`X Sync: Continuing with main bookmarks sync`);
     } catch (setupError) {
       console.error(`X Sync: Error in sync setup:`, setupError);
       return { added: 0, updated: 0, errors: 1 };
