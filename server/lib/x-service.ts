@@ -1106,11 +1106,14 @@ export class XService {
     let allBookmarks: { 
       tweets: XTweet[], 
       users: { [key: string]: XUser },
-      media: { [key: string]: XMedia }
+      media: { [key: string]: XMedia },
+      // Add a map to track which tweets came from which folders
+      folderTweetMap: Map<string, Set<string>>
     } = { 
       tweets: [], 
       users: {},
-      media: {}
+      media: {},
+      folderTweetMap: new Map<string, Set<string>>()
     };
     
     // Create a cache to hold existing bookmark metadata for more efficient updates
@@ -1184,6 +1187,7 @@ export class XService {
           // For each folder, fetch bookmarks and add them to allBookmarks
           for (const folder of allFolders) {
             console.log(`X Sync: Processing folder ${folder.name} (${folder.id})`);
+            // Pass allBookmarks including folderTweetMap for tracking folder-tweet associations
             await this.syncBookmarksFromFolder(userId, folder, allBookmarks, existingBookmarkCache);
           }
         } else {
@@ -1279,8 +1283,43 @@ export class XService {
           }
           
           // Create the new bookmark
-          await storage.createBookmark(bookmarkData);
+          const newBookmark = await storage.createBookmark(bookmarkData);
           added++;
+          
+          // Check if this tweet belongs to any mapped folders
+          // We'll look for mapped collections and add the bookmark to them
+          try {
+            // Get all folder IDs where this tweet belongs
+            // Use Array.from to avoid TypeScript iterator issues
+            for (const entry of Array.from(allBookmarks.folderTweetMap.entries())) {
+              const folderId = entry[0];
+              const tweetIds = entry[1];
+              if (tweetIds.has(tweet.id)) {
+                console.log(`X Sync: Tweet ${tweet.id} belongs to folder ${folderId}`);
+                
+                // Look up the folder-to-collection mapping
+                const [folderMapping] = await db.select()
+                  .from(xFolders)
+                  .where(
+                    and(
+                      eq(xFolders.user_id, userId),
+                      eq(xFolders.x_folder_id, folderId)
+                    )
+                  );
+                
+                // If the folder has a mapped collection, add the bookmark to it
+                if (folderMapping && folderMapping.collection_id) {
+                  console.log(`X Sync: Adding bookmark ${newBookmark.id} to collection ${folderMapping.collection_id} (mapped from folder ${folderId})`);
+                  
+                  // Add the bookmark to the mapped collection
+                  await storage.addBookmarkToCollection(folderMapping.collection_id, newBookmark.id);
+                }
+              }
+            }
+          } catch (collectionError) {
+            console.error(`X Sync: Error adding bookmark to collections:`, collectionError);
+            // Continue processing other bookmarks even if this one fails
+          }
         }
       } catch (error) {
         console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
@@ -1310,7 +1349,9 @@ export class XService {
     allBookmarks: {
       tweets: XTweet[],
       users: { [key: string]: XUser },
-      media: { [key: string]: XMedia }
+      media: { [key: string]: XMedia },
+      // Add a map to track which tweets came from which folders
+      folderTweetMap: Map<string, Set<string>>
     },
     existingBookmarkCache: Map<string, Bookmark>
   ): Promise<void> {
@@ -1330,6 +1371,21 @@ export class XService {
           allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
           allBookmarks.users = { ...allBookmarks.users, ...result.users };
           allBookmarks.media = { ...allBookmarks.media, ...result.media };
+          
+          // Track which tweets belong to this folder
+          if (result.tweets.length > 0) {
+            // Get or create a Set for this folder
+            let folderTweets = allBookmarks.folderTweetMap.get(folder.id);
+            if (!folderTweets) {
+              folderTweets = new Set<string>();
+              allBookmarks.folderTweetMap.set(folder.id, folderTweets);
+            }
+            
+            // Add each tweet ID to the folder's Set
+            result.tweets.forEach(tweet => folderTweets!.add(tweet.id));
+            console.log(`X Sync: Tracked ${result.tweets.length} tweets for folder ${folder.id}`);
+          }
+          
           nextToken = result.nextToken;
           
           if (nextToken) {
