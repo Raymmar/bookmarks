@@ -62,22 +62,71 @@ export function setupEmailAuthRoutes(app: Express) {
     try {
       const { token } = req.query;
       
+      console.log("Email verification request received with token:", token);
+      
       if (!token || typeof token !== "string") {
+        console.log("Token missing or invalid format");
         return res.status(400).json({ message: "Invalid verification token" });
       }
       
-      // Verify the token
+      // First check if this token exists and belongs to a user
+      const userByToken = await storage.getUserByVerificationToken(token);
+      console.log("User lookup by token result:", userByToken ? `Found user: ${userByToken.email}` : "No user found");
+      
+      // If no user found with this token, it might have already been used or is invalid
+      if (!userByToken) {
+        // Check if there's a verified user with a matching token hash (could be a reused token)
+        // This would require additional functionality, but as a workaround we'll just return a clear message
+        console.log("No user found with this verification token - might be already used or invalid");
+        return res.status(400).json({ 
+          message: "Invalid or expired verification token. If you've already verified your email, please log in.",
+          alreadyVerified: true
+        });
+      }
+      
+      // If the user is already verified, log them in but provide a different message
+      if (userByToken.email_verified) {
+        console.log("User's email is already verified:", userByToken.email);
+        
+        // Log the already-verified user in
+        return req.login(userByToken, (err) => {
+          if (err) {
+            console.error("Error logging in already-verified user:", err);
+            return next(err);
+          }
+          
+          console.log("Already-verified user successfully logged in");
+          
+          // Return success with an appropriate message
+          const { password, ...userWithoutPassword } = userByToken;
+          return res.status(200).json({ 
+            message: "Your email was already verified. You have been logged in.", 
+            verified: true,
+            alreadyVerified: true,
+            user: userWithoutPassword
+          });
+        });
+      }
+      
+      // Now proceed to actually verify the email
+      console.log("Attempting to verify email with token:", token);
       const user = await storage.verifyEmail(token);
       
       if (!user) {
-        return res.status(400).json({ message: "Invalid or expired verification token" });
+        console.log("Failed to verify email - database update error");
+        return res.status(500).json({ message: "Failed to verify your email due to a server error" });
       }
+      
+      console.log("User successfully verified:", user.id, user.email);
       
       // Automatically log in the user after verification
       req.login(user, (err) => {
         if (err) {
+          console.error("Error logging in user after verification:", err);
           return next(err);
         }
+        
+        console.log("User successfully logged in after verification");
         
         // Return success and the user data without password
         const { password, ...userWithoutPassword } = user;
@@ -88,6 +137,7 @@ export function setupEmailAuthRoutes(app: Express) {
         });
       });
     } catch (error) {
+      console.error("Unexpected error during email verification:", error);
       next(error);
     }
   });

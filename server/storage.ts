@@ -1014,28 +1014,46 @@ export class DatabaseStorage implements IStorage {
   }
   
   async verifyEmail(token: string): Promise<User | undefined> {
+    console.log("Storage: verifyEmail called with token:", token);
+    
     // Find user with this token
     const user = await this.getUserByVerificationToken(token);
-    if (!user) return undefined;
+    console.log("Storage: user found?", !!user);
     
-    // Check if token is expired
-    if (user.verification_expires && new Date(user.verification_expires) < new Date()) {
+    if (!user) {
+      console.log("Storage: No user found with this token");
       return undefined;
     }
     
+    console.log("Storage: Found user:", user.id, user.email, "email verified:", user.email_verified);
+    
+    // Check if token is expired
+    if (user.verification_expires && new Date(user.verification_expires) < new Date()) {
+      console.log("Storage: Token expired at:", user.verification_expires);
+      return undefined;
+    }
+    
+    console.log("Storage: Token is valid, proceeding to update user");
+    
     // Verify the email by updating the user
-    const [updatedUser] = await db
-      .update(users)
-      .set({ 
-        email_verified: true,
-        verification_token: null,
-        verification_expires: null,
-        updated_at: new Date()
-      })
-      .where(eq(users.id, user.id))
-      .returning();
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({ 
+          email_verified: true,
+          verification_token: null,
+          verification_expires: null,
+          updated_at: new Date()
+        })
+        .where(eq(users.id, user.id))
+        .returning();
       
-    return updatedUser || undefined;
+      console.log("Storage: User updated successfully:", !!updatedUser);
+      return updatedUser || undefined;
+    } catch (error) {
+      console.error("Storage: Error updating user:", error);
+      throw error;
+    }
   }
   
   // Password reset methods
