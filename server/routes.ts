@@ -1744,19 +1744,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as Express.User).id;
       
       try {
-        // Get folders directly from X.com using our updated method
-        const folders = await xService.getFolders(userId);
+        // Get all folders with pagination from X.com
+        const allFolders = await xService.getAllFolders(userId);
         
-        if (!folders || folders.length === 0) {
+        if (allFolders.length === 0) {
           console.log("No X.com folders found or API doesn't support folders yet");
           return res.json([]);
         }
+        
+        console.log(`Retrieved ${allFolders.length} X.com folders for user`);
         
         // Get existing folder mappings
         const existingMappings = await storage.getXFoldersByUserId(userId);
         
         // Combine data for response
-        const foldersWithMappings = folders.map(folder => {
+        const foldersWithMappings = allFolders.map(folder => {
           const mapping = existingMappings.find(m => m.x_folder_id === folder.id);
           return {
             ...folder,

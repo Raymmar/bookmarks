@@ -823,8 +823,9 @@ export class XService {
 
   /**
    * Get user's bookmark folders from X.com
+   * Supports pagination to ensure all folders are retrieved
    */
-  async getFolders(userId: string): Promise<XFolderData[]> {
+  async getFolders(userId: string, paginationToken?: string): Promise<{ folders: XFolderData[], nextToken?: string }> {
     // Get user credentials
     const credentials = await this.getUserCredentials(userId);
     
@@ -836,10 +837,15 @@ export class XService {
     await this.ensureValidToken(userId);
     
     try {
-      console.log(`X Folders: Fetching bookmark folders for user ${userId}`);
+      console.log(`X Folders: Fetching bookmark folders for user ${userId}${paginationToken ? ' with pagination token' : ''}`);
       
       // Create the authenticated URL using the user's credentials
-      const url = `${X_API_BASE}/2/users/${credentials.x_user_id}/bookmarks/folders`;
+      let url = `${X_API_BASE}/2/users/${credentials.x_user_id}/bookmarks/folders`;
+      
+      // Add pagination token if provided
+      if (paginationToken) {
+        url += `?pagination_token=${paginationToken}`;
+      }
       
       // Make the request with the user's access token
       const response = await fetch(url, {
@@ -867,13 +873,51 @@ export class XService {
       if (!data.data) {
         // No folders found or API doesn't support folders yet
         console.log('X Folders: No folders found or API returned an empty response');
-        return [];
+        return { folders: [] };
       }
       
-      console.log(`X Folders: Found ${data.data.length} folders`);
-      return data.data;
+      console.log(`X Folders: Found ${data.data.length} folders${data.meta?.next_token ? ' with more available' : ''}`);
+      
+      return { 
+        folders: data.data,
+        nextToken: data.meta?.next_token
+      };
     } catch (error) {
       console.error('X Folders: Error fetching folders:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get all user's bookmark folders from X.com
+   * This method handles pagination internally and returns all folders
+   */
+  async getAllFolders(userId: string): Promise<XFolderData[]> {
+    let allFolders: XFolderData[] = [];
+    let nextToken: string | undefined = undefined;
+    
+    try {
+      do {
+        // Get a batch of folders
+        const result = await this.getFolders(userId, nextToken);
+        
+        // Add folders to our collection
+        allFolders = [...allFolders, ...result.folders];
+        
+        // Update the pagination token for the next request
+        nextToken = result.nextToken;
+        
+        // If we got folders but we're at the end, log it
+        if (result.folders.length > 0 && !nextToken) {
+          console.log(`X Folders: Retrieved all ${allFolders.length} folders successfully`);
+        }
+        
+      } while (nextToken); // Continue until there are no more pages
+      
+      return allFolders;
+      
+    } catch (error) {
+      console.error('X Folders: Error fetching all folders:', error);
       throw error;
     }
   }
@@ -961,16 +1005,16 @@ export class XService {
         }
       });
       
-      // Step 1: Try to fetch folders (this will use the undocumented API endpoint)
+      // Step 1: Try to fetch folders with pagination (this will use the undocumented API endpoint)
       try {
-        console.log(`X Sync: Attempting to fetch folders for user ${userId}`);
-        const folders = await this.getFolders(userId);
+        console.log(`X Sync: Attempting to fetch all folders for user ${userId}`);
+        const allFolders = await this.getAllFolders(userId);
         
-        if (folders.length > 0) {
-          console.log(`X Sync: Found ${folders.length} folders, syncing bookmarks from each folder`);
+        if (allFolders.length > 0) {
+          console.log(`X Sync: Found ${allFolders.length} folders using pagination, syncing bookmarks from each folder`);
           
           // For each folder, fetch bookmarks and add them to allBookmarks
-          for (const folder of folders) {
+          for (const folder of allFolders) {
             console.log(`X Sync: Processing folder ${folder.name} (${folder.id})`);
             await this.syncBookmarksFromFolder(userId, folder, allBookmarks, existingBookmarkCache);
           }
