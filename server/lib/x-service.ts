@@ -1687,12 +1687,17 @@ export class XService {
               like_count: tweet.public_metrics?.like_count,
               repost_count: tweet.public_metrics?.retweet_count,
               reply_count: tweet.public_metrics?.reply_count,
-              quote_count: tweet.public_metrics?.quote_count,
-              // Only update created_at if it's not already set and the tweet has a creation date
-              created_at: (!existingBookmark.created_at && tweet.created_at) 
-                ? new Date(tweet.created_at) 
-                : undefined
+              quote_count: tweet.public_metrics?.quote_count
             };
+            
+            // Specifically check for created_at and backfill it if the tweet has this data
+            if (tweet.created_at) {
+              // If existing bookmark has no created_at (null) or it's undefined
+              if (!existingBookmark.created_at) {
+                console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
+                updateData.created_at = new Date(tweet.created_at);
+              }
+            }
             
             // Update only the engagement metrics for the existing bookmark
             await storage.updateBookmark(existingBookmark.id, updateData);
