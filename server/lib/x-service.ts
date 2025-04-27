@@ -532,10 +532,11 @@ export class XService {
       // Create the authenticated URL using the user's credentials
       const url = new URL(`${X_API_BASE}/2/users/${credentials.x_user_id}/bookmarks/folders/${folderId}`);
       
-      // The folder-specific endpoint is more restrictive on parameters
-      // The API only accepts a few fields as valid parameters
+      // The folder-specific endpoint is extremely restrictive on parameters
+      // According to the API error response, it only accepts 'id' and 'folder_id'
+      // The folder_id is already in the URL path, and we don't need an ID parameter
+      // So we only need to add the pagination token if it exists
       
-      // If pagination token is provided, use it
       const params = new URLSearchParams();
       
       // Add pagination token if provided
@@ -543,9 +544,8 @@ export class XService {
         params.append("pagination_token", paginationToken);
       }
       
-      // We're limited to very few parameters - let's add max_results
-      // to ensure we get the maximum number of bookmarks per page
-      params.append("max_results", "100");
+      // DO NOT add max_results, it's not supported by this endpoint
+      // The API returned a 400 error when we tried to use it
       
       url.search = params.toString();
       
