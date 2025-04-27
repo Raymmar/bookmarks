@@ -824,8 +824,9 @@ export class XService {
   /**
    * Get user's bookmark folders from X.com
    * Supports pagination to ensure all folders are retrieved
+   * Includes rate limiting protection
    */
-  async getFolders(userId: string, paginationToken?: string): Promise<{ folders: XFolderData[], nextToken?: string }> {
+  async getFolders(userId: string, paginationToken?: string): Promise<{ folders: XFolderData[], nextToken?: string, rateLimit?: boolean }> {
     // Get user credentials
     const credentials = await this.getUserCredentials(userId);
     
@@ -847,6 +848,11 @@ export class XService {
         url += `?pagination_token=${paginationToken}`;
       }
       
+      // Add a delay to prevent rate limiting (500ms)
+      if (paginationToken) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       // Make the request with the user's access token
       const response = await fetch(url, {
         method: 'GET',
@@ -863,6 +869,14 @@ export class XService {
         // Check if this is an auth error
         if (response.status === 401) {
           throw new Error('User needs to reconnect');
+        }
+        
+        // Handle rate limiting specifically
+        if (response.status === 429) {
+          console.log('X Folders: Rate limit exceeded, waiting before retry');
+          // If this is a rate limit error, wait and return empty for now
+          // The client can retry later
+          return { folders: [], rateLimit: true };
         }
         
         throw new Error(`Failed to get folders: ${response.status} ${errorText}`);
@@ -891,28 +905,68 @@ export class XService {
   /**
    * Get all user's bookmark folders from X.com
    * This method handles pagination internally and returns all folders
+   * Includes rate limiting protection with exponential backoff
    */
   async getAllFolders(userId: string): Promise<XFolderData[]> {
     let allFolders: XFolderData[] = [];
     let nextToken: string | undefined = undefined;
+    let retryCount = 0;
+    const maxRetries = 3;
     
     try {
       do {
-        // Get a batch of folders
-        const result = await this.getFolders(userId, nextToken);
-        
-        // Add folders to our collection
-        allFolders = [...allFolders, ...result.folders];
-        
-        // Update the pagination token for the next request
-        nextToken = result.nextToken;
-        
-        // If we got folders but we're at the end, log it
-        if (result.folders.length > 0 && !nextToken) {
-          console.log(`X Folders: Retrieved all ${allFolders.length} folders successfully`);
+        try {
+          // Get a batch of folders
+          const result = await this.getFolders(userId, nextToken);
+          
+          // Check if we hit a rate limit
+          if ('rateLimit' in result && result.rateLimit) {
+            retryCount++;
+            if (retryCount <= maxRetries) {
+              // Wait with exponential backoff: 1s, 2s, 4s
+              const waitTime = Math.pow(2, retryCount - 1) * 1000;
+              console.log(`X Folders: Rate limited, retry ${retryCount}/${maxRetries} after ${waitTime}ms`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              continue; // Try the same request again
+            } else {
+              console.log(`X Folders: Max retries reached (${maxRetries}), returning current results`);
+              break; // Exit the loop, return what we have so far
+            }
+          }
+          
+          // Reset retry count on successful requests
+          retryCount = 0;
+          
+          // Add folders to our collection
+          allFolders = [...allFolders, ...result.folders];
+          
+          // Update the pagination token for the next request
+          nextToken = result.nextToken;
+          
+          // If we got folders but we're at the end, log it
+          if (result.folders.length > 0 && !nextToken) {
+            console.log(`X Folders: Retrieved all ${allFolders.length} folders successfully`);
+          }
+          
+          // Add a delay between pages to avoid rate limiting
+          if (nextToken) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (pageError) {
+          console.error('X Folders: Error fetching page:', pageError);
+          retryCount++;
+          
+          if (retryCount <= maxRetries) {
+            // Wait with exponential backoff: 1s, 2s, 4s
+            const waitTime = Math.pow(2, retryCount - 1) * 1000;
+            console.log(`X Folders: Error, retry ${retryCount}/${maxRetries} after ${waitTime}ms`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+            console.log(`X Folders: Max retries reached (${maxRetries}), returning current results`);
+            break; // Exit the loop, return what we have so far
+          }
         }
-        
-      } while (nextToken); // Continue until there are no more pages
+      } while (nextToken || (retryCount > 0 && retryCount <= maxRetries)); // Continue until there are no more pages or max retries reached
       
       return allFolders;
       

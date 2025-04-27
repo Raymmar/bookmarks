@@ -48,7 +48,7 @@ const XIntegrationPanel = () => {
   const [isMappingFolder, setIsMappingFolder] = useState(false);
 
   // Fetch X.com connection status
-  const { data: connectionStatus, isLoading: isLoadingStatus } = useQuery({
+  const { data: connectionStatus, isLoading: isLoadingStatus } = useQuery<XConnectionStatus>({
     queryKey: ['/api/x/status'],
     refetchOnWindowFocus: false,
     retry: false
@@ -59,7 +59,7 @@ const XIntegrationPanel = () => {
     data: folders, 
     isLoading: isLoadingFolders,
     refetch: refetchFolders 
-  } = useQuery({
+  } = useQuery<XFolder[]>({
     queryKey: ['/api/x/folders'],
     enabled: !!connectionStatus?.connected,
     retry: false,
@@ -69,7 +69,7 @@ const XIntegrationPanel = () => {
   // Fetch user collections for mapping
   const { 
     data: collections 
-  } = useQuery({
+  } = useQuery<Collection[]>({
     queryKey: ['/api/collections'],
     retry: false,
     refetchOnWindowFocus: false
@@ -539,15 +539,28 @@ const XIntegrationPanel = () => {
                 <div className="text-center py-6">
                   <p className="text-muted-foreground">No folders found in your X.com account.</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    This could be because you don't have any folders or the API is temporarily unavailable.
+                    {isLoadingFolders ? 
+                      "Fetching folders, please wait..." :
+                      "This could be because you hit X.com's rate limits. Please wait a moment before trying again."
+                    }
                   </p>
                   <Button 
                     variant="outline" 
                     className="mt-4" 
                     onClick={() => refetchFolders()}
+                    disabled={isLoadingFolders}
                   >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Refresh Folders
+                    {isLoadingFolders ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Retry Loading Folders
+                      </>
+                    )}
                   </Button>
                 </div>
               ) : (
@@ -558,9 +571,16 @@ const XIntegrationPanel = () => {
                       variant="outline" 
                       size="sm" 
                       onClick={() => refetchFolders()}
+                      disabled={isLoadingFolders}
                     >
-                      <RefreshCw className="mr-2 h-3 w-3" />
-                      Refresh
+                      {isLoadingFolders ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      <span className="ml-2">
+                        {isLoadingFolders ? "Loading..." : "Refresh"}
+                      </span>
                     </Button>
                   </div>
                   
