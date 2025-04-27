@@ -1743,16 +1743,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const userId = (req.user as Express.User).id;
       
-      // Get user credentials first
-      const credentials = await storage.getXCredentialsByUserId(userId);
-      
-      if (!credentials) {
-        return res.status(404).json({ error: "X.com connection not found" });
-      }
-      
       try {
-        // Get folders from X.com - using user's UUID, not the x_user_id
-        const folders = await xService.getFolders(credentials.access_token, userId);
+        // Get folders directly from X.com using our updated method
+        const folders = await xService.getFolders(userId);
+        
+        if (!folders || folders.length === 0) {
+          console.log("No X.com folders found or API doesn't support folders yet");
+          return res.json([]);
+        }
         
         // Get existing folder mappings
         const existingMappings = await storage.getXFoldersByUserId(userId);

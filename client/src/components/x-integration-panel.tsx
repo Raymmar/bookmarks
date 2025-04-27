@@ -504,6 +504,16 @@ const XIntegrationPanel = () => {
             </TabsContent>
             
             <TabsContent value="folders" className="py-4">
+              <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-4 mb-4">
+                <h3 className="font-medium text-blue-800 dark:text-blue-300">Folder Support Now Available</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
+                  We now support importing bookmarks from X.com folders. Map your folders to collections to keep your bookmarks organized.
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-500 mt-2">
+                  When you sync, we'll fetch bookmarks from all your folders and import them into their mapped collections.
+                </p>
+              </div>
+              
               {isLoadingFolders ? (
                 <div className="flex justify-center py-6">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -511,6 +521,9 @@ const XIntegrationPanel = () => {
               ) : !folders || folders.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-muted-foreground">No folders found in your X.com account.</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This could be because you don't have any folders or the API is temporarily unavailable.
+                  </p>
                   <Button 
                     variant="outline" 
                     className="mt-4" 

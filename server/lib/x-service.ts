@@ -567,7 +567,7 @@ export class XService {
         throw new Error(`Failed to get bookmarks from folder: ${response.status} ${errorText}`);
       }
       
-      const data: XApiResponse<any> = await response.json();
+      const data = await response.json() as XApiResponse<any>;
       
       if (!data.data) {
         // No bookmarks found in this folder, return empty arrays
@@ -880,6 +880,7 @@ export class XService {
 
   /**
    * Sync bookmarks from X.com to our database
+   * Includes bookmarks from folders if available
    */
   async syncBookmarks(userId: string): Promise<{ added: number, updated: number, errors: number }> {
     console.log(`X Sync: Starting bookmark sync for user ${userId}`);
@@ -899,7 +900,6 @@ export class XService {
       users: {},
       media: {}
     };
-    let nextToken: string | undefined = undefined;
     
     // Create a cache to hold existing bookmark metadata for more efficient updates
     const existingBookmarkCache = new Map<string, Bookmark>();
@@ -960,38 +960,78 @@ export class XService {
           existingBookmarkCache.set(bookmarkId, bookmark);
         }
       });
-    } catch (error) {
-      console.error(`X Sync: Error checking credentials or fetching existing bookmarks:`, error);
+      
+      // Step 1: Try to fetch folders (this will use the undocumented API endpoint)
+      try {
+        console.log(`X Sync: Attempting to fetch folders for user ${userId}`);
+        const folders = await this.getFolders(userId);
+        
+        if (folders.length > 0) {
+          console.log(`X Sync: Found ${folders.length} folders, syncing bookmarks from each folder`);
+          
+          // For each folder, fetch bookmarks and add them to allBookmarks
+          for (const folder of folders) {
+            console.log(`X Sync: Processing folder ${folder.name} (${folder.id})`);
+            await this.syncBookmarksFromFolder(userId, folder, allBookmarks, existingBookmarkCache);
+          }
+        } else {
+          console.log(`X Sync: No folders found or folder API not available`);
+        }
+      } catch (folderError) {
+        // If folder API fails, just log the error and continue with main bookmarks
+        console.error(`X Sync: Error fetching or processing folders:`, folderError);
+        console.log(`X Sync: Continuing with main bookmarks sync`);
+      }
+    } catch (setupError) {
+      console.error(`X Sync: Error in sync setup:`, setupError);
       return { added: 0, updated: 0, errors: 1 };
     }
     
-    // Fetch bookmarks with pagination
-    do {
-      try {
-        console.log(`X Sync: Fetching bookmarks${nextToken ? ' with pagination token' : ''}`);
-        const result = await this.getBookmarks(userId, nextToken);
-        console.log(`X Sync: Fetched ${result.tweets.length} tweets, ${Object.keys(result.users).length} users, and ${Object.keys(result.media).length} media items`);
-        
-        allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
-        allBookmarks.users = { ...allBookmarks.users, ...result.users };
-        allBookmarks.media = { ...allBookmarks.media, ...result.media };
-        nextToken = result.nextToken;
-        
-        if (nextToken) {
-          console.log(`X Sync: More bookmarks available, will paginate`);
+    // Step 2: Now fetch the main bookmarks (unfiled bookmarks)
+    try {
+      console.log(`X Sync: Fetching unfiled bookmarks`);
+      let nextToken: string | undefined = undefined;
+      
+      // Fetch bookmarks with pagination
+      do {
+        try {
+          console.log(`X Sync: Fetching bookmarks${nextToken ? ' with pagination token' : ''}`);
+          const result = await this.getBookmarks(userId, nextToken);
+          console.log(`X Sync: Fetched ${result.tweets.length} tweets, ${Object.keys(result.users).length} users, and ${Object.keys(result.media).length} media items`);
+          
+          allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
+          allBookmarks.users = { ...allBookmarks.users, ...result.users };
+          allBookmarks.media = { ...allBookmarks.media, ...result.media };
+          nextToken = result.nextToken;
+          
+          if (nextToken) {
+            console.log(`X Sync: More bookmarks available, will paginate`);
+          }
+        } catch (error) {
+          console.error('X Sync: Error fetching bookmarks from X.com:', error);
+          errors++;
+          break;
         }
-      } catch (error) {
-        console.error('X Sync: Error fetching bookmarks from X.com:', error);
-        errors++;
-        break;
-      }
-    } while (nextToken);
+      } while (nextToken);
+    } catch (mainSyncError) {
+      console.error(`X Sync: Error fetching main bookmarks:`, mainSyncError);
+      errors++;
+    }
     
     console.log(`X Sync: Total fetched - ${allBookmarks.tweets.length} tweets, ${Object.keys(allBookmarks.users).length} users, and ${Object.keys(allBookmarks.media).length} media items`);
     
-    // Process each bookmark
+    // Step 3: Process all the collected bookmarks
+    // Use a Set to track processed tweet IDs to avoid duplicates from different folders
+    const processedTweetIds = new Set<string>();
+    
     for (const tweet of allBookmarks.tweets) {
       try {
+        // Skip if we've already processed this tweet (could be in multiple folders)
+        if (processedTweetIds.has(tweet.id)) {
+          continue;
+        }
+        
+        processedTweetIds.add(tweet.id);
         const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
         
         // Check if bookmark already exists in our cache
@@ -1046,6 +1086,84 @@ export class XService {
     
     console.log(`X Sync: Finished - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
     return { added, updated, errors };
+  }
+  
+  /**
+   * Sync bookmarks from a specific X.com folder
+   * This adds bookmarks to the allBookmarks object
+   */
+  private async syncBookmarksFromFolder(
+    userId: string, 
+    folder: XFolderData, 
+    allBookmarks: {
+      tweets: XTweet[],
+      users: { [key: string]: XUser },
+      media: { [key: string]: XMedia }
+    },
+    existingBookmarkCache: Map<string, Bookmark>
+  ): Promise<void> {
+    console.log(`X Sync: Syncing bookmarks from folder "${folder.name}" (${folder.id})`);
+    
+    let nextToken: string | undefined = undefined;
+    
+    try {
+      // Fetch bookmarks from this folder with pagination
+      do {
+        try {
+          console.log(`X Sync: Fetching bookmarks from folder ${folder.id}${nextToken ? ' with pagination token' : ''}`);
+          const result = await this.getBookmarksFromFolder(userId, folder.id, nextToken);
+          console.log(`X Sync: Fetched ${result.tweets.length} tweets from folder ${folder.id}`);
+          
+          // Add the tweets, users, and media to our collection
+          allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
+          allBookmarks.users = { ...allBookmarks.users, ...result.users };
+          allBookmarks.media = { ...allBookmarks.media, ...result.media };
+          nextToken = result.nextToken;
+          
+          if (nextToken) {
+            console.log(`X Sync: More bookmarks available in folder ${folder.id}, will paginate`);
+          }
+        } catch (error) {
+          console.error(`X Sync: Error fetching bookmarks from folder ${folder.id}:`, error);
+          break;
+        }
+      } while (nextToken);
+      
+      // Look up or create a collection mapping for this folder
+      await this.ensureFolderCollection(userId, folder);
+      
+    } catch (error) {
+      console.error(`X Sync: Error syncing bookmarks from folder ${folder.id}:`, error);
+    }
+  }
+  
+  /**
+   * Ensure a folder has a corresponding collection in our system
+   */
+  private async ensureFolderCollection(userId: string, folder: XFolderData): Promise<void> {
+    try {
+      // Check if there's already a mapping for this folder
+      const [existingMapping] = await db.select()
+        .from(xFolders)
+        .where(
+          and(
+            eq(xFolders.user_id, userId),
+            eq(xFolders.x_folder_id, folder.id)
+          )
+        );
+      
+      if (existingMapping) {
+        // Update the last sync time for this folder mapping
+        await storage.updateXFolderLastSync(existingMapping.id);
+        console.log(`X Sync: Updated last sync time for folder "${folder.name}" (${folder.id})`);
+      } else {
+        // Create a new collection for this folder
+        console.log(`X Sync: Creating new collection for folder "${folder.name}" (${folder.id})`);
+        await this.createCollectionFromFolder(userId, folder);
+      }
+    } catch (error) {
+      console.error(`X Sync: Error ensuring folder collection for ${folder.id}:`, error);
+    }
   }
 
   /**
