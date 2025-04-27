@@ -283,7 +283,28 @@ export class MemStorage implements IStorage {
   }
   
   async deleteCollection(id: string): Promise<boolean> {
-    return this.collections.delete(id);
+    try {
+      // First, update any X.com folder mappings to remove the collection reference
+      for (const folder of this.xFolders.values()) {
+        if (folder.collection_id === id) {
+          folder.collection_id = null;
+          folder.updated_at = new Date();
+        }
+      }
+      
+      // Then remove any bookmarks in this collection
+      for (const cb of this.collectionBookmarks.values()) {
+        if (cb.collection_id === id) {
+          this.collectionBookmarks.delete(cb.id);
+        }
+      }
+      
+      // Finally delete the collection itself
+      return this.collections.delete(id);
+    } catch (error) {
+      console.error(`Error deleting collection ${id}:`, error);
+      throw error;
+    }
   }
   
   // Collection Bookmarks methods
@@ -1163,8 +1184,29 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteCollection(id: string): Promise<boolean> {
-    const result = await db.delete(collections).where(eq(collections.id, id)).returning();
-    return result.length > 0;
+    try {
+      // First, remove any X.com folder mappings to this collection
+      await db.update(xFolders)
+        .set({ 
+          collection_id: null,
+          updated_at: new Date()
+        })
+        .where(eq(xFolders.collection_id, id));
+      
+      // Then remove any bookmarks in this collection
+      await db.delete(collectionBookmarks)
+        .where(eq(collectionBookmarks.collection_id, id));
+      
+      // Finally delete the collection itself
+      const result = await db.delete(collections)
+        .where(eq(collections.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting collection ${id}:`, error);
+      throw error;
+    }
   }
   
   // Collection Bookmarks
