@@ -84,6 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      // Invalidate user-specific queries to ensure fresh data on login
+      queryClient.invalidateQueries({
+        queryKey: ["/api/bookmarks"],
+      });
+      // Add invalidation for collections to refresh them on login
+      queryClient.invalidateQueries({
+        queryKey: ["/api/collections"],
+      });
       refetchUser();
       
       toast({
@@ -161,6 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Invalidate any user-specific queries
       queryClient.invalidateQueries({
         queryKey: ["/api/bookmarks"],
+      });
+      // Add invalidation for collections to refresh them on logout
+      queryClient.invalidateQueries({
+        queryKey: ["/api/collections"],
       });
       refetchUser();
       
