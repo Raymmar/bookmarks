@@ -75,6 +75,40 @@ const XIntegrationPanel = () => {
     refetchOnWindowFocus: false
   });
 
+  // Function to force refresh folders from API
+  const forceRefreshFolders = async () => {
+    toast({
+      title: "Refreshing folders",
+      description: "Fetching all folders from X.com with pagination...",
+    });
+    
+    try {
+      // Manually fetch with force=true parameter
+      await queryClient.fetchQuery({
+        queryKey: ['/api/x/folders'],
+        queryFn: async () => {
+          const response = await fetch('/api/x/folders?force=true');
+          if (!response.ok) {
+            throw new Error('Failed to refresh folders');
+          }
+          return response.json();
+        }
+      });
+      
+      toast({
+        title: "Folders refreshed",
+        description: "Successfully fetched all folders from X.com",
+      });
+    } catch (error) {
+      console.error("Error force refreshing folders:", error);
+      toast({
+        title: "Refresh failed",
+        description: "Failed to refresh folders. Rate limits may apply.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Force disconnect from X.com
   const forceDisconnect = useMutation({
     mutationFn: async () => {
@@ -567,21 +601,37 @@ const XIntegrationPanel = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-medium">Your X.com Folders</h3>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => refetchFolders()}
-                      disabled={isLoadingFolders}
-                    >
-                      {isLoadingFolders ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3 w-3" />
-                      )}
-                      <span className="ml-2">
-                        {isLoadingFolders ? "Loading..." : "Refresh"}
-                      </span>
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => refetchFolders()}
+                        disabled={isLoadingFolders}
+                        title="Refresh from cache"
+                      >
+                        {isLoadingFolders ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                        <span className="ml-2 hidden sm:inline">
+                          {isLoadingFolders ? "Loading..." : "Refresh"}
+                        </span>
+                      </Button>
+                      
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        onClick={() => forceRefreshFolders()}
+                        disabled={isLoadingFolders}
+                        title="Force refresh from X.com API with pagination"
+                      >
+                        <DownloadCloud className="h-3 w-3" />
+                        <span className="ml-2 hidden sm:inline">
+                          Force Refresh All
+                        </span>
+                      </Button>
+                    </div>
                   </div>
                   
                   <Separator />
