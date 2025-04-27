@@ -380,8 +380,9 @@ export class XService {
 
   /**
    * Get user's bookmarked tweets
+   * If folderId is provided, gets bookmarks from that specific folder
    */
-  async getBookmarks(userId: string, paginationToken?: string): Promise<{ 
+  async getBookmarks(userId: string, paginationToken?: string, folderId?: string): Promise<{ 
     tweets: XTweet[], 
     users: { [key: string]: XUser }, 
     media: { [key: string]: XMedia },
@@ -394,61 +395,188 @@ export class XService {
       throw new Error('User is not authenticated with X.com');
     }
     
-    // Create a Twitter API client with the stored credentials
-    this.authClient = new auth.OAuth2User({
-      client_id: X_CLIENT_ID,
-      client_secret: X_CLIENT_SECRET,
-      callback: X_REDIRECT_URI,
-      scopes: REQUIRED_SCOPES,
-      token: {
-        access_token: credentials.access_token,
-        refresh_token: credentials.refresh_token || '',
-        expires_at: credentials.token_expires_at?.getTime() || 0,
-        token_type: 'bearer'
-      }
-    });
-    
-    const client = new Client(this.authClient);
-    
     try {
-      // Use the SDK to fetch bookmarks
-      const bookmarksResponse = await client.bookmarks.getUsersIdBookmarks(credentials.x_user_id, {
-        "expansions": [
-          "author_id",
-          "attachments.media_keys",
-          "referenced_tweets.id",
-          "referenced_tweets.id.author_id"
-        ],
-        "tweet.fields": [
-          "created_at",
-          "public_metrics",
-          "entities",
-          "attachments"
-        ],
-        "user.fields": [
-          "name",
-          "username",
-          "profile_image_url"
-        ],
-        "media.fields": [
-          "url",
-          "preview_image_url",
-          "alt_text",
-          "type",
-          "width",
-          "height"
-        ],
-        "max_results": 100,
-        "pagination_token": paginationToken
+      // Check if we're getting bookmarks from a specific folder
+      if (folderId) {
+        return await this.getBookmarksFromFolder(userId, folderId, paginationToken);
+      }
+      
+      // Create a Twitter API client with the stored credentials
+      this.authClient = new auth.OAuth2User({
+        client_id: X_CLIENT_ID,
+        client_secret: X_CLIENT_SECRET,
+        callback: X_REDIRECT_URI,
+        scopes: REQUIRED_SCOPES,
+        token: {
+          access_token: credentials.access_token,
+          refresh_token: credentials.refresh_token || '',
+          expires_at: credentials.token_expires_at?.getTime() || 0,
+          token_type: 'bearer'
+        }
       });
       
-      if (!bookmarksResponse.data) {
-        // No bookmarks found, return empty arrays
+      const client = new Client(this.authClient);
+      
+      try {
+        // Use the SDK to fetch bookmarks
+        const bookmarksResponse = await client.bookmarks.getUsersIdBookmarks(credentials.x_user_id, {
+          "expansions": [
+            "author_id",
+            "attachments.media_keys",
+            "referenced_tweets.id",
+            "referenced_tweets.id.author_id"
+          ],
+          "tweet.fields": [
+            "created_at",
+            "public_metrics",
+            "entities",
+            "attachments"
+          ],
+          "user.fields": [
+            "name",
+            "username",
+            "profile_image_url"
+          ],
+          "media.fields": [
+            "url",
+            "preview_image_url",
+            "alt_text",
+            "type",
+            "width",
+            "height"
+          ],
+          "max_results": 100,
+          "pagination_token": paginationToken
+        });
+        
+        if (!bookmarksResponse.data) {
+          // No bookmarks found, return empty arrays
+          return { tweets: [], users: {}, media: {} };
+        }
+        
+        // Convert SDK response to our internal format
+        const tweets = bookmarksResponse.data.map(tweet => ({
+          id: tweet.id,
+          text: tweet.text,
+          created_at: tweet.created_at,
+          author_id: tweet.author_id,
+          public_metrics: tweet.public_metrics,
+          entities: tweet.entities,
+          attachments: tweet.attachments,
+          // Initialize local_media as empty array for each tweet
+          local_media: []
+        }));
+        
+        // Extract users from includes
+        const users: { [key: string]: XUser } = {};
+        if (bookmarksResponse.includes && bookmarksResponse.includes.users) {
+          bookmarksResponse.includes.users.forEach(user => {
+            users[user.id] = {
+              id: user.id,
+              name: user.name,
+              username: user.username,
+              profile_image_url: user.profile_image_url
+            };
+          });
+        }
+        
+        // Extract media from includes
+        const media: { [key: string]: XMedia } = {};
+        if (bookmarksResponse.includes && bookmarksResponse.includes.media) {
+          bookmarksResponse.includes.media.forEach((mediaItem: any) => {
+            media[mediaItem.media_key] = {
+              media_key: mediaItem.media_key,
+              type: mediaItem.type,
+              url: mediaItem.url || mediaItem.preview_image_url,
+              preview_image_url: mediaItem.preview_image_url,
+              width: mediaItem.width,
+              height: mediaItem.height,
+              alt_text: mediaItem.alt_text
+            };
+          });
+        }
+        
+        // Extract next pagination token if available
+        const nextToken = bookmarksResponse.meta?.next_token;
+        
+        return { tweets, users, nextToken, media };
+      } catch (error) {
+        console.error('Error fetching bookmarks:', error);
+        throw new Error(`Failed to get bookmarks: ${error}`);
+      }
+    } catch (error) {
+      console.error('Error in getBookmarks:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get user's bookmarked tweets from a specific folder
+   */
+  async getBookmarksFromFolder(userId: string, folderId: string, paginationToken?: string): Promise<{
+    tweets: XTweet[],
+    users: { [key: string]: XUser },
+    media: { [key: string]: XMedia },
+    nextToken?: string
+  }> {
+    // Get user credentials
+    const credentials = await this.getUserCredentials(userId);
+    
+    if (!credentials) {
+      throw new Error('User is not authenticated with X.com');
+    }
+    
+    try {
+      console.log(`X Folders: Fetching bookmarks from folder ${folderId} for user ${userId}`);
+      
+      // Create the authenticated URL using the user's credentials
+      const url = new URL(`${X_API_BASE}/2/users/${credentials.x_user_id}/bookmarks/folders/${folderId}`);
+      
+      // Add query parameters
+      const params = new URLSearchParams();
+      params.append("expansions", "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id");
+      params.append("tweet.fields", "created_at,public_metrics,entities,attachments");
+      params.append("user.fields", "name,username,profile_image_url");
+      params.append("media.fields", "url,preview_image_url,alt_text,type,width,height");
+      params.append("max_results", "100");
+      
+      if (paginationToken) {
+        params.append("pagination_token", paginationToken);
+      }
+      
+      url.search = params.toString();
+      
+      // Make the request with the user's access token
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${credentials.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`X Folders: Error fetching bookmarks from folder, Status: ${response.status}, Response:`, errorText);
+        
+        // Check if this is an auth error
+        if (response.status === 401) {
+          throw new Error('User needs to reconnect');
+        }
+        
+        throw new Error(`Failed to get bookmarks from folder: ${response.status} ${errorText}`);
+      }
+      
+      const data: XApiResponse<any> = await response.json();
+      
+      if (!data.data) {
+        // No bookmarks found in this folder, return empty arrays
+        console.log(`X Folders: No bookmarks found in folder ${folderId}`);
         return { tweets: [], users: {}, media: {} };
       }
       
-      // Convert SDK response to our internal format
-      const tweets = bookmarksResponse.data.map(tweet => ({
+      // Convert API response to our internal format
+      const tweets = data.data.map((tweet: any) => ({
         id: tweet.id,
         text: tweet.text,
         created_at: tweet.created_at,
@@ -462,8 +590,8 @@ export class XService {
       
       // Extract users from includes
       const users: { [key: string]: XUser } = {};
-      if (bookmarksResponse.includes && bookmarksResponse.includes.users) {
-        bookmarksResponse.includes.users.forEach(user => {
+      if (data.includes && data.includes.users) {
+        data.includes.users.forEach((user: any) => {
           users[user.id] = {
             id: user.id,
             name: user.name,
@@ -475,8 +603,8 @@ export class XService {
       
       // Extract media from includes
       const media: { [key: string]: XMedia } = {};
-      if (bookmarksResponse.includes && bookmarksResponse.includes.media) {
-        bookmarksResponse.includes.media.forEach((mediaItem: any) => {
+      if (data.includes && data.includes.media) {
+        data.includes.media.forEach((mediaItem: any) => {
           media[mediaItem.media_key] = {
             media_key: mediaItem.media_key,
             type: mediaItem.type,
@@ -490,12 +618,13 @@ export class XService {
       }
       
       // Extract next pagination token if available
-      const nextToken = bookmarksResponse.meta?.next_token;
+      const nextToken = data.meta?.next_token;
       
+      console.log(`X Folders: Found ${tweets.length} bookmarks in folder ${folderId}`);
       return { tweets, users, nextToken, media };
     } catch (error) {
-      console.error('Error fetching bookmarks:', error);
-      throw new Error(`Failed to get bookmarks: ${error}`);
+      console.error(`X Folders: Error fetching bookmarks from folder ${folderId}:`, error);
+      throw error;
     }
   }
 
@@ -693,17 +822,60 @@ export class XService {
   }
 
   /**
-   * Get user's folders
+   * Get user's bookmark folders from X.com
    */
-  async getFolders(accessToken: string, userId: string): Promise<XFolderData[]> {
+  async getFolders(userId: string): Promise<XFolderData[]> {
+    // Get user credentials
+    const credentials = await this.getUserCredentials(userId);
+    
+    if (!credentials) {
+      throw new Error('User is not authenticated with X.com');
+    }
+    
     // Ensure token is valid
     await this.ensureValidToken(userId);
     
-    // TODO: Implement once X API supports folders
-    // Currently, the X API does not have an endpoint for retrieving folders
-    // This is a placeholder for when it becomes available
-    
-    return [];
+    try {
+      console.log(`X Folders: Fetching bookmark folders for user ${userId}`);
+      
+      // Create the authenticated URL using the user's credentials
+      const url = `${X_API_BASE}/2/users/${credentials.x_user_id}/bookmarks/folders`;
+      
+      // Make the request with the user's access token
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${credentials.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`X Folders: Error fetching folders, Status: ${response.status}, Response:`, errorText);
+        
+        // Check if this is an auth error
+        if (response.status === 401) {
+          throw new Error('User needs to reconnect');
+        }
+        
+        throw new Error(`Failed to get folders: ${response.status} ${errorText}`);
+      }
+      
+      const data = await response.json() as XApiResponse<XFolderData[]>;
+      
+      if (!data.data) {
+        // No folders found or API doesn't support folders yet
+        console.log('X Folders: No folders found or API returned an empty response');
+        return [];
+      }
+      
+      console.log(`X Folders: Found ${data.data.length} folders`);
+      return data.data;
+    } catch (error) {
+      console.error('X Folders: Error fetching folders:', error);
+      throw error;
+    }
   }
 
   /**
