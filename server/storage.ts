@@ -1812,6 +1812,25 @@ export class DatabaseStorage implements IStorage {
     return updatedFolder;
   }
   
+  async getStoredXFolders(userId: string): Promise<XFolder[]> {
+    console.log(`DB: Getting stored X folders for user ${userId}`);
+    return await db.select()
+      .from(xFolders)
+      .where(eq(xFolders.user_id, userId));
+  }
+  
+  async updateXFolder(id: string, folderUpdate: Partial<XFolder>): Promise<XFolder | undefined> {
+    console.log(`DB: Updating X folder ${id}`);
+    const [updatedFolder] = await db.update(xFolders)
+      .set({
+        ...folderUpdate,
+        updated_at: new Date()
+      })
+      .where(eq(xFolders.id, id))
+      .returning();
+    return updatedFolder;
+  }
+  
   async findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined> {
     const [bookmark] = await db.select()
       .from(bookmarks)
