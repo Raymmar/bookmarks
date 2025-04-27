@@ -73,21 +73,13 @@ export function setupEmailAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid or expired verification token" });
       }
       
-      // If the user is not logged in, log them in
-      if (!req.isAuthenticated()) {
-        req.login(user, (err) => {
-          if (err) return next(err);
-          
-          // Don't send password to client
-          const { password, ...userWithoutPassword } = user;
-          res.status(200).json({ 
-            message: "Email verified successfully", 
-            user: userWithoutPassword 
-          });
-        });
-      } else {
-        res.status(200).json({ message: "Email verified successfully" });
-      }
+      // For security, require users to login manually after email verification
+      // instead of auto-logging them in
+      const { password, ...userWithoutPassword } = user;
+      res.status(200).json({ 
+        message: "Email verified successfully. Please log in to continue.", 
+        verified: true 
+      });
     } catch (error) {
       next(error);
     }

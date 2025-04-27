@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { Redirect } from "wouter";
+import { Redirect, useLocation } from "wouter";
 import { ForgotPasswordForm } from "@/components/forgot-password-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle } from "lucide-react";
@@ -19,6 +19,23 @@ const AuthPage = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [location] = useLocation();
+
+  // Handle verification success message from redirect
+  useEffect(() => {
+    // Check if there's state from navigation (like from email verification)
+    const state = window.history.state?.state;
+    if (state?.message && state?.type === "success") {
+      setVerificationSuccess(true);
+      setVerificationMessage(state.message);
+      setActiveTab("login");
+      
+      // Clear the state so it doesn't show again on refresh
+      window.history.replaceState({}, document.title, location);
+    }
+  }, [location]);
 
   // Redirect to home if user is already logged in
   if (user) {
@@ -170,6 +187,15 @@ const AuthPage = () => {
                           <CheckCircle className="h-4 w-4 text-primary" />
                           <AlertDescription>
                             Registration successful! Please check your email to verify your account before logging in.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      {verificationSuccess && (
+                        <Alert className="bg-primary/10 border-primary">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                          <AlertDescription>
+                            {verificationMessage || "Your email has been verified successfully! You can now log in."}
                           </AlertDescription>
                         </Alert>
                       )}

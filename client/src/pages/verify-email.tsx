@@ -34,18 +34,16 @@ const VerifyEmail = () => {
           setStatus('success');
           setMessage(data.message || 'Your email has been successfully verified!');
           
-          // If the user was automatically logged in by the server,
-          // redirect to home page after a short delay
-          if (data.user) {
-            setTimeout(() => {
-              navigate('/');
-            }, 2000);
-          } else {
-            // If no auto-login, redirect to auth page after a short delay
-            setTimeout(() => {
-              navigate('/auth');
-            }, 2000);
-          }
+          // Always redirect to the login page after successful verification
+          // since we require manual login after email verification for security
+          setTimeout(() => {
+            navigate('/auth', { 
+              state: { 
+                message: "Your email has been verified. Please log in to continue.",
+                type: "success" 
+              } 
+            });
+          }, 2000);
         } else {
           let errorMessage = 'Failed to verify your email. The token may be invalid or expired.';
           try {
