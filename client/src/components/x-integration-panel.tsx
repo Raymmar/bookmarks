@@ -450,6 +450,16 @@ const XIntegrationPanel = () => {
             </TabsList>
             
             <TabsContent value="bookmarks" className="py-4">
+              <div className="rounded-md bg-green-50 dark:bg-green-900/20 p-4 mb-4">
+                <h3 className="font-medium text-green-800 dark:text-green-300">Enhanced Sync Available</h3>
+                <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                  We've improved the bookmark sync to get more of your X.com bookmarks, including those in folders.
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-500 mt-2">
+                  The sync process now preserves your custom titles and descriptions for existing bookmarks.
+                </p>
+              </div>
+                
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground">
                   Connected as <span className="font-medium">@{connectionStatus.username}</span>
@@ -500,6 +510,13 @@ const XIntegrationPanel = () => {
                 <p className="text-xs text-muted-foreground text-center">
                   If syncing fails, try reconnecting to refresh your X.com access
                 </p>
+                
+                <div className="text-xs text-muted-foreground space-y-1 p-2 border rounded-md mt-2">
+                  <p>• Syncs bookmarks from both your main list and folders</p>
+                  <p>• Only updates engagement metrics (likes, reposts) for existing bookmarks</p>
+                  <p>• Your custom titles and descriptions are preserved</p>
+                  <p>• Mapped folders will sync to their respective collections</p>
+                </div>
               </div>
             </TabsContent>
             
