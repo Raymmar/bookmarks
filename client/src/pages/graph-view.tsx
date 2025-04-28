@@ -68,10 +68,11 @@ export default function GraphView() {
     const savedViewMode = localStorage.getItem('bookmarkViewMode');
     return savedViewMode === "grid" ? "grid" : "graph";
   });
-  // Initialize sortOrder from localStorage with fallback to "newest"
+  // Initialize sortOrder from localStorage with fallback to "created_newest"
+  // This prioritizes the actual content creation date rather than when it was saved
   const [sortOrder, setSortOrder] = useState<string>(() => {
     const savedSort = localStorage.getItem('bookmarkSortOrder');
-    return savedSort ? savedSort : "newest";
+    return savedSort ? savedSort : "created_newest";
   });
   const [dateRange, setDateRange] = useState(() => {
     const savedDateRange = localStorage.getItem('bookmarkDateRange');
@@ -512,9 +513,14 @@ export default function GraphView() {
       return fullBookmarks; // Load all bookmarks
     }
     
-    // Sort by date (newest first) and apply limit
+    // Sort by content creation date (newest first) and apply limit
     return [...fullBookmarks]
-      .sort((a, b) => new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime())
+      .sort((a, b) => {
+        // Use created_at if available, fallback to date_saved
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+        return bDate - aDate;
+      })
       .slice(0, loadLimit);
   }, [fullBookmarks, loadLimit]);
   
