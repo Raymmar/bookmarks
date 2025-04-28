@@ -326,11 +326,13 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             </ul>
           </div>
           
-          {user && (
-            <div className="mb-6">
-              <div className="flex flex-col space-y-1 mb-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs uppercase font-semibold text-gray-500">Collections</h2>
+          {/* Collections section - shown for both logged in and logged out users */}
+          <div className="mb-6">
+            <div className="flex flex-col space-y-1 mb-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs uppercase font-semibold text-gray-500">Collections</h2>
+                {/* Only show Create button for logged in users */}
+                {user && (
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -340,27 +342,222 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   >
                     <Plus className="h-4 w-4 text-gray-500" />
                   </Button>
-                </div>
+                )}
               </div>
+            </div>
               
-              <ul className="space-y-1">
-                {collections.length === 0 ? (
-                  <li className="text-sm text-gray-500 py-1 px-2 italic">
-                    {collectionsLoading ? 'Loading collections...' : 'No collections yet'}
-                  </li>
-                ) : (
-                  collections.map(collection => (
-                    <li key={collection.id}>
-                      <div className="flex items-center">
+              {collectionsLoading ? (
+                <div className="text-sm text-gray-500 py-1 px-2 italic">
+                  Loading collections...
+                </div>
+              ) : collections.length === 0 ? (
+                <div className="text-sm text-gray-500 py-1 px-2 italic">
+                  {user ? 'No collections yet' : 'No public collections available'}
+                </div>
+              ) : user ? (
+                /* Logged in users see accordion with public and private collections */
+                <Accordion type="multiple" defaultValue={["public", "private"]} className="space-y-1">
+                  {/* Public Collections */}
+                  <AccordionItem value="public" className="border-none">
+                    <AccordionTrigger className="py-1 px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded">
+                      Public Collections ({publicCollections.length})
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-1 pb-0 px-0">
+                      <ul className="space-y-0.5">
+                        {publicCollections.length === 0 ? (
+                          <li className="text-xs text-gray-500 pl-6 py-1 italic">
+                            No public collections
+                          </li>
+                        ) : (
+                          publicCollections.map(collection => (
+                            <li key={collection.id}>
+                              <div className="flex items-center">
+                                <div 
+                                  className={cn(
+                                    "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
+                                    selectedCollections.includes(collection.id) 
+                                      ? "bg-primary/10 text-primary font-medium" 
+                                      : "text-gray-700 hover:bg-gray-50"
+                                  )}
+                                  onClick={() => handleCollectionClick(collection.id)}
+                                  title="Click to select or deselect. You can select multiple collections."
+                                >
+                                  <div className="flex h-4 w-4 items-center justify-center mr-2">
+                                    {selectedCollections.includes(collection.id) ? (
+                                      <Checkbox 
+                                        id={`collection-${collection.id}`} 
+                                        checked={true}
+                                        className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                                      />
+                                    ) : (
+                                      <Checkbox 
+                                        id={`collection-${collection.id}`} 
+                                        checked={false}
+                                      />
+                                    )}
+                                  </div>
+                                  <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
+                                    {collection.name}
+                                  </span>
+                                </div>
+                                
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0 ml-1">
+                                      <MoreHorizontal className="h-3 w-3 text-gray-500" />
+                                      <span className="sr-only">More options</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-[160px]">
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        setSelectedCollectionToEdit({
+                                          id: collection.id,
+                                          name: collection.name,
+                                          description: collection.description,
+                                          is_public: collection.is_public
+                                        });
+                                        setEditCollectionOpen(true);
+                                      }}
+                                    >
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      <span>Edit</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedCollectionToEdit({
+                                          id: collection.id,
+                                          name: collection.name,
+                                          description: collection.description,
+                                          is_public: collection.is_public
+                                        });
+                                        setDeleteConfirmOpen(true);
+                                      }}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      <span>Delete</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Private Collections */}
+                  <AccordionItem value="private" className="border-none">
+                    <AccordionTrigger className="py-1 px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded">
+                      Private Collections ({privateCollections.length})
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-1 pb-0 px-0">
+                      <ul className="space-y-0.5">
+                        {privateCollections.length === 0 ? (
+                          <li className="text-xs text-gray-500 pl-6 py-1 italic">
+                            No private collections
+                          </li>
+                        ) : (
+                          privateCollections.map(collection => (
+                            <li key={collection.id}>
+                              <div className="flex items-center">
+                                <div 
+                                  className={cn(
+                                    "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
+                                    selectedCollections.includes(collection.id) 
+                                      ? "bg-primary/10 text-primary font-medium" 
+                                      : "text-gray-700 hover:bg-gray-50"
+                                  )}
+                                  onClick={() => handleCollectionClick(collection.id)}
+                                  title="Click to select or deselect. You can select multiple collections."
+                                >
+                                  <div className="flex h-4 w-4 items-center justify-center mr-2">
+                                    {selectedCollections.includes(collection.id) ? (
+                                      <Checkbox 
+                                        id={`collection-${collection.id}`} 
+                                        checked={true}
+                                        className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                                      />
+                                    ) : (
+                                      <Checkbox 
+                                        id={`collection-${collection.id}`} 
+                                        checked={false}
+                                      />
+                                    )}
+                                  </div>
+                                  <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
+                                    {collection.name}
+                                  </span>
+                                </div>
+                                
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0 ml-1">
+                                      <MoreHorizontal className="h-3 w-3 text-gray-500" />
+                                      <span className="sr-only">More options</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-[160px]">
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        setSelectedCollectionToEdit({
+                                          id: collection.id,
+                                          name: collection.name,
+                                          description: collection.description,
+                                          is_public: collection.is_public
+                                        });
+                                        setEditCollectionOpen(true);
+                                      }}
+                                    >
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      <span>Edit</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedCollectionToEdit({
+                                          id: collection.id,
+                                          name: collection.name,
+                                          description: collection.description,
+                                          is_public: collection.is_public
+                                        });
+                                        setDeleteConfirmOpen(true);
+                                      }}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      <span>Delete</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              ) : (
+                /* Logged out users only see public collections */
+                <ul className="space-y-0.5">
+                  {publicCollections.length === 0 ? (
+                    <li className="text-sm text-gray-500 py-1 px-2 italic">
+                      No public collections available
+                    </li>
+                  ) : (
+                    publicCollections.map(collection => (
+                      <li key={collection.id}>
                         <div 
                           className={cn(
-                            "flex flex-1 items-center px-2 py-2 text-sm rounded-lg cursor-pointer",
+                            "flex items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
                             selectedCollections.includes(collection.id) 
                               ? "bg-primary/10 text-primary font-medium" 
-                              : "text-gray-700 hover:bg-gray-100"
+                              : "text-gray-700 hover:bg-gray-50"
                           )}
                           onClick={() => handleCollectionClick(collection.id)}
-                          title="Click to select or deselect. You can select multiple collections."
+                          title="Click to explore this collection"
                         >
                           <div className="flex h-4 w-4 items-center justify-center mr-2">
                             {selectedCollections.includes(collection.id) ? (
@@ -379,66 +576,13 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                           <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
                             {collection.name}
                           </span>
-                          {!collection.is_public && (
-                            <span className="ml-1 text-xs text-gray-500">(Private)</span>
-                          )}
                         </div>
-                        
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 p-0 ml-1">
-                              <MoreHorizontal className="h-4 w-4 text-gray-500" />
-                              <span className="sr-only">More options</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[160px]">
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                // Open edit collection modal with current collection data
-                                setSelectedCollectionToEdit({
-                                  id: collection.id,
-                                  name: collection.name,
-                                  description: collection.description,
-                                  is_public: collection.is_public
-                                });
-                                setEditCollectionOpen(true);
-                              }}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span>Edit</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                // Set the selected collection and open delete confirmation directly
-                                setSelectedCollectionToEdit({
-                                  id: collection.id,
-                                  name: collection.name,
-                                  description: collection.description,
-                                  is_public: collection.is_public
-                                });
-                                // Open delete confirmation dialog directly
-                                setDeleteConfirmOpen(true);
-                              }}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </li>
-                  ))
-                )}
-                
-                {/* Create collection hint if no collections */}
-                {collections.length === 0 && !collectionsLoading && (
-                  <li>
-                  </li>
-                )}
-              </ul>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </div>
-          )}
         </div>
       </div>
       
