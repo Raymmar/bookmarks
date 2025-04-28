@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, uuid, json, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uuid, json, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -101,6 +101,11 @@ export const collectionBookmarks = pgTable("collection_bookmarks", {
   id: uuid("id").defaultRandom().primaryKey(),
   collection_id: uuid("collection_id").references(() => collections.id, { onDelete: "cascade" }).notNull(),
   bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }).notNull(),
+}, (table) => {
+  return {
+    // Add a unique constraint to prevent duplicate bookmark entries in a collection
+    uniqueBookmarkInCollection: unique().on(table.collection_id, table.bookmark_id),
+  };
 });
 
 // Notes table
