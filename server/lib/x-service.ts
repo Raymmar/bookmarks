@@ -611,8 +611,9 @@ export class XService {
       // Since we need to get the actual tweets from these IDs, we need to call the main bookmarks API
       // with each tweet ID to get full details
       
-      // Convert API response to our internal format - handle both ID-only and full object cases
-      // For ID-only responses or incomplete responses, we'll mark these with a needsFetching flag to get full content later
+      // Convert API response to our internal format
+      // The folder API endpoint typically only returns tweet IDs or partial data
+      // Always mark the tweets as needsFetching to ensure we get the full data
       const tweets = data.data.map((item: any) => {
         // If the item is just an ID string
         if (typeof item === 'string') {
@@ -625,22 +626,15 @@ export class XService {
           };
         }
         
-        // Check if the item is a tweet object but missing critical data
-        // We consider a tweet to need fetching if it's missing text, author_id, or created_at
-        const needsAdditionalFetching = !item.text || !item.author_id || !item.created_at;
+        // Even if we get a tweet object, we'll still mark it for fetching
+        // The folder API doesn't consistently return complete data
+        console.log(`X Folders: Adding ID for tweet ${item.id} to fetch queue`);
         
-        console.log(`X Folders: Tweet ${item.id} complete data check: has text=${!!item.text}, has author=${!!item.author_id}, has date=${!!item.created_at}, needsFetching=${needsAdditionalFetching}`);
-        
-        // Return a tweet object, marking if it needs additional fetching
+        // Return a tweet object, always marking it for fetching
         return {
           id: item.id,
-          text: item.text || '', // Use text if available or empty string
-          created_at: item.created_at,
-          author_id: item.author_id,
-          public_metrics: item.public_metrics,
-          entities: item.entities,
-          attachments: item.attachments,
-          needsFetching: needsAdditionalFetching, // Mark tweets with incomplete data for fetching
+          text: '', // Will be filled with actual content after fetching
+          needsFetching: true, // Always fetch the full tweet data
           // Initialize local_media as empty array for each tweet
           local_media: []
         };
@@ -1728,42 +1722,26 @@ export class XService {
       
       console.log(`X Sync: Fetched ${folderBookmarks.tweets.length} tweets from folder ${folderId}`);
       
-      // Log a few sample tweets to understand what we're getting
-      if (folderBookmarks.tweets.length > 0) {
-        console.log(`X Sync: First tweet sample:`, JSON.stringify(folderBookmarks.tweets[0], null, 2));
-        // Count how many tweets need fetching
-        const needFetchingCount = folderBookmarks.tweets.filter(t => t.needsFetching).length;
-        console.log(`X Sync: Out of ${folderBookmarks.tweets.length} tweets, ${needFetchingCount} need fetching`);
-      }
+      // Log how many tweets we found in this folder
+      console.log(`X Sync: Processing ${folderBookmarks.tweets.length} tweets from folder ${folderId}`);
       
-      // Find tweets that only have IDs (needsFetching=true)
-      // We need to remove them from the tweets array and collect their IDs separately
-      const tweetsWithFullContent: XTweet[] = [];
-      const tweetsToFetch: XTweet[] = [];
+      // With our new approach, we fetch ALL tweets from the folder API to get their full data
+      // even if we already have them (to get the most up-to-date engagement metrics)
+      const tweetIdsToFetch: string[] = [];
       
-      // First pass: separate tweets that need fetching vs those with full content
+      // Collect all tweet IDs for fetching
       for (const tweet of folderBookmarks.tweets) {
-        if (tweet.needsFetching && !existingBookmarkCache.has(tweet.id)) {
-          console.log(`X Sync: Tweet ${tweet.id} needs fetching, has text=${!!tweet.text}`);
-          tweetsToFetch.push(tweet);
-        } else {
-          if (tweet.needsFetching) {
-            console.log(`X Sync: Tweet ${tweet.id} needs fetching but exists in cache, skipping fetch`);
-          }
-          tweetsWithFullContent.push(tweet);
-        }
+        tweetIdsToFetch.push(tweet.id);
+        console.log(`X Sync: Adding tweet ${tweet.id} to fetch queue`);
       }
       
-      // Replace tweets array with only those that have full content for now
-      folderBookmarks.tweets = tweetsWithFullContent;
+      // Clear the tweets array, we'll refill it after fetching
+      folderBookmarks.tweets = [];
       
-      console.log(`X Sync: Found ${tweetsToFetch.length} tweets that need to be fetched from X API`);
+      console.log(`X Sync: Will fetch ${tweetIdsToFetch.length} tweets from X API`);
       
       // If we have tweets to fetch, process them in batches
-      if (tweetsToFetch.length > 0) {
-        // Extract just the IDs for batch processing
-        const tweetIdsToFetch = tweetsToFetch.map(t => t.id);
-        
+      if (tweetIdsToFetch.length > 0) {
         // X API allows up to 100 IDs per request, so we'll batch them
         const batchSize = 100;
         const batches: string[][] = [];
@@ -1818,36 +1796,32 @@ export class XService {
           
           if (existingBookmark) {
             // The bookmark already exists in our system
+            const author = tweet.author_id ? folderBookmarks.users[tweet.author_id] : undefined;
             
-            // If we have author and metrics data, update the bookmark
-            if (!tweet.needsFetching) {
-              const author = tweet.author_id ? folderBookmarks.users[tweet.author_id] : undefined;
+            // Update engagement metrics if we have them
+            if (tweet.public_metrics) {
+              console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
               
-              // Only update engagement metrics if we have them
-              if (tweet.public_metrics) {
-                console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
-                
-                // Extract just the engagement metrics and add created_at if missing
-                const updateData: Partial<InsertBookmark> = {
-                  like_count: tweet.public_metrics?.like_count,
-                  repost_count: tweet.public_metrics?.retweet_count,
-                  reply_count: tweet.public_metrics?.reply_count,
-                  quote_count: tweet.public_metrics?.quote_count
-                };
-                
-                // Specifically check for created_at and backfill it if the tweet has this data
-                if (tweet.created_at) {
-                  // If existing bookmark has no created_at (null) or it's undefined
-                  if (!existingBookmark.created_at) {
-                    console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
-                    updateData.created_at = new Date(tweet.created_at);
-                  }
+              // Extract just the engagement metrics and add created_at if missing
+              const updateData: Partial<InsertBookmark> = {
+                like_count: tweet.public_metrics?.like_count,
+                repost_count: tweet.public_metrics?.retweet_count,
+                reply_count: tweet.public_metrics?.reply_count,
+                quote_count: tweet.public_metrics?.quote_count
+              };
+              
+              // Specifically check for created_at and backfill it if the tweet has this data
+              if (tweet.created_at) {
+                // If existing bookmark has no created_at (null) or it's undefined
+                if (!existingBookmark.created_at) {
+                  console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
+                  updateData.created_at = new Date(tweet.created_at);
                 }
-                
-                // Update only the engagement metrics for the existing bookmark
-                await storage.updateBookmark(existingBookmark.id, updateData);
-                updated++;
               }
+              
+              // Update only the engagement metrics for the existing bookmark
+              await storage.updateBookmark(existingBookmark.id, updateData);
+              updated++;
             }
             
             // If this folder has a collection mapping, associate the bookmark with it
@@ -1863,8 +1837,8 @@ export class XService {
                 console.log(`X Sync: Note - Bookmark ${existingBookmark.id} might already be in collection ${folderData.collection_id}`);
               }
             }
-          } else if (!tweet.needsFetching) {
-            // We don't have this bookmark yet and we have full tweet data to create it
+          } else {
+            // We don't have this bookmark yet, create it with the fetched data
             try {
               const author = tweet.author_id ? folderBookmarks.users[tweet.author_id] : undefined;
               
@@ -1890,10 +1864,6 @@ export class XService {
               console.error(`X Sync: Error creating bookmark for tweet ${tweet.id}:`, createError);
               errors++;
             }
-          } else {
-            // This bookmark still needs fetching even after our batch fetching attempts
-            // This can happen if the tweet was deleted or is no longer available
-            console.log(`X Sync: Could not retrieve full data for tweet ${tweet.id} - it may no longer be available`);
           }
         } catch (error) {
           console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
