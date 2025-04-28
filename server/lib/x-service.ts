@@ -590,6 +590,16 @@ export class XService {
       
       console.log(`X Folders: Folder API response sample:`, JSON.stringify(data, null, 2).substring(0, 500));
       
+      // Add detailed logging of the full data structure
+      console.log(`X Folders: Inspecting data.data first item type:`, typeof data.data[0]);
+      if (data.data && data.data.length > 0) {
+        console.log(`X Folders: First item sample:`, JSON.stringify(data.data[0], null, 2));
+        // Check if data items are objects or strings
+        const hasObjects = data.data.some((item: any) => typeof item === 'object');
+        const hasStrings = data.data.some((item: any) => typeof item === 'string');
+        console.log(`X Folders: Data items include objects: ${hasObjects}, strings: ${hasStrings}`);
+      }
+      
       // The folder-specific endpoint returns data in a different format
       // It might just return tweet IDs rather than full tweet objects with metadata
       
@@ -602,20 +612,26 @@ export class XService {
       // with each tweet ID to get full details
       
       // Convert API response to our internal format - handle both ID-only and full object cases
-      // For ID-only responses, we'll mark these with a needsFetching flag to get full content later
+      // For ID-only responses or incomplete responses, we'll mark these with a needsFetching flag to get full content later
       const tweets = data.data.map((item: any) => {
         // If the item is just an ID string
         if (typeof item === 'string') {
           return {
             id: item,
-            text: '', // Empty text - will be filled later in processTweetAfterSync
+            text: '', // Empty text - will be filled later when fetched
             needsFetching: true, // Mark that this tweet needs its full content fetched
             // Initialize local_media as empty array for each tweet
             local_media: []
           };
         }
         
-        // If the item is a tweet object
+        // Check if the item is a tweet object but missing critical data
+        // We consider a tweet to need fetching if it's missing text, author_id, or created_at
+        const needsAdditionalFetching = !item.text || !item.author_id || !item.created_at;
+        
+        console.log(`X Folders: Tweet ${item.id} complete data check: has text=${!!item.text}, has author=${!!item.author_id}, has date=${!!item.created_at}, needsFetching=${needsAdditionalFetching}`);
+        
+        // Return a tweet object, marking if it needs additional fetching
         return {
           id: item.id,
           text: item.text || '', // Use text if available or empty string
@@ -624,6 +640,7 @@ export class XService {
           public_metrics: item.public_metrics,
           entities: item.entities,
           attachments: item.attachments,
+          needsFetching: needsAdditionalFetching, // Mark tweets with incomplete data for fetching
           // Initialize local_media as empty array for each tweet
           local_media: []
         };
@@ -1711,6 +1728,14 @@ export class XService {
       
       console.log(`X Sync: Fetched ${folderBookmarks.tweets.length} tweets from folder ${folderId}`);
       
+      // Log a few sample tweets to understand what we're getting
+      if (folderBookmarks.tweets.length > 0) {
+        console.log(`X Sync: First tweet sample:`, JSON.stringify(folderBookmarks.tweets[0], null, 2));
+        // Count how many tweets need fetching
+        const needFetchingCount = folderBookmarks.tweets.filter(t => t.needsFetching).length;
+        console.log(`X Sync: Out of ${folderBookmarks.tweets.length} tweets, ${needFetchingCount} need fetching`);
+      }
+      
       // Find tweets that only have IDs (needsFetching=true)
       // We need to remove them from the tweets array and collect their IDs separately
       const tweetsWithFullContent: XTweet[] = [];
@@ -1719,8 +1744,12 @@ export class XService {
       // First pass: separate tweets that need fetching vs those with full content
       for (const tweet of folderBookmarks.tweets) {
         if (tweet.needsFetching && !existingBookmarkCache.has(tweet.id)) {
+          console.log(`X Sync: Tweet ${tweet.id} needs fetching, has text=${!!tweet.text}`);
           tweetsToFetch.push(tweet);
         } else {
+          if (tweet.needsFetching) {
+            console.log(`X Sync: Tweet ${tweet.id} needs fetching but exists in cache, skipping fetch`);
+          }
           tweetsWithFullContent.push(tweet);
         }
       }
