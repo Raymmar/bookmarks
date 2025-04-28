@@ -7,22 +7,35 @@
 import cron from 'node-cron';
 import { xService } from './x-service';
 import { db } from '../db';
-import { xCredentials } from '@shared/schema';
+import { xCredentials, xFolders } from '@shared/schema';
+import { eq, lt, isNull } from 'drizzle-orm';
+import { or } from 'drizzle-orm/expressions';
 
 /**
  * Schedule automatic X.com bookmark sync for all connected users
- * Runs every hour by default
+ * Runs twice daily at noon and midnight
  */
 export async function setupXSyncScheduler() {
   console.log('Setting up automatic X.com bookmark sync scheduler');
   
-  // Schedule task to run every hour
-  cron.schedule('0 * * * *', async () => {
+  // Schedule main bookmark sync task to run at noon and midnight
+  cron.schedule('0 0,12 * * *', async () => {
     try {
       console.log('Running scheduled X.com bookmark sync for all users');
       await syncAllXAccounts();
     } catch (error) {
       console.error('Error in scheduled X.com bookmark sync:', error);
+    }
+  });
+  
+  // Schedule folder sync task to run every 15 minutes
+  // This will handle no more than 5 folders in each run to avoid rate limits
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      console.log('Running scheduled X.com folder sync (rate-limited batch)');
+      await syncFoldersBatchForAllUsers();
+    } catch (error) {
+      console.error('Error in scheduled X.com folder sync:', error);
     }
   });
   
@@ -65,5 +78,63 @@ async function syncAllXAccounts() {
     console.log(`Scheduled sync complete. Success: ${successCount}, Errors: ${errorCount}`);
   } catch (error) {
     console.error('Error retrieving users for X.com sync:', error);
+  }
+}
+
+/**
+ * Sync a batch of folders across all users, rate-limited to avoid X API limits
+ * This ensures we don't make more than 5 folder update requests in each 15-minute period
+ */
+async function syncFoldersBatchForAllUsers() {
+  try {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    // Get a limited batch of folders to sync, prioritizing:
+    // 1. Folders that have never been synced (last_sync_at is null)
+    // 2. Folders that were synced more than an hour ago
+    // Limit to 5 folders to avoid rate limits (X.com limits folder requests)
+    const foldersToSync = await db.select()
+      .from(xFolders)
+      .where(
+        or(
+          isNull(xFolders.last_sync_at),
+          lt(xFolders.last_sync_at, oneHourAgo)
+        )
+      )
+      .limit(5);
+    
+    console.log(`Found ${foldersToSync.length} folders to sync in this batch`);
+    
+    // Process each folder
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const folder of foldersToSync) {
+      try {
+        console.log(`Syncing folder ${folder.x_folder_name} (${folder.x_folder_id}) for user ${folder.user_id}`);
+        
+        // Sync this specific folder
+        const result = await xService.syncBookmarksFromSpecificFolder(folder.user_id, folder.x_folder_id);
+        
+        // Update the folder's last_sync_at timestamp
+        await db.update(xFolders)
+          .set({ last_sync_at: now })
+          .where(eq(xFolders.id, folder.id));
+        
+        console.log(`Folder sync complete: ${folder.x_folder_name} for user ${folder.user_id}:`, result);
+        successCount++;
+      } catch (error) {
+        console.error(`Error syncing folder ${folder.x_folder_id} for user ${folder.user_id}:`, error);
+        errorCount++;
+      }
+      
+      // Add a delay between folder syncs to be extra cautious with rate limits
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    console.log(`Folder batch sync complete. Success: ${successCount}, Errors: ${errorCount}`);
+  } catch (error) {
+    console.error('Error retrieving folders for batch sync:', error);
   }
 }
