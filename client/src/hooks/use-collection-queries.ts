@@ -27,19 +27,6 @@ export function useCollections(): UseQueryResult<Collection[], Error> {
   });
 }
 
-// Hook for fetching public collections
-export function usePublicCollections(): UseQueryResult<Collection[], Error> {
-  return useQuery({
-    queryKey: ['/api/collections', 'public'],
-    queryFn: async () => {
-      // This API is already set up to return public collections for unauthenticated users
-      // We'll just filter the results to ensure we only get public ones
-      const collections = await apiRequest('GET', '/api/collections');
-      return collections.filter(collection => collection.is_public);
-    }
-  });
-}
-
 // Hook for fetching a specific collection with its bookmarks
 export function useCollection(id: string): UseQueryResult<CollectionWithBookmarks, Error> {
   return useQuery({

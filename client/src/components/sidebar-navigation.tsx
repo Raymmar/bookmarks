@@ -17,15 +17,14 @@ import {
   Edit,
   Trash2,
   Cable,
-  Twitter,
-  Globe
+  Twitter
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
 import { CreateCollectionDialog } from "@/components/ui/create-collection-dialog";
 import { EditCollectionDialog } from "@/components/ui/edit-collection-dialog";
 import { useAuth } from "@/hooks/use-auth";
-import { useCollections, useCollectionMutations, usePublicCollections } from "@/hooks/use-collection-queries";
+import { useCollections, useCollectionMutations } from "@/hooks/use-collection-queries";
 import { queryClient } from "@/lib/queryClient";
 import {
   DropdownMenu,
@@ -66,15 +65,11 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   } | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [expandPublicCollections, setExpandPublicCollections] = useState(true);
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
-  
-  // Fetch public collections (both authenticated and unauthenticated users)
-  const { data: publicCollections = [], isLoading: publicCollectionsLoading } = usePublicCollections();
   
   // Get mutations for collections (create, update, delete)
   const { updateCollection, deleteCollection } = useCollectionMutations();
@@ -320,7 +315,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             </ul>
           </div>
           
-          {/* Collections - for logged in users */}
           {user && (
             <div className="mb-6">
               <div className="flex flex-col space-y-1 mb-2">
@@ -434,64 +428,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
               </ul>
             </div>
           )}
-          
-          {/* Public Collections - for logged out users only */}
-          {!user && (
-            <div className="mb-6">
-              <div className="flex flex-col space-y-1 mb-2">
-                <div className="flex items-center justify-between cursor-pointer">
-                  <h2 className="text-xs uppercase font-semibold text-gray-500">Public Collections</h2>
-                </div>
-              </div>
-              
-              <ul className="space-y-1">
-                {publicCollections.length === 0 ? (
-                  <li className="text-sm text-gray-500 py-1 px-2 italic">
-                    {publicCollectionsLoading ? 'Loading public collections...' : 'No public collections available'}
-                  </li>
-                ) : (
-                  publicCollections.map(collection => (
-                    <li key={collection.id}>
-                      <div className="flex items-center">
-                        <div 
-                          className={cn(
-                            "flex flex-1 items-center px-2 py-2 text-sm rounded-lg cursor-pointer",
-                            selectedCollections.includes(collection.id) 
-                              ? "bg-primary/10 text-primary font-medium" 
-                              : "text-gray-700 hover:bg-gray-100"
-                          )}
-                          onClick={() => handleCollectionClick(collection.id)}
-                          title="Click to select or deselect. You can select multiple collections."
-                        >
-                          <div className="flex h-4 w-4 items-center justify-center mr-2">
-                            {selectedCollections.includes(collection.id) ? (
-                              <Checkbox 
-                                id={`public-collection-${collection.id}`} 
-                                checked={true}
-                                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                              />
-                            ) : (
-                              <Checkbox 
-                                id={`public-collection-${collection.id}`} 
-                                checked={false}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center flex-1 truncate">
-                            <Globe className="h-3 w-3 mr-1 text-primary" />
-                            <span className={cn("truncate", selectedCollections.includes(collection.id) && "font-medium")}>
-                              {collection.name}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          )}
-          </div>
         </div>
       </div>
       
