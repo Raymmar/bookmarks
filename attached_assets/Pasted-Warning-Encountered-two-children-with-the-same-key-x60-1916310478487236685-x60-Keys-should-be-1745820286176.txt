@@ -1,0 +1,37 @@
+Warning: Encountered two children with the same key, &#x60;1916310478487236685&#x60;. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+    at div
+    at div
+    at div
+    at https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PALV7G7K.js?v=b7606084:42:13
+    at Presence (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-G2EEGIFZ.js?v=b7606084:24:11)
+    at https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b7606084:173:13
+    at _c5 (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/components/ui/tabs.tsx:72:12)
+    at div
+    at https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PALV7G7K.js?v=b7606084:42:13
+    at Provider (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-VJRUVGTI.js?v=b7606084:38:15)
+    at https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=b7606084:51:7
+    at div
+    at _c9 (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/components/ui/card.tsx:114:12)
+    at div
+    at _c (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/components/ui/card.tsx:20:11)
+    at XIntegrationPanel (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/components/x-integration-panel.tsx:34:21)
+    at div
+    at div
+    at div
+    at XIntegrationPage (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/pages/x-integration.tsx:24:31)
+    at Route (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b7606084:323:16)
+    at ProtectedRoute (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/lib/protected-route.tsx:22:3)
+    at Switch (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b7606084:379:17)
+    at Router
+    at main
+    at div
+    at div
+    at MainLayout (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/layouts/main-layout.tsx:22:38)
+    at Provider (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-VJRUVGTI.js?v=b7606084:38:15)
+    at TooltipProvider (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=b7606084:61:5)
+    at AuthProvider (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/src/hooks/use-auth.tsx:26:32)
+    at QueryClientProvider (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b7606084:2805:3)
+    at App
+    at V (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/next-themes.js?v=b7606084:44:25)
+    at J (https://56f8f4f7-945d-4766-96d6-ef1ec8147a6b-00-21dbjfamun38x.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/next-themes.js?v=b7606084:42:18)
+User authentication state changed, refreshing bookmark data
