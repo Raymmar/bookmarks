@@ -17,7 +17,8 @@ import {
   Edit,
   Trash2,
   Cable,
-  Twitter
+  Twitter,
+  ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
@@ -37,6 +38,12 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +77,10 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   
   // Fetch collections
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
+  
+  // Separate collections into public and private
+  const publicCollections = collections.filter(collection => collection.is_public);
+  const privateCollections = collections.filter(collection => !collection.is_public);
   
   // Get mutations for collections (create, update, delete)
   const { updateCollection, deleteCollection } = useCollectionMutations();
