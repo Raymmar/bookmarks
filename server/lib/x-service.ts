@@ -90,6 +90,8 @@ interface XTweet {
     media_key: string;
     type: string;
   }[];
+  // Flag to mark tweets that only have IDs and need full data fetching
+  needsFetching?: boolean;
 }
 
 /**
@@ -1566,16 +1568,46 @@ export class XService {
    * Map an X.com folder to an existing collection
    */
   async mapFolderToCollection(userId: string, folderData: { id: string, name: string }, collectionId: string): Promise<XFolder> {
-    // Create folder mapping
-    const folderMapping: InsertXFolder = {
-      user_id: userId,
-      x_folder_id: folderData.id,
-      x_folder_name: folderData.name,
-      collection_id: collectionId,
-    };
+    console.log(`X Mapping: Mapping folder "${folderData.name}" (${folderData.id}) to collection ${collectionId}`);
     
-    // Store in database
-    return await this.createFolderMapping(folderMapping);
+    // First, check if this folder already exists in our system
+    const [existingFolder] = await db.select()
+      .from(xFolders)
+      .where(
+        and(
+          eq(xFolders.user_id, userId),
+          eq(xFolders.x_folder_id, folderData.id)
+        )
+      );
+    
+    if (existingFolder) {
+      // Update the existing folder mapping to point to the new collection
+      console.log(`X Mapping: Updating existing folder mapping from collection ${existingFolder.collection_id || 'none'} to ${collectionId}`);
+      
+      const [updatedFolder] = await db.update(xFolders)
+        .set({
+          x_folder_name: folderData.name, // Update name in case it changed
+          collection_id: collectionId,
+          updated_at: new Date()
+        })
+        .where(eq(xFolders.id, existingFolder.id))
+        .returning();
+      
+      return updatedFolder;
+    } else {
+      // Create a new folder mapping
+      console.log(`X Mapping: Creating new folder mapping for "${folderData.name}" to collection ${collectionId}`);
+      
+      const folderMapping: InsertXFolder = {
+        user_id: userId,
+        x_folder_id: folderData.id,
+        x_folder_name: folderData.name,
+        collection_id: collectionId,
+      };
+      
+      // Store in database
+      return await this.createFolderMapping(folderMapping);
+    }
   }
 
   /**
@@ -1619,12 +1651,13 @@ export class XService {
    * Sync bookmarks from a specific X.com folder
    * This is exposed to API consumers for manual folder syncing
    */
-  async syncBookmarksFromSpecificFolder(userId: string, folderId: string): Promise<{ added: number, updated: number, errors: number }> {
+  async syncBookmarksFromSpecificFolder(userId: string, folderId: string): Promise<{ added: number, updated: number, errors: number, associated: number }> {
     console.log(`X Sync: Starting folder-specific sync for user ${userId}, folder ${folderId}`);
     
     let added = 0;
     let updated = 0;
     let errors = 0;
+    let associated = 0; // Count of existing bookmarks associated with collections
     
     try {
       // First, validate that the folder exists for this user
@@ -1643,6 +1676,12 @@ export class XService {
       }
       
       console.log(`X Sync: Found folder "${folderData.x_folder_name}" (${folderId}) for user ${userId}`);
+      
+      // Check if this folder has a collection mapping
+      if (!folderData.collection_id) {
+        console.log(`X Sync: Warning - Folder "${folderData.x_folder_name}" has no collection mapping yet`);
+        // We'll continue with the sync, but we won't be able to associate bookmarks with collections
+      }
       
       // Create a wrapper that matches our standard bookmark collection format
       let folderBookmarks: { 
@@ -1682,54 +1721,88 @@ export class XService {
           }
           
           processedTweetIds.add(tweet.id);
-          const author = tweet.author_id ? folderBookmarks.users[tweet.author_id] : undefined;
           
           // Check if bookmark already exists in our cache
           const existingBookmark = existingBookmarkCache.get(tweet.id);
           
           if (existingBookmark) {
-            // Bookmark exists - only update engagement metrics
-            console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
+            // The bookmark already exists in our system
             
-            // Extract just the engagement metrics and add created_at if missing
-            const updateData: Partial<InsertBookmark> = {
-              like_count: tweet.public_metrics?.like_count,
-              repost_count: tweet.public_metrics?.retweet_count,
-              reply_count: tweet.public_metrics?.reply_count,
-              quote_count: tweet.public_metrics?.quote_count
-            };
-            
-            // Specifically check for created_at and backfill it if the tweet has this data
-            if (tweet.created_at) {
-              // If existing bookmark has no created_at (null) or it's undefined
-              if (!existingBookmark.created_at) {
-                console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
-                updateData.created_at = new Date(tweet.created_at);
+            // If we have author and metrics data, update the bookmark
+            if (!tweet.needsFetching) {
+              const author = tweet.author_id ? folderBookmarks.users[tweet.author_id] : undefined;
+              
+              // Only update engagement metrics if we have them
+              if (tweet.public_metrics) {
+                console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
+                
+                // Extract just the engagement metrics and add created_at if missing
+                const updateData: Partial<InsertBookmark> = {
+                  like_count: tweet.public_metrics?.like_count,
+                  repost_count: tweet.public_metrics?.retweet_count,
+                  reply_count: tweet.public_metrics?.reply_count,
+                  quote_count: tweet.public_metrics?.quote_count
+                };
+                
+                // Specifically check for created_at and backfill it if the tweet has this data
+                if (tweet.created_at) {
+                  // If existing bookmark has no created_at (null) or it's undefined
+                  if (!existingBookmark.created_at) {
+                    console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
+                    updateData.created_at = new Date(tweet.created_at);
+                  }
+                }
+                
+                // Update only the engagement metrics for the existing bookmark
+                await storage.updateBookmark(existingBookmark.id, updateData);
+                updated++;
               }
             }
             
-            // Update only the engagement metrics for the existing bookmark
-            await storage.updateBookmark(existingBookmark.id, updateData);
-            updated++;
-          } else {
-            // This is a new bookmark - create it with all data
-            console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
-            
-            // Convert tweet to full bookmark
-            const bookmarkData = await this.convertTweetToBookmark(tweet, author, folderBookmarks.media);
-            bookmarkData.user_id = userId;
-            
-            // Create the new bookmark
-            const newBookmark = await storage.createBookmark(bookmarkData);
-            added++;
-            
-            // Check if this folder has a collection mapping
+            // If this folder has a collection mapping, associate the bookmark with it
             if (folderData.collection_id) {
-              console.log(`X Sync: Adding bookmark ${newBookmark.id} to collection ${folderData.collection_id}`);
-              
-              // Add the bookmark to the mapped collection
-              await storage.addBookmarkToCollection(folderData.collection_id, newBookmark.id);
+              try {
+                console.log(`X Sync: Associating existing bookmark ${existingBookmark.id} with collection ${folderData.collection_id}`);
+                
+                // Add the bookmark to the mapped collection if it's not already there
+                await storage.addBookmarkToCollection(folderData.collection_id, existingBookmark.id);
+                associated++;
+              } catch (collectionError) {
+                // This is likely because the bookmark is already in the collection, which is fine
+                console.log(`X Sync: Note - Bookmark ${existingBookmark.id} might already be in collection ${folderData.collection_id}`);
+              }
             }
+          } else if (!tweet.needsFetching) {
+            // We don't have this bookmark yet and we have full tweet data to create it
+            try {
+              const author = tweet.author_id ? folderBookmarks.users[tweet.author_id] : undefined;
+              
+              console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
+              
+              // Convert tweet to full bookmark
+              const bookmarkData = await this.convertTweetToBookmark(tweet, author, folderBookmarks.media);
+              bookmarkData.user_id = userId;
+              
+              // Create the new bookmark
+              const newBookmark = await storage.createBookmark(bookmarkData);
+              added++;
+              
+              // If this folder has a collection mapping, associate the bookmark with it
+              if (folderData.collection_id) {
+                console.log(`X Sync: Adding new bookmark ${newBookmark.id} to collection ${folderData.collection_id}`);
+                
+                // Add the bookmark to the mapped collection
+                await storage.addBookmarkToCollection(folderData.collection_id, newBookmark.id);
+                associated++;
+              }
+            } catch (createError) {
+              console.error(`X Sync: Error creating bookmark for tweet ${tweet.id}:`, createError);
+              errors++;
+            }
+          } else {
+            // This bookmark needs fetching (we only have its ID), but doesn't exist in our system
+            // We'll skip it since we can't create a proper bookmark without the tweet data
+            console.log(`X Sync: Skipping tweet ${tweet.id} - We only have ID and no existing bookmark`);
           }
         } catch (error) {
           console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
@@ -1740,8 +1813,8 @@ export class XService {
       // Update last sync time for the folder
       await storage.updateXFolderLastSync(folderData.id);
       
-      console.log(`X Sync: Finished folder sync - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
-      return { added, updated, errors };
+      console.log(`X Sync: Finished folder sync - Added: ${added}, Updated: ${updated}, Associated with collections: ${associated}, Errors: ${errors}`);
+      return { added, updated, errors, associated };
       
     } catch (error) {
       console.error(`X Sync: Error syncing folder ${folderId}:`, error);
