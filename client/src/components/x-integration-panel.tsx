@@ -386,7 +386,7 @@ const XIntegrationPanel = () => {
       
       toast({
         title: "Folder Bookmarks Synced",
-        description: `Synced "${folderName}" folder: Added ${data.added} new bookmarks, updated ${data.updated} existing bookmarks${data.associated ? `, associated ${data.associated} with collection` : ''}.`,
+        description: `Synced "${folderName}" folder: Added ${data.added} new bookmarks${data.fetched ? `, fetched ${data.fetched} from X API` : ''}, updated ${data.updated} existing bookmarks${data.associated ? `, associated ${data.associated} with collection` : ''}.`,
         variant: "default"
       });
     },

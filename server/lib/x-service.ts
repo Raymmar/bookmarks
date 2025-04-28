@@ -1651,13 +1651,14 @@ export class XService {
    * Sync bookmarks from a specific X.com folder
    * This is exposed to API consumers for manual folder syncing
    */
-  async syncBookmarksFromSpecificFolder(userId: string, folderId: string): Promise<{ added: number, updated: number, errors: number, associated: number }> {
+  async syncBookmarksFromSpecificFolder(userId: string, folderId: string): Promise<{ added: number, updated: number, errors: number, associated: number, fetched: number }> {
     console.log(`X Sync: Starting folder-specific sync for user ${userId}, folder ${folderId}`);
     
     let added = 0;
     let updated = 0;
     let errors = 0;
     let associated = 0; // Count of existing bookmarks associated with collections
+    let fetched = 0; // Count of tweets that were fetched using the API
     
     try {
       // First, validate that the folder exists for this user
@@ -1709,6 +1710,58 @@ export class XService {
       await this.syncBookmarksFromFolder(userId, folder, folderBookmarks, existingBookmarkCache);
       
       console.log(`X Sync: Fetched ${folderBookmarks.tweets.length} tweets from folder ${folderId}`);
+      
+      // Collect IDs of tweets that need fetching (we only have IDs, not full content)
+      const tweetIdsToFetch: string[] = [];
+      
+      // First pass: identify tweets that need fetching
+      for (const tweet of folderBookmarks.tweets) {
+        // If we need fetching and don't already have this bookmark in our system
+        if (tweet.needsFetching && !existingBookmarkCache.has(tweet.id)) {
+          tweetIdsToFetch.push(tweet.id);
+        }
+      }
+      
+      // If we have tweets that need fetching, let's batch fetch them
+      if (tweetIdsToFetch.length > 0) {
+        console.log(`X Sync: Found ${tweetIdsToFetch.length} tweets that need fetching`);
+        
+        // X API allows up to 100 IDs per request, so we'll batch them
+        const batchSize = 100;
+        const batches: string[][] = [];
+        
+        for (let i = 0; i < tweetIdsToFetch.length; i += batchSize) {
+          batches.push(tweetIdsToFetch.slice(i, i + batchSize));
+        }
+        
+        console.log(`X Sync: Splitting into ${batches.length} batches of up to ${batchSize} tweets each`);
+        
+        // Process each batch
+        for (const batch of batches) {
+          try {
+            // Fetch the full tweet data
+            const batchData = await this.fetchTweetsBatch(userId, batch);
+            
+            // If we got results, add them to our collection
+            if (batchData.tweets.length > 0) {
+              console.log(`X Sync: Successfully fetched ${batchData.tweets.length}/${batch.length} tweets`);
+              fetched += batchData.tweets.length;
+              
+              // Add these tweets to our collection
+              folderBookmarks.tweets.push(...batchData.tweets);
+              
+              // Add users and media to our collection
+              Object.assign(folderBookmarks.users, batchData.users);
+              Object.assign(folderBookmarks.media, batchData.media);
+            } else {
+              console.log(`X Sync: No tweets returned for this batch`);
+            }
+          } catch (batchError) {
+            console.error(`X Sync: Error fetching batch of tweets:`, batchError);
+            errors++;
+          }
+        }
+      }
       
       // Process each bookmark
       const processedTweetIds = new Set<string>();
@@ -1800,9 +1853,9 @@ export class XService {
               errors++;
             }
           } else {
-            // This bookmark needs fetching (we only have its ID), but doesn't exist in our system
-            // We'll skip it since we can't create a proper bookmark without the tweet data
-            console.log(`X Sync: Skipping tweet ${tweet.id} - We only have ID and no existing bookmark`);
+            // This bookmark still needs fetching even after our batch fetching attempts
+            // This can happen if the tweet was deleted or is no longer available
+            console.log(`X Sync: Could not retrieve full data for tweet ${tweet.id} - it may no longer be available`);
           }
         } catch (error) {
           console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
@@ -1813,8 +1866,8 @@ export class XService {
       // Update last sync time for the folder
       await storage.updateXFolderLastSync(folderData.id);
       
-      console.log(`X Sync: Finished folder sync - Added: ${added}, Updated: ${updated}, Associated with collections: ${associated}, Errors: ${errors}`);
-      return { added, updated, errors, associated };
+      console.log(`X Sync: Finished folder sync - Added: ${added}, Updated: ${updated}, Fetched: ${fetched}, Associated with collections: ${associated}, Errors: ${errors}`);
+      return { added, updated, errors, associated, fetched };
       
     } catch (error) {
       console.error(`X Sync: Error syncing folder ${folderId}:`, error);
@@ -1880,10 +1933,125 @@ export class XService {
   }
   
   /**
-   * Fetch all existing X.com bookmarks for a user
-   * This builds a cache of tweet_id -> bookmark mappings to optimize the sync process
-   * Returns a Map where the key is the tweet ID (external_id) and the value is the bookmark
+   * Fetch tweet data for a batch of tweet IDs
+   * This uses the /2/tweets endpoint to get full tweet data for IDs we only have references to
    */
+  private async fetchTweetsBatch(userId: string, tweetIds: string[]): Promise<{
+    tweets: XTweet[],
+    users: { [key: string]: XUser },
+    media: { [key: string]: XMedia }
+  }> {
+    if (tweetIds.length === 0) {
+      return { tweets: [], users: {}, media: {} };
+    }
+    
+    console.log(`X Batch Fetch: Fetching data for ${tweetIds.length} tweets`);
+    
+    // Get user credentials
+    const credentials = await this.getUserCredentials(userId);
+    
+    if (!credentials) {
+      throw new Error('User is not authenticated with X.com');
+    }
+    
+    try {
+      // Create the authenticated URL for the tweets lookup endpoint
+      const url = new URL(`${X_API_BASE}/2/tweets`);
+      
+      // Add the tweet IDs as a comma-separated list
+      const params = new URLSearchParams();
+      params.append("ids", tweetIds.join(','));
+      
+      // Add expansions and fields to get complete tweet data
+      params.append("expansions", "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id");
+      params.append("tweet.fields", "created_at,public_metrics,entities,attachments");
+      params.append("user.fields", "name,username,profile_image_url");
+      params.append("media.fields", "url,preview_image_url,alt_text,type,width,height");
+      
+      url.search = params.toString();
+      
+      // Make the API request with the user's access token
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${credentials.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`X Batch Fetch: Error fetching tweets, Status: ${response.status}, Response:`, errorText);
+        
+        // Check if this is an auth error
+        if (response.status === 401) {
+          throw new Error('User needs to reconnect');
+        }
+        
+        throw new Error(`Failed to get tweets data: ${response.status} ${errorText}`);
+      }
+      
+      const data = await response.json() as any;
+      
+      // Log a response sample for debugging
+      console.log(`X Batch Fetch: Response sample:`, JSON.stringify(data, null, 2).substring(0, 300) + '...');
+      
+      if (!data || !data.data || !Array.isArray(data.data)) {
+        console.log(`X Batch Fetch: No tweets found or unexpected response format`);
+        return { tweets: [], users: {}, media: {} };
+      }
+      
+      // Convert API response to our internal format
+      const tweets = data.data.map((tweet: any) => ({
+        id: tweet.id,
+        text: tweet.text || '',
+        created_at: tweet.created_at,
+        author_id: tweet.author_id,
+        public_metrics: tweet.public_metrics,
+        entities: tweet.entities,
+        attachments: tweet.attachments,
+        // Initialize local_media as empty array for each tweet
+        local_media: []
+      }));
+      
+      // Extract users from includes
+      const users: { [key: string]: XUser } = {};
+      if (data.includes && data.includes.users) {
+        data.includes.users.forEach((user: any) => {
+          users[user.id] = {
+            id: user.id,
+            name: user.name,
+            username: user.username,
+            profile_image_url: user.profile_image_url
+          };
+        });
+      }
+      
+      // Extract media from includes
+      const media: { [key: string]: XMedia } = {};
+      if (data.includes && data.includes.media) {
+        data.includes.media.forEach((mediaItem: any) => {
+          media[mediaItem.media_key] = {
+            media_key: mediaItem.media_key,
+            type: mediaItem.type,
+            url: mediaItem.url || mediaItem.preview_image_url,
+            preview_image_url: mediaItem.preview_image_url,
+            width: mediaItem.width,
+            height: mediaItem.height,
+            alt_text: mediaItem.alt_text
+          };
+        });
+      }
+      
+      console.log(`X Batch Fetch: Successfully fetched ${tweets.length} tweets, ${Object.keys(users).length} users, and ${Object.keys(media).length} media items`);
+      return { tweets, users, media };
+      
+    } catch (error) {
+      console.error(`X Batch Fetch: Error fetching tweet data:`, error);
+      throw error;
+    }
+  }
+  
   private async getExistingXBookmarks(userId: string): Promise<Map<string, Bookmark>> {
     console.log(`X Sync: Fetching existing X.com bookmarks for user ${userId}`);
     
