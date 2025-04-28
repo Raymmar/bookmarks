@@ -1237,15 +1237,60 @@ export class DatabaseStorage implements IStorage {
   }
   
   async addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark> {
-    const [newCollectionBookmark] = await db
-      .insert(collectionBookmarks)
-      .values({
-        collection_id: collectionId,
-        bookmark_id: bookmarkId
-      })
-      .returning();
-    
-    return newCollectionBookmark;
+    try {
+      // First check if this bookmark is already in the collection
+      const existingRelation = await db
+        .select()
+        .from(collectionBookmarks)
+        .where(
+          and(
+            eq(collectionBookmarks.collection_id, collectionId),
+            eq(collectionBookmarks.bookmark_id, bookmarkId)
+          )
+        )
+        .limit(1);
+        
+      // If it already exists, return the existing relationship
+      if (existingRelation.length > 0) {
+        console.log(`Bookmark ${bookmarkId} is already in collection ${collectionId}, skipping insert`);
+        return existingRelation[0];
+      }
+      
+      // Otherwise, create a new relationship
+      const [newCollectionBookmark] = await db
+        .insert(collectionBookmarks)
+        .values({
+          collection_id: collectionId,
+          bookmark_id: bookmarkId
+        })
+        .returning();
+      
+      console.log(`Added bookmark ${bookmarkId} to collection ${collectionId}`);
+      return newCollectionBookmark;
+    } catch (error) {
+      console.error(`Error adding bookmark ${bookmarkId} to collection ${collectionId}:`, error);
+      
+      // Handle unique constraint violation (if our check somehow missed it)
+      if (error instanceof Error && error.message.includes('uniqueBookmarkInCollection')) {
+        console.log(`Unique constraint prevented duplicate: bookmark ${bookmarkId} in collection ${collectionId}`);
+        
+        // Retrieve and return the existing record
+        const [existingRecord] = await db
+          .select()
+          .from(collectionBookmarks)
+          .where(
+            and(
+              eq(collectionBookmarks.collection_id, collectionId),
+              eq(collectionBookmarks.bookmark_id, bookmarkId)
+            )
+          )
+          .limit(1);
+          
+        return existingRecord;
+      }
+      
+      throw error;
+    }
   }
   
   async removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean> {
