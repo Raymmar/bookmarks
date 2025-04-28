@@ -184,7 +184,14 @@ export default function GraphView() {
         }
         
         // Fetch tags for ALL bookmarks to ensure complete tag-bookmark relationships
-        const response = await fetch(`/api/bookmarks-tags${allBookmarkIds.length > 0 ? `?ids=${allBookmarkIds.join(',')}` : ''}`);
+        // Using POST instead of GET to handle large numbers of bookmark IDs
+        const response = await fetch('/api/bookmarks-tags-batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ids: allBookmarkIds })
+        });
         
         if (!response.ok) {
           throw new Error(`Failed to fetch bookmark tags: ${response.statusText}`);

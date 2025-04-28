@@ -794,6 +794,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // POST version of the bookmark tags endpoint to handle large numbers of IDs
+  app.post("/api/bookmarks-tags-batch", async (req, res) => {
+    try {
+      // Extract bookmark IDs from request body
+      const bookmarkIds = req.body.ids || [];
+      
+      if (!Array.isArray(bookmarkIds)) {
+        return res.status(400).json({ error: "Invalid bookmark IDs format. Expected an array of IDs." });
+      }
+      
+      console.log(`Processing batch tag request for ${bookmarkIds.length} bookmarks`);
+      
+      // Get all bookmark tags using the same underlying function
+      const bookmarkTagsMap = await storage.getAllBookmarkTags(bookmarkIds);
+      res.json(bookmarkTagsMap);
+    } catch (error) {
+      console.error("Error retrieving batch bookmark tags:", error);
+      res.status(500).json({ error: "Failed to retrieve bookmark tags" });
+    }
+  });
+  
   app.get("/api/tags/:tagId/bookmarks", async (req, res) => {
     try {
       const bookmarks = await storage.getBookmarksByTagId(req.params.tagId);
