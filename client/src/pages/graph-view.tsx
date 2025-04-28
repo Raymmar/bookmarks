@@ -536,9 +536,8 @@ export default function GraphView() {
     bookmarksWithTagsMap.set(bookmark.id, bookmark);
   });
   
-  // Always filter using full bookmarks to enable searching across all items
-  // This allows searching/filtering even when show limit is active
-  const filteredBookmarkIds = fullBookmarks.filter(bookmark => {
+  // Filter bookmarks based on search query, selected tags, domain, and visibility
+  const filteredBookmarkIds = activeBookmarks.filter(bookmark => {
     // Skip bookmarks explicitly marked as hidden (used for establishing tag relationships)
     if ((bookmark as any).isHidden) {
       return false;
@@ -631,16 +630,7 @@ export default function GraphView() {
   });
   
   // Filtered bookmarks now come from either regular bookmarks or collection bookmarks
-  // Apply load limit only if there are no active filters (search, tags, domain)
-  // This ensures users can search/filter all bookmarks while maintaining performance when no filters are active
-  const shouldApplyLoadLimit = loadLimit !== null && 
-                              !searchQuery && 
-                              selectedTags.length === 0 && 
-                              !selectedDomain;
-                              
-  const filteredBookmarks = shouldApplyLoadLimit
-    ? combinedBookmarksWithTags.slice(0, loadLimit)
-    : combinedBookmarksWithTags;
+  const filteredBookmarks = combinedBookmarksWithTags;
   
   // Sort bookmarks
   const sortedBookmarks = [...filteredBookmarks].sort((a, b) => {
@@ -1006,13 +996,9 @@ export default function GraphView() {
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-[200px] h-9 justify-between"
+                    className="w-[160px] h-9 justify-between"
                   >
-                    {loadLimit === null 
-                      ? `Show All (${fullBookmarks.length})`
-                      : shouldApplyLoadLimit
-                        ? `Show ${loadLimit}`
-                        : `Show All (Filtered Results)`}
+                    {loadLimit === null ? `Show All (${fullBookmarks.length})` : `Show ${loadLimit}`}
                     <ChevronDown className="h-4 w-4 ml-1 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -1072,7 +1058,7 @@ export default function GraphView() {
                             loadLimit === null ? "opacity-100" : "opacity-0"
                           }`}
                         />
-                        <span>Show All ({fullBookmarks.length}) - No Limit</span>
+                        <span>Show All ({fullBookmarks.length})</span>
                       </CommandItem>
                     </CommandGroup>
                   </Command>
