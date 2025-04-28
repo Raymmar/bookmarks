@@ -43,8 +43,7 @@ const XIntegrationPage = () => {
             <ul className="list-disc list-inside space-y-1">
               <li>Bookmarks will be imported as links to the original tweet</li>
               <li>Tweet text, author, engagement metrics and more are saved with each bookmark</li>
-              <li>Map oyour flders to bookmark collections</li>
-              <li>Sync bookmarks manually or on a schedule</li>
+              <li>Map your folders to collections</li>
             </ul>
           </div>
         </div>

@@ -582,14 +582,6 @@ const XIntegrationPanel = () => {
                 <p className="text-xs text-muted-foreground text-center">
                   If syncing fails, try reconnecting to refresh your X.com access
                 </p>
-                
-                <div className="text-xs text-muted-foreground space-y-1 p-2 border rounded-md mt-2">
-                  <p>• Syncs bookmarks from your main X.com bookmark list only</p>
-                  <p>• Does not include folder contents to respect X API rate limits</p>
-                  <p>• Only updates engagement metrics (likes, reposts) for existing bookmarks</p>
-                  <p>• Your custom titles and descriptions are preserved</p>
-                  <p className="font-medium text-primary">• To sync folders, use the dedicated sync buttons in the Folders tab</p>
-                </div>
               </div>
             </TabsContent>
             
