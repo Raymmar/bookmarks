@@ -19,7 +19,7 @@ export function BookmarkGrid({
   const [breakpointCols, setBreakpointCols] = useState(2);
   
   // Constants for minimum and maximum card widths (in pixels)
-  const MIN_CARD_WIDTH = 300;
+  const MIN_CARD_WIDTH = 270;
   const MAX_CARD_WIDTH = 360;
   const GRID_GAP = 12; // 0.75rem = 12px
   

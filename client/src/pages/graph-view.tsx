@@ -1144,12 +1144,12 @@ export default function GraphView() {
                   // If we don't have a lastSetWidth or specifically set gridWidthWithDetail, use 720px min-width
                   !layoutPreferences.preferences.lastSetWidth && 
                   !layoutPreferences.preferences.gridWidthWithDetail
-                  ? 'min-w-[720px]' 
+                  ? 'min-w-[540px]' 
                   : ''
                 }`}>
                   {/* Detail panel (conditionally shown on left side) */}
                   {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
-                    <div className="w-1/2 min-w-[360px] border-r border-gray-200 bg-white overflow-auto">
+                    <div className="w-1/2 min-w-[270px] border-r border-gray-200 bg-white overflow-auto">
                       <BookmarkDetailPanel
                         bookmark={getSelectedBookmark()}
                         onClose={() => {
@@ -1171,7 +1171,7 @@ export default function GraphView() {
                   )}
                   
                   {/* Bookmark grid (always on right) */}
-                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[360px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[270px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
                     <BookmarkGrid
                       bookmarks={sortedBookmarks}
                       selectedBookmarkId={selectedBookmarkId}
