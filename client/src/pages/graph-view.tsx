@@ -109,10 +109,12 @@ export default function GraphView() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Fetch regular bookmarks (used when no collection is selected)
+  // Always fetch all bookmarks, whether a collection is selected or not
+  // This ensures we have all tag relationships even when viewing collections
   const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useQuery<Bookmark[]>({
     queryKey: ["/api/bookmarks"],
-    enabled: !selectedCollectionId // Only fetch when no collection is selected
+    // Set a lower priority when collection is selected (to avoid blocking the collection-specific query)
+    meta: selectedCollectionId ? { priority: -1 } : undefined
   });
   
   // State for multiple collection selection initialized from localStorage
@@ -162,25 +164,27 @@ export default function GraphView() {
     queryKey: ["/api/tags"],
   });
 
-  // Fetch bookmark-tag associations using the optimized batch endpoint
+  // Fetch bookmark-tag associations for both the selected collection and all bookmarks
+  // This ensures we have the tag relationships even when viewing collections
   const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags, refetch: refetchBookmarkTags } = useQuery<BookmarkWithTags[]>({
     queryKey: ["/api/bookmarks-with-tags", selectedCollectionId, selectedCollectionIds],
     enabled: !isLoadingBookmarks && !isLoadingTags && !isLoadingSingleCollection && !isLoadingMultiCollections,
     queryFn: async () => {
       try {
-        // Determine which bookmarks array to use
-        const bookmarksToFetch = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
-                                selectedCollectionId ? singleCollectionBookmarks : bookmarks;
+        // Determine which bookmarks to display based on collection selection
+        const displayBookmarks = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
+                                 selectedCollectionId ? singleCollectionBookmarks : bookmarks;
         
-        // Get all bookmark IDs to fetch
-        const bookmarkIds = bookmarksToFetch.map(bookmark => bookmark.id);
+        // For tag relationships, we need both the displayed bookmarks and all bookmarks
+        // This ensures proper tag connections in the graph
+        const allBookmarkIds = bookmarks.map(bookmark => bookmark.id);
         
-        if (bookmarkIds.length === 0) {
+        if (allBookmarkIds.length === 0) {
           return [];
         }
         
-        // Fetch all bookmark tags in a single request using the batch endpoint
-        const response = await fetch(`/api/bookmarks-tags${bookmarkIds.length > 0 ? `?ids=${bookmarkIds.join(',')}` : ''}`);
+        // Fetch tags for ALL bookmarks to ensure complete tag-bookmark relationships
+        const response = await fetch(`/api/bookmarks-tags${allBookmarkIds.length > 0 ? `?ids=${allBookmarkIds.join(',')}` : ''}`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch bookmark tags: ${response.statusText}`);
@@ -189,17 +193,41 @@ export default function GraphView() {
         // Map of bookmarkId -> Tag[]
         const bookmarkTagsMap = await response.json();
         
-        // Combine bookmarks with their tags
-        return bookmarksToFetch.map(bookmark => ({
-          ...bookmark,
-          tags: bookmarkTagsMap[bookmark.id] || []
-        }));
+        // Add the all tags to the displayed bookmarks for proper rendering
+        const bookmarksWithAllTags = displayBookmarks.map(bookmark => {
+          // If this bookmark is in the current view, add its tags
+          return {
+            ...bookmark,
+            tags: bookmarkTagsMap[bookmark.id] || []
+          };
+        });
+        
+        // If we're in a collection view, also add the all-bookmarks data with their tags
+        // but mark them as hidden - this ensures tag relationships are preserved
+        if (selectedCollectionId || selectedCollectionIds.length > 1) {
+          // Get IDs of bookmarks we're already showing
+          const displayedIds = new Set(displayBookmarks.map(b => b.id));
+          
+          // Add non-displayed bookmarks with isHidden flag
+          bookmarks.forEach(bookmark => {
+            if (!displayedIds.has(bookmark.id)) {
+              bookmarksWithAllTags.push({
+                ...bookmark, 
+                tags: bookmarkTagsMap[bookmark.id] || [],
+                isHidden: true // Mark as hidden so graph can use for relationships but not display
+              });
+            }
+          });
+        }
+        
+        console.log(`Loaded ${displayBookmarks.length} bookmarks to display with ${bookmarksWithAllTags.length} total bookmarks for tag relationships`);
+        return bookmarksWithAllTags;
       } catch (error) {
         console.error("Error fetching batch bookmark tags:", error);
         // Return bookmarks with empty tags if the request fails
-        const bookmarksToFetch = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
-                               selectedCollectionId ? singleCollectionBookmarks : bookmarks;
-        return bookmarksToFetch.map(bookmark => ({
+        const displayBookmarks = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
+                                selectedCollectionId ? singleCollectionBookmarks : bookmarks;
+        return displayBookmarks.map(bookmark => ({
           ...bookmark,
           tags: []
         }));
@@ -487,8 +515,13 @@ export default function GraphView() {
     bookmarksWithTagsMap.set(bookmark.id, bookmark);
   });
   
-  // Filter bookmarks based on search query, selected tags, and domain
+  // Filter bookmarks based on search query, selected tags, domain, and visibility
   const filteredBookmarkIds = activeBookmarks.filter(bookmark => {
+    // Skip bookmarks explicitly marked as hidden (used for establishing tag relationships)
+    if ((bookmark as any).isHidden) {
+      return false;
+    }
+    
     // Get this bookmark's tags from our map using the normalized tag system
     const bookmarkTags = bookmarkTagsMap.get(bookmark.id) || [];
     // Use only normalized tags
