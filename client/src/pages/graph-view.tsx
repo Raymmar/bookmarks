@@ -558,9 +558,12 @@ export default function GraphView() {
     
     if (bookmark) {
       combinedBookmarksWithTags.push(bookmark);
-    } else if (selectedCollectionId) {
+    } else if (selectedCollectionIds.length > 0) {
       // If not found, it might be a collection bookmark that hasn't been processed yet
-      const collectionBookmark = collectionBookmarks.find(b => b.id === id);
+      // Look for the bookmark in appropriate collection bookmarks based on selection
+      const collectionBookmark = selectedCollectionIds.length > 1 
+        ? multiCollectionBookmarks.find(b => b.id === id)
+        : singleCollectionBookmarks.find(b => b.id === id);
       
       if (collectionBookmark) {
         // Create a temporary BookmarkWithTags object for this collection bookmark
