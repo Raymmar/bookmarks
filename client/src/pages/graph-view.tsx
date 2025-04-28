@@ -51,7 +51,15 @@ export default function GraphView() {
   // Initialize filter settings from localStorage with fallbacks
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  // Initialize selectedCollectionId from localStorage if only one collection is selected
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(() => {
+    const savedCollections = localStorage.getItem('selectedCollections');
+    if (savedCollections) {
+      const parsed = JSON.parse(savedCollections);
+      return parsed.length === 1 ? parsed[0] : null;
+    }
+    return null;
+  });
   const [tagMode, setTagMode] = useState<"any" | "all">(() => {
     const savedTagMode = localStorage.getItem('bookmarkTagMode');
     return savedTagMode === "all" ? "all" : "any";
@@ -107,14 +115,27 @@ export default function GraphView() {
     enabled: !selectedCollectionId // Only fetch when no collection is selected
   });
   
-  // State for multiple collection selection
-  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
+  // State for multiple collection selection initialized from localStorage
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(() => {
+    // Initialize from localStorage if available
+    const savedCollections = localStorage.getItem('selectedCollections');
+    return savedCollections ? JSON.parse(savedCollections) : [];
+  });
+  
+  // Initialize selectedCollectionId from selectedCollectionIds on first render
+  useEffect(() => {
+    // Only run this once on component mount
+    if (selectedCollectionIds.length === 1 && !selectedCollectionId) {
+      setSelectedCollectionId(selectedCollectionIds[0]);
+    }
+  }, []); // Empty dependency array ensures this only runs once
   
   // Update multiple collections when single collection changes
   useEffect(() => {
     if (selectedCollectionId) {
       setSelectedCollectionIds([selectedCollectionId]);
-    } else {
+    } else if (selectedCollectionIds.length <= 1) {
+      // Only clear if we're not in multi-select mode
       setSelectedCollectionIds([]);
     }
   }, [selectedCollectionId]);
@@ -143,12 +164,16 @@ export default function GraphView() {
 
   // Fetch bookmark-tag associations using the optimized batch endpoint
   const { data: bookmarksWithTags = [], isLoading: isLoadingBookmarkTags, refetch: refetchBookmarkTags } = useQuery<BookmarkWithTags[]>({
-    queryKey: ["/api/bookmarks-with-tags"],
-    enabled: !isLoadingBookmarks && !isLoadingTags,
+    queryKey: ["/api/bookmarks-with-tags", selectedCollectionId, selectedCollectionIds],
+    enabled: !isLoadingBookmarks && !isLoadingTags && !isLoadingSingleCollection && !isLoadingMultiCollections,
     queryFn: async () => {
       try {
+        // Determine which bookmarks array to use
+        const bookmarksToFetch = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
+                                selectedCollectionId ? singleCollectionBookmarks : bookmarks;
+        
         // Get all bookmark IDs to fetch
-        const bookmarkIds = bookmarks.map(bookmark => bookmark.id);
+        const bookmarkIds = bookmarksToFetch.map(bookmark => bookmark.id);
         
         if (bookmarkIds.length === 0) {
           return [];
@@ -165,14 +190,16 @@ export default function GraphView() {
         const bookmarkTagsMap = await response.json();
         
         // Combine bookmarks with their tags
-        return bookmarks.map(bookmark => ({
+        return bookmarksToFetch.map(bookmark => ({
           ...bookmark,
           tags: bookmarkTagsMap[bookmark.id] || []
         }));
       } catch (error) {
         console.error("Error fetching batch bookmark tags:", error);
         // Return bookmarks with empty tags if the request fails
-        return bookmarks.map(bookmark => ({
+        const bookmarksToFetch = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
+                               selectedCollectionId ? singleCollectionBookmarks : bookmarks;
+        return bookmarksToFetch.map(bookmark => ({
           ...bookmark,
           tags: []
         }));
@@ -432,8 +459,9 @@ export default function GraphView() {
     }
   }, [loadLimit]);
 
-  // Determine which bookmarks to use based on whether a collection is selected
-  const fullBookmarks = selectedCollectionId ? collectionBookmarks : bookmarks;
+  // Determine which bookmarks to use based on whether collections are selected
+  const fullBookmarks = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
+                       selectedCollectionId ? singleCollectionBookmarks : bookmarks;
   
   // Apply load limit to bookmarks if loadLimit is set
   const activeBookmarks = useMemo(() => {
