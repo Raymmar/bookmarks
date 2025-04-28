@@ -1725,22 +1725,33 @@ export class XService {
       // Log how many tweets we found in this folder
       console.log(`X Sync: Processing ${folderBookmarks.tweets.length} tweets from folder ${folderId}`);
       
-      // With our new approach, we fetch ALL tweets from the folder API to get their full data
-      // even if we already have them (to get the most up-to-date engagement metrics)
+      // We'll only fetch data for tweets we don't already have to conserve API quota
       const tweetIdsToFetch: string[] = [];
+      const tweetIdsToSkipFetching: string[] = [];
       
-      // Collect all tweet IDs for fetching
+      // Collect tweet IDs for fetching, but only for those we don't already have
       for (const tweet of folderBookmarks.tweets) {
-        tweetIdsToFetch.push(tweet.id);
-        console.log(`X Sync: Adding tweet ${tweet.id} to fetch queue`);
+        if (existingBookmarkCache.has(tweet.id)) {
+          // We already have this tweet, so we can skip fetching it from the API
+          // We'll just update its engagement metrics later using our existing data
+          tweetIdsToSkipFetching.push(tweet.id);
+          console.log(`X Sync: Skipping API fetch for tweet ${tweet.id} (already in database)`);
+        } else {
+          // We don't have this tweet yet, so add it to the fetch queue
+          tweetIdsToFetch.push(tweet.id);
+          console.log(`X Sync: Adding new tweet ${tweet.id} to fetch queue`);
+        }
       }
       
-      // Clear the tweets array, we'll refill it after fetching
+      // Make a copy of tweets that we won't fetch (we'll need these later)
+      const tweetsToSkip = folderBookmarks.tweets.filter(t => tweetIdsToSkipFetching.includes(t.id));
+      
+      // Clear the tweets array, we'll refill it after processing
       folderBookmarks.tweets = [];
       
-      console.log(`X Sync: Will fetch ${tweetIdsToFetch.length} tweets from X API`);
+      console.log(`X Sync: Will fetch ${tweetIdsToFetch.length} new tweets from X API and skip ${tweetIdsToSkipFetching.length} existing tweets`);
       
-      // If we have tweets to fetch, process them in batches
+      // If we have new tweets to fetch, process them in batches
       if (tweetIdsToFetch.length > 0) {
         // X API allows up to 100 IDs per request, so we'll batch them
         const batchSize = 100;
