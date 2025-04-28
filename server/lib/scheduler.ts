@@ -1,0 +1,69 @@
+/**
+ * Automatic Task Scheduler
+ * 
+ * Sets up scheduled tasks for the application, such as syncing bookmarks from X.com
+ */
+
+import cron from 'node-cron';
+import { xService } from './x-service';
+import { db } from '../db';
+import { xCredentials } from '@shared/schema';
+
+/**
+ * Schedule automatic X.com bookmark sync for all connected users
+ * Runs every hour by default
+ */
+export async function setupXSyncScheduler() {
+  console.log('Setting up automatic X.com bookmark sync scheduler');
+  
+  // Schedule task to run every hour
+  cron.schedule('0 * * * *', async () => {
+    try {
+      console.log('Running scheduled X.com bookmark sync for all users');
+      await syncAllXAccounts();
+    } catch (error) {
+      console.error('Error in scheduled X.com bookmark sync:', error);
+    }
+  });
+  
+  console.log('X.com bookmark sync scheduler set up successfully');
+}
+
+/**
+ * Sync bookmarks from X.com for all connected users
+ */
+async function syncAllXAccounts() {
+  try {
+    // Get all users with X.com credentials
+    const connectedUsers = await db.select().from(xCredentials);
+    
+    console.log(`Found ${connectedUsers.length} users connected to X.com`);
+    
+    // Counter for statistics
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // Process each user
+    for (const user of connectedUsers) {
+      try {
+        console.log(`Syncing X.com bookmarks for user ${user.user_id}`);
+        
+        // Sync bookmarks for this user
+        const result = await xService.syncBookmarks(user.user_id);
+        
+        console.log(`Sync complete for user ${user.user_id}:`, result);
+        successCount++;
+      } catch (error) {
+        console.error(`Error syncing X.com bookmarks for user ${user.user_id}:`, error);
+        errorCount++;
+      }
+      
+      // Add a small delay between users to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    console.log(`Scheduled sync complete. Success: ${successCount}, Errors: ${errorCount}`);
+  } catch (error) {
+    console.error('Error retrieving users for X.com sync:', error);
+  }
+}
