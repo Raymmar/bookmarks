@@ -37,13 +37,11 @@ const XIntegrationPage = () => {
           
           <div className="bg-muted p-4 rounded-md text-sm text-muted-foreground">
             <h3 className="font-medium mb-2">About X.com Integration</h3>
-            <p className="mb-2">
-              Connect with x.com to import your bookmarks and folders.
-            </p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Bookmarks will be imported as links to the original tweet</li>
-              <li>Tweet text, author, engagement metrics and more are saved with each bookmark</li>
-              <li>Map your folders to collections</li>
+              <li>Due to limitations of the x API, we may not be able to import all of your bookmarks.</li>
+              <li>As long as your x account is connected your new bookmarks will sync automatically every (x) hours.</li>
+              <li>The x API only returns your 20 most recent active folders.</li>
+              <li>Map folders from x.com to collections in atmosphere to explore folders visually.</li>
             </ul>
           </div>
         </div>

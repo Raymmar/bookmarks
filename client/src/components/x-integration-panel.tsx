@@ -491,7 +491,7 @@ const XIntegrationPanel = () => {
           Connect to X
         </CardTitle>
         <CardDescription>
-          Connect your X.com account to import your bookmarked tweets
+          Connect your X.com account to import your bookmarks
         </CardDescription>
       </CardHeader>
       
@@ -503,7 +503,7 @@ const XIntegrationPanel = () => {
         ) : !connectionStatus?.connected ? (
           <div className="flex flex-col items-center justify-center py-6 space-y-4">
             <p className="text-center text-muted-foreground">
-              Connect your X.com account to import your bookmarked tweets.
+              Connect your X.com account to import your bookmarks.
             </p>
             <Button 
               onClick={() => startAuth.mutate()} 
@@ -517,7 +517,7 @@ const XIntegrationPanel = () => {
                 </>
               ) : (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4" />
+                  <Cable className="mr-2 h-4 w-4" />
                   Connect to X.com
                 </>
               )}
@@ -577,7 +577,7 @@ const XIntegrationPanel = () => {
                     </>
                   ) : (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4" />
+                      <Cable className="mr-2 h-4 w-4" />
                       Reconnect to X.com
                     </>
                   )}
