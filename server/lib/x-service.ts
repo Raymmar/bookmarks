@@ -1711,20 +1711,29 @@ export class XService {
       
       console.log(`X Sync: Fetched ${folderBookmarks.tweets.length} tweets from folder ${folderId}`);
       
-      // Collect IDs of tweets that need fetching (we only have IDs, not full content)
-      const tweetIdsToFetch: string[] = [];
+      // Find tweets that only have IDs (needsFetching=true)
+      // We need to remove them from the tweets array and collect their IDs separately
+      const tweetsWithFullContent: XTweet[] = [];
+      const tweetsToFetch: XTweet[] = [];
       
-      // First pass: identify tweets that need fetching
+      // First pass: separate tweets that need fetching vs those with full content
       for (const tweet of folderBookmarks.tweets) {
-        // If we need fetching and don't already have this bookmark in our system
         if (tweet.needsFetching && !existingBookmarkCache.has(tweet.id)) {
-          tweetIdsToFetch.push(tweet.id);
+          tweetsToFetch.push(tweet);
+        } else {
+          tweetsWithFullContent.push(tweet);
         }
       }
       
-      // If we have tweets that need fetching, let's batch fetch them
-      if (tweetIdsToFetch.length > 0) {
-        console.log(`X Sync: Found ${tweetIdsToFetch.length} tweets that need fetching`);
+      // Replace tweets array with only those that have full content for now
+      folderBookmarks.tweets = tweetsWithFullContent;
+      
+      console.log(`X Sync: Found ${tweetsToFetch.length} tweets that need to be fetched from X API`);
+      
+      // If we have tweets to fetch, process them in batches
+      if (tweetsToFetch.length > 0) {
+        // Extract just the IDs for batch processing
+        const tweetIdsToFetch = tweetsToFetch.map(t => t.id);
         
         // X API allows up to 100 IDs per request, so we'll batch them
         const batchSize = 100;
@@ -1734,7 +1743,7 @@ export class XService {
           batches.push(tweetIdsToFetch.slice(i, i + batchSize));
         }
         
-        console.log(`X Sync: Splitting into ${batches.length} batches of up to ${batchSize} tweets each`);
+        console.log(`X Sync: Splitting ${tweetIdsToFetch.length} tweets into ${batches.length} batches of up to ${batchSize} each`);
         
         // Process each batch
         for (const batch of batches) {
@@ -1744,7 +1753,7 @@ export class XService {
             
             // If we got results, add them to our collection
             if (batchData.tweets.length > 0) {
-              console.log(`X Sync: Successfully fetched ${batchData.tweets.length}/${batch.length} tweets`);
+              console.log(`X Sync: Successfully fetched ${batchData.tweets.length}/${batch.length} tweets from X API`);
               fetched += batchData.tweets.length;
               
               // Add these tweets to our collection
@@ -1754,7 +1763,7 @@ export class XService {
               Object.assign(folderBookmarks.users, batchData.users);
               Object.assign(folderBookmarks.media, batchData.media);
             } else {
-              console.log(`X Sync: No tweets returned for this batch`);
+              console.log(`X Sync: No tweets returned from X API for this batch`);
             }
           } catch (batchError) {
             console.error(`X Sync: Error fetching batch of tweets:`, batchError);
