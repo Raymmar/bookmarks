@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, RefreshCw, FolderPlus, Link, Cable, Twitter, Download, DownloadCloud } from "lucide-react";
+import { Loader2, RefreshCw, FolderPlus, Link, Cable, Twitter, Download, DownloadCloud, Clock } from "lucide-react";
 
 // Type definitions
 interface XConnectionStatus {
@@ -539,6 +539,9 @@ const XIntegrationPanel = () => {
                 <p className="text-sm text-muted-foreground">
                   Last synchronized: {connectionStatus.lastSync ? 
                     new Date(connectionStatus.lastSync).toLocaleString() : 'Never'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <Clock className="h-3 w-3 inline-block mr-1" /> Syncs automatically every hour
                 </p>
               </div>
               

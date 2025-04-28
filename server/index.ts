@@ -67,5 +67,10 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Set up automatic X.com bookmark sync scheduler
+    setupXSyncScheduler()
+      .then(() => log('Automatic X.com bookmark sync scheduler initialized'))
+      .catch(err => log(`Error setting up X.com sync scheduler: ${err.message}`));
   });
 })();
