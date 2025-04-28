@@ -1790,7 +1790,13 @@ export class XService {
         }
       }
       
-      // Process each bookmark
+      // Add back the tweets we skipped fetching
+      if (tweetsToSkip && tweetsToSkip.length > 0) {
+        console.log(`X Sync: Adding back ${tweetsToSkip.length} existing tweets that we skipped fetching`);
+        folderBookmarks.tweets.push(...tweetsToSkip);
+      }
+      
+      // Process each bookmark 
       const processedTweetIds = new Set<string>();
       
       for (const tweet of folderBookmarks.tweets) {
