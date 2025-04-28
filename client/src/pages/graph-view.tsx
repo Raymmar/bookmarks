@@ -224,6 +224,14 @@ export default function GraphView() {
         return bookmarksWithAllTags;
       } catch (error) {
         console.error("Error fetching batch bookmark tags:", error);
+        // Log more details about the error for debugging
+        console.log("Detailed error info:", { 
+          message: error.message, 
+          stack: error.stack,
+          bookmarkCount: bookmarks.length,
+          selectedCollection: selectedCollectionId,
+          multiCollections: selectedCollectionIds
+        });
         // Return bookmarks with empty tags if the request fails
         const displayBookmarks = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
                                 selectedCollectionId ? singleCollectionBookmarks : bookmarks;
