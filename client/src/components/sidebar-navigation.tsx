@@ -18,7 +18,8 @@ import {
   Trash2,
   Cable,
   Twitter,
-  ChevronDown
+  ChevronDown,
+  LayoutGrid
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
@@ -326,14 +327,29 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 <Link href="/">
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
-                    location === "/" || location === "/graph"
+                    location === "/" 
+                      ? "bg-secondary/20 text-primary border border-primary/20" 
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}>
+                    <Bookmark className={cn("h-5 w-5 mr-2", 
+                      location === "/" ? "text-primary" : ""
+                    )} />
+                    Bookmarks
+                  </div>
+                </Link>
+              </li>
+              <li className="mb-1">
+                <Link href="/graph">
+                  <div className={cn(
+                    "flex items-center px-2 py-2 text-sm rounded-lg",
+                    location === "/graph"
                       ? "bg-secondary/20 text-primary border border-primary/20" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
                     <Waypoints className={cn("h-5 w-5 mr-2", 
-                      location === "/" || location === "/graph" ? "text-primary" : ""
+                      location === "/graph" ? "text-primary" : ""
                     )} />
-                    Explore
+                    Explore Graph
                   </div>
                 </Link>
               </li>
