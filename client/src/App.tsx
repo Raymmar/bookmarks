@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Activity from "@/pages/activity";
 import GraphView from "@/pages/graph-view";
+import BookmarksView from "@/pages/bookmarks-view";
 import AiChat from "@/pages/ai-chat";
 import Settings from "@/pages/settings";
 import XIntegration from "@/pages/x-integration";
@@ -20,7 +21,8 @@ import { ProtectedRoute } from "@/lib/protected-route";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={GraphView} />
+      <Route path="/" component={BookmarksView} />
+      <Route path="/graph" component={GraphView} />
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />
       <ProtectedRoute path="/settings" component={Settings} />
