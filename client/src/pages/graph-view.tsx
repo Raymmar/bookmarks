@@ -1110,34 +1110,12 @@ export default function GraphView() {
               onLayout={(sizes) => {
                 // Only handle the resize if we have two panels (sizes array has length 2)
                 if (sizes.length === 2) {
-                  const gridWidth = Math.round(sizes[1]);
+                  const gridWidth = Math.round(sizes[0]);
                   layoutPreferences.setGridWidth(gridWidth);
                 }
               }}
             >
-              {/* Graph panel */}
-              <ResizablePanel 
-                defaultSize={100 - layoutPreferences.preferences.gridWidth} 
-                minSize={20}
-                className="h-full"
-              >
-                <div className="h-full border border-gray-200 overflow-hidden bg-white">
-                  <ForceDirectedGraph
-                    bookmarks={filteredBookmarks}
-                    insightLevel={insightLevel}
-                    onNodeClick={handleSelectBookmark}
-                    onTagClick={handleTagClick}
-                    onDomainClick={handleDomainSelection}
-                    selectedBookmarkId={selectedBookmarkId}
-                    visibleNodeTypes={visibleNodeTypes}
-                  />
-                </div>
-              </ResizablePanel>
-              
-              {/* Resizable handle with visual indicator */}
-              <ResizableHandle withHandle />
-              
-              {/* Grid panel */}
+              {/* Grid panel - now first */}
               <ResizablePanel 
                 defaultSize={layoutPreferences.preferences.gridWidth} 
                 minSize={layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 60 : 20}
@@ -1153,9 +1131,19 @@ export default function GraphView() {
                   ? 'min-w-[540px]' 
                   : ''
                 }`}>
-                  {/* Detail panel (conditionally shown on left side) */}
+                  {/* Bookmark grid (now always on left) */}
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[270px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
+                    <BookmarkGrid
+                      bookmarks={sortedBookmarks}
+                      selectedBookmarkId={selectedBookmarkId}
+                      onSelectBookmark={handleSelectBookmark}
+                      isLoading={isLoading}
+                    />
+                  </div>
+                  
+                  {/* Detail panel (now shown on right side of the grid panel) */}
                   {layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() && (
-                    <div className="w-1/2 min-w-[270px] border-r border-gray-200 bg-white overflow-auto">
+                    <div className="w-1/2 min-w-[270px] border-l border-gray-200 bg-white overflow-auto">
                       <BookmarkDetailPanel
                         bookmark={getSelectedBookmark()}
                         onClose={() => {
@@ -1175,16 +1163,28 @@ export default function GraphView() {
                       />
                     </div>
                   )}
-                  
-                  {/* Bookmark grid (always on right) */}
-                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[270px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
-                    <BookmarkGrid
-                      bookmarks={sortedBookmarks}
-                      selectedBookmarkId={selectedBookmarkId}
-                      onSelectBookmark={handleSelectBookmark}
-                      isLoading={isLoading}
-                    />
-                  </div>
+                </div>
+              </ResizablePanel>
+              
+              {/* Resizable handle with visual indicator */}
+              <ResizableHandle withHandle />
+              
+              {/* Graph panel - now last */}
+              <ResizablePanel 
+                defaultSize={100 - layoutPreferences.preferences.gridWidth} 
+                minSize={20}
+                className="h-full"
+              >
+                <div className="h-full border border-gray-200 overflow-hidden bg-white">
+                  <ForceDirectedGraph
+                    bookmarks={filteredBookmarks}
+                    insightLevel={insightLevel}
+                    onNodeClick={handleSelectBookmark}
+                    onTagClick={handleTagClick}
+                    onDomainClick={handleDomainSelection}
+                    selectedBookmarkId={selectedBookmarkId}
+                    visibleNodeTypes={visibleNodeTypes}
+                  />
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
