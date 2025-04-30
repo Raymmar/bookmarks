@@ -659,6 +659,8 @@ export default function GraphView() {
     bookmarksWithTagsMap.set(bookmark.id, bookmark);
   });
   
+  console.log(`Debug filtering: ${activeBookmarks.length} active bookmarks, ${bookmarksWithTags.length} bookmarks with tags`);
+  
   // Filter bookmarks based on search query, selected tags, domain, and visibility
   const filteredBookmarkIds = activeBookmarks.filter(bookmark => {
     // Skip bookmarks explicitly marked as hidden (used for establishing tag relationships)
