@@ -526,15 +526,10 @@ export default function GraphView() {
   
   // State for progressive loading
   const [loadLimit, setLoadLimit] = useState<number | null>(() => {
-    // Get saved preference from localStorage or default to limit=25
-    const savedLimit = localStorage.getItem('bookmarkLoadLimit');
-    
-    if (!savedLimit) return 25; // Default value
-    if (savedLimit === 'all') return null; // "Show All" setting
-    
-    // Try to parse as number
-    const numValue = parseInt(savedLimit);
-    return !isNaN(numValue) ? numValue : 25; // Fallback to default if not a valid number
+    // Always reset to minimum load limit (pageSize) to ensure we start with a small batch
+    // and can load more with infinite scroll
+    console.log("Initializing loadLimit to pageSize (25)");
+    return 25; // Default value matching pageSize
   });
 
   // Update localStorage when load limit changes

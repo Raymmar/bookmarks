@@ -1,11 +1,16 @@
 import { Bookmark } from "@shared/types";
+import { useEffect, useRef } from "react";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
-  columns: number;
+  columns?: number;
+  // New pagination props
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function BookmarkGrid({
@@ -14,13 +19,52 @@ export function BookmarkGrid({
   onSelectBookmark,
   isLoading,
   columns = 2,
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore
 }: BookmarkGridProps) {
   // Generate the grid styles based on the number of columns
   const gridStyle = {
     display: 'grid',
     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-    gap: '0.5rem',
+    gap: '0.75rem',
   };
+  
+  // Reference for the load more trigger element
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  
+  // Set up intersection observer for infinite scrolling
+  useEffect(() => {
+    // Only set up if we have onLoadMore and there's more to load
+    if (!onLoadMore || !hasMore) return;
+    
+    console.log("Creating IntersectionObserver for grid view infinite scroll");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // If our loading element is in view and we're not already loading
+        const [entry] = entries;
+        if (entry.isIntersecting && !isLoadingMore && hasMore) {
+          console.log("Load more element intersected, triggering onLoadMore");
+          onLoadMore();
+        }
+      },
+      {
+        // Increased sensitivity for more reliable triggering
+        rootMargin: '200px',
+        threshold: 0.1
+      }
+    );
+    
+    // Start observing the loader element
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+    
+    // Clean up
+    return () => {
+      observer.disconnect();
+    };
+  }, [onLoadMore, isLoadingMore, hasMore]);
 
   return (
     <div className="p-3 overflow-auto h-full">
@@ -36,17 +80,41 @@ export function BookmarkGrid({
           No bookmarks found. Try adjusting your filters.
         </div>
       ) : (
-        <div style={gridStyle}>
-          {bookmarks.map((bookmark) => {
-            return (
-              <BookmarkCard
-                key={bookmark.id}
-                bookmark={bookmark}
-                isSelected={selectedBookmarkId === bookmark.id}
-                onClick={() => onSelectBookmark(bookmark.id)}
-              />
-            );
-          })}
+        <div className="relative">
+          {/* Grid of bookmarks */}
+          <div style={gridStyle} className="mb-8">
+            {bookmarks.map((bookmark) => {
+              return (
+                <BookmarkCard
+                  key={bookmark.id}
+                  bookmark={bookmark}
+                  isSelected={selectedBookmarkId === bookmark.id}
+                  onClick={() => onSelectBookmark(bookmark.id)}
+                />
+              );
+            })}
+          </div>
+          
+          {/* Loader element for intersection observer (infinite scroll) */}
+          <div 
+            ref={loadMoreRef} 
+            className="w-full h-32 mt-4 mb-8"
+            id="grid-infinite-scroll-trigger"
+          >
+            {/* Always show a subtle indicator (whether loading or not) to ensure the element has height */}
+            <div className="text-center py-4">
+              {isLoadingMore ? (
+                <>
+                  <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading more bookmarks...</p>
+                </>
+              ) : hasMore ? (
+                <p className="text-gray-400 text-sm">Scroll for more bookmarks</p>
+              ) : (
+                <p className="text-gray-400 text-sm">No more bookmarks to load</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
