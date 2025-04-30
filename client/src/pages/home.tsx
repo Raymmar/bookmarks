@@ -27,20 +27,87 @@ export default function Home() {
   });
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [insightLevel, setInsightLevel] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const pageSize = 25; // Number of bookmarks to load per batch
+  const [allBookmarks, setAllBookmarks] = useState<Bookmark[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
-    queryKey: ["/api/bookmarks"],
+  // Initial bookmarks query with pagination metadata
+  const { data: initialBookmarksData, isLoading } = useQuery({
+    queryKey: ["/api/bookmarks", { page: 1, pageSize, includeTotal: true }],
+    queryFn: async () => {
+      const data = await apiRequest('GET', `/api/bookmarks?page=1&pageSize=${pageSize}&includeTotal=true`);
+      return data;
+    }
   });
+
+  // Effect to update our state with the initial bookmarks
+  useEffect(() => {
+    if (initialBookmarksData) {
+      setAllBookmarks(initialBookmarksData.data || []);
+      const pagination = initialBookmarksData.pagination;
+      if (pagination) {
+        setHasMore(currentPage < pagination.totalPages);
+      }
+    }
+  }, [initialBookmarksData, currentPage]);
+
+  // Function to load more bookmarks
+  const loadMoreBookmarks = async () => {
+    if (isLoadingMore || !hasMore) return;
+    
+    try {
+      setIsLoadingMore(true);
+      const nextPage = currentPage + 1;
+      const nextBookmarks = await apiRequest('GET', `/api/bookmarks?page=${nextPage}&pageSize=${pageSize}`);
+      
+      setAllBookmarks(prev => [...prev, ...nextBookmarks]);
+      setCurrentPage(nextPage);
+      
+      // Check if we've loaded all bookmarks
+      if (initialBookmarksData?.pagination && nextPage >= initialBookmarksData.pagination.totalPages) {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error loading more bookmarks:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load more bookmarks. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // Effect to implement infinite scrolling
+  useEffect(() => {
+    const handleScroll = () => {
+      // Check if user has scrolled to the bottom of the page
+      if (
+        window.innerHeight + document.documentElement.scrollTop >= 
+        document.documentElement.offsetHeight - 500 && 
+        hasMore && 
+        !isLoadingMore
+      ) {
+        loadMoreBookmarks();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMore, isLoadingMore]);
 
   const { data: activities = [], isLoading: isActivitiesLoading } = useQuery({
     queryKey: ["/api/activities"],
   });
 
-  const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
+  const selectedBookmark = allBookmarks.find(b => b.id === selectedBookmarkId);
 
-  const filteredBookmarks = bookmarks.filter(bookmark => {
+  const filteredBookmarks = allBookmarks.filter(bookmark => {
     if (!searchQuery) return true;
     
     const searchLower = searchQuery.toLowerCase();
@@ -48,8 +115,8 @@ export default function Home() {
       bookmark.title.toLowerCase().includes(searchLower) ||
       bookmark.description?.toLowerCase().includes(searchLower) ||
       bookmark.url.toLowerCase().includes(searchLower) ||
-      bookmark.user_tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
-      bookmark.system_tags.some(tag => tag.toLowerCase().includes(searchLower))
+      (bookmark as any).user_tags?.some((tag: string) => tag.toLowerCase().includes(searchLower)) ||
+      (bookmark as any).system_tags?.some((tag: string) => tag.toLowerCase().includes(searchLower))
     );
   });
 
@@ -222,6 +289,27 @@ export default function Home() {
                       />
                     ))}
                   </div>
+                  
+                  {/* Loading indicator for more bookmarks */}
+                  {isLoadingMore && (
+                    <div className="mt-8 p-4 text-center">
+                      <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                      <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
+                    </div>
+                  )}
+                  
+                  {/* Load more button if needed */}
+                  {hasMore && !isLoadingMore && (
+                    <div className="mt-8 text-center">
+                      <Button 
+                        variant="outline" 
+                        onClick={loadMoreBookmarks}
+                        className="mx-auto"
+                      >
+                        Load More Bookmarks
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               
