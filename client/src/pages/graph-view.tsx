@@ -1300,7 +1300,7 @@ export default function GraphView() {
                   )}
                   
                   {/* Bookmark grid (always on right) */}
-                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[270px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[270px]' : 'w-full'} overflow-auto border border-gray-200 bg-white`}>
                     <BookmarkGrid
                       bookmarks={sortedBookmarks}
                       selectedBookmarkId={selectedBookmarkId}
