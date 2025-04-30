@@ -468,6 +468,32 @@ export default function GraphView() {
     }, 100);
   };
   
+  // Function to load more bookmarks
+  const loadMoreBookmarks = () => {
+    if (isLoadingMore || !hasMore) return;
+    
+    setIsLoadingMore(true);
+    try {
+      // In the graph view, we're using client-side pagination with the loadLimit
+      // Increase the load limit to show more bookmarks
+      if (loadLimit !== null) {
+        setLoadLimit(prevLimit => (prevLimit || 25) + pageSize);
+      }
+      
+      // Set hasMore flag based on whether there are more bookmarks to show
+      setHasMore(loadLimit !== null && (loadLimit + pageSize) < fullBookmarks.length);
+    } catch (error) {
+      console.error("Error loading more bookmarks:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load more bookmarks. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+  
   // Filter tags based on type
   const userTags = tags.filter(tag => tag.type === "user");
   const systemTags = tags.filter(tag => tag.type === "system");
@@ -508,10 +534,22 @@ export default function GraphView() {
       localStorage.setItem('bookmarkLoadLimit', 'all');
     }
   }, [loadLimit]);
-
+  
   // Determine which bookmarks to use based on whether collections are selected
   const fullBookmarks = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
                        selectedCollectionId ? singleCollectionBookmarks : bookmarks;
+  
+  // Update hasMore state whenever fullBookmarks or loadLimit changes
+  useEffect(() => {
+    // If we're showing all bookmarks, there's nothing more to load
+    if (loadLimit === null) {
+      setHasMore(false);
+      return;
+    }
+    
+    // Check if there are more bookmarks to show
+    setHasMore(loadLimit < fullBookmarks.length);
+  }, [fullBookmarks, loadLimit]);
   
   // Apply load limit to bookmarks if loadLimit is set
   const activeBookmarks = useMemo(() => {
