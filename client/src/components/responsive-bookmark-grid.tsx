@@ -1,12 +1,16 @@
 import { Bookmark } from "@shared/types";
 import { useState, useEffect, useRef } from "react";
 import Masonry from "react-masonry-css";
+import { Button } from "./ui/button";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function BookmarkGrid({
@@ -14,6 +18,9 @@ export function BookmarkGrid({
   selectedBookmarkId,
   onSelectBookmark,
   isLoading,
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore,
 }: BookmarkGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [breakpointCols, setBreakpointCols] = useState(2);

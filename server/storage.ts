@@ -1339,6 +1339,7 @@ export class DatabaseStorage implements IStorage {
         .select()
         .from(bookmarks)
         .where(eq(bookmarks.user_id, userId))
+        .orderBy(desc(bookmarks.date_saved)) // Order by most recent first
         .limit(pageSize)
         .offset(offset);
     }
@@ -1346,6 +1347,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(bookmarks)
+      .orderBy(desc(bookmarks.date_saved)) // Order by most recent first
       .limit(pageSize)
       .offset(offset);
   }
