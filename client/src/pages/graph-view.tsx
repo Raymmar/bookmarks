@@ -661,8 +661,12 @@ export default function GraphView() {
   
   console.log(`Debug filtering: ${activeBookmarks.length} active bookmarks, ${bookmarksWithTags.length} bookmarks with tags`);
   
+  // Only proceed with filtering if we have both active bookmarks and bookmarks with tags
+  // This prevents the "No bookmarks found" message from flashing during loading
+  const readyToFilter = activeBookmarks.length > 0 && bookmarksWithTags.length > 0;
+  
   // Filter bookmarks based on search query, selected tags, domain, and visibility
-  const filteredBookmarkIds = activeBookmarks.filter(bookmark => {
+  const filteredBookmarkIds = readyToFilter ? activeBookmarks.filter(bookmark => {
     // Skip bookmarks explicitly marked as hidden (used for establishing tag relationships)
     if ((bookmark as any).isHidden) {
       return false;
@@ -725,7 +729,7 @@ export default function GraphView() {
     } else {
       return selectedTags.every(tag => allBookmarkTags.includes(tag));
     }
-  }).map(bookmark => bookmark.id);
+  }).map(bookmark => bookmark.id) : [];
   
   // Create a combined map of all bookmarks with tags for unified filtering
   const combinedBookmarksWithTags: BookmarkWithTags[] = [];
