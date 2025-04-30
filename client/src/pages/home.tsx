@@ -38,8 +38,16 @@ export default function Home() {
   // Initial bookmarks query with pagination metadata
   const { data: initialBookmarksData, isLoading } = useQuery({
     queryKey: ["/api/bookmarks", { page: currentPage, pageSize, includeTotal: true }],
-    queryFn: async () => {
-      const data = await apiRequest('GET', `/api/bookmarks?page=1&pageSize=${pageSize}&includeTotal=true`);
+    queryFn: async ({ queryKey }) => {
+      // Extract parameters from queryKey to ensure they match
+      const [_, params] = queryKey;
+      const { page, pageSize, includeTotal } = params as { page: number, pageSize: number, includeTotal: boolean };
+      
+      // Use the extracted parameters to build the URL
+      const data = await apiRequest(
+        'GET', 
+        `/api/bookmarks?page=${page}&pageSize=${pageSize}&includeTotal=${includeTotal}`
+      );
       return data;
     }
   });
@@ -76,7 +84,7 @@ export default function Home() {
     try {
       setIsLoadingMore(true);
       const nextPage = currentPage + 1;
-      const nextPageData = await apiRequest('GET', `/api/bookmarks?page=${nextPage}&pageSize=${pageSize}`);
+      const nextPageData = await apiRequest('GET', `/api/bookmarks?page=${nextPage}&pageSize=${pageSize}&includeTotal=true`);
       
       // Handle the response based on its format (regular array or pagination object)
       let newBookmarks: Bookmark[] = [];
@@ -195,7 +203,12 @@ export default function Home() {
         description: "Your bookmark was successfully deleted",
       });
       
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      // Invalidate all bookmark queries (including paginated ones)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && 
+          query.queryKey[0] === "/api/bookmarks" 
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
       
       if (selectedBookmarkId === id) {
