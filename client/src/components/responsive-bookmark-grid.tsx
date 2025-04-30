@@ -1,5 +1,5 @@
 import { Bookmark } from "@shared/types";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Masonry from "react-masonry-css";
 import { Button } from "./ui/button";
 
@@ -23,7 +23,20 @@ export function BookmarkGrid({
   onLoadMore,
 }: BookmarkGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const [breakpointCols, setBreakpointCols] = useState(2);
+  
+  // Intersection Observer for infinite scroll
+  const observerCallback = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasMore && !isLoadingMore && onLoadMore) {
+        // When the footer element is visible, load more bookmarks
+        onLoadMore();
+      }
+    },
+    [hasMore, isLoadingMore, onLoadMore]
+  );
   
   // Constants for minimum and maximum card widths (in pixels)
   const MIN_CARD_WIDTH = 270;
@@ -65,6 +78,27 @@ export function BookmarkGrid({
       resizeObserver.disconnect();
     };
   }, []);
+  
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(observerCallback, {
+      root: null, // viewport is used as root
+      rootMargin: '100px', // start loading when loader is 100px from viewport
+      threshold: 0.1, // trigger when at least 10% of the target is visible
+    });
+    
+    // Start observing the loader element
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+    
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+      observer.disconnect();
+    };
+  }, [observerCallback]);
 
   return (
     <div className="p-3 overflow-auto h-full" ref={containerRef}>
@@ -96,26 +130,20 @@ export function BookmarkGrid({
             ))}
           </Masonry>
           
-          {/* Loading more indicator */}
-          {isLoadingMore && (
-            <div className="mt-6 text-center">
-              <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
-            </div>
-          )}
-          
-          {/* Load more button */}
-          {hasMore && !isLoadingMore && onLoadMore && (
-            <div className="mt-6 text-center">
-              <Button 
-                variant="outline" 
-                onClick={onLoadMore}
-                className="mx-auto"
-              >
-                Load More Bookmarks
-              </Button>
-            </div>
-          )}
+          {/* Invisible loader element for intersection observer (infinite scroll) */}
+          <div 
+            ref={loadMoreRef} 
+            className="w-full h-10 mt-4"
+            aria-hidden="true"
+          >
+            {/* Loading more indicator */}
+            {isLoadingMore && (
+              <div className="text-center">
+                <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
