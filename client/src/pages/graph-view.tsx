@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { InfiniteScrollLoader } from "@/components/ui/infinite-scroll-loader";
 import { 
   Command, 
   CommandEmpty, 
@@ -117,9 +116,10 @@ export default function GraphView() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Always fetch bookmarks with pagination, requesting more pages as needed
+  // Always fetch all bookmarks, whether a collection is selected or not
   // This ensures we have all tag relationships even when viewing collections
-  const { data: bookmarksResponse, isLoading: isLoadingBookmarks, isFetching: isFetchingBookmarks } = useQuery<{
+  // We now use the pagination API to get total count information
+  const { data: bookmarksResponse, isLoading: isLoadingBookmarks } = useQuery<{
     data: Bookmark[],
     pagination: {
       total: number,
@@ -130,7 +130,7 @@ export default function GraphView() {
       hasPrevPage: boolean
     }
   }>({
-    queryKey: ["/api/bookmarks", { includeTotal: true, page: currentPage, pageSize }],
+    queryKey: ["/api/bookmarks", { includeTotal: true, page: 1, pageSize: 100 }],
     queryFn: async ({ queryKey }) => {
       const [_, params] = queryKey;
       const { includeTotal, page, pageSize } = params as { includeTotal: boolean, page: number, pageSize: number };
@@ -142,43 +142,13 @@ export default function GraphView() {
       );
       return data;
     },
-    // Keep previous data while loading new pages
-    keepPreviousData: true,
     // Set a lower priority when collection is selected (to avoid blocking the collection-specific query)
     meta: selectedCollectionId ? { priority: -1 } : undefined
   });
   
-  // State to accumulate bookmark pages as they load
-  const [allBookmarks, setAllBookmarks] = useState<Bookmark[]>([]);
-  
-  // Extract pagination info
+  // Extract bookmarks array and pagination info
+  const bookmarks = bookmarksResponse?.data || [];
   const totalBookmarkCount = bookmarksResponse?.pagination?.total || 0;
-  const hasNextPage = bookmarksResponse?.pagination?.hasNextPage || false;
-  
-  // Accumulate bookmarks as new pages are loaded
-  useEffect(() => {
-    if (bookmarksResponse?.data && bookmarksResponse.data.length > 0) {
-      // On page 1, reset the accumulated bookmarks
-      if (currentPage === 1) {
-        setAllBookmarks(bookmarksResponse.data);
-      } else {
-        // For subsequent pages, append to existing bookmarks
-        setAllBookmarks(prev => {
-          // Create a Set of existing IDs for fast lookup
-          const existingIds = new Set(prev.map(b => b.id));
-          
-          // Filter out any duplicates from the new page
-          const newBookmarks = bookmarksResponse.data.filter(b => !existingIds.has(b.id));
-          
-          // Return combined array
-          return [...prev, ...newBookmarks];
-        });
-      }
-    }
-  }, [bookmarksResponse, currentPage]);
-  
-  // Use the accumulated bookmarks for rendering
-  const bookmarks = allBookmarks;
   
   // State for multiple collection selection initialized from localStorage
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(() => {
@@ -524,31 +494,25 @@ export default function GraphView() {
     }, 100);
   };
   
-  // Function to load more bookmarks by fetching the next page
+  // Function to load more bookmarks
   const loadMoreBookmarks = () => {
-    if (isLoadingMore || !hasMore || isFetchingBookmarks) {
-      console.log(`Not loading more: isLoadingMore=${isLoadingMore}, hasMore=${hasMore}, isFetching=${isFetchingBookmarks}`);
+    if (isLoadingMore || !hasMore) {
+      console.log(`Not loading more: isLoadingMore=${isLoadingMore}, hasMore=${hasMore}`);
       return;
     }
     
-    console.log(`Loading more bookmarks: current page=${currentPage}, loadLimit=${loadLimit}, totalBookmarks=${totalBookmarkCount}`);
+    console.log(`Loading more bookmarks: current loadLimit=${loadLimit}, totalBookmarks=${totalBookmarkCount}`);
     setIsLoadingMore(true);
     try {
-      // Instead of just updating the loadLimit, we'll fetch the next page of data
-      // This ensures we're getting fresh data from the server
-      const nextPage = currentPage + 1;
-      console.log(`Fetching next page: ${nextPage}`);
-      setCurrentPage(nextPage);
-      
-      // We still need to update loadLimit for client-side rendering controls
+      // In the graph view, we're using client-side pagination with the loadLimit
+      // Increase the load limit to show more bookmarks
       if (loadLimit !== null) {
         // Increase the limit by pageSize (usually 25)
         const newLimit = (loadLimit || 25) + pageSize;
         console.log(`Setting new loadLimit=${newLimit}`);
         setLoadLimit(newLimit);
         
-        // We'll continue to check hasMore using the total count from the server
-        // This ensures we only load what's needed
+        // Set hasMore flag based on server total count
         const moreAvailable = newLimit < totalBookmarkCount;
         console.log(`Setting hasMore=${moreAvailable} (${newLimit} < ${totalBookmarkCount})`);
         setHasMore(moreAvailable);
@@ -616,19 +580,13 @@ export default function GraphView() {
       return;
     }
     
-    // Use the server's hasNextPage flag to determine if there are more bookmarks to load
-    const hasMoreBookmarks = bookmarksResponse?.pagination?.hasNextPage || false;
+    // Use the total bookmark count from the server to determine if there are more to load
+    // This is reliable because it comes from the server pagination metadata
+    const hasMoreBookmarks = totalBookmarkCount > loadLimit;
+    console.log(`Setting hasMore=${hasMoreBookmarks} based on server total count: ${totalBookmarkCount} > ${loadLimit}`);
     
-    // If we're not using server pagination, fall back to comparing with total count
-    if (hasMoreBookmarks === false && totalBookmarkCount > 0) {
-      const hasMoreByCount = totalBookmarkCount > loadLimit;
-      console.log(`Setting hasMore=${hasMoreByCount} based on server total count: ${totalBookmarkCount} > ${loadLimit}`);
-      setHasMore(hasMoreByCount);
-    } else {
-      console.log(`Setting hasMore=${hasMoreBookmarks} based on server pagination.hasNextPage`);
-      setHasMore(hasMoreBookmarks);
-    }
-  }, [bookmarksResponse, totalBookmarkCount, loadLimit]);
+    setHasMore(hasMoreBookmarks);
+  }, [totalBookmarkCount, loadLimit]);
   
   // Apply load limit to bookmarks if loadLimit is set
   const activeBookmarks = useMemo(() => {
@@ -659,14 +617,8 @@ export default function GraphView() {
     bookmarksWithTagsMap.set(bookmark.id, bookmark);
   });
   
-  console.log(`Debug filtering: ${activeBookmarks.length} active bookmarks, ${bookmarksWithTags.length} bookmarks with tags`);
-  
-  // Only proceed with filtering if we have both active bookmarks and bookmarks with tags
-  // This prevents the "No bookmarks found" message from flashing during loading
-  const readyToFilter = activeBookmarks.length > 0 && bookmarksWithTags.length > 0;
-  
   // Filter bookmarks based on search query, selected tags, domain, and visibility
-  const filteredBookmarkIds = readyToFilter ? activeBookmarks.filter(bookmark => {
+  const filteredBookmarkIds = activeBookmarks.filter(bookmark => {
     // Skip bookmarks explicitly marked as hidden (used for establishing tag relationships)
     if ((bookmark as any).isHidden) {
       return false;
@@ -729,7 +681,7 @@ export default function GraphView() {
     } else {
       return selectedTags.every(tag => allBookmarkTags.includes(tag));
     }
-  }).map(bookmark => bookmark.id) : [];
+  }).map(bookmark => bookmark.id);
   
   // Create a combined map of all bookmarks with tags for unified filtering
   const combinedBookmarksWithTags: BookmarkWithTags[] = [];
@@ -1306,7 +1258,7 @@ export default function GraphView() {
                   )}
                   
                   {/* Bookmark grid (always on right) */}
-                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[270px]' : 'w-full'} overflow-auto border border-gray-200 bg-white`}>
+                  <div className={`h-full ${layoutPreferences.preferences.showDetailPanel && getSelectedBookmark() ? 'w-1/2 min-w-[270px]' : 'w-full'} overflow-hidden border border-gray-200 bg-white`}>
                     <BookmarkGrid
                       bookmarks={sortedBookmarks}
                       selectedBookmarkId={selectedBookmarkId}
