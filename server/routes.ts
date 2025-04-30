@@ -31,23 +31,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bookmarks API endpoints
   app.get("/api/bookmarks", async (req, res) => {
     try {
-      // Parse pagination parameters
-      const page = parseInt(req.query.page as string) || 1;
-      const pageSize = parseInt(req.query.pageSize as string) || 25;
-      const includeTotal = (req.query.includeTotal as string) === 'true';
-      
       // If user is authenticated, filter bookmarks by user_id
       const userId = req.isAuthenticated() ? (req.user as Express.User).id : undefined;
-      
-      // First get all bookmarks to calculate total if needed
-      let totalCount = 0;
-      if (includeTotal) {
-        const allBookmarks = await storage.getBookmarks(userId);
-        totalCount = allBookmarks.length;
-      }
-      
-      // Get paginated bookmarks
-      const bookmarks = await storage.getBookmarksPaginated(userId, page, pageSize);
+      const bookmarks = await storage.getBookmarks(userId);
       
       // Populate the bookmarks with related data
       const populatedBookmarks = await Promise.all(
@@ -67,25 +53,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Return response with pagination metadata if requested
-      if (includeTotal) {
-        const totalPages = Math.ceil(totalCount / pageSize);
-        res.json({
-          data: populatedBookmarks,
-          pagination: {
-            total: totalCount,
-            page,
-            pageSize,
-            totalPages,
-            hasNextPage: page < totalPages,
-            hasPrevPage: page > 1
-          }
-        });
-      } else {
-        res.json(populatedBookmarks);
-      }
+      res.json(populatedBookmarks);
     } catch (error) {
-      console.error("Error retrieving bookmarks:", error);
       res.status(500).json({ error: "Failed to retrieve bookmarks" });
     }
   });

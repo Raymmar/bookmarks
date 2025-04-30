@@ -27,135 +27,20 @@ export default function Home() {
   });
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   const [insightLevel, setInsightLevel] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const pageSize = 25; // Number of bookmarks to load per batch
-  const [allBookmarks, setAllBookmarks] = useState<Bookmark[]>([]);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Initial bookmarks query with pagination metadata
-  const { data: initialBookmarksData, isLoading } = useQuery({
-    queryKey: ["/api/bookmarks", { page: currentPage, pageSize, includeTotal: true }],
-    queryFn: async ({ queryKey }) => {
-      // Extract parameters from queryKey to ensure they match
-      const [_, params] = queryKey;
-      const { page, pageSize, includeTotal } = params as { page: number, pageSize: number, includeTotal: boolean };
-      
-      // Use the extracted parameters to build the URL
-      const data = await apiRequest(
-        'GET', 
-        `/api/bookmarks?page=${page}&pageSize=${pageSize}&includeTotal=${includeTotal}`
-      );
-      return data;
-    }
+  const { data: bookmarks = [], isLoading } = useQuery<Bookmark[]>({
+    queryKey: ["/api/bookmarks"],
   });
-
-  // Effect to update our state with the initial bookmarks
-  useEffect(() => {
-    if (initialBookmarksData) {
-      // Handle both response formats (array or pagination object)
-      if (Array.isArray(initialBookmarksData)) {
-        setAllBookmarks(initialBookmarksData);
-        // If we got fewer items than the page size, there are no more
-        setHasMore(initialBookmarksData.length >= pageSize);
-      } else if (initialBookmarksData.data && Array.isArray(initialBookmarksData.data)) {
-        setAllBookmarks(initialBookmarksData.data);
-        const pagination = initialBookmarksData.pagination;
-        if (pagination) {
-          // Use hasNextPage from the server if available
-          if (typeof pagination.hasNextPage === 'boolean') {
-            setHasMore(pagination.hasNextPage);
-          } else if (pagination.totalPages) {
-            setHasMore(currentPage < pagination.totalPages);
-          }
-        }
-      } else {
-        console.error("Unexpected response format for initial bookmarks:", initialBookmarksData);
-      }
-    }
-  }, [initialBookmarksData, currentPage, pageSize]);
-
-  // Function to load more bookmarks
-  const loadMoreBookmarks = async () => {
-    if (isLoadingMore || !hasMore) return;
-    
-    try {
-      setIsLoadingMore(true);
-      const nextPage = currentPage + 1;
-      const nextPageData = await apiRequest('GET', `/api/bookmarks?page=${nextPage}&pageSize=${pageSize}&includeTotal=true`);
-      
-      // Handle the response based on its format (regular array or pagination object)
-      let newBookmarks: Bookmark[] = [];
-      
-      if (Array.isArray(nextPageData)) {
-        // The API returned a plain array of bookmarks
-        newBookmarks = nextPageData;
-        
-        // Check if we've reached the end (fewer items than pageSize)
-        if (newBookmarks.length < pageSize) {
-          setHasMore(false);
-        }
-      } else if (nextPageData.data && Array.isArray(nextPageData.data)) {
-        // The API returned a pagination object
-        newBookmarks = nextPageData.data;
-        
-        // Check pagination metadata
-        if (nextPageData.pagination) {
-          // Use hasNextPage from the server if available
-          if (typeof nextPageData.pagination.hasNextPage === 'boolean') {
-            setHasMore(nextPageData.pagination.hasNextPage);
-          } else if (nextPageData.pagination.totalPages) {
-            setHasMore(nextPage < nextPageData.pagination.totalPages);
-          }
-        }
-      } else {
-        console.error("Unexpected response format:", nextPageData);
-        throw new Error("Unexpected response format");
-      }
-      
-      // Add the new bookmarks to our state
-      setAllBookmarks(prev => [...prev, ...newBookmarks]);
-      setCurrentPage(nextPage);
-      
-    } catch (error) {
-      console.error("Error loading more bookmarks:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load more bookmarks. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
-  // Effect to implement infinite scrolling
-  useEffect(() => {
-    const handleScroll = () => {
-      // Check if user has scrolled to the bottom of the page
-      if (
-        window.innerHeight + document.documentElement.scrollTop >= 
-        document.documentElement.offsetHeight - 500 && 
-        hasMore && 
-        !isLoadingMore
-      ) {
-        loadMoreBookmarks();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMore, isLoadingMore]);
 
   const { data: activities = [], isLoading: isActivitiesLoading } = useQuery({
     queryKey: ["/api/activities"],
   });
 
-  const selectedBookmark = allBookmarks.find(b => b.id === selectedBookmarkId);
+  const selectedBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
 
-  const filteredBookmarks = allBookmarks.filter(bookmark => {
+  const filteredBookmarks = bookmarks.filter(bookmark => {
     if (!searchQuery) return true;
     
     const searchLower = searchQuery.toLowerCase();
@@ -163,8 +48,8 @@ export default function Home() {
       bookmark.title.toLowerCase().includes(searchLower) ||
       bookmark.description?.toLowerCase().includes(searchLower) ||
       bookmark.url.toLowerCase().includes(searchLower) ||
-      (bookmark as any).user_tags?.some((tag: string) => tag.toLowerCase().includes(searchLower)) ||
-      (bookmark as any).system_tags?.some((tag: string) => tag.toLowerCase().includes(searchLower))
+      bookmark.user_tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
+      bookmark.system_tags.some(tag => tag.toLowerCase().includes(searchLower))
     );
   });
 
@@ -203,12 +88,7 @@ export default function Home() {
         description: "Your bookmark was successfully deleted",
       });
       
-      // Invalidate all bookmark queries (including paginated ones)
-      queryClient.invalidateQueries({ 
-        predicate: (query) => 
-          Array.isArray(query.queryKey) && 
-          query.queryKey[0] === "/api/bookmarks" 
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
       
       if (selectedBookmarkId === id) {
@@ -342,27 +222,6 @@ export default function Home() {
                       />
                     ))}
                   </div>
-                  
-                  {/* Loading indicator for more bookmarks */}
-                  {isLoadingMore && (
-                    <div className="mt-8 p-4 text-center">
-                      <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
-                      <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
-                    </div>
-                  )}
-                  
-                  {/* Load more button if needed */}
-                  {hasMore && !isLoadingMore && (
-                    <div className="mt-8 text-center">
-                      <Button 
-                        variant="outline" 
-                        onClick={loadMoreBookmarks}
-                        className="mx-auto"
-                      >
-                        Load More Bookmarks
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </TabsContent>
               
@@ -396,27 +255,6 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
-                    
-                    {/* Loading indicator for more bookmarks */}
-                    {isLoadingMore && (
-                      <div className="mt-8 p-4 text-center">
-                        <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
-                        <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
-                      </div>
-                    )}
-                    
-                    {/* Load more button if needed */}
-                    {hasMore && !isLoadingMore && (
-                      <div className="mt-8 text-center">
-                        <Button 
-                          variant="outline" 
-                          onClick={loadMoreBookmarks}
-                          className="mx-auto"
-                        >
-                          Load More Bookmarks
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </div>
               </TabsContent>
@@ -448,27 +286,6 @@ export default function Home() {
                       onNodeClick={(id) => setSelectedBookmarkId(id)}
                     />
                   </div>
-                  
-                  {/* Loading indicator for more bookmarks */}
-                  {isLoadingMore && (
-                    <div className="mt-8 p-4 text-center">
-                      <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
-                      <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
-                    </div>
-                  )}
-                  
-                  {/* Load more button if needed */}
-                  {hasMore && !isLoadingMore && (
-                    <div className="mt-8 text-center">
-                      <Button 
-                        variant="outline" 
-                        onClick={loadMoreBookmarks}
-                        className="mx-auto"
-                      >
-                        Load More Bookmarks
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </TabsContent>
             </Tabs>

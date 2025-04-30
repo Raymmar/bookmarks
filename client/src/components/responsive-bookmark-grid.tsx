@@ -1,16 +1,12 @@
 import { Bookmark } from "@shared/types";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Masonry from "react-masonry-css";
-import { Button } from "./ui/button";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
-  isLoadingMore?: boolean;
-  hasMore?: boolean;
-  onLoadMore?: () => void;
 }
 
 export function BookmarkGrid({
@@ -18,27 +14,9 @@ export function BookmarkGrid({
   selectedBookmarkId,
   onSelectBookmark,
   isLoading,
-  isLoadingMore = false,
-  hasMore = false,
-  onLoadMore,
 }: BookmarkGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
   const [breakpointCols, setBreakpointCols] = useState(2);
-  
-  // Intersection Observer for infinite scroll
-  const observerCallback = useCallback(
-    (entries: IntersectionObserverEntry[]) => {
-      const [entry] = entries;
-      if (entry.isIntersecting && hasMore && !isLoadingMore && onLoadMore) {
-        // Debug log to see when the intersection happens
-        console.log("Intersection detected, loading more bookmarks");
-        // When the footer element is visible, load more bookmarks
-        onLoadMore();
-      }
-    },
-    [hasMore, isLoadingMore, onLoadMore]
-  );
   
   // Constants for minimum and maximum card widths (in pixels)
   const MIN_CARD_WIDTH = 270;
@@ -80,33 +58,6 @@ export function BookmarkGrid({
       resizeObserver.disconnect();
     };
   }, []);
-  
-  // Set up intersection observer for infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(observerCallback, {
-      root: null, // viewport is used as root
-      rootMargin: '300px', // start loading when loader is 300px from viewport (increased from 100px)
-      threshold: 0.01, // trigger when at least 1% of the target is visible (more sensitive)
-    });
-    
-    // Log that we're creating the observer
-    console.log("Creating IntersectionObserver for infinite scroll");
-    
-    // Start observing the loader element
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-      console.log("Started observing loader element", loadMoreRef.current);
-    } else {
-      console.log("Loader element ref is not available");
-    }
-    
-    return () => {
-      if (loadMoreRef.current) {
-        observer.unobserve(loadMoreRef.current);
-      }
-      observer.disconnect();
-    };
-  }, [observerCallback]);
 
   return (
     <div className="p-3 overflow-auto h-full" ref={containerRef}>
@@ -122,43 +73,20 @@ export function BookmarkGrid({
           No bookmarks found. Try adjusting your filters.
         </div>
       ) : (
-        <div className="flex flex-col">
-          <Masonry
-            breakpointCols={breakpointCols}
-            className="masonry-grid"
-            columnClassName="masonry-grid-column"
-          >
-            {bookmarks.map((bookmark) => (
-              <BookmarkCard
-                key={bookmark.id}
-                bookmark={bookmark}
-                isSelected={selectedBookmarkId === bookmark.id}
-                onClick={() => onSelectBookmark(bookmark.id)}
-              />
-            ))}
-          </Masonry>
-          
-          {/* Loader element for intersection observer (infinite scroll) */}
-          <div 
-            ref={loadMoreRef} 
-            className="w-full h-32 mt-8 mb-8" // Increased height (32 instead of 10) and added bottom margin
-            id="infinite-scroll-trigger" // Added ID for easier debugging
-          >
-            {/* Always show a subtle indicator (whether loading or not) to ensure the element has height */}
-            <div className="text-center py-4">
-              {isLoadingMore ? (
-                <>
-                  <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
-                  <p className="mt-2 text-gray-600">Loading more bookmarks...</p>
-                </>
-              ) : hasMore ? (
-                <p className="text-gray-400 text-sm">Scroll for more bookmarks</p>
-              ) : (
-                <p className="text-gray-400 text-sm">No more bookmarks to load</p>
-              )}
-            </div>
-          </div>
-        </div>
+        <Masonry
+          breakpointCols={breakpointCols}
+          className="masonry-grid"
+          columnClassName="masonry-grid-column"
+        >
+          {bookmarks.map((bookmark) => (
+            <BookmarkCard
+              key={bookmark.id}
+              bookmark={bookmark}
+              isSelected={selectedBookmarkId === bookmark.id}
+              onClick={() => onSelectBookmark(bookmark.id)}
+            />
+          ))}
+        </Masonry>
       )}
     </div>
   );

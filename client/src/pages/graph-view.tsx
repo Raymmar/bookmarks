@@ -106,49 +106,17 @@ export default function GraphView() {
   // Fallback number of popular tags to show when drawer is closed (if width calculation fails)
   const [popularTagCount] = useState<number>(10);
   
-  // State for pagination
-  const [hasMore, setHasMore] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(25);
-  
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
   
   // Always fetch all bookmarks, whether a collection is selected or not
   // This ensures we have all tag relationships even when viewing collections
-  // We now use the pagination API to get total count information
-  const { data: bookmarksResponse, isLoading: isLoadingBookmarks } = useQuery<{
-    data: Bookmark[],
-    pagination: {
-      total: number,
-      page: number,
-      pageSize: number,
-      totalPages: number,
-      hasNextPage: boolean,
-      hasPrevPage: boolean
-    }
-  }>({
-    queryKey: ["/api/bookmarks", { includeTotal: true, page: 1, pageSize: 100 }],
-    queryFn: async ({ queryKey }) => {
-      const [_, params] = queryKey;
-      const { includeTotal, page, pageSize } = params as { includeTotal: boolean, page: number, pageSize: number };
-      
-      // Use the extracted parameters to build the URL
-      const data = await apiRequest(
-        'GET', 
-        `/api/bookmarks?page=${page}&pageSize=${pageSize}&includeTotal=${includeTotal}`
-      );
-      return data;
-    },
+  const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useQuery<Bookmark[]>({
+    queryKey: ["/api/bookmarks"],
     // Set a lower priority when collection is selected (to avoid blocking the collection-specific query)
     meta: selectedCollectionId ? { priority: -1 } : undefined
   });
-  
-  // Extract bookmarks array and pagination info
-  const bookmarks = bookmarksResponse?.data || [];
-  const totalBookmarkCount = bookmarksResponse?.pagination?.total || 0;
   
   // State for multiple collection selection initialized from localStorage
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(() => {
@@ -494,44 +462,6 @@ export default function GraphView() {
     }, 100);
   };
   
-  // Function to load more bookmarks
-  const loadMoreBookmarks = () => {
-    if (isLoadingMore || !hasMore) {
-      console.log(`Not loading more: isLoadingMore=${isLoadingMore}, hasMore=${hasMore}`);
-      return;
-    }
-    
-    console.log(`Loading more bookmarks: current loadLimit=${loadLimit}, totalBookmarks=${totalBookmarkCount}`);
-    setIsLoadingMore(true);
-    try {
-      // In the graph view, we're using client-side pagination with the loadLimit
-      // Increase the load limit to show more bookmarks
-      if (loadLimit !== null) {
-        // Increase the limit by pageSize (usually 25)
-        const newLimit = (loadLimit || 25) + pageSize;
-        console.log(`Setting new loadLimit=${newLimit}`);
-        setLoadLimit(newLimit);
-        
-        // Set hasMore flag based on server total count
-        const moreAvailable = newLimit < totalBookmarkCount;
-        console.log(`Setting hasMore=${moreAvailable} (${newLimit} < ${totalBookmarkCount})`);
-        setHasMore(moreAvailable);
-      }
-    } catch (error) {
-      console.error("Error loading more bookmarks:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load more bookmarks. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      // Use a short delay to ensure the UI updates properly
-      setTimeout(() => {
-        setIsLoadingMore(false);
-      }, 500);
-    }
-  };
-  
   // Filter tags based on type
   const userTags = tags.filter(tag => tag.type === "user");
   const systemTags = tags.filter(tag => tag.type === "system");
@@ -552,10 +482,15 @@ export default function GraphView() {
   
   // State for progressive loading
   const [loadLimit, setLoadLimit] = useState<number | null>(() => {
-    // Always reset to minimum load limit (pageSize) to ensure we start with a small batch
-    // and can load more with infinite scroll
-    console.log("Initializing loadLimit to pageSize (25)");
-    return 25; // Default value matching pageSize
+    // Get saved preference from localStorage or default to limit=25
+    const savedLimit = localStorage.getItem('bookmarkLoadLimit');
+    
+    if (!savedLimit) return 25; // Default value
+    if (savedLimit === 'all') return null; // "Show All" setting
+    
+    // Try to parse as number
+    const numValue = parseInt(savedLimit);
+    return !isNaN(numValue) ? numValue : 25; // Fallback to default if not a valid number
   });
 
   // Update localStorage when load limit changes
@@ -567,26 +502,10 @@ export default function GraphView() {
       localStorage.setItem('bookmarkLoadLimit', 'all');
     }
   }, [loadLimit]);
-  
+
   // Determine which bookmarks to use based on whether collections are selected
   const fullBookmarks = selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
                        selectedCollectionId ? singleCollectionBookmarks : bookmarks;
-  
-  // Update hasMore state whenever fullBookmarks or loadLimit changes
-  useEffect(() => {
-    // If we're showing all bookmarks, there's nothing more to load
-    if (loadLimit === null) {
-      setHasMore(false);
-      return;
-    }
-    
-    // Use the total bookmark count from the server to determine if there are more to load
-    // This is reliable because it comes from the server pagination metadata
-    const hasMoreBookmarks = totalBookmarkCount > loadLimit;
-    console.log(`Setting hasMore=${hasMoreBookmarks} based on server total count: ${totalBookmarkCount} > ${loadLimit}`);
-    
-    setHasMore(hasMoreBookmarks);
-  }, [totalBookmarkCount, loadLimit]);
   
   // Apply load limit to bookmarks if loadLimit is set
   const activeBookmarks = useMemo(() => {
@@ -1264,9 +1183,6 @@ export default function GraphView() {
                       selectedBookmarkId={selectedBookmarkId}
                       onSelectBookmark={handleSelectBookmark}
                       isLoading={isLoading}
-                      isLoadingMore={isLoadingMore}
-                      hasMore={hasMore}
-                      onLoadMore={loadMoreBookmarks}
                     />
                   </div>
                 </div>

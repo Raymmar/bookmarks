@@ -45,7 +45,6 @@ export interface IStorage {
 
   // Bookmarks
   getBookmarks(userId?: string): Promise<Bookmark[]>;
-  getBookmarksPaginated(userId: string | undefined, page: number, pageSize: number): Promise<Bookmark[]>;
   getBookmark(id: string): Promise<Bookmark | undefined>;
   createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
   updateBookmark(id: string, bookmark: Partial<InsertBookmark>): Promise<Bookmark | undefined>;
@@ -356,18 +355,6 @@ export class MemStorage implements IStorage {
       );
     }
     return Array.from(this.bookmarks.values());
-  }
-
-  async getBookmarksPaginated(userId: string | undefined, page: number, pageSize: number): Promise<Bookmark[]> {
-    // Get all bookmarks that match the userId criteria
-    const allBookmarks = await this.getBookmarks(userId);
-    
-    // Calculate pagination
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    
-    // Return the paginated slice
-    return allBookmarks.slice(startIndex, endIndex);
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
@@ -1329,27 +1316,6 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(bookmarks).where(eq(bookmarks.user_id, userId));
     }
     return await db.select().from(bookmarks);
-  }
-  
-  async getBookmarksPaginated(userId: string | undefined, page: number, pageSize: number): Promise<Bookmark[]> {
-    const offset = (page - 1) * pageSize;
-    
-    if (userId) {
-      return await db
-        .select()
-        .from(bookmarks)
-        .where(eq(bookmarks.user_id, userId))
-        .orderBy(desc(bookmarks.date_saved)) // Order by most recent first
-        .limit(pageSize)
-        .offset(offset);
-    }
-    
-    return await db
-      .select()
-      .from(bookmarks)
-      .orderBy(desc(bookmarks.date_saved)) // Order by most recent first
-      .limit(pageSize)
-      .offset(offset);
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
