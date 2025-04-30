@@ -106,6 +106,12 @@ export default function GraphView() {
   // Fallback number of popular tags to show when drawer is closed (if width calculation fails)
   const [popularTagCount] = useState<number>(10);
   
+  // State for pagination
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(25);
+  
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1183,6 +1189,9 @@ export default function GraphView() {
                       selectedBookmarkId={selectedBookmarkId}
                       onSelectBookmark={handleSelectBookmark}
                       isLoading={isLoading}
+                      isLoadingMore={isLoadingMore}
+                      hasMore={hasMore}
+                      onLoadMore={loadMoreBookmarks}
                     />
                   </div>
                 </div>

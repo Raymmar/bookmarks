@@ -80,20 +80,43 @@ export function BookmarkGrid({
           No bookmarks found. Try adjusting your filters.
         </div>
       ) : (
-        <Masonry
-          breakpointCols={breakpointCols}
-          className="masonry-grid"
-          columnClassName="masonry-grid-column"
-        >
-          {bookmarks.map((bookmark) => (
-            <BookmarkCard
-              key={bookmark.id}
-              bookmark={bookmark}
-              isSelected={selectedBookmarkId === bookmark.id}
-              onClick={() => onSelectBookmark(bookmark.id)}
-            />
-          ))}
-        </Masonry>
+        <div className="flex flex-col">
+          <Masonry
+            breakpointCols={breakpointCols}
+            className="masonry-grid"
+            columnClassName="masonry-grid-column"
+          >
+            {bookmarks.map((bookmark) => (
+              <BookmarkCard
+                key={bookmark.id}
+                bookmark={bookmark}
+                isSelected={selectedBookmarkId === bookmark.id}
+                onClick={() => onSelectBookmark(bookmark.id)}
+              />
+            ))}
+          </Masonry>
+          
+          {/* Loading more indicator */}
+          {isLoadingMore && (
+            <div className="mt-6 text-center">
+              <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+              <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
+            </div>
+          )}
+          
+          {/* Load more button */}
+          {hasMore && !isLoadingMore && onLoadMore && (
+            <div className="mt-6 text-center">
+              <Button 
+                variant="outline" 
+                onClick={onLoadMore}
+                className="mx-auto"
+              >
+                Load More Bookmarks
+              </Button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
