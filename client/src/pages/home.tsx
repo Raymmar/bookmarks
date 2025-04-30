@@ -37,7 +37,7 @@ export default function Home() {
 
   // Initial bookmarks query with pagination metadata
   const { data: initialBookmarksData, isLoading } = useQuery({
-    queryKey: ["/api/bookmarks", { page: 1, pageSize, includeTotal: true }],
+    queryKey: ["/api/bookmarks", { page: currentPage, pageSize, includeTotal: true }],
     queryFn: async () => {
       const data = await apiRequest('GET', `/api/bookmarks?page=1&pageSize=${pageSize}&includeTotal=true`);
       return data;
@@ -47,13 +47,27 @@ export default function Home() {
   // Effect to update our state with the initial bookmarks
   useEffect(() => {
     if (initialBookmarksData) {
-      setAllBookmarks(initialBookmarksData.data || []);
-      const pagination = initialBookmarksData.pagination;
-      if (pagination) {
-        setHasMore(currentPage < pagination.totalPages);
+      // Handle both response formats (array or pagination object)
+      if (Array.isArray(initialBookmarksData)) {
+        setAllBookmarks(initialBookmarksData);
+        // If we got fewer items than the page size, there are no more
+        setHasMore(initialBookmarksData.length >= pageSize);
+      } else if (initialBookmarksData.data && Array.isArray(initialBookmarksData.data)) {
+        setAllBookmarks(initialBookmarksData.data);
+        const pagination = initialBookmarksData.pagination;
+        if (pagination) {
+          // Use hasNextPage from the server if available
+          if (typeof pagination.hasNextPage === 'boolean') {
+            setHasMore(pagination.hasNextPage);
+          } else if (pagination.totalPages) {
+            setHasMore(currentPage < pagination.totalPages);
+          }
+        }
+      } else {
+        console.error("Unexpected response format for initial bookmarks:", initialBookmarksData);
       }
     }
-  }, [initialBookmarksData, currentPage]);
+  }, [initialBookmarksData, currentPage, pageSize]);
 
   // Function to load more bookmarks
   const loadMoreBookmarks = async () => {
@@ -62,15 +76,41 @@ export default function Home() {
     try {
       setIsLoadingMore(true);
       const nextPage = currentPage + 1;
-      const nextBookmarks = await apiRequest('GET', `/api/bookmarks?page=${nextPage}&pageSize=${pageSize}`);
+      const nextPageData = await apiRequest('GET', `/api/bookmarks?page=${nextPage}&pageSize=${pageSize}`);
       
-      setAllBookmarks(prev => [...prev, ...nextBookmarks]);
+      // Handle the response based on its format (regular array or pagination object)
+      let newBookmarks: Bookmark[] = [];
+      
+      if (Array.isArray(nextPageData)) {
+        // The API returned a plain array of bookmarks
+        newBookmarks = nextPageData;
+        
+        // Check if we've reached the end (fewer items than pageSize)
+        if (newBookmarks.length < pageSize) {
+          setHasMore(false);
+        }
+      } else if (nextPageData.data && Array.isArray(nextPageData.data)) {
+        // The API returned a pagination object
+        newBookmarks = nextPageData.data;
+        
+        // Check pagination metadata
+        if (nextPageData.pagination) {
+          // Use hasNextPage from the server if available
+          if (typeof nextPageData.pagination.hasNextPage === 'boolean') {
+            setHasMore(nextPageData.pagination.hasNextPage);
+          } else if (nextPageData.pagination.totalPages) {
+            setHasMore(nextPage < nextPageData.pagination.totalPages);
+          }
+        }
+      } else {
+        console.error("Unexpected response format:", nextPageData);
+        throw new Error("Unexpected response format");
+      }
+      
+      // Add the new bookmarks to our state
+      setAllBookmarks(prev => [...prev, ...newBookmarks]);
       setCurrentPage(nextPage);
       
-      // Check if we've loaded all bookmarks
-      if (initialBookmarksData?.pagination && nextPage >= initialBookmarksData.pagination.totalPages) {
-        setHasMore(false);
-      }
     } catch (error) {
       console.error("Error loading more bookmarks:", error);
       toast({
@@ -343,6 +383,27 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Loading indicator for more bookmarks */}
+                    {isLoadingMore && (
+                      <div className="mt-8 p-4 text-center">
+                        <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                        <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
+                      </div>
+                    )}
+                    
+                    {/* Load more button if needed */}
+                    {hasMore && !isLoadingMore && (
+                      <div className="mt-8 text-center">
+                        <Button 
+                          variant="outline" 
+                          onClick={loadMoreBookmarks}
+                          className="mx-auto"
+                        >
+                          Load More Bookmarks
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </TabsContent>
@@ -374,6 +435,27 @@ export default function Home() {
                       onNodeClick={(id) => setSelectedBookmarkId(id)}
                     />
                   </div>
+                  
+                  {/* Loading indicator for more bookmarks */}
+                  {isLoadingMore && (
+                    <div className="mt-8 p-4 text-center">
+                      <div className="h-6 w-6 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                      <p className="mt-2 text-sm text-gray-600">Loading more bookmarks...</p>
+                    </div>
+                  )}
+                  
+                  {/* Load more button if needed */}
+                  {hasMore && !isLoadingMore && (
+                    <div className="mt-8 text-center">
+                      <Button 
+                        variant="outline" 
+                        onClick={loadMoreBookmarks}
+                        className="mx-auto"
+                      >
+                        Load More Bookmarks
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

@@ -69,13 +69,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return response with pagination metadata if requested
       if (includeTotal) {
+        const totalPages = Math.ceil(totalCount / pageSize);
         res.json({
           data: populatedBookmarks,
           pagination: {
             total: totalCount,
             page,
             pageSize,
-            totalPages: Math.ceil(totalCount / pageSize)
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1
           }
         });
       } else {
