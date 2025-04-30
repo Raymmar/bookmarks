@@ -118,11 +118,37 @@ export default function GraphView() {
   
   // Always fetch all bookmarks, whether a collection is selected or not
   // This ensures we have all tag relationships even when viewing collections
-  const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useQuery<Bookmark[]>({
-    queryKey: ["/api/bookmarks"],
+  // We now use the pagination API to get total count information
+  const { data: bookmarksResponse, isLoading: isLoadingBookmarks } = useQuery<{
+    data: Bookmark[],
+    pagination: {
+      total: number,
+      page: number,
+      pageSize: number,
+      totalPages: number,
+      hasNextPage: boolean,
+      hasPrevPage: boolean
+    }
+  }>({
+    queryKey: ["/api/bookmarks", { includeTotal: true, page: 1, pageSize: 100 }],
+    queryFn: async ({ queryKey }) => {
+      const [_, params] = queryKey;
+      const { includeTotal, page, pageSize } = params as { includeTotal: boolean, page: number, pageSize: number };
+      
+      // Use the extracted parameters to build the URL
+      const data = await apiRequest(
+        'GET', 
+        `/api/bookmarks?page=${page}&pageSize=${pageSize}&includeTotal=${includeTotal}`
+      );
+      return data;
+    },
     // Set a lower priority when collection is selected (to avoid blocking the collection-specific query)
     meta: selectedCollectionId ? { priority: -1 } : undefined
   });
+  
+  // Extract bookmarks array and pagination info
+  const bookmarks = bookmarksResponse?.data || [];
+  const totalBookmarkCount = bookmarksResponse?.pagination?.total || 0;
   
   // State for multiple collection selection initialized from localStorage
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(() => {
@@ -475,7 +501,7 @@ export default function GraphView() {
       return;
     }
     
-    console.log(`Loading more bookmarks: current loadLimit=${loadLimit}, fullBookmarks.length=${fullBookmarks.length}`);
+    console.log(`Loading more bookmarks: current loadLimit=${loadLimit}, totalBookmarks=${totalBookmarkCount}`);
     setIsLoadingMore(true);
     try {
       // In the graph view, we're using client-side pagination with the loadLimit
@@ -486,9 +512,9 @@ export default function GraphView() {
         console.log(`Setting new loadLimit=${newLimit}`);
         setLoadLimit(newLimit);
         
-        // Set hasMore flag based on whether there are more bookmarks to show after this load
-        const moreAvailable = newLimit < fullBookmarks.length;
-        console.log(`Setting hasMore=${moreAvailable} (${newLimit} < ${fullBookmarks.length})`);
+        // Set hasMore flag based on server total count
+        const moreAvailable = newLimit < totalBookmarkCount;
+        console.log(`Setting hasMore=${moreAvailable} (${newLimit} < ${totalBookmarkCount})`);
         setHasMore(moreAvailable);
       }
     } catch (error) {
@@ -554,16 +580,13 @@ export default function GraphView() {
       return;
     }
     
-    // Debug bookmarks count
-    console.log(`Loaded ${fullBookmarks.length} bookmarks to compare against loadLimit=${loadLimit}`);
-    
-    // Check if there are more bookmarks to show
-    // Make sure we have more than the current load limit
-    const hasMoreBookmarks = fullBookmarks.length > loadLimit;
-    console.log(`Setting hasMore=${hasMoreBookmarks} based on comparison`);
+    // Use the total bookmark count from the server to determine if there are more to load
+    // This is reliable because it comes from the server pagination metadata
+    const hasMoreBookmarks = totalBookmarkCount > loadLimit;
+    console.log(`Setting hasMore=${hasMoreBookmarks} based on server total count: ${totalBookmarkCount} > ${loadLimit}`);
     
     setHasMore(hasMoreBookmarks);
-  }, [fullBookmarks, loadLimit]);
+  }, [totalBookmarkCount, loadLimit]);
   
   // Apply load limit to bookmarks if loadLimit is set
   const activeBookmarks = useMemo(() => {
