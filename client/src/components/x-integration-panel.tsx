@@ -537,11 +537,8 @@ const XIntegrationPanel = () => {
                   Connected as <span className="font-medium">@{connectionStatus.username}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Last synchronized: {connectionStatus.lastSync ? 
+                  Last sync: {connectionStatus.lastSync ? 
                     new Date(connectionStatus.lastSync).toLocaleString() : 'Never'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <Clock className="h-3 w-3 inline-block mr-1" /> Syncs automatically every hour
                 </p>
               </div>
               
