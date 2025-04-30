@@ -14,6 +14,9 @@ import { or } from 'drizzle-orm/expressions';
 /**
  * Schedule automatic X.com bookmark sync for all connected users
  * Runs twice daily at noon and midnight
+ * 
+ * Note: Automatic folder sync has been removed as per requirements.
+ * Users should manually sync folders as needed.
  */
 export async function setupXSyncScheduler() {
   console.log('Setting up automatic X.com bookmark sync scheduler');
@@ -28,18 +31,7 @@ export async function setupXSyncScheduler() {
     }
   });
   
-  // Schedule folder sync task to run every 15 minutes
-  // This will handle no more than 5 folders in each run to avoid rate limits
-  cron.schedule('*/15 * * * *', async () => {
-    try {
-      console.log('Running scheduled X.com folder sync (rate-limited batch)');
-      await syncFoldersBatchForAllUsers();
-    } catch (error) {
-      console.error('Error in scheduled X.com folder sync:', error);
-    }
-  });
-  
-  console.log('X.com bookmark sync scheduler set up successfully');
+  console.log('X.com bookmark sync scheduler set up successfully (folder sync removed)');
 }
 
 /**
