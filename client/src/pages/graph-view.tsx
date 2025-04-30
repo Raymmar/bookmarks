@@ -470,18 +470,27 @@ export default function GraphView() {
   
   // Function to load more bookmarks
   const loadMoreBookmarks = () => {
-    if (isLoadingMore || !hasMore) return;
+    if (isLoadingMore || !hasMore) {
+      console.log(`Not loading more: isLoadingMore=${isLoadingMore}, hasMore=${hasMore}`);
+      return;
+    }
     
+    console.log(`Loading more bookmarks: current loadLimit=${loadLimit}, fullBookmarks.length=${fullBookmarks.length}`);
     setIsLoadingMore(true);
     try {
       // In the graph view, we're using client-side pagination with the loadLimit
       // Increase the load limit to show more bookmarks
       if (loadLimit !== null) {
-        setLoadLimit(prevLimit => (prevLimit || 25) + pageSize);
+        // Increase the limit by pageSize (usually 25)
+        const newLimit = (loadLimit || 25) + pageSize;
+        console.log(`Setting new loadLimit=${newLimit}`);
+        setLoadLimit(newLimit);
+        
+        // Set hasMore flag based on whether there are more bookmarks to show after this load
+        const moreAvailable = newLimit < fullBookmarks.length;
+        console.log(`Setting hasMore=${moreAvailable} (${newLimit} < ${fullBookmarks.length})`);
+        setHasMore(moreAvailable);
       }
-      
-      // Set hasMore flag based on whether there are more bookmarks to show
-      setHasMore(loadLimit !== null && (loadLimit + pageSize) < fullBookmarks.length);
     } catch (error) {
       console.error("Error loading more bookmarks:", error);
       toast({
@@ -490,7 +499,10 @@ export default function GraphView() {
         variant: "destructive"
       });
     } finally {
-      setIsLoadingMore(false);
+      // Use a short delay to ensure the UI updates properly
+      setTimeout(() => {
+        setIsLoadingMore(false);
+      }, 500);
     }
   };
   
@@ -547,8 +559,15 @@ export default function GraphView() {
       return;
     }
     
+    // Debug bookmarks count
+    console.log(`Loaded ${fullBookmarks.length} bookmarks to compare against loadLimit=${loadLimit}`);
+    
     // Check if there are more bookmarks to show
-    setHasMore(loadLimit < fullBookmarks.length);
+    // Make sure we have more than the current load limit
+    const hasMoreBookmarks = fullBookmarks.length > loadLimit;
+    console.log(`Setting hasMore=${hasMoreBookmarks} based on comparison`);
+    
+    setHasMore(hasMoreBookmarks);
   }, [fullBookmarks, loadLimit]);
   
   // Apply load limit to bookmarks if loadLimit is set
