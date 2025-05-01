@@ -19,6 +19,7 @@ const MAX_CONCURRENCY = 3; // Maximum number of concurrent AI processes
 export class AIProcessorService {
   private isProcessing: boolean = false;
   private processingCount: number = 0;
+  private recentRateLimitErrors: number = 0;
 
   /**
    * Set up scheduled background processing of unprocessed bookmarks
@@ -51,6 +52,7 @@ export class AIProcessorService {
   
   /**
    * Find and process all bookmarks in pending state
+   * Continues processing in batches until all pending bookmarks are processed
    * 
    * @param userId Optional user ID to filter bookmarks by user
    */
@@ -64,58 +66,80 @@ export class AIProcessorService {
     try {
       this.isProcessing = true;
       
-      // Get pending bookmarks (ai_processing_status = 'pending')
-      let pendingBookmarksQuery = db
-        .select()
-        .from(bookmarks)
-        .where(eq(bookmarks.ai_processing_status, 'pending'));
+      // Process in continuous batches until no more pending bookmarks
+      let hasMoreBookmarks = true;
+      let totalProcessed = 0;
+      let batchNumber = 1;
       
-      // Add user filter if provided
-      if (userId) {
-        pendingBookmarksQuery = db
+      while (hasMoreBookmarks) {
+        console.log(`Starting batch #${batchNumber} of AI processing...`);
+        
+        // Get pending bookmarks (ai_processing_status = 'pending')
+        let pendingBookmarksQuery = db
           .select()
           .from(bookmarks)
-          .where(and(
-            eq(bookmarks.ai_processing_status, 'pending'),
-            eq(bookmarks.user_id, userId)
-          ));
-      }
-      
-      // Execute query with limit
-      const pendingBookmarks = await pendingBookmarksQuery.limit(BATCH_SIZE);
-      
-      if (pendingBookmarks.length === 0) {
-        console.log('No pending bookmarks found for AI processing');
-        return;
-      }
-      
-      console.log(`Found ${pendingBookmarks.length} pending bookmarks for AI processing`);
-      
-      // Process bookmarks in parallel with concurrency limit
-      this.processingCount = 0;
-      const promises: Promise<void>[] = [];
-      
-      for (const bookmark of pendingBookmarks) {
-        // Wait until we have a processing slot available
-        while (this.processingCount >= MAX_CONCURRENCY) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+          .where(eq(bookmarks.ai_processing_status, 'pending'));
+        
+        // Add user filter if provided
+        if (userId) {
+          pendingBookmarksQuery = db
+            .select()
+            .from(bookmarks)
+            .where(and(
+              eq(bookmarks.ai_processing_status, 'pending'),
+              eq(bookmarks.user_id, userId)
+            ));
         }
         
-        this.processingCount++;
+        // Execute query with limit
+        const pendingBookmarks = await pendingBookmarksQuery.limit(BATCH_SIZE);
         
-        // Process the bookmark
-        const promise = this.processBookmark(bookmark.id, bookmark.url, bookmark.content_html)
-          .finally(() => {
-            this.processingCount--;
-          });
+        if (pendingBookmarks.length === 0) {
+          console.log('No more pending bookmarks found for AI processing');
+          hasMoreBookmarks = false;
+          break;
+        }
         
-        promises.push(promise);
+        console.log(`Found ${pendingBookmarks.length} pending bookmarks for AI processing (batch #${batchNumber})`);
+        
+        // Process bookmarks in parallel with concurrency limit
+        this.processingCount = 0;
+        const promises: Promise<void>[] = [];
+        
+        for (const bookmark of pendingBookmarks) {
+          // Wait until we have a processing slot available
+          while (this.processingCount >= MAX_CONCURRENCY) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          
+          this.processingCount++;
+          
+          // Process the bookmark
+          const promise = this.processBookmark(bookmark.id, bookmark.url, bookmark.content_html)
+            .finally(() => {
+              this.processingCount--;
+            });
+          
+          promises.push(promise);
+        }
+        
+        // Wait for all processing to complete in this batch
+        await Promise.all(promises);
+        
+        totalProcessed += pendingBookmarks.length;
+        console.log(`Completed processing batch #${batchNumber} of ${pendingBookmarks.length} bookmarks`);
+        batchNumber++;
+        
+        // Check if we're reaching OpenAI rate limits (429 errors)
+        // If we get too many errors in a batch, pause before continuing
+        if (this.recentRateLimitErrors > 2) {
+          console.log('Detected multiple rate limit errors, pausing processing for 60 seconds');
+          await new Promise(resolve => setTimeout(resolve, 60000)); // 1 minute pause
+          this.recentRateLimitErrors = 0;
+        }
       }
       
-      // Wait for all processing to complete
-      await Promise.all(promises);
-      
-      console.log(`Completed processing batch of ${pendingBookmarks.length} bookmarks`);
+      console.log(`AI processing complete. Total bookmarks processed: ${totalProcessed}`);
     } catch (error) {
       console.error('Error in AI bookmark processing:', error);
     } finally {
@@ -151,6 +175,19 @@ export class AIProcessorService {
       console.log(`AI processing completed for bookmark ${bookmarkId}`);
     } catch (error) {
       console.error(`Error processing bookmark ${bookmarkId}:`, error);
+      
+      // Check if this is a rate limit error from OpenAI
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        if (
+          errorMessage.includes('rate limit') || 
+          errorMessage.includes('too many requests') || 
+          errorMessage.includes('429')
+        ) {
+          console.log('Detected OpenAI rate limit error');
+          this.recentRateLimitErrors++;
+        }
+      }
       
       // Update status to failed
       await db
