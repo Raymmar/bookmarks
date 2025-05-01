@@ -12,6 +12,7 @@
 import { storage } from '../storage';
 import { db } from '../db';
 import { eq, and } from 'drizzle-orm';
+import { aiProcessorService } from './ai-processor-service';
 import type { Bookmark } from '@shared/schema';
 import { 
   xCredentials, XCredentials, InsertXCredentials, 
@@ -1389,6 +1390,17 @@ export class XService {
       console.error(`X Sync: Error updating last sync time:`, error);
     }
     
+    // Trigger AI processing for newly added bookmarks
+    if (added > 0) {
+      console.log(`X Sync: Triggering AI processing for user ${userId} after sync (${added} new bookmarks)`);
+      
+      // We'll trigger the processing asynchronously but not wait for it to complete
+      // This allows the sync API to return quickly while processing happens in the background
+      aiProcessorService.processAfterSync(userId).catch(err => {
+        console.error(`X Sync: Error triggering AI processing after sync: ${err}`);
+      });
+    }
+    
     console.log(`X Sync: Finished - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
     return { added, updated, errors };
   }
@@ -1890,6 +1902,17 @@ export class XService {
       
       // Update last sync time for the folder
       await storage.updateXFolderLastSync(folderData.id);
+      
+      // Trigger AI processing for newly added bookmarks
+      if (added > 0) {
+        console.log(`X Sync: Triggering AI processing for user ${userId} after folder sync (${added} new bookmarks)`);
+        
+        // We'll trigger the processing asynchronously but not wait for it to complete
+        // This allows the sync API to return quickly while processing happens in the background
+        aiProcessorService.processAfterSync(userId).catch(err => {
+          console.error(`X Sync: Error triggering AI processing after folder sync: ${err}`);
+        });
+      }
       
       console.log(`X Sync: Finished folder sync - Added: ${added}, Updated: ${updated}, Fetched: ${fetched}, Associated with collections: ${associated}, Errors: ${errors}`);
       return { added, updated, errors, associated, fetched };
