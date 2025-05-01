@@ -2,14 +2,24 @@
  * Automatic Task Scheduler
  * 
  * Sets up scheduled tasks for the application, such as syncing bookmarks from X.com
+ * and processing bookmark AI analysis in the background
  */
 
 import cron from 'node-cron';
 import { xService } from './x-service';
+import { aiProcessorService } from './ai-processor-service';
 import { db } from '../db';
 import { xCredentials, xFolders } from '@shared/schema';
 import { eq, lt, isNull } from 'drizzle-orm';
 import { or } from 'drizzle-orm/expressions';
+
+/**
+ * Set up all application schedulers
+ */
+export async function setupSchedulers() {
+  await setupXSyncScheduler();
+  setupAIProcessingScheduler();
+}
 
 /**
  * Schedule automatic X.com bookmark sync for all connected users
@@ -26,12 +36,24 @@ export async function setupXSyncScheduler() {
     try {
       console.log('Running scheduled X.com bookmark sync for all users');
       await syncAllXAccounts();
+      
+      // After sync completes, process new bookmarks with AI
+      console.log('X.com sync complete, triggering AI processing for new bookmarks');
+      await aiProcessorService.processPendingBookmarks();
     } catch (error) {
       console.error('Error in scheduled X.com bookmark sync:', error);
     }
   });
   
   console.log('X.com bookmark sync scheduler set up successfully (folder sync removed)');
+}
+
+/**
+ * Set up the AI processing scheduler for background bookmark analysis
+ */
+export function setupAIProcessingScheduler() {
+  console.log('Setting up AI processing scheduler');
+  aiProcessorService.setupScheduledProcessing();
 }
 
 /**

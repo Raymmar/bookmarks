@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { setupXSyncScheduler } from "./lib/scheduler";
+import { setupSchedulers } from "./lib/scheduler";
 
 const app = express();
 app.use(express.json());
@@ -68,9 +68,9 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
     
-    // Set up automatic X.com bookmark sync scheduler
-    setupXSyncScheduler()
-      .then(() => log('Automatic X.com bookmark sync scheduler initialized'))
-      .catch(err => log(`Error setting up X.com sync scheduler: ${err.message}`));
+    // Set up all scheduled tasks
+    setupSchedulers()
+      .then(() => log('Background schedulers initialized successfully'))
+      .catch((err: Error) => log(`Error setting up schedulers: ${err.message}`));
   });
 })();
