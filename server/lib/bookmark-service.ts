@@ -437,11 +437,15 @@ ${summaryPrompt?.value || ""}
       // 1. Update bookmark with embedding if available
       if (embedding && embedding.length > 0) {
         try {
-          // Use the storage interface to update the bookmark with ORM
-          await this.storage.updateBookmark(bookmarkId, {
-            vector_embedding: embedding,
-            ai_processing_status: 'complete'
-          });
+          // Update bookmark using SQL directly to avoid schema typing issues
+          // This is a known workaround until we update the schema definition
+          await this.storage.getDb().execute(
+            `UPDATE bookmarks 
+             SET vector_embedding = $1, 
+                 ai_processing_status = 'completed' 
+             WHERE id = $2`,
+            [embedding, bookmarkId],
+          );
           console.log(
             `Updated bookmark ${bookmarkId} with embedding and set processing status to complete`,
           );
