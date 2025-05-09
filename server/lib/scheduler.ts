@@ -1,13 +1,14 @@
 /**
  * Automatic Task Scheduler
  * 
- * Sets up scheduled tasks for the application, such as syncing bookmarks from X.com
- * and processing bookmark AI analysis in the background
+ * Sets up scheduled tasks for the application, such as syncing bookmarks from X.com,
+ * processing bookmark AI analysis, and generating weekly reports in the background
  */
 
 import cron from 'node-cron';
 import { xService } from './x-service';
 import { aiProcessorService } from './ai-processor-service';
+import { ReportService } from './report-service';
 import { db } from '../db';
 import { xCredentials, xFolders } from '@shared/schema';
 import { eq, lt, isNull } from 'drizzle-orm';
@@ -19,6 +20,7 @@ import { or } from 'drizzle-orm/expressions';
 export async function setupSchedulers() {
   await setupXSyncScheduler();
   setupAIProcessingScheduler();
+  setupWeeklyReportScheduler();
 }
 
 /**
@@ -54,6 +56,30 @@ export async function setupXSyncScheduler() {
 export function setupAIProcessingScheduler() {
   console.log('Setting up AI processing scheduler');
   aiProcessorService.setupScheduledProcessing();
+}
+
+/**
+ * Set up the weekly report generation scheduler
+ * Runs every Sunday at 1:00 AM to generate reports for all users
+ */
+export function setupWeeklyReportScheduler() {
+  console.log('Setting up weekly report generation scheduler');
+  
+  // Schedule weekly report generation (every Sunday at 1:00 AM)
+  cron.schedule('0 1 * * 0', async () => {
+    try {
+      console.log('Running scheduled weekly report generation');
+      await ReportService.scheduleWeeklyReports();
+      
+      // Process the reports
+      console.log('Processing queued reports');
+      await ReportService.processQueuedReports();
+    } catch (error) {
+      console.error('Error in weekly report generation:', error);
+    }
+  });
+  
+  console.log('Weekly report scheduler set up successfully');
 }
 
 /**
