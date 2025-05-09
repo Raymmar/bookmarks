@@ -71,15 +71,16 @@ const Reports = () => {
       const timePeriodEnd = endDate.toISOString();
       
       // Send request to generate report
-      // Using apiRequest with correct params
-      return apiRequest<Report>('/api/reports', {
-        method: 'POST',
-        data: {
+      // apiRequest expects (method, url, data) parameters
+      return apiRequest<Report>(
+        'POST',
+        '/api/reports',
+        {
           timePeriodStart,
           timePeriodEnd,
           maxBookmarks: 100
         }
-      });
+      );
     },
     onSuccess: (newReport: Report) => {
       // Update reports list and select the new report
