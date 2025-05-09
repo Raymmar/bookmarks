@@ -190,6 +190,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   activities: many(activities),
   settings: many(settings),
   chatSessions: many(chatSessions),
+  reports: many(reports),
 }));
 
 export const activitiesRelations = relations(activities, ({ one }) => ({
@@ -220,6 +221,7 @@ export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
   screenshots: many(screenshots),
   insights: many(insights),
   bookmarkTags: many(bookmarkTags),
+  reportBookmarks: many(reportBookmarks),
 }));
 
 export const collectionsRelations = relations(collections, ({ one, many }) => ({
@@ -355,6 +357,46 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
 
+// Weekly Insights Reports table
+export const reports = pgTable("reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  user_id: uuid("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(), // The full AI-generated report content
+  time_period_start: timestamp("time_period_start").notNull(),
+  time_period_end: timestamp("time_period_end").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  status: text("status", { enum: ["generating", "completed", "failed"] }).default("generating").notNull(),
+});
+
+// Report Bookmarks join table to track which bookmarks were included in each report
+export const reportBookmarks = pgTable("report_bookmarks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  report_id: uuid("report_id").references(() => reports.id, { onDelete: "cascade" }).notNull(),
+  bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }).notNull(),
+});
+
+// Relations for reports
+export const reportsRelations = relations(reports, ({ one, many }) => ({
+  user: one(users, {
+    fields: [reports.user_id],
+    references: [users.id],
+  }),
+  reportBookmarks: many(reportBookmarks),
+}));
+
+// Relations for report bookmarks
+export const reportBookmarksRelations = relations(reportBookmarks, ({ one }) => ({
+  report: one(reports, {
+    fields: [reportBookmarks.report_id],
+    references: [reports.id],
+  }),
+  bookmark: one(bookmarks, {
+    fields: [reportBookmarks.bookmark_id],
+    references: [bookmarks.id],
+  }),
+}));
+
 // X.com integration tables
 export const xCredentials = pgTable("x_credentials", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -400,6 +442,17 @@ export const xFoldersRelations = relations(xFolders, ({ one }) => ({
   }),
 }));
 
+// Insert schemas for reports tables
+export const insertReportSchema = createInsertSchema(reports).omit({
+  id: true,
+  created_at: true,
+  status: true,
+});
+
+export const insertReportBookmarkSchema = createInsertSchema(reportBookmarks).omit({
+  id: true,
+});
+
 // Insert schemas for X tables
 export const insertXCredentialsSchema = createInsertSchema(xCredentials).omit({
   id: true,
@@ -412,6 +465,13 @@ export const insertXFoldersSchema = createInsertSchema(xFolders).omit({
   created_at: true,
   updated_at: true,
 });
+
+// Types for reports tables
+export type InsertReport = z.infer<typeof insertReportSchema>;
+export type Report = typeof reports.$inferSelect;
+
+export type InsertReportBookmark = z.infer<typeof insertReportBookmarkSchema>;
+export type ReportBookmark = typeof reportBookmarks.$inferSelect;
 
 // Types for X tables
 export type InsertXCredentials = z.infer<typeof insertXCredentialsSchema>;
