@@ -57,6 +57,15 @@ const Reports = () => {
   } = useQuery<Report>({
     queryKey: ['/api/reports', selectedReportId],
     enabled: !!selectedReportId, // Only run if we have a selected report ID
+    onSuccess: (reportData) => {
+      // Debug the report data
+      console.log('Selected report data:', reportData);
+      if (reportData && reportData.time_period_start) {
+        console.log('time_period_start type:', typeof reportData.time_period_start);
+        console.log('time_period_start value:', reportData.time_period_start);
+        console.log('Attempting to create date from time_period_start:', new Date(reportData.time_period_start));
+      }
+    }
   });
 
   // Mutation for generating a new report
