@@ -10,6 +10,7 @@ import GraphView from "@/pages/graph-view";
 import AiChat from "@/pages/ai-chat";
 import Settings from "@/pages/settings";
 import XIntegration from "@/pages/x-integration";
+import Reports from "@/pages/reports";
 import AuthPage from "@/pages/auth-page";
 import VerifyEmail from "@/pages/verify-email";
 import ResetPassword from "@/pages/reset-password";
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/ai-chat" component={AiChat} />
       <ProtectedRoute path="/settings" component={Settings} />
       <ProtectedRoute path="/x-integration" component={XIntegration} />
+      <ProtectedRoute path="/reports" component={Reports} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/reset-password" component={ResetPassword} />

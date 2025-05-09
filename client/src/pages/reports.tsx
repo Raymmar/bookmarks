@@ -1,24 +1,26 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, Query, QueryKey } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format, subWeeks } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 
 // UI Components
+import { Button } from '@/components/ui/button';
 import { 
-  Button, 
   Card, 
   CardContent, 
   CardDescription, 
   CardFooter, 
   CardHeader, 
-  CardTitle,
-  Skeleton,
+  CardTitle 
+} from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { 
   Alert,
   AlertDescription,
-  AlertTitle
-} from '@/components/ui';
+  AlertTitle 
+} from '@/components/ui/alert';
 import { AlertCircle, Calendar, FileText, RefreshCw } from 'lucide-react';
 import MainLayout from '@/layouts/main-layout';
 
@@ -46,10 +48,7 @@ const Reports = () => {
     error: reportsError 
   } = useQuery<Report[]>({
     queryKey: ['/api/reports'],
-    refetchInterval: (data) => {
-      // Refresh more frequently if we have any reports in "generating" state
-      return data?.some(report => report.status === 'generating') ? 5000 : 30000;
-    }
+    refetchInterval: 15000 // Refresh every 15 seconds to keep reports updated
   });
 
   // Fetch a specific report if one is selected
@@ -73,7 +72,7 @@ const Reports = () => {
       const timePeriodEnd = endDate.toISOString();
       
       // Send request to generate report
-      return apiRequest('/api/reports', {
+      return apiRequest<Report>('/api/reports', {
         method: 'POST',
         data: {
           timePeriodStart,
