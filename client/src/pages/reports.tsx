@@ -4,7 +4,13 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format, subWeeks, subDays } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
-import { useReportPreferences, ReportType } from '@/hooks/use-report-preferences';
+import { 
+  useReportPreferences, 
+  ReportType, 
+  ReadingLength, 
+  READING_LENGTH_CONFIG 
+} from '@/hooks/use-report-preferences';
+import ReadingLengthSlider from '@/components/ui/reading-length-slider';
 
 // UI Components
 import { Button } from '@/components/ui/button';
@@ -29,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, Calendar, FileText, RefreshCw } from 'lucide-react';
+import { AlertCircle, Calendar, FileText, Loader2, RefreshCw } from 'lucide-react';
 
 // Report interface matches what we expect from the API
 interface Report {
@@ -47,7 +53,13 @@ const Reports = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const { preferences, setReportType } = useReportPreferences();
+  const { 
+    reportType, 
+    readingLength, 
+    readingLengthConfig,
+    setReportType, 
+    setReadingLength 
+  } = useReportPreferences();
   
   // Fetch reports from API
   const { 
@@ -100,7 +112,7 @@ const Reports = () => {
       const endDate = new Date();
       let startDate: Date;
       
-      if (preferences.reportType === 'daily') {
+      if (reportType === 'daily') {
         // For daily reports, get just the last day
         startDate = subDays(endDate, 1);
       } else {
@@ -117,7 +129,8 @@ const Reports = () => {
         timePeriodStart,
         timePeriodEnd,
         maxBookmarks: 100,
-        reportType: preferences.reportType
+        reportType,
+        readingLength
       });
     },
     onSuccess: (newReport: Report) => {
@@ -130,7 +143,7 @@ const Reports = () => {
       // Make sure we also invalidate the individual report query
       queryClient.invalidateQueries({ queryKey: [`/api/reports/${newReport.id}`] });
       
-      const reportTypeLabel = preferences.reportType === 'daily' ? 'daily' : 'weekly';
+      const reportTypeLabel = reportType === 'daily' ? 'daily' : 'weekly';
       
       toast({
         title: "Report generation started",
@@ -242,7 +255,7 @@ const Reports = () => {
           <div className="flex flex-col space-y-4 items-center">
             <div className="w-64">
               <Select
-                value={preferences.reportType}
+                value={reportType}
                 onValueChange={handleReportTypeChange}
               >
                 <SelectTrigger>
@@ -255,8 +268,15 @@ const Reports = () => {
               </Select>
             </div>
             
+            <div className="w-64">
+              <ReadingLengthSlider 
+                value={readingLength} 
+                onChange={setReadingLength} 
+              />
+            </div>
+            
             <Button onClick={handleGenerateReport} disabled={generateReportMutation.isPending} className="w-64">
-              Generate {preferences.reportType === 'daily' ? 'Daily' : 'Weekly'} Report
+              Generate {reportType === 'daily' ? 'Daily' : 'Weekly'} Report
             </Button>
           </div>
         </div>
@@ -331,34 +351,43 @@ const Reports = () => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="flex justify-between items-center mb-6 px-2">
-        <h1 className="text-3xl font-bold">{preferences.reportType === 'daily' ? 'Daily' : 'Weekly'} Insights Reports</h1>
-        <div className="flex items-center space-x-3">
-          <Select
-            value={preferences.reportType}
-            onValueChange={handleReportTypeChange}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Report type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Daily Report</SelectItem>
-              <SelectItem value="weekly">Weekly Report</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button 
-            onClick={handleGenerateReport}
-            disabled={generateReportMutation.isPending}
-          >
-            {generateReportMutation.isPending ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate Report'
-            )}
-          </Button>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 px-2 gap-4">
+        <h1 className="text-3xl font-bold">{reportType === 'daily' ? 'Daily' : 'Weekly'} Insights Reports</h1>
+        
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
+            <Select
+              value={reportType}
+              onValueChange={handleReportTypeChange}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Report type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily Report</SelectItem>
+                <SelectItem value="weekly">Weekly Report</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+              onClick={handleGenerateReport}
+              disabled={generateReportMutation.isPending}
+            >
+              {generateReportMutation.isPending ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Generate Report'
+              )}
+            </Button>
+          </div>
+          
+          {/* Reading Length Slider */}
+          <ReadingLengthSlider 
+            value={readingLength} 
+            onChange={setReadingLength} 
+          />
         </div>
       </div>
 
