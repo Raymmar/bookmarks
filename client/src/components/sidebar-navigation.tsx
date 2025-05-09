@@ -18,7 +18,8 @@ import {
   Trash2,
   Cable,
   Twitter,
-  ChevronDown
+  ChevronDown,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
@@ -367,6 +368,23 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   </div>
                 </Link>
               </li>
+              {user && (
+                <li className="mb-1">
+                  <Link href="/reports">
+                    <div className={cn(
+                      "flex items-center px-2 py-2 text-sm rounded-lg",
+                      location === "/reports" 
+                        ? "bg-secondary/20 text-primary border border-primary/20" 
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}>
+                      <FileText className={cn("h-5 w-5 mr-2", 
+                        location === "/reports" ? "text-primary" : ""
+                      )} />
+                      Reports
+                    </div>
+                  </Link>
+                </li>
+              )}
               {user && (
                 <>
                   <li className="mb-1">
