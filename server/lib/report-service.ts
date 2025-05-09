@@ -52,6 +52,9 @@ export interface GenerateReportOptions {
   timePeriodEnd?: Date;
   maxBookmarks?: number;
   reportType?: 'daily' | 'weekly';
+  readingLength?: 'quick' | 'default' | 'deep';
+  maxTokens?: number;
+  temperature?: number;
 }
 
 /**
@@ -64,7 +67,15 @@ export class ReportService {
    * Generate a report for the user's recent bookmarks
    */
   async generateWeeklyReport(options: GenerateReportOptions): Promise<Report> {
-    const { userId, customSystemPrompt, maxBookmarks = 100, reportType = 'weekly' } = options;
+    const { 
+      userId, 
+      customSystemPrompt, 
+      maxBookmarks = 100, 
+      reportType = 'weekly',
+      readingLength = 'default',
+      maxTokens,
+      temperature
+    } = options;
 
     // Determine time period based on report type
     const timePeriodEnd = options.timePeriodEnd || new Date();
@@ -177,7 +188,42 @@ export class ReportService {
         `Report generation: Sending request to OpenAI with ${userPrompt.length} characters`,
       );
 
-      // Send to OpenAI for processing with increased token limits
+      // Set default values for reading length
+      let finalMaxTokens = 4500;  // Default value
+      let finalTemperature = 0.6; // Default value
+      
+      // Use provided values or determine based on reading length
+      if (maxTokens !== undefined) {
+        finalMaxTokens = maxTokens;
+      } else {
+        // Set based on reading length
+        switch (readingLength) {
+          case 'quick':
+            finalMaxTokens = 2000;
+            finalTemperature = 0.5;
+            break;
+          case 'default':
+            finalMaxTokens = 4500;
+            finalTemperature = 0.6;
+            break;
+          case 'deep':
+            finalMaxTokens = 8000;
+            finalTemperature = 0.7;
+            break;
+        }
+      }
+      
+      // Use provided temperature if specified
+      if (temperature !== undefined) {
+        finalTemperature = temperature;
+      }
+      
+      // Log reading length settings
+      console.log(
+        `Report generation: Using reading length ${readingLength} with max_tokens=${finalMaxTokens}, temperature=${finalTemperature}`
+      );
+      
+      // Send to OpenAI for processing with configured parameters
       const response = await openai.chat.completions.create({
         model: MODEL,
         messages: [
@@ -190,8 +236,8 @@ export class ReportService {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 6000, // Increased from 4000 to allow for longer, more detailed reports
+        temperature: finalTemperature,
+        max_tokens: finalMaxTokens,
       });
 
       // Get the generated report content

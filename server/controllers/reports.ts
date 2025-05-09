@@ -31,6 +31,9 @@ export function setupReportRoutes(app: Express) {
         timePeriodEnd: z.string().optional(),   // ISO date string
         maxBookmarks: z.number().min(1).max(500).optional(),
         reportType: z.enum(['daily', 'weekly']).optional(),
+        readingLength: z.enum(['quick', 'default', 'deep']).optional(),
+        maxTokens: z.number().min(500).max(16000).optional(),
+        temperature: z.number().min(0).max(2).optional(),
       });
       
       const parseResult = requestSchema.safeParse(req.body);
@@ -49,6 +52,9 @@ export function setupReportRoutes(app: Express) {
         timePeriodEnd: parseResult.data.timePeriodEnd ? new Date(parseResult.data.timePeriodEnd) : undefined,
         maxBookmarks: parseResult.data.maxBookmarks,
         reportType: parseResult.data.reportType,
+        readingLength: parseResult.data.readingLength,
+        maxTokens: parseResult.data.maxTokens,
+        temperature: parseResult.data.temperature,
       };
       
       // Generate the report (this will be a long-running operation)
