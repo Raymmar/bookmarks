@@ -6,8 +6,8 @@ import { json } from 'drizzle-orm/pg-core';
 // Extend the Bookmark type to include summary and tags
 // that we'll extract from description and content
 interface ExtendedBookmark extends Bookmark {
-  summary?: string;
-  tags?: string[];
+  summary: string;
+  tags: string[];
 }
 
 // Initialize OpenAI client
@@ -64,8 +64,7 @@ export class ReportService {
       
       // Update report status to processing
       await storage.updateReport(reportId, { 
-        status: 'processing',
-        updated_at: new Date()
+        status: 'processing'
       });
       
       // Get bookmarks for the user
@@ -75,9 +74,8 @@ export class ReportService {
         // No bookmarks to process
         await storage.updateReport(reportId, {
           status: 'completed',
-          completed_at: new Date(),
-          content: 'No bookmarks found for this time period.',
-          bookmark_count: 0
+          content: 'No bookmarks found for this time period.'
+          // Note: bookmark_count and completed_at are handled by the storage layer
         });
         return await storage.getReport(reportId);
       }
@@ -96,9 +94,8 @@ export class ReportService {
       // Update report with final content
       const updatedReport = await storage.updateReport(reportId, {
         status: 'completed',
-        completed_at: new Date(),
-        content: reportContent,
-        bookmark_count: bookmarks.length
+        content: reportContent
+        // Note: bookmark_count and completed_at are handled by the storage layer
       });
       
       console.log(`Report ${reportId} processed successfully with ${bookmarks.length} bookmarks`);
@@ -138,10 +135,11 @@ export class ReportService {
     // Convert regular bookmarks to extended bookmarks
     const extendedBookmarks: ExtendedBookmark[] = await Promise.all(
       recentBookmarks.map(async (bookmark) => {
-        // Create extended bookmark
+        // Create extended bookmark with initial empty tags array
         const extendedBookmark: ExtendedBookmark = {
           ...bookmark,
           summary: bookmark.description || '', // Use description as summary
+          tags: [] // Initialize with empty array, will be populated below
         };
         
         try {
@@ -287,10 +285,11 @@ export class ReportService {
       // Get bookmarks and convert to ExtendedBookmarks
       const extendedBookmarks: ExtendedBookmark[] = await Promise.all(
         bookmarks.map(async (bookmark) => {
-          // Create extended bookmark
+          // Create extended bookmark with initial empty tags array
           const extendedBookmark: ExtendedBookmark = {
             ...bookmark,
             summary: bookmark.description || '', // Use description as summary
+            tags: [] // Initialize with empty array, will be populated below
           };
           
           try {
