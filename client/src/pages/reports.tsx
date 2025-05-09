@@ -30,8 +30,8 @@ interface Report {
   content: string;
   user_id: string;
   created_at: string;
-  time_period_start: string;
-  time_period_end: string;
+  time_period_start: Date | string; // Can be either Date or string when serialized
+  time_period_end: Date | string;   // Can be either Date or string when serialized
   status: 'generating' | 'completed' | 'failed';
 }
 
@@ -57,6 +57,12 @@ const Reports = () => {
   } = useQuery<Report>({
     queryKey: ['/api/reports', selectedReportId],
     enabled: !!selectedReportId, // Only run if we have a selected report ID
+    onSuccess: (data) => {
+      // Log the report data to see what we're getting
+      console.log('Selected report data:', data);
+      console.log('Time period start:', data.time_period_start, typeof data.time_period_start);
+      console.log('Time period end:', data.time_period_end, typeof data.time_period_end);
+    }
   });
 
   // Mutation for generating a new report

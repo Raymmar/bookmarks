@@ -1962,16 +1962,40 @@ export class DatabaseStorage implements IStorage {
   
   // Reports methods
   async getReportsByUserId(userId: string): Promise<Report[]> {
-    return await db.select()
+    const userReports = await db.select()
       .from(reports)
       .where(eq(reports.user_id, userId))
       .orderBy(desc(reports.created_at));
+    
+    // Ensure all date fields are properly converted to strings
+    return userReports.map(report => {
+      // Convert only if the fields are Date objects and not already strings
+      if (report.time_period_start instanceof Date) {
+        report.time_period_start = report.time_period_start.toISOString();
+      }
+      if (report.time_period_end instanceof Date) {
+        report.time_period_end = report.time_period_end.toISOString();
+      }
+      return report;
+    });
   }
   
   async getReport(id: string): Promise<Report | undefined> {
     const [report] = await db.select()
       .from(reports)
       .where(eq(reports.id, id));
+    
+    // Ensure the time_period fields are properly converted to date strings
+    if (report) {
+      // Convert only if the fields are Date objects and not already strings
+      if (report.time_period_start instanceof Date) {
+        report.time_period_start = report.time_period_start.toISOString();
+      }
+      if (report.time_period_end instanceof Date) {
+        report.time_period_end = report.time_period_end.toISOString();
+      }
+    }
+    
     return report;
   }
   
@@ -1982,6 +2006,15 @@ export class DatabaseStorage implements IStorage {
         created_at: new Date(),
       })
       .returning();
+    
+    // Ensure dates are formatted as strings before returning
+    if (newReport.time_period_start instanceof Date) {
+      newReport.time_period_start = newReport.time_period_start.toISOString();
+    }
+    if (newReport.time_period_end instanceof Date) {
+      newReport.time_period_end = newReport.time_period_end.toISOString();
+    }
+    
     return newReport;
   }
   
@@ -1990,6 +2023,15 @@ export class DatabaseStorage implements IStorage {
       .set(reportUpdate)
       .where(eq(reports.id, id))
       .returning();
+    
+    // Ensure dates are formatted as strings before returning
+    if (updatedReport && updatedReport.time_period_start instanceof Date) {
+      updatedReport.time_period_start = updatedReport.time_period_start.toISOString();
+    }
+    if (updatedReport && updatedReport.time_period_end instanceof Date) {
+      updatedReport.time_period_end = updatedReport.time_period_end.toISOString();
+    }
+    
     return updatedReport;
   }
   
