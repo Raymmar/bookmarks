@@ -13,6 +13,9 @@ import {
   users, User, InsertUser,
   collections, Collection, InsertCollection,
   collectionBookmarks, CollectionBookmark, InsertCollectionBookmark,
+  reports, Report, InsertReport,
+  reportBookmarks, ReportBookmark, InsertReportBookmark,
+  reportSections, ReportSection, InsertReportSection,
   xCredentials, XCredentials, InsertXCredentials,
   xFolders, XFolder, InsertXFolder
 } from "@shared/schema";
@@ -124,6 +127,25 @@ export interface IStorage {
   updateSetting(key: string, value: string): Promise<Setting | undefined>;
   deleteSetting(key: string): Promise<boolean>;
   
+  // Reports
+  getReports(userId?: string): Promise<Report[]>;
+  getReport(id: string): Promise<Report | undefined>;
+  createReport(report: InsertReport): Promise<Report>;
+  updateReport(id: string, report: Partial<InsertReport>): Promise<Report | undefined>;
+  deleteReport(id: string): Promise<boolean>;
+  
+  // Report Bookmarks
+  getBookmarksByReportId(reportId: string): Promise<Bookmark[]>;
+  getReportsByBookmarkId(bookmarkId: string): Promise<Report[]>;
+  addBookmarkToReport(reportId: string, bookmarkId: string): Promise<ReportBookmark>;
+  removeBookmarkFromReport(reportId: string, bookmarkId: string): Promise<boolean>;
+  
+  // Report Sections
+  getSectionsByReportId(reportId: string): Promise<ReportSection[]>;
+  createReportSection(section: InsertReportSection): Promise<ReportSection>;
+  updateReportSection(id: string, section: Partial<InsertReportSection>): Promise<ReportSection | undefined>;
+  deleteReportSection(id: string): Promise<boolean>;
+  
   // X.com integration
   createXCredentials(credentials: InsertXCredentials): Promise<XCredentials>;
   getXCredentialsByUserId(userId: string): Promise<XCredentials | undefined>;
@@ -157,6 +179,11 @@ export class MemStorage implements IStorage {
   // Settings
   private settings: Map<string, Setting>;
   
+  // Reports
+  private reports: Map<string, Report>;
+  private reportBookmarks: Map<string, ReportBookmark>;
+  private reportSections: Map<string, ReportSection>;
+  
   // X.com integration
   private xCredentials: Map<string, XCredentials>;
   private xFolders: Map<string, XFolder>;
@@ -181,6 +208,9 @@ export class MemStorage implements IStorage {
     this.chatSessions = new Map();
     this.chatMessages = new Map();
     this.settings = new Map();
+    this.reports = new Map();
+    this.reportBookmarks = new Map();
+    this.reportSections = new Map();
     this.xCredentials = new Map();
     this.xFolders = new Map();
   }

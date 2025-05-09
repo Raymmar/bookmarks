@@ -221,6 +221,7 @@ export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
   screenshots: many(screenshots),
   insights: many(insights),
   bookmarkTags: many(bookmarkTags),
+  reportBookmarks: many(reportBookmarks),
 }));
 
 export const collectionsRelations = relations(collections, ({ one, many }) => ({
@@ -455,6 +456,63 @@ export const insertXFoldersSchema = createInsertSchema(xFolders).omit({
   created_at: true,
   updated_at: true,
 });
+
+// Report relations
+export const reportsRelations = relations(reports, ({ one, many }) => ({
+  user: one(users, {
+    fields: [reports.user_id],
+    references: [users.id],
+  }),
+  reportBookmarks: many(reportBookmarks),
+  sections: many(reportSections),
+}));
+
+export const reportBookmarksRelations = relations(reportBookmarks, ({ one }) => ({
+  report: one(reports, {
+    fields: [reportBookmarks.report_id],
+    references: [reports.id],
+  }),
+  bookmark: one(bookmarks, {
+    fields: [reportBookmarks.bookmark_id],
+    references: [bookmarks.id],
+  }),
+}));
+
+export const reportSectionsRelations = relations(reportSections, ({ one }) => ({
+  report: one(reports, {
+    fields: [reportSections.report_id],
+    references: [reports.id],
+  }),
+}));
+
+// Insert schemas for reports
+export const insertReportSchema = createInsertSchema(reports).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+  completed_at: true,
+  error_message: true,
+  bookmark_count: true,
+});
+
+export const insertReportBookmarkSchema = createInsertSchema(reportBookmarks).omit({
+  id: true,
+  included_at: true,
+});
+
+export const insertReportSectionSchema = createInsertSchema(reportSections).omit({
+  id: true,
+});
+
+// Types for reports
+export type InsertReport = z.infer<typeof insertReportSchema>;
+export type Report = typeof reports.$inferSelect;
+
+export type InsertReportBookmark = z.infer<typeof insertReportBookmarkSchema>;
+export type ReportBookmark = typeof reportBookmarks.$inferSelect;
+
+export type InsertReportSection = z.infer<typeof insertReportSectionSchema>;
+export type ReportSection = typeof reportSections.$inferSelect;
 
 // Types for X tables
 export type InsertXCredentials = z.infer<typeof insertXCredentialsSchema>;
