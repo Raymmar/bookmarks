@@ -101,7 +101,7 @@ const Reports = () => {
         data: {
           timePeriodStart,
           timePeriodEnd,
-          maxBookmarks: 100
+          maxBookmarks: 250  // Increased from 100 to get more comprehensive reports
         }
       });
     },

@@ -28,15 +28,17 @@ Your task is to analyze the user's recently saved bookmarks and generate a compr
 
 Follow these guidelines:
 1. Organize the bookmarks into logical sections and themes
-2. Identify key insights and highlight important concepts from across bookmarks
+2. Identify key insights and highlight important concepts from across all bookmarks
 3. Find connections between seemingly unrelated content
 4. Create a custom "newsletter" feel with sections that make the content digestible
 5. Use markdown formatting to create a beautiful, readable report
 6. Begin with an executive summary that highlights the main themes
-7. Include all bookmark titles and a brief summary for each
-8. Always link back to the original content when mentioning bookmarks
+7. Create a comprehensive thematic overview that captures ALL bookmark topics, even if there are many
+8. For key themes, include relevant bookmark titles and brief summaries
+9. Always link back to the original content when mentioning bookmarks
+10. Focus on providing a comprehensive high-level view rather than trying to mention every bookmark individually
 
-Remember that you have access to the bookmark content, extracted insights, and associated tags. Use all this information to create a truly valuable report.`;
+Remember that you have access to the bookmark content, extracted insights, and associated tags. Use all this information to create a truly valuable report that summarizes the entirety of the user's content for the week.`;
 
 export interface GenerateReportOptions {
   userId: string;
@@ -59,7 +61,7 @@ export class ReportService {
     const { 
       userId, 
       customSystemPrompt,
-      maxBookmarks = 100
+      maxBookmarks = 250  // Increased from 100 to capture more bookmarks in reports
     } = options;
 
     // Default to the previous week if not specified
@@ -125,7 +127,27 @@ export class ReportService {
       // Prepare the system prompt
       const systemPrompt = customSystemPrompt || DEFAULT_SYSTEM_PROMPT;
 
-      // Send to OpenAI for processing
+      // Log the number of bookmarks being processed
+      console.log(`Report generation: Processing ${bookmarksData.length} bookmarks for user ${userId}`);
+      
+      // Log a sample of bookmark titles for debugging
+      const sampleTitles = bookmarksData.slice(0, 5).map(b => b.title);
+      console.log(`Report generation: Sample bookmarks (first 5): ${sampleTitles.join(', ')}${bookmarksData.length > 5 ? '...' : ''}`);
+      
+      // Enhanced user prompt to ensure comprehensive coverage
+      const userPrompt = JSON.stringify({
+        request: "Generate a comprehensive weekly insights report for my bookmarks",
+        time_period: {
+          start: format(timePeriodStart, 'yyyy-MM-dd'),
+          end: format(timePeriodEnd, 'yyyy-MM-dd')
+        },
+        instructions: "Even if there are many bookmarks, please provide a high-level overview of ALL content themes and topics. You don't need to mention every bookmark individually, but ensure the report captures the breadth of topics across all bookmarks.",
+        bookmarks: bookmarksData
+      });
+      
+      console.log(`Report generation: Sending request to OpenAI with ${userPrompt.length} characters`);
+      
+      // Send to OpenAI for processing with increased token limits
       const response = await openai.chat.completions.create({
         model: MODEL,
         messages: [
@@ -135,18 +157,11 @@ export class ReportService {
           },
           {
             role: "user",
-            content: JSON.stringify({
-              request: "Generate a weekly insights report for my bookmarks",
-              time_period: {
-                start: format(timePeriodStart, 'yyyy-MM-dd'),
-                end: format(timePeriodEnd, 'yyyy-MM-dd')
-              },
-              bookmarks: bookmarksData
-            })
+            content: userPrompt
           }
         ],
         temperature: 0.7,
-        max_tokens: 4000
+        max_tokens: 6000  // Increased from 4000 to allow for longer, more detailed reports
       });
 
       // Get the generated report content
