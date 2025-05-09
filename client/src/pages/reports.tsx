@@ -22,7 +22,6 @@ import {
   AlertTitle 
 } from '@/components/ui/alert';
 import { AlertCircle, Calendar, FileText, RefreshCw } from 'lucide-react';
-import MainLayout from '@/layouts/main-layout';
 
 // Report interface matches what we expect from the API
 interface Report {
@@ -223,78 +222,76 @@ const Reports = () => {
   };
 
   return (
-    <MainLayout>
-      <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Weekly Insights Reports</h1>
-          <Button 
-            onClick={handleGenerateReport}
-            disabled={generateReportMutation.isPending}
-          >
-            {generateReportMutation.isPending ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate New Report'
-            )}
-          </Button>
-        </div>
-
-        {reportsError && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              Failed to load reports. Please try refreshing the page.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Reports list panel */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Your Reports</CardTitle>
-              <CardDescription>
-                View insights from your saved content
-              </CardDescription>
-            </CardHeader>
-            <div className="max-h-[60vh] overflow-y-auto">
-              {isLoadingReports ? (
-                renderReportSkeletons()
-              ) : reports && reports.length > 0 ? (
-                reports.map(renderReportItem)
-              ) : (
-                <div className="p-4 text-center text-gray-500">
-                  No reports yet. Generate your first report.
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Report content panel */}
-          <Card className="lg:col-span-2">
-            <div className="min-h-[60vh] max-h-[80vh] overflow-y-auto">
-              {isLoadingSelectedReport ? (
-                <div className="p-6 space-y-4">
-                  <Skeleton className="h-8 w-3/4" />
-                  <Skeleton className="h-4 w-1/3 mb-6" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-4/5" />
-                </div>
-              ) : (
-                renderReportContent()
-              )}
-            </div>
-          </Card>
-        </div>
+    <div className="container mx-auto py-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Weekly Insights Reports</h1>
+        <Button 
+          onClick={handleGenerateReport}
+          disabled={generateReportMutation.isPending}
+        >
+          {generateReportMutation.isPending ? (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            'Generate New Report'
+          )}
+        </Button>
       </div>
-    </MainLayout>
+
+      {reportsError && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            Failed to load reports. Please try refreshing the page.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Reports list panel */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Your Reports</CardTitle>
+            <CardDescription>
+              View insights from your saved content
+            </CardDescription>
+          </CardHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {isLoadingReports ? (
+              renderReportSkeletons()
+            ) : reports && reports.length > 0 ? (
+              reports.map(renderReportItem)
+            ) : (
+              <div className="p-4 text-center text-gray-500">
+                No reports yet. Generate your first report.
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Report content panel */}
+        <Card className="lg:col-span-2">
+          <div className="min-h-[60vh] max-h-[80vh] overflow-y-auto">
+            {isLoadingSelectedReport ? (
+              <div className="p-6 space-y-4">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-4 w-1/3 mb-6" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-4/5" />
+              </div>
+            ) : (
+              renderReportContent()
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
   );
 };
 
