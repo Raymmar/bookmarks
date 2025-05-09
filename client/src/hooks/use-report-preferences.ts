@@ -1,92 +1,45 @@
 import { useState, useEffect } from 'react';
 
 export type ReportType = 'daily' | 'weekly';
-export type ReadingLength = 'quick' | 'default' | 'deep';
-
-export interface ReportLengthConfig {
-  maxTokens: number;
-  temperature: number;
-  label: string;
-}
-
-export const READING_LENGTH_CONFIG: Record<ReadingLength, ReportLengthConfig> = {
-  quick: {
-    maxTokens: 2000,
-    temperature: 0.5,
-    label: "Quick Read"
-  },
-  default: {
-    maxTokens: 4500,
-    temperature: 0.6,
-    label: "Default"
-  },
-  deep: {
-    maxTokens: 8000,
-    temperature: 0.7,
-    label: "Deep Dive"
-  }
-};
 
 interface ReportPreferences {
   reportType: ReportType;
-  readingLength: ReadingLength;
 }
 
 const DEFAULT_PREFERENCES: ReportPreferences = {
-  reportType: 'weekly',
-  readingLength: 'default'
+  reportType: 'weekly', // Default to weekly reports
 };
 
-const STORAGE_KEY = 'report_preferences';
-
 export function useReportPreferences() {
-  const [preferences, setPreferences] = useState<ReportPreferences>(DEFAULT_PREFERENCES);
-  
-  // Load preferences from localStorage on initial render
-  useEffect(() => {
-    try {
-      const storedPreferences = localStorage.getItem(STORAGE_KEY);
-      if (storedPreferences) {
-        const parsedPreferences = JSON.parse(storedPreferences) as Partial<ReportPreferences>;
-        setPreferences(prev => ({
-          ...prev,
-          ...parsedPreferences
-        }));
+  const [preferences, setPreferences] = useState<ReportPreferences>(() => {
+    // Initialize from localStorage or use defaults
+    const savedPrefs = localStorage.getItem('reportPreferences');
+    if (savedPrefs) {
+      try {
+        return JSON.parse(savedPrefs);
+      } catch (e) {
+        console.error('Failed to parse saved report preferences:', e);
+        return DEFAULT_PREFERENCES;
       }
-    } catch (error) {
-      console.error('Failed to load report preferences:', error);
     }
-  }, []);
-  
-  // Save to localStorage whenever preferences change
-  const savePreferences = (newPreferences: Partial<ReportPreferences>) => {
-    const updatedPreferences = {
-      ...preferences,
-      ...newPreferences
-    };
-    
-    setPreferences(updatedPreferences);
-    
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPreferences));
-    } catch (error) {
-      console.error('Failed to save report preferences:', error);
-    }
-  };
-  
+    return DEFAULT_PREFERENCES;
+  });
+
+  // Save preferences to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('reportPreferences', JSON.stringify(preferences));
+  }, [preferences]);
+
+  // Update report type
   const setReportType = (type: ReportType) => {
-    savePreferences({ reportType: type });
+    setPreferences(prev => ({
+      ...prev,
+      reportType: type,
+    }));
   };
-  
-  const setReadingLength = (length: ReadingLength) => {
-    savePreferences({ readingLength: length });
-  };
-  
+
   return {
-    reportType: preferences.reportType,
-    readingLength: preferences.readingLength,
+    preferences,
     setReportType,
-    setReadingLength,
-    readingLengthConfig: READING_LENGTH_CONFIG[preferences.readingLength]
   };
 }
