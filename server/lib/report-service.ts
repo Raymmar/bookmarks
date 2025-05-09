@@ -61,7 +61,7 @@ export class ReportService {
     const { 
       userId, 
       customSystemPrompt,
-      maxBookmarks = 250  // Increased from 100 to capture more bookmarks in reports
+      maxBookmarks = 100
     } = options;
 
     // Default to the previous week if not specified
