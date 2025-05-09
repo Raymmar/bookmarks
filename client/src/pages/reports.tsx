@@ -42,12 +42,12 @@ const Reports = () => {
   
   // Fetch reports from API
   const { 
-    data: reports, 
+    data: reports = [], 
     isLoading: isLoadingReports,
     error: reportsError 
   } = useQuery<Report[]>({
     queryKey: ['/api/reports'],
-    refetchInterval: 15000 // Refresh every 15 seconds to keep reports updated
+    refetchInterval: 15000, // Refresh every 15 seconds to keep reports updated
   });
 
   // Fetch a specific report if one is selected
@@ -71,6 +71,7 @@ const Reports = () => {
       const timePeriodEnd = endDate.toISOString();
       
       // Send request to generate report
+      // Using apiRequest with correct params
       return apiRequest<Report>('/api/reports', {
         method: 'POST',
         data: {
@@ -120,10 +121,20 @@ const Reports = () => {
       'failed': 'text-red-500'
     }[report.status];
 
-    // Format dates for display
-    const startDate = new Date(report.time_period_start);
-    const endDate = new Date(report.time_period_end);
-    const dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+    // Format dates for display, with error handling
+    let dateRange = '';
+    try {
+      const startDate = new Date(report.time_period_start);
+      const endDate = new Date(report.time_period_end);
+      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+        dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+      } else {
+        dateRange = 'Date range unavailable';
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      dateRange = 'Date range unavailable';
+    }
 
     return (
       <div 
@@ -201,10 +212,20 @@ const Reports = () => {
       );
     }
 
-    // Format dates for display
-    const startDate = new Date(selectedReport.time_period_start);
-    const endDate = new Date(selectedReport.time_period_end);
-    const dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+    // Format dates for display, with error handling
+    let dateRange = '';
+    try {
+      const startDate = new Date(selectedReport.time_period_start);
+      const endDate = new Date(selectedReport.time_period_end);
+      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+        dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+      } else {
+        dateRange = 'Date range unavailable';
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      dateRange = 'Date range unavailable';
+    }
 
     return (
       <div className="p-6">
@@ -262,7 +283,7 @@ const Reports = () => {
           <div className="max-h-[60vh] overflow-y-auto">
             {isLoadingReports ? (
               renderReportSkeletons()
-            ) : reports && reports.length > 0 ? (
+            ) : reports.length > 0 ? (
               reports.map(renderReportItem)
             ) : (
               <div className="p-4 text-center text-gray-500">
