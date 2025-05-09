@@ -53,30 +53,11 @@ const Reports = () => {
   // Fetch a specific report if one is selected
   const { 
     data: selectedReport,
-    isLoading: isLoadingSelectedReport,
-    refetch: refetchSelectedReport
+    isLoading: isLoadingSelectedReport
   } = useQuery<Report>({
     queryKey: ['/api/reports', selectedReportId],
     enabled: !!selectedReportId, // Only run if we have a selected report ID
-    staleTime: 0,
-    gcTime: 0, // Don't cache to ensure we always get fresh data (cacheTime renamed to gcTime in v5)
-    onSuccess: (reportData) => {
-      // Debug the report data
-      console.log('Selected report data:', reportData);
-      console.log('Selected report data keys:', reportData ? Object.keys(reportData) : 'No data');
-      if (reportData && reportData.time_period_start) {
-        console.log('time_period_start type:', typeof reportData.time_period_start);
-        console.log('time_period_start value:', reportData.time_period_start);
-      }
-    }
   });
-  
-  // Effect to refetch the report when selectedReportId changes
-  React.useEffect(() => {
-    if (selectedReportId) {
-      refetchSelectedReport();
-    }
-  }, [selectedReportId, refetchSelectedReport]);
 
   // Mutation for generating a new report
   const generateReportMutation = useMutation({
@@ -128,45 +109,27 @@ const Reports = () => {
 
   // Render a report list item
   const renderReportItem = (report: Report) => {
-    // Apply formatting to ensure proper typing
-    const formattedReport = getFormattedReport(report);
-    
-    const isSelected = selectedReportId === formattedReport.id;
+    const isSelected = selectedReportId === report.id;
     const statusLabel = {
       'generating': 'Generating...',
       'completed': 'Completed',
       'failed': 'Failed'
-    }[formattedReport.status] || 'Unknown';
+    }[report.status];
 
     const statusClass = {
       'generating': 'text-yellow-500',
       'completed': 'text-green-500',
       'failed': 'text-red-500'
-    }[formattedReport.status] || 'text-gray-500';
+    }[report.status];
 
     // Format dates for display, with error handling
     let dateRange = '';
     try {
-      console.log('List item date values:', {
-        id: formattedReport.id, 
-        start: formattedReport.time_period_start,
-        startType: typeof formattedReport.time_period_start,
-        end: formattedReport.time_period_end,
-        endType: typeof formattedReport.time_period_end
-      });
-      
-      if (formattedReport.time_period_start && formattedReport.time_period_end) {
-        const startDate = new Date(formattedReport.time_period_start);
-        const endDate = new Date(formattedReport.time_period_end);
-        
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
-        } else {
-          console.error('Invalid date values in list item:', { startDate, endDate });
-          dateRange = 'Date range unavailable';
-        }
+      const startDate = new Date(report.time_period_start);
+      const endDate = new Date(report.time_period_end);
+      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+        dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
       } else {
-        console.error('Missing date values in list item');
         dateRange = 'Date range unavailable';
       }
     } catch (error) {
@@ -184,7 +147,7 @@ const Reports = () => {
       >
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="text-lg font-medium">{formattedReport.title}</h3>
+            <h3 className="text-lg font-medium">{report.title}</h3>
             <div className="text-sm text-gray-500 flex items-center gap-1">
               <Calendar className="w-4 h-4" /> 
               {dateRange}
@@ -208,68 +171,6 @@ const Reports = () => {
     ));
   };
 
-  // Transform the report object to ensure all fields are properly formatted
-  const getFormattedReport = (report: any): Report => {
-    if (!report) return null;
-    
-    console.log('Formatting report:', report);
-    console.log('Raw time_period_start:', report.time_period_start, 'type:', typeof report.time_period_start);
-    console.log('Raw time_period_end:', report.time_period_end, 'type:', typeof report.time_period_end);
-    
-    // Handle time_period_start
-    let formattedStartDate = '';
-    if (report.time_period_start) {
-      if (typeof report.time_period_start === 'string') {
-        formattedStartDate = report.time_period_start;
-      } else if (report.time_period_start instanceof Date) {
-        formattedStartDate = report.time_period_start.toISOString();
-      } else if (typeof report.time_period_start === 'object') {
-        // PostgreSQL timestamp might come as an object with a toISOString method
-        try {
-          formattedStartDate = new Date(report.time_period_start).toISOString();
-        } catch (e) {
-          console.error('Error formatting start date:', e);
-        }
-      }
-    }
-    
-    // Handle time_period_end 
-    let formattedEndDate = '';
-    if (report.time_period_end) {
-      if (typeof report.time_period_end === 'string') {
-        formattedEndDate = report.time_period_end;
-      } else if (report.time_period_end instanceof Date) {
-        formattedEndDate = report.time_period_end.toISOString();
-      } else if (typeof report.time_period_end === 'object') {
-        // PostgreSQL timestamp might come as an object with a toISOString method
-        try {
-          formattedEndDate = new Date(report.time_period_end).toISOString();
-        } catch (e) {
-          console.error('Error formatting end date:', e);
-        }
-      }
-    }
-    
-    // Create a properly typed report object from the raw data
-    const formattedReport = {
-      id: report.id || '',
-      title: report.title || '',
-      content: report.content || '',
-      user_id: report.user_id || '',
-      created_at: report.created_at || '',
-      time_period_start: formattedStartDate,
-      time_period_end: formattedEndDate,
-      status: report.status || 'completed'
-    };
-    
-    console.log('Formatted report time periods:', {
-      start: formattedReport.time_period_start,
-      end: formattedReport.time_period_end
-    });
-    
-    return formattedReport;
-  };
-  
   // Render the report content (markdown)
   const renderReportContent = () => {
     if (!selectedReport) {
@@ -284,23 +185,8 @@ const Reports = () => {
         </div>
       );
     }
-    
-    // Apply the formatting to ensure proper typing
-    const formattedReport = getFormattedReport(selectedReport);
-    
-    if (!formattedReport) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full text-center p-8">
-          <AlertCircle className="w-20 h-20 text-red-500 mb-4" />
-          <h3 className="text-xl font-medium mb-2">Error Loading Report</h3>
-          <p className="text-gray-500 mb-6">
-            There was a problem loading this report. Please try selecting a different report.
-          </p>
-        </div>
-      );
-    }
 
-    if (formattedReport.status === 'generating') {
+    if (selectedReport.status === 'generating') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center p-8">
           <RefreshCw className="w-20 h-20 text-yellow-500 mb-4 animate-spin" />
@@ -312,7 +198,7 @@ const Reports = () => {
       );
     }
 
-    if (formattedReport.status === 'failed') {
+    if (selectedReport.status === 'failed') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center p-8">
           <AlertCircle className="w-20 h-20 text-red-500 mb-4" />
@@ -330,25 +216,11 @@ const Reports = () => {
     // Format dates for display, with error handling
     let dateRange = '';
     try {
-      console.log('Report date values from formatted report:', {
-        start: formattedReport.time_period_start,
-        startType: typeof formattedReport.time_period_start,
-        end: formattedReport.time_period_end,
-        endType: typeof formattedReport.time_period_end
-      });
-      
-      if (formattedReport.time_period_start && formattedReport.time_period_end) {
-        const startDate = new Date(formattedReport.time_period_start);
-        const endDate = new Date(formattedReport.time_period_end);
-        
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
-        } else {
-          console.error('Invalid date objects:', { startDate, endDate });
-          dateRange = 'Date range unavailable';
-        }
+      const startDate = new Date(selectedReport.time_period_start);
+      const endDate = new Date(selectedReport.time_period_end);
+      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+        dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
       } else {
-        console.error('Missing date values in formatted report');
         dateRange = 'Date range unavailable';
       }
     } catch (error) {
@@ -358,14 +230,14 @@ const Reports = () => {
 
     return (
       <div className="p-6">
-        <h2 className="text-2xl font-bold mb-2">{formattedReport.title}</h2>
+        <h2 className="text-2xl font-bold mb-2">{selectedReport.title}</h2>
         <div className="text-sm text-gray-500 mb-6 flex items-center gap-2">
           <Calendar className="w-4 h-4" /> 
           {dateRange}
         </div>
         
         <div className="prose dark:prose-invert max-w-none">
-          <ReactMarkdown>{formattedReport.content}</ReactMarkdown>
+          <ReactMarkdown>{selectedReport.content}</ReactMarkdown>
         </div>
       </div>
     );
