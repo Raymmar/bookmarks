@@ -290,8 +290,8 @@ const Reports = () => {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto px-4 py-6">
+      <div className="flex justify-between items-center mb-6 px-2">
         <h1 className="text-3xl font-bold">Weekly Insights Reports</h1>
         <Button 
           onClick={handleGenerateReport}
@@ -309,7 +309,7 @@ const Reports = () => {
       </div>
 
       {reportsError && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive" className="mb-6 mx-2">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>
@@ -318,7 +318,7 @@ const Reports = () => {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-2">
         {/* Reports list panel */}
         <Card className="lg:col-span-1">
           <CardHeader>
