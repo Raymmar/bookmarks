@@ -30,8 +30,8 @@ interface Report {
   content: string;
   user_id: string;
   created_at: string;
-  time_period_start: string;
-  time_period_end: string;
+  time_period_start: string | null;
+  time_period_end: string | null;
   status: 'generating' | 'completed' | 'failed';
 }
 
@@ -59,6 +59,10 @@ const Reports = () => {
     enabled: !!selectedReportId, // Only run if we have a selected report ID
     onSuccess: (data) => {
       console.log('Selected report details:', data);
+      // Log the exact type and value of date fields
+      console.log('time_period_start:', data.time_period_start, 'type:', typeof data.time_period_start);
+      console.log('time_period_end:', data.time_period_end, 'type:', typeof data.time_period_end);
+      
       if (data.time_period_start === null || data.time_period_end === null) {
         console.error('Missing date values in report:', data.id);
       }
@@ -134,10 +138,15 @@ const Reports = () => {
     // Format dates for display, with error handling
     let dateRange = '';
     try {
-      const startDate = new Date(report.time_period_start);
-      const endDate = new Date(report.time_period_end);
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+      // Only try to format if both dates exist
+      if (report.time_period_start && report.time_period_end) {
+        const startDate = new Date(report.time_period_start);
+        const endDate = new Date(report.time_period_end);
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+        } else {
+          dateRange = 'Date range unavailable';
+        }
       } else {
         dateRange = 'Date range unavailable';
       }
@@ -225,10 +234,15 @@ const Reports = () => {
     // Format dates for display, with error handling
     let dateRange = '';
     try {
-      const startDate = new Date(selectedReport.time_period_start);
-      const endDate = new Date(selectedReport.time_period_end);
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+      // Only try to format if both dates exist
+      if (selectedReport.time_period_start && selectedReport.time_period_end) {
+        const startDate = new Date(selectedReport.time_period_start);
+        const endDate = new Date(selectedReport.time_period_end);
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+        } else {
+          dateRange = 'Date range unavailable';
+        }
       } else {
         dateRange = 'Date range unavailable';
       }
