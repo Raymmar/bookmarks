@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, Query, QueryKey } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format, subWeeks } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -20,7 +21,7 @@ import {
   AlertDescription,
   AlertTitle 
 } from '@/components/ui/alert';
-import { AlertCircle, Calendar, FileText, RefreshCw, Bookmark } from 'lucide-react';
+import { AlertCircle, Calendar, FileText, RefreshCw } from 'lucide-react';
 import MainLayout from '@/layouts/main-layout';
 
 // Report interface matches what we expect from the API
@@ -30,7 +31,6 @@ interface Report {
   content: string;
   user_id: string;
   created_at: string;
-  updated_at: string;
   time_period_start: string;
   time_period_end: string;
   status: 'generating' | 'completed' | 'failed';
@@ -43,24 +43,11 @@ const Reports = () => {
   
   // Fetch reports from API
   const { 
-    data: reports = [], 
+    data: reports, 
     isLoading: isLoadingReports,
     error: reportsError 
-  } = useQuery({
-    queryKey: ['reports'],
-    queryFn: async (): Promise<Report[]> => {
-      try {
-        const response = await fetch('/api/reports');
-        if (!response.ok) {
-          throw new Error('Failed to fetch reports');
-        }
-        const data = await response.json();
-        return data || [];
-      } catch (error) {
-        console.error('Error fetching reports:', error);
-        return [];
-      }
-    },
+  } = useQuery<Report[]>({
+    queryKey: ['/api/reports'],
     refetchInterval: 15000 // Refresh every 15 seconds to keep reports updated
   });
 
@@ -68,33 +55,13 @@ const Reports = () => {
   const { 
     data: selectedReport,
     isLoading: isLoadingSelectedReport
-  } = useQuery({
-    queryKey: ['report', selectedReportId],
-    queryFn: async (): Promise<Report | null> => {
-      if (!selectedReportId) return null;
-      
-      try {
-        const response = await fetch(`/api/reports/${selectedReportId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch report');
-        }
-        const data = await response.json();
-        return data;
-      } catch (error) {
-        console.error('Error fetching report:', error);
-        return null;
-      }
-    },
-    enabled: !!selectedReportId // Only run if we have a selected report ID
+  } = useQuery<Report>({
+    queryKey: ['/api/reports', selectedReportId],
+    enabled: !!selectedReportId, // Only run if we have a selected report ID
   });
 
   // Mutation for generating a new report
-  const generateReportMutation = useMutation<
-    Report, 
-    Error, 
-    void, 
-    { previousReports: Report[] | undefined }
-  >({
+  const generateReportMutation = useMutation({
     mutationFn: async () => {
       // Calculate date range (last week)
       const endDate = new Date();
@@ -105,28 +72,18 @@ const Reports = () => {
       const timePeriodEnd = endDate.toISOString();
       
       // Send request to generate report
-      const response = await fetch('/api/reports', {
+      return apiRequest<Report>('/api/reports', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        data: {
           timePeriodStart,
           timePeriodEnd,
           maxBookmarks: 100
-        })
+        }
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate report');
-      }
-      
-      const data = await response.json();
-      return data as Report;
     },
     onSuccess: (newReport: Report) => {
       // Update reports list and select the new report
-      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports'] });
       setSelectedReportId(newReport.id);
       
       toast({
@@ -267,76 +224,74 @@ const Reports = () => {
 
   return (
     <MainLayout>
-      <div className="h-full w-full overflow-y-auto p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">Weekly Insights Reports</h1>
-            <Button 
-              onClick={handleGenerateReport}
-              disabled={generateReportMutation.isPending}
-            >
-              {generateReportMutation.isPending ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
+      <div className="container mx-auto py-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Weekly Insights Reports</h1>
+          <Button 
+            onClick={handleGenerateReport}
+            disabled={generateReportMutation.isPending}
+          >
+            {generateReportMutation.isPending ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              'Generate New Report'
+            )}
+          </Button>
+        </div>
+
+        {reportsError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              Failed to load reports. Please try refreshing the page.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Reports list panel */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Your Reports</CardTitle>
+              <CardDescription>
+                View insights from your saved content
+              </CardDescription>
+            </CardHeader>
+            <div className="max-h-[60vh] overflow-y-auto">
+              {isLoadingReports ? (
+                renderReportSkeletons()
+              ) : reports && reports.length > 0 ? (
+                reports.map(renderReportItem)
               ) : (
-                'Generate New Report'
+                <div className="p-4 text-center text-gray-500">
+                  No reports yet. Generate your first report.
+                </div>
               )}
-            </Button>
-          </div>
+            </div>
+          </Card>
 
-          {reportsError && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
-                Failed to load reports. Please try refreshing the page.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Reports list panel */}
-            <Card className="lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Your Reports</CardTitle>
-                <CardDescription>
-                  View insights from your saved content
-                </CardDescription>
-              </CardHeader>
-              <div className="max-h-[60vh] overflow-y-auto">
-                {isLoadingReports ? (
-                  renderReportSkeletons()
-                ) : reports && reports.length > 0 ? (
-                  reports.map(renderReportItem)
-                ) : (
-                  <div className="p-4 text-center text-gray-500">
-                    No reports yet. Generate your first report.
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* Report content panel */}
-            <Card className="lg:col-span-2">
-              <div className="min-h-[60vh] max-h-[80vh] overflow-y-auto">
-                {isLoadingSelectedReport ? (
-                  <div className="p-6 space-y-4">
-                    <Skeleton className="h-8 w-3/4" />
-                    <Skeleton className="h-4 w-1/3 mb-6" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-5/6" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-4/5" />
-                  </div>
-                ) : (
-                  renderReportContent()
-                )}
-              </div>
-            </Card>
-          </div>
+          {/* Report content panel */}
+          <Card className="lg:col-span-2">
+            <div className="min-h-[60vh] max-h-[80vh] overflow-y-auto">
+              {isLoadingSelectedReport ? (
+                <div className="p-6 space-y-4">
+                  <Skeleton className="h-8 w-3/4" />
+                  <Skeleton className="h-4 w-1/3 mb-6" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-4/5" />
+                </div>
+              ) : (
+                renderReportContent()
+              )}
+            </div>
+          </Card>
         </div>
       </div>
     </MainLayout>
