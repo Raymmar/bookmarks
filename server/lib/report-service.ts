@@ -116,7 +116,7 @@ export class ReportService {
   
   /**
    * Fetches relevant bookmarks for the report
-   * Returns bookmarks enhanced with summary and tags
+   * Returns bookmarks enhanced with summary and tags from insights
    */
   private static async getRelevantBookmarks(userId: string, limit: number = 100): Promise<ExtendedBookmark[]> {
     // Get most recent bookmarks for the user, with a limit
@@ -135,20 +135,28 @@ export class ReportService {
     // Convert regular bookmarks to extended bookmarks
     const extendedBookmarks: ExtendedBookmark[] = await Promise.all(
       recentBookmarks.map(async (bookmark) => {
-        // Create extended bookmark with initial empty tags array
+        // Create extended bookmark with initial empty tags array and default summary
         const extendedBookmark: ExtendedBookmark = {
           ...bookmark,
-          summary: bookmark.description || '', // Use description as summary
+          summary: bookmark.description || '', // Default to description
           tags: [] // Initialize with empty array, will be populated below
         };
         
         try {
-          // Get tags for this bookmark
+          // First get tags for this bookmark
           const bookmarkTags = await storage.getTagsByBookmarkId(bookmark.id);
           extendedBookmark.tags = bookmarkTags.map(tag => tag.name);
+          
+          // Then try to get the AI-generated insight for better summary
+          const insight = await storage.getInsightByBookmarkId(bookmark.id);
+          if (insight && insight.summary) {
+            // Use the AI-generated summary if available
+            extendedBookmark.summary = insight.summary;
+            console.log(`Using AI-generated summary for bookmark ${bookmark.id}`);
+          }
         } catch (error) {
-          console.warn(`Could not fetch tags for bookmark ${bookmark.id}:`, error);
-          extendedBookmark.tags = [];
+          console.warn(`Error fetching data for bookmark ${bookmark.id}:`, error);
+          // We already have default values, so no need to set them again
         }
         
         return extendedBookmark;
