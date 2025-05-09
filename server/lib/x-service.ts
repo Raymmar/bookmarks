@@ -1156,7 +1156,7 @@ export class XService {
 
   /**
    * Sync bookmarks from X.com to our database
-   * Includes bookmarks from folders if available
+   * Only syncs main bookmarks, not folder bookmarks (those are synced separately via the folder-specific sync)
    */
   async syncBookmarks(userId: string): Promise<{ added: number, updated: number, errors: number }> {
     console.log(`X Sync: Starting bookmark sync for user ${userId}`);
@@ -1171,7 +1171,8 @@ export class XService {
       tweets: XTweet[], 
       users: { [key: string]: XUser },
       media: { [key: string]: XMedia },
-      // Add a map to track which tweets came from which folders
+      // The folderTweetMap will always be empty in this method to avoid folder sync
+      // Folder sync is handled separately by syncBookmarksFromSpecificFolder
       folderTweetMap: Map<string, Set<string>>
     } = { 
       tweets: [], 
@@ -1341,40 +1342,11 @@ export class XService {
           const newBookmark = await storage.createBookmark(bookmarkData);
           added++;
           
-          // Check if this tweet belongs to any mapped folders
-          // We'll look for mapped collections and add the bookmark to them
-          try {
-            // Get all folder IDs where this tweet belongs
-            // Use Array.from to avoid TypeScript iterator issues
-            for (const entry of Array.from(allBookmarks.folderTweetMap.entries())) {
-              const folderId = entry[0];
-              const tweetIds = entry[1];
-              if (tweetIds.has(tweet.id)) {
-                console.log(`X Sync: Tweet ${tweet.id} belongs to folder ${folderId}`);
-                
-                // Look up the folder-to-collection mapping
-                const [folderMapping] = await db.select()
-                  .from(xFolders)
-                  .where(
-                    and(
-                      eq(xFolders.user_id, userId),
-                      eq(xFolders.x_folder_id, folderId)
-                    )
-                  );
-                
-                // If the folder has a mapped collection, add the bookmark to it
-                if (folderMapping && folderMapping.collection_id) {
-                  console.log(`X Sync: Adding bookmark ${newBookmark.id} to collection ${folderMapping.collection_id} (mapped from folder ${folderId})`);
-                  
-                  // Add the bookmark to the mapped collection
-                  await storage.addBookmarkToCollection(folderMapping.collection_id, newBookmark.id);
-                }
-              }
-            }
-          } catch (collectionError) {
-            console.error(`X Sync: Error adding bookmark to collections:`, collectionError);
-            // Continue processing other bookmarks even if this one fails
-          }
+          // Skip folder processing during main bookmark sync
+          // Note: In the regular syncBookmarks method, we don't process folder mappings
+          // This is only done in syncBookmarksFromSpecificFolder
+          console.log(`X Sync: Skipping folder mapping check for tweet ${tweet.id} during main sync`);
+          // The folderTweetMap will always be empty here, so there's no need to process it
         }
       } catch (error) {
         console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
