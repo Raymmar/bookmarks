@@ -27,7 +27,7 @@ const DEFAULT_SYSTEM_PROMPT = `You are a casual and conversational research assi
 Your task is to extract useful insights from bookmarks that have been collected by the user and turn them into a casual, readable report with useful links back to the original content.
 
 The report should be structured in two main sections:
-"Quick Links"
+"Rundown"
 "Deep Dive"
 
 - Quick Links: A casual but informative list of key takeaways and analysis with links (formatted in markdown) back to the referenced bookmarks. Each point should be brief but insightful, and EVERY point must include at least one link to a relevant bookmark. This section should give the user a quick overview of the most important information.
@@ -63,7 +63,7 @@ export interface GenerateReportOptions {
   timePeriodStart?: Date;
   timePeriodEnd?: Date;
   maxBookmarks?: number;
-  reportType?: 'daily' | 'weekly';
+  reportType?: "daily" | "weekly";
 }
 
 /**
@@ -76,13 +76,18 @@ export class ReportService {
    * Generate a report for the user's recent bookmarks
    */
   async generateWeeklyReport(options: GenerateReportOptions): Promise<Report> {
-    const { userId, customSystemPrompt, maxBookmarks = 100, reportType = 'weekly' } = options;
+    const {
+      userId,
+      customSystemPrompt,
+      maxBookmarks = 100,
+      reportType = "weekly",
+    } = options;
 
     // Determine time period based on report type
     const timePeriodEnd = options.timePeriodEnd || new Date();
     let timePeriodStart: Date;
-    
-    if (reportType === 'daily') {
+
+    if (reportType === "daily") {
       // For daily reports, get just the last day
       timePeriodStart = options.timePeriodStart || subDays(timePeriodEnd, 1);
     } else {
@@ -93,7 +98,7 @@ export class ReportService {
     // Format date range for the report title
     const formattedStartDate = format(timePeriodStart, "MMM d, yyyy");
     const formattedEndDate = format(timePeriodEnd, "MMM d, yyyy");
-    const reportTitle = `${reportType === 'daily' ? 'Daily' : 'Weekly'} Insights: ${formattedStartDate} - ${formattedEndDate}`;
+    const reportTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
     // Used to store the report for reference in the catch block
     let reportObj: Report;
@@ -173,15 +178,13 @@ export class ReportService {
 
       // Enhanced user prompt to ensure comprehensive coverage
       const userPrompt = JSON.stringify({
-        request:
-          `Generate a comprehensive ${reportType} insights report for my bookmarks`,
+        request: `Generate a comprehensive ${reportType} insights report for my bookmarks`,
         time_period: {
           start: format(timePeriodStart, "yyyy-MM-dd"),
           end: format(timePeriodEnd, "yyyy-MM-dd"),
-          type: reportType
+          type: reportType,
         },
-        instructions:
-          `Use the attached system prompt to create a unified ${reportType} report. You're looking for patterns in the bookmarks and to provide additional insights by acting as a research assistant for the user.`,
+        instructions: `Use the attached system prompt to create a unified ${reportType} report. You're looking for patterns in the bookmarks and to provide additional insights by acting as a research assistant for the user.`,
         bookmarks: bookmarksData,
       });
 
