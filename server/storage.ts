@@ -1010,6 +1010,158 @@ export class MemStorage implements IStorage {
         bookmark.source === source
     );
   }
+  
+  // Reports
+  async getReports(userId?: string): Promise<Report[]> {
+    if (userId) {
+      return Array.from(this.reports.values()).filter(
+        report => report.user_id === userId
+      );
+    }
+    return Array.from(this.reports.values());
+  }
+  
+  async getReport(id: string): Promise<Report | undefined> {
+    return this.reports.get(id);
+  }
+  
+  async createReport(report: InsertReport): Promise<Report> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
+    const newReport: Report = {
+      ...report,
+      id,
+      created_at: now,
+      updated_at: now,
+      completed_at: null,
+      error_message: null,
+      bookmark_count: null,
+      scheduled_for: report.scheduled_for || null,
+      status: report.status || 'queued',
+      metadata: report.metadata || null
+    };
+    
+    this.reports.set(id, newReport);
+    return newReport;
+  }
+  
+  async updateReport(id: string, report: Partial<InsertReport>): Promise<Report | undefined> {
+    const existingReport = this.reports.get(id);
+    if (!existingReport) return undefined;
+    
+    const updatedReport = {
+      ...existingReport,
+      ...report,
+      updated_at: new Date(),
+    };
+    
+    this.reports.set(id, updatedReport);
+    return updatedReport;
+  }
+  
+  async deleteReport(id: string): Promise<boolean> {
+    try {
+      // First, remove bookmark-report associations
+      for (const rb of this.reportBookmarks.values()) {
+        if (rb.report_id === id) {
+          this.reportBookmarks.delete(rb.id);
+        }
+      }
+      
+      // Then, remove report sections
+      for (const section of this.reportSections.values()) {
+        if (section.report_id === id) {
+          this.reportSections.delete(section.id);
+        }
+      }
+      
+      // Finally delete the report itself
+      return this.reports.delete(id);
+    } catch (error) {
+      console.error(`Error deleting report ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  // Report Bookmarks
+  async getBookmarksByReportId(reportId: string): Promise<Bookmark[]> {
+    const reportBookmarksEntries = Array.from(this.reportBookmarks.values())
+      .filter(rb => rb.report_id === reportId);
+    
+    const bookmarkIds = reportBookmarksEntries.map(rb => rb.bookmark_id);
+    return bookmarkIds.map(id => this.bookmarks.get(id)!).filter(Boolean);
+  }
+  
+  async getReportsByBookmarkId(bookmarkId: string): Promise<Report[]> {
+    const reportBookmarksEntries = Array.from(this.reportBookmarks.values())
+      .filter(rb => rb.bookmark_id === bookmarkId);
+    
+    const reportIds = reportBookmarksEntries.map(rb => rb.report_id);
+    return reportIds.map(id => this.reports.get(id)!).filter(Boolean);
+  }
+  
+  async addBookmarkToReport(reportId: string, bookmarkId: string): Promise<ReportBookmark> {
+    const id = crypto.randomUUID();
+    
+    const newReportBookmark: ReportBookmark = {
+      id,
+      report_id: reportId,
+      bookmark_id: bookmarkId,
+      included_at: new Date(),
+    };
+    
+    this.reportBookmarks.set(id, newReportBookmark);
+    return newReportBookmark;
+  }
+  
+  async removeBookmarkFromReport(reportId: string, bookmarkId: string): Promise<boolean> {
+    const reportBookmark = Array.from(this.reportBookmarks.values())
+      .find(rb => rb.report_id === reportId && rb.bookmark_id === bookmarkId);
+    
+    if (!reportBookmark) return false;
+    
+    return this.reportBookmarks.delete(reportBookmark.id);
+  }
+  
+  // Report Sections
+  async getSectionsByReportId(reportId: string): Promise<ReportSection[]> {
+    return Array.from(this.reportSections.values())
+      .filter(section => section.report_id === reportId)
+      .sort((a, b) => a.position - b.position); // Sort by position
+  }
+  
+  async createReportSection(section: InsertReportSection): Promise<ReportSection> {
+    const id = crypto.randomUUID();
+    
+    const newSection: ReportSection = {
+      ...section,
+      id,
+      position: section.position || 0,
+      theme: section.theme || null,
+      bookmark_ids: section.bookmark_ids || null
+    };
+    
+    this.reportSections.set(id, newSection);
+    return newSection;
+  }
+  
+  async updateReportSection(id: string, section: Partial<InsertReportSection>): Promise<ReportSection | undefined> {
+    const existingSection = this.reportSections.get(id);
+    if (!existingSection) return undefined;
+    
+    const updatedSection = {
+      ...existingSection,
+      ...section,
+    };
+    
+    this.reportSections.set(id, updatedSection);
+    return updatedSection;
+  }
+  
+  async deleteReportSection(id: string): Promise<boolean> {
+    return this.reportSections.delete(id);
+  }
 }
 
 // PostgreSQL database storage implementation
@@ -1961,6 +2113,147 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return bookmark;
+  }
+  
+  // Reports
+  async getReports(userId?: string): Promise<Report[]> {
+    if (userId) {
+      return await db.select()
+        .from(reports)
+        .where(eq(reports.user_id, userId))
+        .orderBy(desc(reports.created_at));
+    }
+    return await db.select()
+      .from(reports)
+      .orderBy(desc(reports.created_at));
+  }
+  
+  async getReport(id: string): Promise<Report | undefined> {
+    const [report] = await db.select()
+      .from(reports)
+      .where(eq(reports.id, id));
+    return report;
+  }
+  
+  async createReport(report: InsertReport): Promise<Report> {
+    const [newReport] = await db.insert(reports)
+      .values({
+        ...report,
+        created_at: new Date(),
+        updated_at: new Date()
+      })
+      .returning();
+    return newReport;
+  }
+  
+  async updateReport(id: string, reportUpdate: Partial<InsertReport>): Promise<Report | undefined> {
+    const [updatedReport] = await db.update(reports)
+      .set({
+        ...reportUpdate,
+        updated_at: new Date()
+      })
+      .where(eq(reports.id, id))
+      .returning();
+    return updatedReport;
+  }
+  
+  async deleteReport(id: string): Promise<boolean> {
+    try {
+      // First, remove report-bookmark associations
+      await db.delete(reportBookmarks)
+        .where(eq(reportBookmarks.report_id, id));
+      
+      // Then, remove report sections
+      await db.delete(reportSections)
+        .where(eq(reportSections.report_id, id));
+      
+      // Finally, delete the report
+      const result = await db.delete(reports)
+        .where(eq(reports.id, id))
+        .returning({ id: reports.id });
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting report ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  // Report Bookmarks
+  async getBookmarksByReportId(reportId: string): Promise<Bookmark[]> {
+    const reportBookmarksJoin = await db.select({
+      bookmark: bookmarks
+    })
+    .from(reportBookmarks)
+    .innerJoin(bookmarks, eq(reportBookmarks.bookmark_id, bookmarks.id))
+    .where(eq(reportBookmarks.report_id, reportId));
+    
+    return reportBookmarksJoin.map(item => item.bookmark);
+  }
+  
+  async getReportsByBookmarkId(bookmarkId: string): Promise<Report[]> {
+    const bookmarkReportsJoin = await db.select({
+      report: reports
+    })
+    .from(reportBookmarks)
+    .innerJoin(reports, eq(reportBookmarks.report_id, reports.id))
+    .where(eq(reportBookmarks.bookmark_id, bookmarkId));
+    
+    return bookmarkReportsJoin.map(item => item.report);
+  }
+  
+  async addBookmarkToReport(reportId: string, bookmarkId: string): Promise<ReportBookmark> {
+    const [reportBookmark] = await db.insert(reportBookmarks)
+      .values({
+        report_id: reportId,
+        bookmark_id: bookmarkId
+      })
+      .returning();
+    return reportBookmark;
+  }
+  
+  async removeBookmarkFromReport(reportId: string, bookmarkId: string): Promise<boolean> {
+    const result = await db.delete(reportBookmarks)
+      .where(
+        and(
+          eq(reportBookmarks.report_id, reportId),
+          eq(reportBookmarks.bookmark_id, bookmarkId)
+        )
+      )
+      .returning({ id: reportBookmarks.id });
+    
+    return result.length > 0;
+  }
+  
+  // Report Sections
+  async getSectionsByReportId(reportId: string): Promise<ReportSection[]> {
+    return await db.select()
+      .from(reportSections)
+      .where(eq(reportSections.report_id, reportId))
+      .orderBy(reportSections.position);
+  }
+  
+  async createReportSection(section: InsertReportSection): Promise<ReportSection> {
+    const [newSection] = await db.insert(reportSections)
+      .values(section)
+      .returning();
+    return newSection;
+  }
+  
+  async updateReportSection(id: string, section: Partial<InsertReportSection>): Promise<ReportSection | undefined> {
+    const [updatedSection] = await db.update(reportSections)
+      .set(section)
+      .where(eq(reportSections.id, id))
+      .returning();
+    return updatedSection;
+  }
+  
+  async deleteReportSection(id: string): Promise<boolean> {
+    const result = await db.delete(reportSections)
+      .where(eq(reportSections.id, id))
+      .returning({ id: reportSections.id });
+    
+    return result.length > 0;
   }
 }
 
