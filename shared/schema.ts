@@ -190,7 +190,6 @@ export const usersRelations = relations(users, ({ many }) => ({
   activities: many(activities),
   settings: many(settings),
   chatSessions: many(chatSessions),
-  reports: many(reports),
 }));
 
 export const activitiesRelations = relations(activities, ({ one }) => ({
@@ -221,7 +220,6 @@ export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
   screenshots: many(screenshots),
   insights: many(insights),
   bookmarkTags: many(bookmarkTags),
-  reportBookmarks: many(reportBookmarks),
 }));
 
 export const collectionsRelations = relations(collections, ({ one, many }) => ({
@@ -357,48 +355,6 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
 
-// Weekly Reports table for bookmark digests
-export const reports = pgTable("reports", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  user_id: uuid("user_id").references(() => users.id).notNull(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),  // The fully generated report content
-  created_at: timestamp("created_at").defaultNow().notNull(),
-  updated_at: timestamp("updated_at").defaultNow().notNull(),
-  scheduled_for: timestamp("scheduled_for"), // When this report was scheduled to run
-  completed_at: timestamp("completed_at"), // When the report generation completed
-  status: text("status", { 
-    enum: ["queued", "processing", "completed", "failed"] 
-  }).default("queued").notNull(),
-  metadata: jsonb("metadata"), // Themes, topics, and other metadata about the report
-  error_message: text("error_message"), // Error message if the report failed
-  bookmark_count: integer("bookmark_count").default(0), // Number of bookmarks in the report
-});
-
-// Report-Bookmarks join table to track which bookmarks are in each report
-export const reportBookmarks = pgTable("report_bookmarks", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  report_id: uuid("report_id").references(() => reports.id, { onDelete: "cascade" }).notNull(),
-  bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }).notNull(),
-  included_at: timestamp("included_at").defaultNow().notNull(),
-}, (table) => {
-  return {
-    // Add a unique constraint to prevent duplicate bookmark entries in a report
-    uniqueBookmarkInReport: unique().on(table.report_id, table.bookmark_id),
-  };
-});
-
-// Report sections for structured content organization
-export const reportSections = pgTable("report_sections", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  report_id: uuid("report_id").references(() => reports.id, { onDelete: "cascade" }).notNull(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  position: integer("position").default(0).notNull(), // Order of this section in the report
-  theme: text("theme"), // Main theme of this section
-  bookmark_ids: text("bookmark_ids").array().default([]), // IDs of bookmarks in this section
-});
-
 // X.com integration tables
 export const xCredentials = pgTable("x_credentials", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -456,63 +412,6 @@ export const insertXFoldersSchema = createInsertSchema(xFolders).omit({
   created_at: true,
   updated_at: true,
 });
-
-// Report relations
-export const reportsRelations = relations(reports, ({ one, many }) => ({
-  user: one(users, {
-    fields: [reports.user_id],
-    references: [users.id],
-  }),
-  reportBookmarks: many(reportBookmarks),
-  sections: many(reportSections),
-}));
-
-export const reportBookmarksRelations = relations(reportBookmarks, ({ one }) => ({
-  report: one(reports, {
-    fields: [reportBookmarks.report_id],
-    references: [reports.id],
-  }),
-  bookmark: one(bookmarks, {
-    fields: [reportBookmarks.bookmark_id],
-    references: [bookmarks.id],
-  }),
-}));
-
-export const reportSectionsRelations = relations(reportSections, ({ one }) => ({
-  report: one(reports, {
-    fields: [reportSections.report_id],
-    references: [reports.id],
-  }),
-}));
-
-// Insert schemas for reports
-export const insertReportSchema = createInsertSchema(reports).omit({
-  id: true,
-  created_at: true,
-  updated_at: true,
-  completed_at: true,
-  error_message: true,
-  bookmark_count: true,
-});
-
-export const insertReportBookmarkSchema = createInsertSchema(reportBookmarks).omit({
-  id: true,
-  included_at: true,
-});
-
-export const insertReportSectionSchema = createInsertSchema(reportSections).omit({
-  id: true,
-});
-
-// Types for reports
-export type InsertReport = z.infer<typeof insertReportSchema>;
-export type Report = typeof reports.$inferSelect;
-
-export type InsertReportBookmark = z.infer<typeof insertReportBookmarkSchema>;
-export type ReportBookmark = typeof reportBookmarks.$inferSelect;
-
-export type InsertReportSection = z.infer<typeof insertReportSectionSchema>;
-export type ReportSection = typeof reportSections.$inferSelect;
 
 // Types for X tables
 export type InsertXCredentials = z.infer<typeof insertXCredentialsSchema>;
