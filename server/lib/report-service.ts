@@ -10,6 +10,9 @@ import { InsertReport, Report } from '@shared/schema';
 import OpenAI from 'openai';
 import { addWeeks, subWeeks, startOfWeek, endOfWeek, format } from 'date-fns';
 
+// Define report status types
+type ReportStatus = "generating" | "completed" | "failed";
+
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const MODEL = "gpt-4o";
 
@@ -68,6 +71,9 @@ export class ReportService {
     const formattedEndDate = format(timePeriodEnd, 'MMM d, yyyy');
     const reportTitle = `Weekly Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
+    // Used to store the report for reference in the catch block
+    let reportObj: Report;
+    
     try {
       // Create the report first with "generating" status
       const report = await storage.createReport({
@@ -76,7 +82,11 @@ export class ReportService {
         content: "Generating report...",
         time_period_start: timePeriodStart,
         time_period_end: timePeriodEnd,
+        status: "generating" as ReportStatus
       });
+      
+      // Store the report for the catch block
+      reportObj = report;
 
       // Fetch bookmarks with insights and tags
       const bookmarksWithData = await storage.getBookmarksWithInsightsAndTags(
@@ -152,13 +162,28 @@ export class ReportService {
     } catch (error) {
       console.error('Error generating weekly report:', error);
       
+      if (!reportObj) {
+        // If we failed even before creating the report, return a minimal error response
+        return {
+          id: '',
+          user_id: userId,
+          title: reportTitle,
+          content: 'Error generating report',
+          created_at: new Date(),
+          updated_at: new Date(),
+          time_period_start: timePeriodStart,
+          time_period_end: timePeriodEnd,
+          status: 'failed' as ReportStatus
+        };
+      }
+      
       // Update the report with error status
       const failedReport = await storage.updateReportStatus(
-        report.id, 
+        reportObj.id, 
         "failed"
       );
       
-      return failedReport || report;
+      return failedReport || reportObj;
     }
   }
 

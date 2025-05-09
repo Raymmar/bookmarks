@@ -15,6 +15,7 @@ import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
 import { bookmarkService } from "./lib/bookmark-service";
 import { setupAuth } from "./auth";
 import { setupEmailAuthRoutes } from "./controllers/email-auth";
+import { setupReportRoutes } from "./controllers/reports";
 import { xService } from "./lib/x-service";
 import fs from "fs";
 
@@ -27,6 +28,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up email verification and password reset routes
   setupEmailAuthRoutes(app);
+  
+  // Set up report generation routes
+  setupReportRoutes(app);
 
   // Bookmarks API endpoints
   app.get("/api/bookmarks", async (req, res) => {
