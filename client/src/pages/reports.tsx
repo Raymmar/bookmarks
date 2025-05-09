@@ -121,9 +121,28 @@ const Reports = () => {
     }[report.status];
 
     // Format dates for display
-    const startDate = new Date(report.time_period_start);
-    const endDate = new Date(report.time_period_end);
-    const dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+    let dateRange = '';
+    try {
+      // Ensure time period values exist and are valid 
+      if (report.time_period_start && report.time_period_end) {
+        const startDate = new Date(report.time_period_start);
+        const endDate = new Date(report.time_period_end);
+        
+        // Verify that the dates are valid
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+        } else {
+          console.error("Invalid date objects created from report time periods");
+          dateRange = 'Date range unavailable';
+        }
+      } else {
+        console.error("Missing date values in formatted report");
+        dateRange = 'Date range unavailable';
+      }
+    } catch (error) {
+      console.error("Error formatting report dates:", error);
+      dateRange = 'Date range unavailable';
+    }
 
     return (
       <div 
@@ -202,9 +221,28 @@ const Reports = () => {
     }
 
     // Format dates for display
-    const startDate = new Date(selectedReport.time_period_start);
-    const endDate = new Date(selectedReport.time_period_end);
-    const dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+    let dateRange = '';
+    try {
+      // Ensure time period values exist and are valid 
+      if (selectedReport.time_period_start && selectedReport.time_period_end) {
+        const startDate = new Date(selectedReport.time_period_start);
+        const endDate = new Date(selectedReport.time_period_end);
+        
+        // Verify that the dates are valid
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+        } else {
+          console.error("Invalid date objects created from report time periods");
+          dateRange = 'Date range unavailable';
+        }
+      } else {
+        console.error("Missing date values in formatted report");
+        dateRange = 'Date range unavailable';
+      }
+    } catch (error) {
+      console.error("Error formatting report dates:", error);
+      dateRange = 'Date range unavailable';
+    }
 
     return (
       <div className="p-6">
