@@ -55,7 +55,7 @@ const Reports = () => {
     data: selectedReport,
     isLoading: isLoadingSelectedReport
   } = useQuery<Report>({
-    queryKey: ['/api/reports', selectedReportId],
+    queryKey: [`/api/reports/${selectedReportId}`], // Direct path to specific report
     enabled: !!selectedReportId, // Only run if we have a selected report ID
     onSuccess: (data) => {
       // Log the report data to see what we're getting
@@ -108,7 +108,12 @@ const Reports = () => {
     onSuccess: (newReport: Report) => {
       // Update reports list and select the new report
       queryClient.invalidateQueries({ queryKey: ['/api/reports'] });
+      
+      // Set the selected report ID
       setSelectedReportId(newReport.id);
+      
+      // Make sure we also invalidate the individual report query
+      queryClient.invalidateQueries({ queryKey: [`/api/reports/${newReport.id}`] });
       
       toast({
         title: "Report generation started",
