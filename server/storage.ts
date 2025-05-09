@@ -2040,6 +2040,15 @@ export class DatabaseStorage implements IStorage {
       .set({ status })
       .where(eq(reports.id, id))
       .returning();
+    
+    // Ensure dates are formatted as strings before returning
+    if (updatedReport && updatedReport.time_period_start instanceof Date) {
+      updatedReport.time_period_start = updatedReport.time_period_start.toISOString();
+    }
+    if (updatedReport && updatedReport.time_period_end instanceof Date) {
+      updatedReport.time_period_end = updatedReport.time_period_end.toISOString();
+    }
+    
     return updatedReport;
   }
   

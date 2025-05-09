@@ -60,8 +60,27 @@ const Reports = () => {
     onSuccess: (data) => {
       // Log the report data to see what we're getting
       console.log('Selected report data:', data);
-      console.log('Time period start:', data.time_period_start, typeof data.time_period_start);
-      console.log('Time period end:', data.time_period_end, typeof data.time_period_end);
+      
+      // Add detailed debugging information about the time period values
+      console.log('Time period start (raw):', data.time_period_start);
+      console.log('Time period start type:', typeof data.time_period_start);
+      console.log('Time period start instanceof Date:', data.time_period_start instanceof Date);
+      
+      console.log('Time period end (raw):', data.time_period_end);
+      console.log('Time period end type:', typeof data.time_period_end);
+      console.log('Time period end instanceof Date:', data.time_period_end instanceof Date);
+      
+      // Try to manually convert to ensure it's a valid date
+      try {
+        const startDate = new Date(data.time_period_start);
+        const endDate = new Date(data.time_period_end);
+        console.log('Start date conversion result:', startDate);
+        console.log('End date conversion result:', endDate);
+        console.log('IsValid start:', !isNaN(startDate.getTime()));
+        console.log('IsValid end:', !isNaN(endDate.getTime()));
+      } catch (error) {
+        console.error('Error converting dates:', error);
+      }
     }
   });
 
