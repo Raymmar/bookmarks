@@ -30,8 +30,8 @@ interface Report {
   content: string;
   user_id: string;
   created_at: string;
-  time_period_start: string | null;
-  time_period_end: string | null;
+  time_period_start: string;
+  time_period_end: string;
   status: 'generating' | 'completed' | 'failed';
 }
 
@@ -42,12 +42,12 @@ const Reports = () => {
   
   // Fetch reports from API
   const { 
-    data: reports = [], 
+    data: reports, 
     isLoading: isLoadingReports,
     error: reportsError 
   } = useQuery<Report[]>({
     queryKey: ['/api/reports'],
-    refetchInterval: 15000, // Refresh every 15 seconds to keep reports updated
+    refetchInterval: 15000 // Refresh every 15 seconds to keep reports updated
   });
 
   // Fetch a specific report if one is selected
@@ -57,19 +57,6 @@ const Reports = () => {
   } = useQuery<Report>({
     queryKey: ['/api/reports', selectedReportId],
     enabled: !!selectedReportId, // Only run if we have a selected report ID
-    onSuccess: (data) => {
-      console.log('Selected report details:', data);
-      // Log the exact type and value of date fields
-      console.log('time_period_start:', data.time_period_start, 'type:', typeof data.time_period_start);
-      console.log('time_period_end:', data.time_period_end, 'type:', typeof data.time_period_end);
-      
-      if (data.time_period_start === null || data.time_period_end === null) {
-        console.error('Missing date values in report:', data.id);
-      }
-    },
-    onError: (error) => {
-      console.error('Error fetching report:', error);
-    }
   });
 
   // Mutation for generating a new report
@@ -84,16 +71,14 @@ const Reports = () => {
       const timePeriodEnd = endDate.toISOString();
       
       // Send request to generate report
-      // apiRequest expects (method, url, data) parameters
-      return apiRequest<Report>(
-        'POST',
-        '/api/reports',
-        {
+      return apiRequest<Report>('/api/reports', {
+        method: 'POST',
+        data: {
           timePeriodStart,
           timePeriodEnd,
           maxBookmarks: 100
         }
-      );
+      });
     },
     onSuccess: (newReport: Report) => {
       // Update reports list and select the new report
@@ -135,25 +120,10 @@ const Reports = () => {
       'failed': 'text-red-500'
     }[report.status];
 
-    // Format dates for display, with error handling
-    let dateRange = '';
-    try {
-      // Only try to format if both dates exist
-      if (report.time_period_start && report.time_period_end) {
-        const startDate = new Date(report.time_period_start);
-        const endDate = new Date(report.time_period_end);
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
-        } else {
-          dateRange = 'Date range unavailable';
-        }
-      } else {
-        dateRange = 'Date range unavailable';
-      }
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      dateRange = 'Date range unavailable';
-    }
+    // Format dates for display
+    const startDate = new Date(report.time_period_start);
+    const endDate = new Date(report.time_period_end);
+    const dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
 
     return (
       <div 
@@ -231,25 +201,10 @@ const Reports = () => {
       );
     }
 
-    // Format dates for display, with error handling
-    let dateRange = '';
-    try {
-      // Only try to format if both dates exist
-      if (selectedReport.time_period_start && selectedReport.time_period_end) {
-        const startDate = new Date(selectedReport.time_period_start);
-        const endDate = new Date(selectedReport.time_period_end);
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
-        } else {
-          dateRange = 'Date range unavailable';
-        }
-      } else {
-        dateRange = 'Date range unavailable';
-      }
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      dateRange = 'Date range unavailable';
-    }
+    // Format dates for display
+    const startDate = new Date(selectedReport.time_period_start);
+    const endDate = new Date(selectedReport.time_period_end);
+    const dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
 
     return (
       <div className="p-6">
@@ -307,7 +262,7 @@ const Reports = () => {
           <div className="max-h-[60vh] overflow-y-auto">
             {isLoadingReports ? (
               renderReportSkeletons()
-            ) : reports.length > 0 ? (
+            ) : reports && reports.length > 0 ? (
               reports.map(renderReportItem)
             ) : (
               <div className="p-4 text-center text-gray-500">
