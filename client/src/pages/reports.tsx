@@ -57,6 +57,15 @@ const Reports = () => {
   } = useQuery<Report>({
     queryKey: ['/api/reports', selectedReportId],
     enabled: !!selectedReportId, // Only run if we have a selected report ID
+    onSuccess: (data) => {
+      console.log('Selected report details:', data);
+      if (data.time_period_start === null || data.time_period_end === null) {
+        console.error('Missing date values in report:', data.id);
+      }
+    },
+    onError: (error) => {
+      console.error('Error fetching report:', error);
+    }
   });
 
   // Mutation for generating a new report
