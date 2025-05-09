@@ -268,8 +268,9 @@ const Reports = () => {
 
   return (
     <MainLayout>
-      <div className="h-full overflow-y-auto p-6">
-        <div className="container mx-auto">
+      {/* Main content - ensure this is the only content rendered inside MainLayout */}
+      <div className="h-full w-full overflow-y-auto p-6">
+        <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Weekly Insights Reports</h1>
             <Button 
