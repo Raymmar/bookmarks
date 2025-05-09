@@ -190,6 +190,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   activities: many(activities),
   settings: many(settings),
   chatSessions: many(chatSessions),
+  reports: many(reports),
 }));
 
 export const activitiesRelations = relations(activities, ({ one }) => ({
@@ -354,6 +355,48 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+// Weekly Reports table for bookmark digests
+export const reports = pgTable("reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  user_id: uuid("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),  // The fully generated report content
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+  scheduled_for: timestamp("scheduled_for"), // When this report was scheduled to run
+  completed_at: timestamp("completed_at"), // When the report generation completed
+  status: text("status", { 
+    enum: ["queued", "processing", "completed", "failed"] 
+  }).default("queued").notNull(),
+  metadata: jsonb("metadata"), // Themes, topics, and other metadata about the report
+  error_message: text("error_message"), // Error message if the report failed
+  bookmark_count: integer("bookmark_count").default(0), // Number of bookmarks in the report
+});
+
+// Report-Bookmarks join table to track which bookmarks are in each report
+export const reportBookmarks = pgTable("report_bookmarks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  report_id: uuid("report_id").references(() => reports.id, { onDelete: "cascade" }).notNull(),
+  bookmark_id: uuid("bookmark_id").references(() => bookmarks.id, { onDelete: "cascade" }).notNull(),
+  included_at: timestamp("included_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    // Add a unique constraint to prevent duplicate bookmark entries in a report
+    uniqueBookmarkInReport: unique().on(table.report_id, table.bookmark_id),
+  };
+});
+
+// Report sections for structured content organization
+export const reportSections = pgTable("report_sections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  report_id: uuid("report_id").references(() => reports.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  position: integer("position").default(0).notNull(), // Order of this section in the report
+  theme: text("theme"), // Main theme of this section
+  bookmark_ids: text("bookmark_ids").array().default([]), // IDs of bookmarks in this section
+});
 
 // X.com integration tables
 export const xCredentials = pgTable("x_credentials", {
