@@ -184,7 +184,7 @@ const Reports = () => {
       >
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="text-lg font-medium">{report.title}</h3>
+            <h3 className="text-lg font-medium">{formattedReport.title}</h3>
             <div className="text-sm text-gray-500 flex items-center gap-1">
               <Calendar className="w-4 h-4" /> 
               {dateRange}
@@ -251,8 +251,20 @@ const Reports = () => {
     
     // Apply the formatting to ensure proper typing
     const formattedReport = getFormattedReport(selectedReport);
+    
+    if (!formattedReport) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center p-8">
+          <AlertCircle className="w-20 h-20 text-red-500 mb-4" />
+          <h3 className="text-xl font-medium mb-2">Error Loading Report</h3>
+          <p className="text-gray-500 mb-6">
+            There was a problem loading this report. Please try selecting a different report.
+          </p>
+        </div>
+      );
+    }
 
-    if (selectedReport.status === 'generating') {
+    if (formattedReport.status === 'generating') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center p-8">
           <RefreshCw className="w-20 h-20 text-yellow-500 mb-4 animate-spin" />
@@ -264,7 +276,7 @@ const Reports = () => {
       );
     }
 
-    if (selectedReport.status === 'failed') {
+    if (formattedReport.status === 'failed') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center p-8">
           <AlertCircle className="w-20 h-20 text-red-500 mb-4" />
