@@ -123,22 +123,38 @@ const Reports = () => {
       'generating': 'Generating...',
       'completed': 'Completed',
       'failed': 'Failed'
-    }[report.status];
+    }[report.status] || 'Unknown';
 
     const statusClass = {
       'generating': 'text-yellow-500',
       'completed': 'text-green-500',
       'failed': 'text-red-500'
-    }[report.status];
+    }[report.status] || 'text-gray-500';
 
     // Format dates for display, with error handling
     let dateRange = '';
     try {
-      const startDate = new Date(report.time_period_start);
-      const endDate = new Date(report.time_period_end);
+      console.log('List item date values:', {
+        id: report.id, 
+        start: report.time_period_start,
+        startType: typeof report.time_period_start,
+        end: report.time_period_end,
+        endType: typeof report.time_period_end
+      });
+      
+      // Handle both string dates and Date objects
+      const startDate = typeof report.time_period_start === 'string'
+        ? new Date(report.time_period_start)
+        : report.time_period_start;
+      
+      const endDate = typeof report.time_period_end === 'string'
+        ? new Date(report.time_period_end)
+        : report.time_period_end;
+        
       if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
         dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
       } else {
+        console.error('Invalid date values in list item:', { startDate, endDate });
         dateRange = 'Date range unavailable';
       }
     } catch (error) {
@@ -225,11 +241,26 @@ const Reports = () => {
     // Format dates for display, with error handling
     let dateRange = '';
     try {
-      const startDate = new Date(selectedReport.time_period_start);
-      const endDate = new Date(selectedReport.time_period_end);
+      console.log('Report date values:', {
+        start: selectedReport.time_period_start,
+        startType: typeof selectedReport.time_period_start,
+        end: selectedReport.time_period_end,
+        endType: typeof selectedReport.time_period_end
+      });
+      
+      // Handle both string dates and Date objects
+      const startDate = typeof selectedReport.time_period_start === 'string'
+        ? new Date(selectedReport.time_period_start)
+        : selectedReport.time_period_start;
+      
+      const endDate = typeof selectedReport.time_period_end === 'string'
+        ? new Date(selectedReport.time_period_end)
+        : selectedReport.time_period_end;
+      
       if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
         dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
       } else {
+        console.error('Invalid date values:', { startDate, endDate });
         dateRange = 'Date range unavailable';
       }
     } catch (error) {
