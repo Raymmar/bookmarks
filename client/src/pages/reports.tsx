@@ -47,11 +47,20 @@ const Reports = () => {
     data: reports = [], 
     isLoading: isLoadingReports,
     error: reportsError 
-  } = useQuery<Report[], Error, Report[]>({
+  } = useQuery({
     queryKey: ['reports'],
-    queryFn: async () => {
-      const result = await apiRequest<Report[]>('/api/reports');
-      return result || [];
+    queryFn: async (): Promise<Report[]> => {
+      try {
+        const response = await fetch('/api/reports');
+        if (!response.ok) {
+          throw new Error('Failed to fetch reports');
+        }
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+        return [];
+      }
     },
     refetchInterval: 15000 // Refresh every 15 seconds to keep reports updated
   });
@@ -60,17 +69,33 @@ const Reports = () => {
   const { 
     data: selectedReport,
     isLoading: isLoadingSelectedReport
-  } = useQuery<Report | null, Error, Report | null>({
+  } = useQuery({
     queryKey: ['report', selectedReportId],
-    queryFn: async () => {
+    queryFn: async (): Promise<Report | null> => {
       if (!selectedReportId) return null;
-      return await apiRequest<Report>(`/api/reports/${selectedReportId}`);
+      
+      try {
+        const response = await fetch(`/api/reports/${selectedReportId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch report');
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Error fetching report:', error);
+        return null;
+      }
     },
-    enabled: !!selectedReportId, // Only run if we have a selected report ID
+    enabled: !!selectedReportId // Only run if we have a selected report ID
   });
 
   // Mutation for generating a new report
-  const generateReportMutation = useMutation({
+  const generateReportMutation = useMutation<
+    Report, 
+    Error, 
+    void, 
+    { previousReports: Report[] | undefined }
+  >({
     mutationFn: async () => {
       // Calculate date range (last week)
       const endDate = new Date();
@@ -97,7 +122,8 @@ const Reports = () => {
         throw new Error('Failed to generate report');
       }
       
-      return await response.json() as Report;
+      const data = await response.json();
+      return data as Report;
     },
     onSuccess: (newReport: Report) => {
       // Update reports list and select the new report
