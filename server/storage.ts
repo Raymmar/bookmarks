@@ -13,6 +13,8 @@ import {
   users, User, InsertUser,
   collections, Collection, InsertCollection,
   collectionBookmarks, CollectionBookmark, InsertCollectionBookmark,
+  reports, Report, InsertReport,
+  reportBookmarks, ReportBookmark, InsertReportBookmark,
   xCredentials, XCredentials, InsertXCredentials,
   xFolders, XFolder, InsertXFolder
 } from "@shared/schema";
@@ -124,6 +126,25 @@ export interface IStorage {
   updateSetting(key: string, value: string): Promise<Setting | undefined>;
   deleteSetting(key: string): Promise<boolean>;
   
+  // Reports
+  getReportsByUserId(userId: string): Promise<Report[]>;
+  getReport(id: string): Promise<Report | undefined>;
+  createReport(report: InsertReport): Promise<Report>;
+  updateReport(id: string, reportUpdate: Partial<InsertReport>): Promise<Report | undefined>;
+  updateReportStatus(id: string, status: "generating" | "completed" | "failed"): Promise<Report | undefined>;
+  deleteReport(id: string): Promise<boolean>;
+  
+  // Report Bookmarks
+  getReportBookmarks(reportId: string): Promise<ReportBookmark[]>;
+  getBookmarksByReportId(reportId: string): Promise<Bookmark[]>;
+  getBookmarksWithInsightsAndTags(userId: string, since: Date, limit?: number): Promise<{
+    bookmark: Bookmark;
+    insight?: Insight;
+    tags: Tag[];
+  }[]>;
+  addBookmarkToReport(reportId: string, bookmarkId: string): Promise<ReportBookmark>;
+  removeBookmarkFromReport(reportId: string, bookmarkId: string): Promise<boolean>;
+  
   // X.com integration
   createXCredentials(credentials: InsertXCredentials): Promise<XCredentials>;
   getXCredentialsByUserId(userId: string): Promise<XCredentials | undefined>;
@@ -157,6 +178,10 @@ export class MemStorage implements IStorage {
   // Settings
   private settings: Map<string, Setting>;
   
+  // Reports
+  private reports: Map<string, Report>;
+  private reportBookmarks: Map<string, ReportBookmark>;
+  
   // X.com integration
   private xCredentials: Map<string, XCredentials>;
   private xFolders: Map<string, XFolder>;
@@ -181,6 +206,8 @@ export class MemStorage implements IStorage {
     this.chatSessions = new Map();
     this.chatMessages = new Map();
     this.settings = new Map();
+    this.reports = new Map();
+    this.reportBookmarks = new Map();
     this.xCredentials = new Map();
     this.xFolders = new Map();
   }
@@ -1931,6 +1958,190 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return bookmark;
+  }
+  
+  // Reports methods
+  async getReportsByUserId(userId: string): Promise<Report[]> {
+    return await db.select()
+      .from(reports)
+      .where(eq(reports.user_id, userId))
+      .orderBy(desc(reports.created_at));
+  }
+  
+  async getReport(id: string): Promise<Report | undefined> {
+    const [report] = await db.select()
+      .from(reports)
+      .where(eq(reports.id, id));
+    return report;
+  }
+  
+  async createReport(report: InsertReport): Promise<Report> {
+    const [newReport] = await db.insert(reports)
+      .values({
+        ...report,
+        created_at: new Date(),
+      })
+      .returning();
+    return newReport;
+  }
+  
+  async updateReport(id: string, reportUpdate: Partial<InsertReport>): Promise<Report | undefined> {
+    const [updatedReport] = await db.update(reports)
+      .set(reportUpdate)
+      .where(eq(reports.id, id))
+      .returning();
+    return updatedReport;
+  }
+  
+  async updateReportStatus(id: string, status: "generating" | "completed" | "failed"): Promise<Report | undefined> {
+    const [updatedReport] = await db.update(reports)
+      .set({ status })
+      .where(eq(reports.id, id))
+      .returning();
+    return updatedReport;
+  }
+  
+  async deleteReport(id: string): Promise<boolean> {
+    // First delete all bookmark associations
+    await db.delete(reportBookmarks)
+      .where(eq(reportBookmarks.report_id, id));
+    
+    // Then delete the report
+    const result = await db.delete(reports)
+      .where(eq(reports.id, id))
+      .returning();
+    return result.length > 0;
+  }
+  
+  // Report Bookmarks methods
+  async getReportBookmarks(reportId: string): Promise<ReportBookmark[]> {
+    return await db.select()
+      .from(reportBookmarks)
+      .where(eq(reportBookmarks.report_id, reportId));
+  }
+  
+  async getBookmarksByReportId(reportId: string): Promise<Bookmark[]> {
+    const reportBookmarkRows = await db.select({
+      bookmarkId: reportBookmarks.bookmark_id
+    })
+    .from(reportBookmarks)
+    .where(eq(reportBookmarks.report_id, reportId));
+    
+    const bookmarkIds = reportBookmarkRows.map(row => row.bookmarkId);
+    
+    if (bookmarkIds.length === 0) {
+      return [];
+    }
+    
+    return await db.select()
+      .from(bookmarks)
+      .where(inArray(bookmarks.id, bookmarkIds));
+  }
+  
+  async getBookmarksWithInsightsAndTags(userId: string, since: Date, limit?: number): Promise<{
+    bookmark: Bookmark;
+    insight?: Insight;
+    tags: Tag[];
+  }[]> {
+    // 1. Get recent bookmarks first
+    let bookmarksQuery = db.select()
+      .from(bookmarks)
+      .where(
+        and(
+          eq(bookmarks.user_id, userId),
+          sql`${bookmarks.date_saved} >= ${since}`
+        )
+      )
+      .orderBy(desc(bookmarks.date_saved));
+    
+    if (limit) {
+      bookmarksQuery = bookmarksQuery.limit(limit);
+    }
+    
+    const recentBookmarks = await bookmarksQuery;
+    
+    if (recentBookmarks.length === 0) {
+      return [];
+    }
+    
+    // 2. Get all bookmark IDs
+    const bookmarkIds = recentBookmarks.map(bookmark => bookmark.id);
+    
+    // 3. Get insights for these bookmarks
+    const bookmarkInsights = await db.select()
+      .from(insights)
+      .where(inArray(insights.bookmark_id, bookmarkIds));
+    
+    // Map insights by bookmark_id for easy lookup
+    const insightsByBookmarkId = new Map<string, Insight>();
+    bookmarkInsights.forEach(insight => {
+      insightsByBookmarkId.set(insight.bookmark_id, insight);
+    });
+    
+    // 4. Get tags for these bookmarks
+    const bookmarkTagRelations = await db.select({
+      bookmarkId: bookmarkTags.bookmark_id,
+      tagId: bookmarkTags.tag_id
+    })
+    .from(bookmarkTags)
+    .where(inArray(bookmarkTags.bookmark_id, bookmarkIds));
+    
+    // Get all unique tag IDs
+    const tagIds = Array.from(new Set(bookmarkTagRelations.map(rel => rel.tagId)));
+    
+    // Get all tags
+    const allTags = await db.select()
+      .from(tags)
+      .where(inArray(tags.id, tagIds));
+    
+    // Map tags by ID for easy lookup
+    const tagsById = new Map<string, Tag>();
+    allTags.forEach(tag => {
+      tagsById.set(tag.id, tag);
+    });
+    
+    // Group tags by bookmark ID
+    const tagsByBookmarkId = new Map<string, Tag[]>();
+    bookmarkTagRelations.forEach(rel => {
+      const tag = tagsById.get(rel.tagId);
+      if (tag) {
+        if (!tagsByBookmarkId.has(rel.bookmarkId)) {
+          tagsByBookmarkId.set(rel.bookmarkId, []);
+        }
+        tagsByBookmarkId.get(rel.bookmarkId)!.push(tag);
+      }
+    });
+    
+    // 5. Assemble the final result
+    return recentBookmarks.map(bookmark => {
+      return {
+        bookmark,
+        insight: insightsByBookmarkId.get(bookmark.id),
+        tags: tagsByBookmarkId.get(bookmark.id) || []
+      };
+    });
+  }
+  
+  async addBookmarkToReport(reportId: string, bookmarkId: string): Promise<ReportBookmark> {
+    const [newReportBookmark] = await db.insert(reportBookmarks)
+      .values({
+        report_id: reportId,
+        bookmark_id: bookmarkId
+      })
+      .returning();
+    return newReportBookmark;
+  }
+  
+  async removeBookmarkFromReport(reportId: string, bookmarkId: string): Promise<boolean> {
+    const result = await db.delete(reportBookmarks)
+      .where(
+        and(
+          eq(reportBookmarks.report_id, reportId),
+          eq(reportBookmarks.bookmark_id, bookmarkId)
+        )
+      )
+      .returning();
+    return result.length > 0;
   }
 }
 
