@@ -53,20 +53,30 @@ const Reports = () => {
   // Fetch a specific report if one is selected
   const { 
     data: selectedReport,
-    isLoading: isLoadingSelectedReport
+    isLoading: isLoadingSelectedReport,
+    refetch: refetchSelectedReport
   } = useQuery<Report>({
     queryKey: ['/api/reports', selectedReportId],
     enabled: !!selectedReportId, // Only run if we have a selected report ID
+    staleTime: 0,
+    cacheTime: 0, // Don't cache to ensure we always get fresh data
     onSuccess: (reportData) => {
       // Debug the report data
       console.log('Selected report data:', reportData);
+      console.log('Selected report data keys:', reportData ? Object.keys(reportData) : 'No data');
       if (reportData && reportData.time_period_start) {
         console.log('time_period_start type:', typeof reportData.time_period_start);
         console.log('time_period_start value:', reportData.time_period_start);
-        console.log('Attempting to create date from time_period_start:', new Date(reportData.time_period_start));
       }
     }
   });
+  
+  // Effect to refetch the report when selectedReportId changes
+  React.useEffect(() => {
+    if (selectedReportId) {
+      refetchSelectedReport();
+    }
+  }, [selectedReportId, refetchSelectedReport]);
 
   // Mutation for generating a new report
   const generateReportMutation = useMutation({
@@ -118,43 +128,45 @@ const Reports = () => {
 
   // Render a report list item
   const renderReportItem = (report: Report) => {
-    const isSelected = selectedReportId === report.id;
+    // Apply formatting to ensure proper typing
+    const formattedReport = getFormattedReport(report);
+    
+    const isSelected = selectedReportId === formattedReport.id;
     const statusLabel = {
       'generating': 'Generating...',
       'completed': 'Completed',
       'failed': 'Failed'
-    }[report.status] || 'Unknown';
+    }[formattedReport.status] || 'Unknown';
 
     const statusClass = {
       'generating': 'text-yellow-500',
       'completed': 'text-green-500',
       'failed': 'text-red-500'
-    }[report.status] || 'text-gray-500';
+    }[formattedReport.status] || 'text-gray-500';
 
     // Format dates for display, with error handling
     let dateRange = '';
     try {
       console.log('List item date values:', {
-        id: report.id, 
-        start: report.time_period_start,
-        startType: typeof report.time_period_start,
-        end: report.time_period_end,
-        endType: typeof report.time_period_end
+        id: formattedReport.id, 
+        start: formattedReport.time_period_start,
+        startType: typeof formattedReport.time_period_start,
+        end: formattedReport.time_period_end,
+        endType: typeof formattedReport.time_period_end
       });
       
-      // Handle both string dates and Date objects
-      const startDate = typeof report.time_period_start === 'string'
-        ? new Date(report.time_period_start)
-        : report.time_period_start;
-      
-      const endDate = typeof report.time_period_end === 'string'
-        ? new Date(report.time_period_end)
-        : report.time_period_end;
+      if (formattedReport.time_period_start && formattedReport.time_period_end) {
+        const startDate = new Date(formattedReport.time_period_start);
+        const endDate = new Date(formattedReport.time_period_end);
         
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+        } else {
+          console.error('Invalid date values in list item:', { startDate, endDate });
+          dateRange = 'Date range unavailable';
+        }
       } else {
-        console.error('Invalid date values in list item:', { startDate, endDate });
+        console.error('Missing date values in list item');
         dateRange = 'Date range unavailable';
       }
     } catch (error) {
@@ -196,6 +208,32 @@ const Reports = () => {
     ));
   };
 
+  // Transform the report object to ensure all fields are properly formatted
+  const getFormattedReport = (report: any): Report => {
+    if (!report) return null;
+    
+    // Create a properly typed report object from the raw data
+    return {
+      id: report.id || '',
+      title: report.title || '',
+      content: report.content || '',
+      user_id: report.user_id || '',
+      created_at: report.created_at || '',
+      // Ensure the date fields are strings
+      time_period_start: typeof report.time_period_start === 'string' 
+        ? report.time_period_start 
+        : report.time_period_start instanceof Date 
+          ? report.time_period_start.toISOString() 
+          : '',
+      time_period_end: typeof report.time_period_end === 'string' 
+        ? report.time_period_end 
+        : report.time_period_end instanceof Date 
+          ? report.time_period_end.toISOString() 
+          : '',
+      status: report.status || 'completed'
+    };
+  };
+  
   // Render the report content (markdown)
   const renderReportContent = () => {
     if (!selectedReport) {
@@ -210,6 +248,9 @@ const Reports = () => {
         </div>
       );
     }
+    
+    // Apply the formatting to ensure proper typing
+    const formattedReport = getFormattedReport(selectedReport);
 
     if (selectedReport.status === 'generating') {
       return (
@@ -241,26 +282,25 @@ const Reports = () => {
     // Format dates for display, with error handling
     let dateRange = '';
     try {
-      console.log('Report date values:', {
-        start: selectedReport.time_period_start,
-        startType: typeof selectedReport.time_period_start,
-        end: selectedReport.time_period_end,
-        endType: typeof selectedReport.time_period_end
+      console.log('Report date values from formatted report:', {
+        start: formattedReport.time_period_start,
+        startType: typeof formattedReport.time_period_start,
+        end: formattedReport.time_period_end,
+        endType: typeof formattedReport.time_period_end
       });
       
-      // Handle both string dates and Date objects
-      const startDate = typeof selectedReport.time_period_start === 'string'
-        ? new Date(selectedReport.time_period_start)
-        : selectedReport.time_period_start;
-      
-      const endDate = typeof selectedReport.time_period_end === 'string'
-        ? new Date(selectedReport.time_period_end)
-        : selectedReport.time_period_end;
-      
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+      if (formattedReport.time_period_start && formattedReport.time_period_end) {
+        const startDate = new Date(formattedReport.time_period_start);
+        const endDate = new Date(formattedReport.time_period_end);
+        
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+        } else {
+          console.error('Invalid date objects:', { startDate, endDate });
+          dateRange = 'Date range unavailable';
+        }
       } else {
-        console.error('Invalid date values:', { startDate, endDate });
+        console.error('Missing date values in formatted report');
         dateRange = 'Date range unavailable';
       }
     } catch (error) {
@@ -270,14 +310,14 @@ const Reports = () => {
 
     return (
       <div className="p-6">
-        <h2 className="text-2xl font-bold mb-2">{selectedReport.title}</h2>
+        <h2 className="text-2xl font-bold mb-2">{formattedReport.title}</h2>
         <div className="text-sm text-gray-500 mb-6 flex items-center gap-2">
           <Calendar className="w-4 h-4" /> 
           {dateRange}
         </div>
         
         <div className="prose dark:prose-invert max-w-none">
-          <ReactMarkdown>{selectedReport.content}</ReactMarkdown>
+          <ReactMarkdown>{formattedReport.content}</ReactMarkdown>
         </div>
       </div>
     );
