@@ -116,54 +116,51 @@ export class ReportService {
   
   /**
    * Fetches relevant bookmarks for the report
-   * Returns bookmarks enhanced with summary and tags from insights
+   * Only returns bookmarks that have already been processed with AI insights
    */
   private static async getRelevantBookmarks(userId: string, limit: number = 100): Promise<ExtendedBookmark[]> {
-    // Get most recent bookmarks for the user, with a limit
+    // Get all bookmarks for this user
     const allBookmarks = await storage.getBookmarks(userId);
     
+    // Filter and process bookmarks to find those with insights
+    const bookmarksWithInsights: ExtendedBookmark[] = [];
+    
+    for (const bookmark of allBookmarks) {
+      try {
+        // Get the AI-generated insight
+        const insight = await storage.getInsightByBookmarkId(bookmark.id);
+        
+        // Only include bookmarks that have insights with summaries
+        if (insight && insight.summary) {
+          // Get tags for this bookmark
+          const bookmarkTags = await storage.getTagsByBookmarkId(bookmark.id);
+          
+          // Create extended bookmark with summary from insight
+          const extendedBookmark: ExtendedBookmark = {
+            ...bookmark,
+            summary: insight.summary,
+            tags: bookmarkTags.map(tag => tag.name)
+          };
+          
+          bookmarksWithInsights.push(extendedBookmark);
+        }
+      } catch (error) {
+        console.warn(`Error checking insights for bookmark ${bookmark.id}:`, error);
+        // Skip this bookmark if we can't process it
+      }
+    }
+    
     // Sort by date saved, newest first
-    const sortedBookmarks = allBookmarks.sort((a, b) => {
+    bookmarksWithInsights.sort((a, b) => {
       const dateA = new Date(a.date_saved);
       const dateB = new Date(b.date_saved);
       return dateB.getTime() - dateA.getTime();
     });
     
+    console.log(`Found ${bookmarksWithInsights.length} bookmarks with insights for user ${userId}`);
+    
     // Limit to the most recent 'limit' bookmarks
-    const recentBookmarks = sortedBookmarks.slice(0, limit);
-    
-    // Convert regular bookmarks to extended bookmarks
-    const extendedBookmarks: ExtendedBookmark[] = await Promise.all(
-      recentBookmarks.map(async (bookmark) => {
-        // Create extended bookmark with initial empty tags array and default summary
-        const extendedBookmark: ExtendedBookmark = {
-          ...bookmark,
-          summary: bookmark.description || '', // Default to description
-          tags: [] // Initialize with empty array, will be populated below
-        };
-        
-        try {
-          // First get tags for this bookmark
-          const bookmarkTags = await storage.getTagsByBookmarkId(bookmark.id);
-          extendedBookmark.tags = bookmarkTags.map(tag => tag.name);
-          
-          // Then try to get the AI-generated insight for better summary
-          const insight = await storage.getInsightByBookmarkId(bookmark.id);
-          if (insight && insight.summary) {
-            // Use the AI-generated summary if available
-            extendedBookmark.summary = insight.summary;
-            console.log(`Using AI-generated summary for bookmark ${bookmark.id}`);
-          }
-        } catch (error) {
-          console.warn(`Error fetching data for bookmark ${bookmark.id}:`, error);
-          // We already have default values, so no need to set them again
-        }
-        
-        return extendedBookmark;
-      })
-    );
-    
-    return extendedBookmarks;
+    return bookmarksWithInsights.slice(0, limit);
   }
   
   /**
@@ -290,23 +287,30 @@ export class ReportService {
       // Get all report bookmarks
       const bookmarks = await storage.getBookmarksByReportId(reportId);
       
-      // Get bookmarks and convert to ExtendedBookmarks
+      // Get bookmarks with insights for the report
       const extendedBookmarks: ExtendedBookmark[] = await Promise.all(
         bookmarks.map(async (bookmark) => {
           // Create extended bookmark with initial empty tags array
           const extendedBookmark: ExtendedBookmark = {
             ...bookmark,
-            summary: bookmark.description || '', // Use description as summary
-            tags: [] // Initialize with empty array, will be populated below
+            summary: bookmark.description || '', // Default to description
+            tags: [] // Initialize with empty tags array
           };
           
           try {
-            // Get tags for this bookmark
+            // Get the bookmark tags
             const bookmarkTags = await storage.getTagsByBookmarkId(bookmark.id);
             extendedBookmark.tags = bookmarkTags.map(tag => tag.name);
+            
+            // Get the insight for this bookmark
+            const insight = await storage.getInsightByBookmarkId(bookmark.id);
+            if (insight && insight.summary) {
+              // Use the AI-generated summary if available
+              extendedBookmark.summary = insight.summary;
+            }
           } catch (error) {
-            console.warn(`Could not fetch tags for bookmark ${bookmark.id}:`, error);
-            extendedBookmark.tags = [];
+            console.warn(`Could not fetch data for bookmark ${bookmark.id}:`, error);
+            // Keep the default values
           }
           
           return extendedBookmark;
