@@ -59,7 +59,7 @@ const Reports = () => {
     queryKey: ['/api/reports', selectedReportId],
     enabled: !!selectedReportId, // Only run if we have a selected report ID
     staleTime: 0,
-    cacheTime: 0, // Don't cache to ensure we always get fresh data
+    gcTime: 0, // Don't cache to ensure we always get fresh data (cacheTime renamed to gcTime in v5)
     onSuccess: (reportData) => {
       // Debug the report data
       console.log('Selected report data:', reportData);
@@ -212,26 +212,62 @@ const Reports = () => {
   const getFormattedReport = (report: any): Report => {
     if (!report) return null;
     
+    console.log('Formatting report:', report);
+    console.log('Raw time_period_start:', report.time_period_start, 'type:', typeof report.time_period_start);
+    console.log('Raw time_period_end:', report.time_period_end, 'type:', typeof report.time_period_end);
+    
+    // Handle time_period_start
+    let formattedStartDate = '';
+    if (report.time_period_start) {
+      if (typeof report.time_period_start === 'string') {
+        formattedStartDate = report.time_period_start;
+      } else if (report.time_period_start instanceof Date) {
+        formattedStartDate = report.time_period_start.toISOString();
+      } else if (typeof report.time_period_start === 'object') {
+        // PostgreSQL timestamp might come as an object with a toISOString method
+        try {
+          formattedStartDate = new Date(report.time_period_start).toISOString();
+        } catch (e) {
+          console.error('Error formatting start date:', e);
+        }
+      }
+    }
+    
+    // Handle time_period_end 
+    let formattedEndDate = '';
+    if (report.time_period_end) {
+      if (typeof report.time_period_end === 'string') {
+        formattedEndDate = report.time_period_end;
+      } else if (report.time_period_end instanceof Date) {
+        formattedEndDate = report.time_period_end.toISOString();
+      } else if (typeof report.time_period_end === 'object') {
+        // PostgreSQL timestamp might come as an object with a toISOString method
+        try {
+          formattedEndDate = new Date(report.time_period_end).toISOString();
+        } catch (e) {
+          console.error('Error formatting end date:', e);
+        }
+      }
+    }
+    
     // Create a properly typed report object from the raw data
-    return {
+    const formattedReport = {
       id: report.id || '',
       title: report.title || '',
       content: report.content || '',
       user_id: report.user_id || '',
       created_at: report.created_at || '',
-      // Ensure the date fields are strings
-      time_period_start: typeof report.time_period_start === 'string' 
-        ? report.time_period_start 
-        : report.time_period_start instanceof Date 
-          ? report.time_period_start.toISOString() 
-          : '',
-      time_period_end: typeof report.time_period_end === 'string' 
-        ? report.time_period_end 
-        : report.time_period_end instanceof Date 
-          ? report.time_period_end.toISOString() 
-          : '',
+      time_period_start: formattedStartDate,
+      time_period_end: formattedEndDate,
       status: report.status || 'completed'
     };
+    
+    console.log('Formatted report time periods:', {
+      start: formattedReport.time_period_start,
+      end: formattedReport.time_period_end
+    });
+    
+    return formattedReport;
   };
   
   // Render the report content (markdown)
