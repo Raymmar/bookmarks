@@ -96,13 +96,10 @@ const Reports = () => {
       const timePeriodEnd = endDate.toISOString();
       
       // Send request to generate report
-      return apiRequest<Report>('/api/reports', {
-        method: 'POST',
-        data: {
-          timePeriodStart,
-          timePeriodEnd,
-          maxBookmarks: 100
-        }
+      return apiRequest<Report>('POST', '/api/reports', {
+        timePeriodStart,
+        timePeriodEnd,
+        maxBookmarks: 100
       });
     },
     onSuccess: (newReport: Report) => {
