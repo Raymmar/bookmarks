@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, Query, QueryKey } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { format, subWeeks } from 'date-fns';
+import { format, subWeeks, subDays } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+import { useReportPreferences, ReportType } from '@/hooks/use-report-preferences';
 
 // UI Components
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,13 @@ import {
   AlertDescription,
   AlertTitle 
 } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AlertCircle, Calendar, FileText, RefreshCw } from 'lucide-react';
 
 // Report interface matches what we expect from the API
@@ -39,6 +47,7 @@ const Reports = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const { preferences, setReportType } = useReportPreferences();
   
   // Fetch reports from API
   const { 
