@@ -51,6 +51,7 @@ export interface GenerateReportOptions {
   timePeriodStart?: Date;
   timePeriodEnd?: Date;
   maxBookmarks?: number;
+  reportType?: 'daily' | 'weekly';
 }
 
 /**
@@ -60,20 +61,27 @@ export class ReportService {
   constructor() {}
 
   /**
-   * Generate a weekly report for the user's recent bookmarks
+   * Generate a report for the user's recent bookmarks
    */
   async generateWeeklyReport(options: GenerateReportOptions): Promise<Report> {
-    const { userId, customSystemPrompt, maxBookmarks = 100 } = options;
+    const { userId, customSystemPrompt, maxBookmarks = 100, reportType = 'weekly' } = options;
 
-    // Default to the previous week if not specified
+    // Determine time period based on report type
     const timePeriodEnd = options.timePeriodEnd || new Date();
-    const timePeriodStart =
-      options.timePeriodStart || subWeeks(timePeriodEnd, 1);
+    let timePeriodStart: Date;
+    
+    if (reportType === 'daily') {
+      // For daily reports, get just the last day
+      timePeriodStart = options.timePeriodStart || subDays(timePeriodEnd, 1);
+    } else {
+      // For weekly reports, get the last week
+      timePeriodStart = options.timePeriodStart || subWeeks(timePeriodEnd, 1);
+    }
 
     // Format date range for the report title
     const formattedStartDate = format(timePeriodStart, "MMM d, yyyy");
     const formattedEndDate = format(timePeriodEnd, "MMM d, yyyy");
-    const reportTitle = `Weekly Insights: ${formattedStartDate} - ${formattedEndDate}`;
+    const reportTitle = `${reportType === 'daily' ? 'Daily' : 'Weekly'} Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
     // Used to store the report for reference in the catch block
     let reportObj: Report;
@@ -154,13 +162,14 @@ export class ReportService {
       // Enhanced user prompt to ensure comprehensive coverage
       const userPrompt = JSON.stringify({
         request:
-          "Generate a comprehensive weekly insights report for my bookmarks",
+          `Generate a comprehensive ${reportType} insights report for my bookmarks`,
         time_period: {
           start: format(timePeriodStart, "yyyy-MM-dd"),
           end: format(timePeriodEnd, "yyyy-MM-dd"),
+          type: reportType
         },
         instructions:
-          "Provide a high level summary of all of the submitted content, themes and topics. Your goal is not to regurgitate the individual bookmarks, instead focus on extracing connections and themes. Patterns in the bookmarks and additional insights that might be useful for the user.",
+          `Provide a high level summary of all of the submitted content, themes and topics for this ${reportType} report. Your goal is not to regurgitate the individual bookmarks, instead focus on extracting connections and themes. Patterns in the bookmarks and additional insights that might be useful for the user.`,
         bookmarks: bookmarksData,
       });
 

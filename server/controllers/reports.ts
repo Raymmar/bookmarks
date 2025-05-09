@@ -30,6 +30,7 @@ export function setupReportRoutes(app: Express) {
         timePeriodStart: z.string().optional(), // ISO date string
         timePeriodEnd: z.string().optional(),   // ISO date string
         maxBookmarks: z.number().min(1).max(500).optional(),
+        reportType: z.enum(['daily', 'weekly']).optional(),
       });
       
       const parseResult = requestSchema.safeParse(req.body);
@@ -47,6 +48,7 @@ export function setupReportRoutes(app: Express) {
         timePeriodStart: parseResult.data.timePeriodStart ? new Date(parseResult.data.timePeriodStart) : undefined,
         timePeriodEnd: parseResult.data.timePeriodEnd ? new Date(parseResult.data.timePeriodEnd) : undefined,
         maxBookmarks: parseResult.data.maxBookmarks,
+        reportType: parseResult.data.reportType,
       };
       
       // Generate the report (this will be a long-running operation)

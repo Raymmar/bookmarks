@@ -96,9 +96,17 @@ const Reports = () => {
   // Mutation for generating a new report
   const generateReportMutation = useMutation({
     mutationFn: async () => {
-      // Calculate date range (last week)
+      // Calculate date range based on report type preference
       const endDate = new Date();
-      const startDate = subWeeks(endDate, 1);
+      let startDate: Date;
+      
+      if (preferences.reportType === 'daily') {
+        // For daily reports, get just the last day
+        startDate = subDays(endDate, 1);
+      } else {
+        // For weekly reports, get the last week
+        startDate = subWeeks(endDate, 1);
+      }
       
       // Format dates as ISO strings
       const timePeriodStart = startDate.toISOString();
@@ -108,7 +116,8 @@ const Reports = () => {
       return apiRequest<Report>('POST', '/api/reports', {
         timePeriodStart,
         timePeriodEnd,
-        maxBookmarks: 100
+        maxBookmarks: 100,
+        reportType: preferences.reportType
       });
     },
     onSuccess: (newReport: Report) => {
@@ -121,9 +130,11 @@ const Reports = () => {
       // Make sure we also invalidate the individual report query
       queryClient.invalidateQueries({ queryKey: [`/api/reports/${newReport.id}`] });
       
+      const reportTypeLabel = preferences.reportType === 'daily' ? 'daily' : 'weekly';
+      
       toast({
         title: "Report generation started",
-        description: "Your weekly report is being generated and will be available shortly."
+        description: `Your ${reportTypeLabel} report is being generated and will be available shortly.`
       });
     },
     onError: (error) => {
@@ -139,6 +150,11 @@ const Reports = () => {
   // Handle generating a new report
   const handleGenerateReport = () => {
     generateReportMutation.mutate();
+  };
+  
+  // Handle report type change
+  const handleReportTypeChange = (value: string) => {
+    setReportType(value as ReportType);
   };
 
   // Render a report list item
@@ -222,9 +238,27 @@ const Reports = () => {
           <FileText className="w-20 h-20 text-gray-300 mb-4" />
           <h3 className="text-xl font-medium mb-2">No Report Selected</h3>
           <p className="text-gray-500 mb-6">Select a report from the list or generate a new one.</p>
-          <Button onClick={handleGenerateReport} disabled={generateReportMutation.isPending}>
-            Generate Weekly Report
-          </Button>
+          
+          <div className="flex flex-col space-y-4 items-center">
+            <div className="w-64">
+              <Select
+                value={preferences.reportType}
+                onValueChange={handleReportTypeChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select report type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily Report</SelectItem>
+                  <SelectItem value="weekly">Weekly Report</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button onClick={handleGenerateReport} disabled={generateReportMutation.isPending} className="w-64">
+              Generate {preferences.reportType === 'daily' ? 'Daily' : 'Weekly'} Report
+            </Button>
+          </div>
         </div>
       );
     }
@@ -298,20 +332,34 @@ const Reports = () => {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6 px-2">
-        <h1 className="text-3xl font-bold">Weekly Insights Reports</h1>
-        <Button 
-          onClick={handleGenerateReport}
-          disabled={generateReportMutation.isPending}
-        >
-          {generateReportMutation.isPending ? (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            'Generate New Report'
-          )}
-        </Button>
+        <h1 className="text-3xl font-bold">{preferences.reportType === 'daily' ? 'Daily' : 'Weekly'} Insights Reports</h1>
+        <div className="flex items-center space-x-3">
+          <Select
+            value={preferences.reportType}
+            onValueChange={handleReportTypeChange}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Report type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Daily Report</SelectItem>
+              <SelectItem value="weekly">Weekly Report</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button 
+            onClick={handleGenerateReport}
+            disabled={generateReportMutation.isPending}
+          >
+            {generateReportMutation.isPending ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              'Generate Report'
+            )}
+          </Button>
+        </div>
       </div>
 
       {reportsError && (
