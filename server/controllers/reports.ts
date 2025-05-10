@@ -8,7 +8,6 @@ import type { Express, Request, Response } from "express";
 import { reportService } from "../lib/report-service";
 import { storage } from "../storage";
 import { z } from "zod";
-import { addWeeks, subWeeks } from "date-fns";
 
 // Middleware to check if user is authenticated
 const ensureAuthenticated = (req: Request, res: Response, next: Function) => {
