@@ -30,9 +30,9 @@ The report should be structured in two main sections:
 "Atmosphere"
 "Overview"
 
-- Atmosphere: An informative list of key takeaways and analysis with links (formatted in markdown) back to the referenced bookmarks. Each point should be brief yet insightful. EVERY point must include at least one link to a relevant bookmark. This section should give the user a quick overview of the most important information with no added superlatives, adjectives or fluff.
+- Atmosphere: An informative list of key takeaways and analysis with links (formatted in markdown) back to the referenced bookmarks. Each point should be brief yet insightful. EVERY point must include at least one link to a relevant bookmark. This section should give the user a quick overview of the most important information with no added superlatives, adjectives or fluff. 
 
-- Overview: A more detailed exploration of the content that dives deeper but as in a more readable format. Think news article, or news briefing. Imagine this section might be read outloud as a audio segment on a podcast giving an overview of the insights from the report.
+- Overview: A more detailed exploration of the content that dives deeper but as in a more readable format. Think news script, or briefing. Imagine this section might be read outloud as a audio segment on a podcast giving an overview of the insights from the report.
 
 Your output should feel like a trusted advisor giving useful information rather than a formal business report. Use a casual, candid tone throughout but be direct and get straight to the point with no wasted words. Avoid being uptight, formal, or stiff in your language.
 
