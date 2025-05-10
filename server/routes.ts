@@ -17,7 +17,6 @@ import { setupAuth } from "./auth";
 import { setupEmailAuthRoutes } from "./controllers/email-auth";
 import { setupReportRoutes } from "./controllers/reports";
 import { xService } from "./lib/x-service";
-import fs from "fs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server

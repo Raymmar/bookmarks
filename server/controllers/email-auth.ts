@@ -1,7 +1,7 @@
 import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "../storage";
 import { emailService } from "../services/email";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
