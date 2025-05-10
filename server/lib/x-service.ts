@@ -84,7 +84,6 @@ interface XTweet {
     media_keys?: string[];
     poll_ids?: string[];
   };
-  // Previously tracked local media files - now removed
   // Flag to mark tweets that only have IDs and need full data fetching
   needsFetching?: boolean;
 }
@@ -460,7 +459,6 @@ export class XService {
           public_metrics: tweet.public_metrics,
           entities: tweet.entities,
           attachments: tweet.attachments
-          // No longer tracking local media
         }));
         
         // Extract users from includes
@@ -615,8 +613,7 @@ export class XService {
             id: item,
             text: '', // Empty text - will be filled later when fetched
             needsFetching: true, // Mark that this tweet needs its full content fetched
-            // Initialize local_media as empty array for each tweet
-            local_media: []
+            // No longer initializing local media
           };
         }
         
@@ -629,8 +626,7 @@ export class XService {
           id: item.id,
           text: '', // Will be filled with actual content after fetching
           needsFetching: true, // Always fetch the full tweet data
-          // Initialize local_media as empty array for each tweet
-          local_media: []
+          // No longer initializing local media
         };
       });
       
@@ -1214,10 +1210,8 @@ export class XService {
           const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
           bookmarkData.user_id = userId;
           
-          // Log if we downloaded any media
-          if (tweet.local_media && tweet.local_media.length > 0) {
-            console.log(`X Sync: Downloaded ${tweet.local_media.length} media files for tweet ${tweet.id}`);
-          }
+          // No longer downloading media files
+          console.log(`X Sync: Using original media URLs for tweet ${tweet.id}`);
           
           // Create the new bookmark
           const newBookmark = await storage.createBookmark(bookmarkData);
@@ -1910,9 +1904,8 @@ export class XService {
         author_id: tweet.author_id,
         public_metrics: tweet.public_metrics,
         entities: tweet.entities,
-        attachments: tweet.attachments,
-        // Initialize local_media as empty array for each tweet
-        local_media: []
+        attachments: tweet.attachments
+        // No longer initializing local media
       }));
       
       // Extract users from includes
