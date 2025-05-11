@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
 import { BookmarkGrid } from "@/components/responsive-bookmark-grid";
@@ -7,9 +7,8 @@ import { ViewModeSwitcher } from "@/components/view-mode-switcher";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pagination } from "@/components/ui/pagination";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { Search, Filter, Bookmark, X } from "lucide-react";
+import { Search, Filter, Bookmark, X, Loader2 } from "lucide-react";
 import { usePaginatedBookmarks } from "@/hooks/use-paginated-bookmarks";
 import { Bookmark as BookmarkType } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +37,9 @@ export default function Feed() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   
+  // Ref for infinite scroll
+  const loaderRef = useRef<HTMLDivElement>(null);
+  
   // Debounce search input to prevent too many requests
   useEffect(() => {
     const timerId = setTimeout(() => {
@@ -47,17 +49,14 @@ export default function Feed() {
     return () => clearTimeout(timerId);
   }, [searchQuery]);
   
-  // Fetch paginated bookmarks with server-side search
+  // Fetch paginated bookmarks with server-side search and infinite scroll
   const {
     bookmarks,
     isLoading,
-    page,
-    totalPages,
-    setPage,
     hasNextPage,
-    hasPreviousPage,
-    goToNextPage,
-    goToPreviousPage,
+    loadMoreBookmarks,
+    isFetchingNextPage,
+    totalPages,
     refetch
   } = usePaginatedBookmarks(50, sortOrder as 'newest' | 'oldest' | 'recently_updated', debouncedSearchQuery);
   
@@ -95,8 +94,28 @@ export default function Feed() {
     sessionStorage.removeItem('lastSelectedBookmarkId');
   };
   
-  // We've removed the automatic loading of bookmarks on component mount
-  // so that no bookmark is loaded in the detail view by default
+  // Setup intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isLoading && !isFetchingNextPage) {
+          loadMoreBookmarks();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    const currentLoaderRef = loaderRef.current;
+    if (currentLoaderRef) {
+      observer.observe(currentLoaderRef);
+    }
+    
+    return () => {
+      if (currentLoaderRef) {
+        observer.unobserve(currentLoaderRef);
+      }
+    };
+  }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreBookmarks]);
 
   return (
     <div className="h-full w-full bg-gray-50">
@@ -163,34 +182,24 @@ export default function Feed() {
                   isLoading={isLoading}
                 />
               )}
-            </div>
-            
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center p-4 border-t">
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToPreviousPage}
-                    disabled={!hasPreviousPage}
-                  >
-                    Previous
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToNextPage}
-                    disabled={!hasNextPage}
-                  >
-                    Next
-                  </Button>
+              
+              {/* Infinite scroll loader */}
+              {(hasNextPage || isFetchingNextPage) && (
+                <div 
+                  ref={loaderRef} 
+                  className="flex justify-center items-center p-4 border-t"
+                >
+                  {isFetchingNextPage ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loading more...</span>
+                    </div>
+                  ) : (
+                    <div className="h-8" /> // Invisible element for intersection observer
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </ResizablePanel>
         

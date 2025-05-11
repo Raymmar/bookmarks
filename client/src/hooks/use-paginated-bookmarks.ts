@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { Bookmark } from '@shared/types';
 import { useAuth } from './use-auth';
 
@@ -7,39 +7,44 @@ type SortOption = 'newest' | 'oldest' | 'recently_updated' | 'created_newest';
 
 export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOption = 'newest', searchQuery: string = '') {
   const { user } = useAuth();
-  const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const allBookmarksRef = useRef<Bookmark[]>([]);
 
-  // Calculate offset for pagination
-  const offset = (page - 1) * pageSize;
+  // Function to build query parameters
+  const buildQueryParams = useCallback((pageParam: number) => {
+    const offset = (pageParam - 1) * pageSize;
+    const params = new URLSearchParams({
+      limit: pageSize.toString(),
+      offset: offset.toString(),
+      sort: sortOrder
+    });
+    
+    if (user?.id) {
+      params.append('user_id', user.id);
+    }
+    
+    if (searchQuery) {
+      params.append('search', searchQuery);
+    }
+    
+    return params;
+  }, [pageSize, sortOrder, user?.id, searchQuery]);
 
-  // Build query parameters
-  const queryParams = new URLSearchParams({
-    limit: pageSize.toString(),
-    offset: offset.toString(),
-    sort: sortOrder
-  });
-  
-  if (user?.id) {
-    queryParams.append('user_id', user.id);
-  }
-  
-  // Add search query if provided
-  if (searchQuery) {
-    queryParams.append('search', searchQuery);
-  }
-
-  // Fetch bookmarks with pagination
+  // Use infinite query instead of regular query
   const {
-    data: bookmarks = [],
+    data,
+    fetchNextPage,
+    hasNextPage: hasMore,
+    isFetchingNextPage,
     isLoading,
     isError,
     error,
-    refetch
-  } = useQuery<Bookmark[]>({
-    queryKey: ['/api/bookmarks', page, pageSize, sortOrder, user?.id, searchQuery],
-    queryFn: async () => {
+    refetch,
+    status
+  } = useInfiniteQuery({
+    queryKey: ['/api/bookmarks/infinite', pageSize, sortOrder, user?.id, searchQuery],
+    queryFn: async ({ pageParam = 1 }) => {
+      const queryParams = buildQueryParams(pageParam);
       const response = await fetch(`/api/bookmarks?${queryParams.toString()}`);
       
       if (!response.ok) {
@@ -51,47 +56,49 @@ export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOpti
       if (totalCount) {
         const count = parseInt(totalCount, 10);
         setTotalItems(count);
-        setTotalPages(Math.ceil(count / pageSize));
       }
       
-      return response.json();
+      const bookmarks = await response.json();
+      return { bookmarks, nextPage: bookmarks.length === pageSize ? pageParam + 1 : undefined };
     },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.nextPage,
   });
-
-  // Reset to page 1 when sort order, user, or search query changes
+  
+  // Combine all pages of bookmarks into a single array
+  const bookmarks = data?.pages.flatMap(page => page.bookmarks) || [];
+  
+  // Keep reference to all bookmarks for optimizations
   useEffect(() => {
-    setPage(1);
-  }, [sortOrder, user?.id, searchQuery]);
+    allBookmarksRef.current = bookmarks;
+  }, [bookmarks]);
+  
+  // Calculate if there are more pages
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const hasNextPage = hasMore;
+  
+  // Reset the query when sort order or search changes
+  useEffect(() => {
+    refetch();
+  }, [sortOrder, user?.id, searchQuery, refetch]);
 
-  // Pagination controls
-  const hasNextPage = page < totalPages;
-  const hasPreviousPage = page > 1;
-  
-  const goToNextPage = () => {
-    if (hasNextPage) {
-      setPage(page + 1);
+  // Function to load more bookmarks
+  const loadMoreBookmarks = useCallback(() => {
+    if (hasMore && !isFetchingNextPage) {
+      fetchNextPage();
     }
-  };
-  
-  const goToPreviousPage = () => {
-    if (hasPreviousPage) {
-      setPage(page - 1);
-    }
-  };
+  }, [hasMore, isFetchingNextPage, fetchNextPage]);
 
   return {
     bookmarks,
     isLoading,
     isError,
     error,
-    page,
-    setPage,
     totalItems,
     totalPages,
     hasNextPage,
-    hasPreviousPage,
-    goToNextPage,
-    goToPreviousPage,
+    loadMoreBookmarks,
+    isFetchingNextPage,
     refetch
   };
 }
