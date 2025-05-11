@@ -42,8 +42,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
       const sort = req.query.sort as string || 'newest';
       
-      // Get bookmarks with pagination
-      const bookmarks = await storage.getBookmarks(userId, { limit, offset, sort });
+      // Parse search query if provided
+      const searchQuery = req.query.search ? (req.query.search as string).trim() : undefined;
+      
+      // Get total count before pagination for accurate pagination info
+      const totalCount = await storage.getBookmarksCount(userId, { searchQuery });
+      
+      // Add count to response headers
+      res.setHeader('X-Total-Count', totalCount.toString());
+      
+      // Get bookmarks with pagination and search
+      const bookmarks = await storage.getBookmarks(userId, { 
+        limit, 
+        offset, 
+        sort,
+        searchQuery 
+      });
       
       // Populate the bookmarks with related data
       const populatedBookmarks = await Promise.all(
