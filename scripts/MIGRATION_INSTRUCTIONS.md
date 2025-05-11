@@ -1,10 +1,38 @@
 # Database Migration Instructions
 
-This document explains how to migrate your database from one Neon PostgreSQL instance to another. We've provided three different approaches to accommodate various scenarios.
+This document explains how to migrate your database from one Neon PostgreSQL instance to another. We've provided multiple approaches to accommodate various scenarios.
 
-## Option 1: PostgreSQL Dump and Restore (Recommended)
+## Option 1: PostgreSQL Dump and Restore using Bash Scripts (Recommended)
 
-This approach uses PostgreSQL's built-in `pg_dump` and `psql` tools to create a full database backup and restore it to the new instance.
+This approach uses PostgreSQL's built-in `pg_dump` and `psql` tools with simple bash scripts.
+
+### Step 1: Export the database
+
+In your source Replit project, run:
+
+```bash
+./scripts/export-db.sh
+```
+
+This will create a SQL dump file in your project's root directory (e.g., `database_export_2025-05-11_22-45-30.sql`).
+
+### Step 2: Transfer the SQL file to the new project
+
+You can download the SQL file from your source Replit project and upload it to the target Replit project.
+
+### Step 3: Import the database
+
+In your target Replit project, run:
+
+```bash
+./scripts/import-db.sh <sql-file-name>
+```
+
+Replace `<sql-file-name>` with the path to the SQL dump file you uploaded.
+
+## Option 2: PostgreSQL Dump and Restore using TypeScript
+
+This approach also uses PostgreSQL's tools but wrapped in TypeScript for more detailed error handling.
 
 ### Step 1: Export the database
 
@@ -14,7 +42,7 @@ In your source Replit project, run:
 npx tsx scripts/export-database.ts
 ```
 
-This will create a SQL dump file in your project's root directory (e.g., `database-export-2025-05-11T22-45-30-000Z.sql`).
+This will create a SQL dump file in your project's root directory.
 
 ### Step 2: Transfer the SQL file to the new project
 

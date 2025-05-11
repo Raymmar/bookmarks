@@ -46,9 +46,14 @@ async function exportDatabase() {
     };
 
     // Prepare pg_dump command
-    const pgDumpCommand = `pg_dump -h ${host} -p ${port} -U ${username} -d ${database} -f "${outputPath}" --no-owner --no-acl`;
+    // Check if port is empty and handle it appropriately
+    const portParam = port ? `-p ${port}` : '';
+    
+    // Handle special characters in the username and database name
+    const pgDumpCommand = `pg_dump -h "${host}" ${portParam} -U "${username}" -d "${database}" -f "${outputPath}" --no-owner --no-acl`;
     
     console.log('Starting database export...');
+    console.log(`Using command: ${pgDumpCommand}`);
     
     // Execute pg_dump
     const { stdout, stderr } = await execAsync(pgDumpCommand, { env });

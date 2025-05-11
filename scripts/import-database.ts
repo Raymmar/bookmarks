@@ -47,22 +47,27 @@ async function importDatabase(dumpFilePath: string) {
     // First, we need to check if there are existing tables and drop them if needed
     console.log('Checking existing database structure...');
     
+    // Check if port is empty and handle it appropriately
+    const portParam = port ? `-p ${port}` : '';
+    
     // Get list of all tables in the database
-    const listTablesCommand = `psql -h ${host} -p ${port} -U ${username} -d ${database} -t -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"`;
+    const listTablesCommand = `psql -h "${host}" ${portParam} -U "${username}" -d "${database}" -t -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"`;
+    console.log(`Checking tables using command: ${listTablesCommand}`);
     const { stdout: tablesList } = await execAsync(listTablesCommand, { env });
     
     if (tablesList.trim()) {
       console.log('Found existing tables. Preparing to drop them...');
       
       // Drop all existing tables if they exist
-      const dropTablesCommand = `psql -h ${host} -p ${port} -U ${username} -d ${database} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`;
+      const dropTablesCommand = `psql -h "${host}" ${portParam} -U "${username}" -d "${database}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`;
       await execAsync(dropTablesCommand, { env });
       console.log('Dropped existing tables.');
     }
 
     // Now import the database dump
     console.log('Starting database import...');
-    const psqlCommand = `psql -h ${host} -p ${port} -U ${username} -d ${database} -f "${dumpFilePath}"`;
+    const psqlCommand = `psql -h "${host}" ${portParam} -U "${username}" -d "${database}" -f "${dumpFilePath}"`;
+    console.log(`Using import command: ${psqlCommand}`);
     
     const { stdout, stderr } = await execAsync(psqlCommand, { env });
     

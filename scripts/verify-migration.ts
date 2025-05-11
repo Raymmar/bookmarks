@@ -68,17 +68,15 @@ async function verifyMigration() {
 
     // Check each table
     for (const tableName of TABLES) {
-      // Get count from source database
-      const sourceCountResult = await sourceDb.execute(
-        sql`SELECT COUNT(*) as count FROM ${sql.identifier(tableName)}`
-      );
-      const sourceCount = parseInt(sourceCountResult.rows[0]?.count || '0', 10);
+      // Get count from source database using raw SQL to avoid type issues
+      const sourceQuery = `SELECT COUNT(*) as count FROM "${tableName}"`;
+      const sourceCountResult = await sourceDb.execute(sql.raw(sourceQuery));
+      const sourceCount = parseInt(String(sourceCountResult.rows[0]?.count) || '0', 10);
 
-      // Get count from target database
-      const targetCountResult = await targetDb.execute(
-        sql`SELECT COUNT(*) as count FROM ${sql.identifier(tableName)}`
-      );
-      const targetCount = parseInt(targetCountResult.rows[0]?.count || '0', 10);
+      // Get count from target database using raw SQL to avoid type issues
+      const targetQuery = `SELECT COUNT(*) as count FROM "${tableName}"`;
+      const targetCountResult = await targetDb.execute(sql.raw(targetQuery));
+      const targetCount = parseInt(String(targetCountResult.rows[0]?.count) || '0', 10);
 
       // Determine status
       const status = sourceCount === targetCount ? 'PASS' : 'FAIL';

@@ -1,0 +1,40 @@
+~/workspace$ npx tsx scripts/export-database.ts
+Exporting database: neondb from host: ep-falling-violet-a62b14pc.us-west-2.aws.neon.tech
+Starting database export...
+Database export failed: Error: Command failed: pg_dump -h ep-falling-violet-a62b14pc.us-west-2.aws.neon.tech -p  -U neondb_owner -d neondb -f "/home/runner/workspace/database-export-2025-05-11T22-46-04-910Z.sql" --no-owner --no-acl
+pg_dump: error: too many command-line arguments (first is "neondb_owner")
+pg_dump: hint: Try "pg_dump --help" for more information.
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:518:28)
+    at maybeClose (node:internal/child_process:1104:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:304:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'pg_dump -h ep-falling-violet-a62b14pc.us-west-2.aws.neon.tech -p  -U neondb_owner -d neondb -f "/home/runner/workspace/database-export-2025-05-11T22-46-04-910Z.sql" --no-owner --no-acl',
+  stdout: '',
+  stderr: 'pg_dump: error: too many command-line arguments (first is "neondb_owner")\n' +
+    'pg_dump: hint: Try "pg_dump --help" for more information.\n'
+}
+Error during database export: Error: Command failed: pg_dump -h ep-falling-violet-a62b14pc.us-west-2.aws.neon.tech -p  -U neondb_owner -d neondb -f "/home/runner/workspace/database-export-2025-05-11T22-46-04-910Z.sql" --no-owner --no-acl
+pg_dump: error: too many command-line arguments (first is "neondb_owner")
+pg_dump: hint: Try "pg_dump --help" for more information.
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:518:28)
+    at maybeClose (node:internal/child_process:1104:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:304:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'pg_dump -h ep-falling-violet-a62b14pc.us-west-2.aws.neon.tech -p  -U neondb_owner -d neondb -f "/home/runner/workspace/database-export-2025-05-11T22-46-04-910Z.sql" --no-owner --no-acl',
+  stdout: '',
+  stderr: 'pg_dump: error: too many command-line arguments (first is "neondb_owner")\n' +
+    'pg_dump: hint: Try "pg_dump --help" for more information.\n'
+}
+~/workspace$ 
