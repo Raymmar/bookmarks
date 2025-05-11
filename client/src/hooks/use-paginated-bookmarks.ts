@@ -5,7 +5,7 @@ import { useAuth } from './use-auth';
 
 type SortOption = 'newest' | 'oldest' | 'recently_updated' | 'created_newest';
 
-export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOption = 'newest') {
+export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOption = 'newest', searchQuery: string = '') {
   const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -24,6 +24,11 @@ export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOpti
   if (user?.id) {
     queryParams.append('user_id', user.id);
   }
+  
+  // Add search query if provided
+  if (searchQuery) {
+    queryParams.append('search', searchQuery);
+  }
 
   // Fetch bookmarks with pagination
   const {
@@ -33,7 +38,7 @@ export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOpti
     error,
     refetch
   } = useQuery<Bookmark[]>({
-    queryKey: ['/api/bookmarks', page, pageSize, sortOrder, user?.id],
+    queryKey: ['/api/bookmarks', page, pageSize, sortOrder, user?.id, searchQuery],
     queryFn: async () => {
       const response = await fetch(`/api/bookmarks?${queryParams.toString()}`);
       

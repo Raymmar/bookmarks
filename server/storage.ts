@@ -19,7 +19,7 @@ import {
   xFolders, XFolder, InsertXFolder
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, inArray, and } from "drizzle-orm";
+import { eq, desc, sql, inArray, and, or } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
@@ -46,7 +46,8 @@ export interface IStorage {
   resetPassword(token: string, newPassword: string): Promise<boolean>;
 
   // Bookmarks
-  getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string }): Promise<Bookmark[]>;
+  getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]>;
+  getBookmarksCount(userId?: string, options?: { searchQuery?: string }): Promise<number>;
   getBookmark(id: string): Promise<Bookmark | undefined>;
   createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
   updateBookmark(id: string, bookmark: Partial<InsertBookmark>): Promise<Bookmark | undefined>;
@@ -375,11 +376,22 @@ export class MemStorage implements IStorage {
   }
 
   // Bookmarks
-  async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string }): Promise<Bookmark[]> {
+  async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
     // Filter by user ID if provided
     let result = userId 
       ? Array.from(this.bookmarks.values()).filter(bookmark => bookmark.user_id === userId)
       : Array.from(this.bookmarks.values());
+    
+    // Apply search filter if provided
+    if (options?.searchQuery) {
+      const query = options.searchQuery.toLowerCase();
+      result = result.filter(bookmark => 
+        bookmark.title.toLowerCase().includes(query) ||
+        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
+        bookmark.url.toLowerCase().includes(query) ||
+        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
+      );
+    }
     
     // Apply sorting
     if (options?.sort) {
@@ -424,6 +436,26 @@ export class MemStorage implements IStorage {
     }
     
     return result;
+  }
+  
+  async getBookmarksCount(userId?: string, options?: { searchQuery?: string }): Promise<number> {
+    // Filter by user ID if provided
+    let result = userId 
+      ? Array.from(this.bookmarks.values()).filter(bookmark => bookmark.user_id === userId)
+      : Array.from(this.bookmarks.values());
+    
+    // Apply search filter if provided
+    if (options?.searchQuery) {
+      const query = options.searchQuery.toLowerCase();
+      result = result.filter(bookmark => 
+        bookmark.title.toLowerCase().includes(query) ||
+        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
+        bookmark.url.toLowerCase().includes(query) ||
+        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
+      );
+    }
+    
+    return result.length;
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
@@ -1380,12 +1412,26 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Bookmarks
-  async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string }): Promise<Bookmark[]> {
+  async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
     let query = db.select().from(bookmarks);
     
     // Apply user filter if provided
     if (userId) {
       query = query.where(eq(bookmarks.user_id, userId));
+    }
+    
+    // Apply search query if provided
+    if (options?.searchQuery) {
+      const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
+      
+      query = query.where(
+        or(
+          sql`LOWER(${bookmarks.title}) LIKE ${searchTerm}`,
+          sql`LOWER(${bookmarks.description}) LIKE ${searchTerm}`,
+          sql`LOWER(${bookmarks.url}) LIKE ${searchTerm}`,
+          sql`LOWER(${bookmarks.content_html}) LIKE ${searchTerm}`
+        )
+      );
     }
     
     // Apply sorting
@@ -1423,6 +1469,34 @@ export class DatabaseStorage implements IStorage {
     }
     
     return await query;
+  }
+  
+  async getBookmarksCount(userId?: string, options?: { searchQuery?: string }): Promise<number> {
+    const result = await db.select({ count: sql<number>`COUNT(*)` }).from(bookmarks).as('count');
+    
+    let query = db.select({ count: sql<number>`COUNT(*)` }).from(bookmarks);
+    
+    // Apply user filter if provided
+    if (userId) {
+      query = query.where(eq(bookmarks.user_id, userId));
+    }
+    
+    // Apply search query if provided
+    if (options?.searchQuery) {
+      const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
+      
+      query = query.where(
+        or(
+          sql`LOWER(${bookmarks.title}) LIKE ${searchTerm}`,
+          sql`LOWER(${bookmarks.description}) LIKE ${searchTerm}`,
+          sql`LOWER(${bookmarks.url}) LIKE ${searchTerm}`,
+          sql`LOWER(${bookmarks.content_html}) LIKE ${searchTerm}`
+        )
+      );
+    }
+    
+    const [{ count }] = await query;
+    return count || 0;
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
