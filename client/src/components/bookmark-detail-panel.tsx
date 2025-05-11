@@ -987,8 +987,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                           // If image fails to load, show fallback message
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
-                          target.parentElement?.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
-                          target.parentElement!.innerHTML = 'Media unavailable';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
+                            parent.innerHTML = 'Media unavailable';
+                          }
                         }}
                       />
                     </a>
@@ -1021,8 +1024,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                           // If image fails to load, show fallback message
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
-                          target.parentElement?.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
-                          target.parentElement!.innerHTML = 'Media unavailable';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
+                            parent.innerHTML = 'Media unavailable';
+                          }
                         }}
                       />
                     </a>
