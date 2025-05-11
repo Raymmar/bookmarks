@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useRoute } from "wouter";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
 import { BookmarkGrid } from "@/components/responsive-bookmark-grid";
 import { BookmarkListView } from "@/components/bookmark-list-view";
@@ -9,35 +9,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { Search, Filter, Bookmark, X, Loader2, ArrowLeft } from "lucide-react";
+import { Search, Filter, Bookmark, X, Loader2, FolderOpen } from "lucide-react";
 import { usePaginatedBookmarks } from "@/hooks/use-paginated-bookmarks";
 import { useCollections } from "@/hooks/use-collection-queries";
 import { Bookmark as BookmarkType } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
 
-// This component will display bookmarks from a specific collection
 export default function CollectionPage() {
-  // Get collection name from URL path
-  const params = useParams<{ name: string }>();
-  const collectionName = params.name;
-  const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Get the collection name from the URL
+  const [, params] = useRoute<{ name: string }>("/collection/:name");
+  const collectionName = params?.name ? decodeURIComponent(params.name) : "";
+  
+  // Get all collections to find the one matching the URL name
+  const { data: collections = [], isLoading: collectionsLoading } = useCollections();
+  
+  // Find the collection by name (case-insensitive)
+  const collection = collections.find(
+    c => c.name.toLowerCase() === collectionName.toLowerCase()
+  );
   
   // State for the selected bookmark
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
   
   // State for view mode (list or grid)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
-    const savedViewMode = localStorage.getItem('bookmarkFeedViewMode');
+    const savedViewMode = localStorage.getItem('bookmarkCollectionViewMode');
     return (savedViewMode === 'list' || savedViewMode === 'grid') ? savedViewMode : 'list';
   });
   
   // State for sorting
   const [sortOrder, setSortOrder] = useState<string>(() => {
-    const savedSort = localStorage.getItem('bookmarkFeedSortOrder');
+    const savedSort = localStorage.getItem('bookmarkCollectionSortOrder');
     return savedSort || 'newest';
   });
   
@@ -45,39 +51,8 @@ export default function CollectionPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   
-  // State for the collection ID
-  const [collectionId, setCollectionId] = useState<string | null>(null);
-  
   // Ref for infinite scroll
   const loaderRef = useRef<HTMLDivElement>(null);
-  
-  // Fetch collections to find the collection ID from the name
-  const { data: collections = [], isLoading: isLoadingCollections } = useCollections();
-  
-  // Find the collection ID based on the collection name in the URL
-  useEffect(() => {
-    if (collections.length > 0 && collectionName) {
-      // Decode URI component in case the name was URL-encoded
-      const decodedName = decodeURIComponent(collectionName);
-      
-      // Find collection that matches the name (case-insensitive)
-      const collection = collections.find(col => 
-        col.name.toLowerCase() === decodedName.toLowerCase()
-      );
-      
-      if (collection) {
-        setCollectionId(collection.id);
-      } else {
-        // If collection not found, show error and redirect to feed
-        toast({
-          title: "Collection not found",
-          description: `No collection found with name "${decodedName}"`,
-          variant: "destructive"
-        });
-        setLocation("/feed");
-      }
-    }
-  }, [collections, collectionName, toast, setLocation]);
   
   // Debounce search input to prevent too many requests
   useEffect(() => {
@@ -99,186 +74,212 @@ export default function CollectionPage() {
     refetch
   } = usePaginatedBookmarks(
     50, 
-    sortOrder as 'newest' | 'oldest' | 'recently_updated' | 'created_newest', 
-    debouncedSearchQuery,
-    collectionId // Pass the collection ID to filter bookmarks
+    sortOrder as 'newest' | 'oldest' | 'recently_updated', 
+    debouncedSearchQuery, 
+    collection?.id || null
   );
   
-  // Function to handle bookmark selection
-  const handleSelectBookmark = (id: string) => {
-    setSelectedBookmarkId(id === selectedBookmarkId ? null : id);
-  };
+  // Fetch the selected bookmark's details
+  const { data: selectedBookmark } = useQuery<BookmarkType>({
+    queryKey: ['/api/bookmarks', selectedBookmarkId],
+    queryFn: async () => {
+      if (!selectedBookmarkId) return null;
+      const data = await fetch(`/api/bookmarks/${selectedBookmarkId}`).then(res => res.json());
+      return data;
+    },
+    enabled: !!selectedBookmarkId,
+  });
   
-  // Function to handle view mode change
+  // Save view mode preference in local storage
   const handleViewModeChange = (mode: 'list' | 'grid') => {
     setViewMode(mode);
-    localStorage.setItem('bookmarkFeedViewMode', mode);
+    localStorage.setItem('bookmarkCollectionViewMode', mode);
   };
   
-  // Function to handle sort order change
+  // Save sort preference in local storage
   const handleSortChange = (value: string) => {
     setSortOrder(value);
-    localStorage.setItem('bookmarkFeedSortOrder', value);
+    localStorage.setItem('bookmarkCollectionSortOrder', value);
   };
   
-  // Handle clearing the search input
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setDebouncedSearchQuery('');
+  // Handle selecting a bookmark (opens the detail panel)
+  const handleSelectBookmark = (id: string) => {
+    setSelectedBookmarkId(id);
+    // Save the selected bookmark ID to session storage for persistence
+    sessionStorage.setItem('lastSelectedBookmarkId', id);
   };
   
-  // Set up intersection observer for infinite scroll
+  // Handle closing the detail panel
+  const handleCloseDetail = () => {
+    setSelectedBookmarkId(null);
+    // Remove the stored bookmark ID when deliberately closing
+    sessionStorage.removeItem('lastSelectedBookmarkId');
+  };
+  
+  // Setup intersection observer for infinite scroll
   useEffect(() => {
-    if (!loaderRef.current || isLoading) return;
-    
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        if (entries[0].isIntersecting && hasNextPage && !isLoading && !isFetchingNextPage) {
           loadMoreBookmarks();
         }
       },
-      { threshold: 0.1 }
+      { 
+        threshold: 0.1,
+        rootMargin: '200px 0px' // Start loading more content before user fully reaches the bottom
+      }
     );
     
-    observer.observe(loaderRef.current);
+    const currentLoaderRef = loaderRef.current;
+    if (currentLoaderRef) {
+      observer.observe(currentLoaderRef);
+    }
     
     return () => {
-      if (loaderRef.current) {
-        observer.unobserve(loaderRef.current);
+      if (currentLoaderRef) {
+        observer.unobserve(currentLoaderRef);
       }
     };
-  }, [isLoading, hasNextPage, isFetchingNextPage, loadMoreBookmarks]);
-  
-  // Handle bookmark details panel close
-  const handleDetailsClose = useCallback(() => {
-    setSelectedBookmarkId(null);
-  }, []);
-  
-  // Get the collection object for the current collection ID
-  const collection = collections.find(col => col.id === collectionId);
-  
-  // Handle navigation back to feed
-  const handleBackToFeed = () => {
-    setLocation("/feed");
-  };
-  
+  }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreBookmarks]);
+
+  // Show a message if collection not found
+  if (!collectionsLoading && !collection) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50 p-8">
+        <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Collection not found</h2>
+        <p className="text-gray-500 mb-4 text-center">
+          The collection "{collectionName}" could not be found or you don't have permission to view it.
+        </p>
+        <Button asChild>
+          <a href="/feed">Back to Feed</a>
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-65px)]">
-      {/* Main content panel */}
-      <ResizablePanel defaultSize={selectedBookmarkId ? 60 : 100} minSize={30} className="flex flex-col">
-        {/* Header */}
-        <div className="border-b p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={handleBackToFeed}
-                className="hover:bg-slate-100"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <h1 className="text-2xl font-bold">
-                {collection ? collection.name : 'Loading collection...'}
-              </h1>
-            </div>
-            {collection && collection.description && (
-              <p className="text-muted-foreground">{collection.description}</p>
-            )}
-            {/* Search and filters */}
-            <div className="flex flex-col sm:flex-row gap-2 mt-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search all bookmarks..."
-                  className="pl-8 pr-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1.5 h-7 w-7"
-                    onClick={handleClearSearch}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+    <div className="h-full w-full bg-gray-50">
+      <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanel defaultSize={70} minSize={50} className="h-full">
+          <div className="flex flex-col h-full w-full">
+            {/* Header with collection title and search */}
+            <div className="border-b">
+              <div className="px-4 py-3">
+                <h1 className="text-xl font-bold truncate">
+                  {collection?.name || "Loading..."}
+                </h1>
+                {collection?.description && (
+                  <p className="text-sm text-gray-500 mt-1">{collection.description}</p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <ViewModeSwitcher
-                  onViewModeChange={handleViewModeChange}
-                  initialViewMode={viewMode}
-                />
-                <Select
-                  value={sortOrder}
-                  onValueChange={handleSortChange}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Date Saved (Newest)</SelectItem>
-                    <SelectItem value="oldest">Date Saved (Oldest)</SelectItem>
-                    <SelectItem value="recently_updated">Recently Updated</SelectItem>
-                    <SelectItem value="created_newest">Date Created (Newest)</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex justify-between items-center p-3 border-t">
+                <div className="relative flex-1 mr-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    className="pl-9" 
+                    placeholder="Search in collection..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground hover:text-foreground"
+                      onClick={() => setSearchQuery('')}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="flex space-x-2 flex-shrink-0">
+                  <ViewModeSwitcher
+                    initialViewMode={viewMode}
+                    onViewModeChange={handleViewModeChange}
+                  />
+                  <Select
+                    value={sortOrder}
+                    onValueChange={handleSortChange}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Date Saved (Newest)</SelectItem>
+                      <SelectItem value="oldest">Date Saved (Oldest)</SelectItem>
+                      <SelectItem value="recently_updated">Recently Updated</SelectItem>
+                      <SelectItem value="created_newest">Date Created (Newest)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 overflow-auto flex flex-col h-full">
+              <div className="flex-grow">
+                {viewMode === 'list' ? (
+                  <BookmarkListView 
+                    bookmarks={bookmarks}
+                    selectedBookmarkId={selectedBookmarkId}
+                    onSelectBookmark={handleSelectBookmark}
+                    isLoading={isLoading || collectionsLoading}
+                  />
+                ) : (
+                  <BookmarkGrid 
+                    bookmarks={bookmarks}
+                    selectedBookmarkId={selectedBookmarkId}
+                    onSelectBookmark={handleSelectBookmark}
+                    isLoading={isLoading || collectionsLoading}
+                  />
+                )}
+              </div>
+              
+              {/* Footer area with loading status and intersection observer target */}
+              <div className="min-h-[60px] w-full">
+                {/* Loading indicator that appears after content */}
+                {isFetchingNextPage && (
+                  <div className="flex justify-center items-center py-4 border-t">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loading more bookmarks...</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Intersection observer target positioned at the bottom */}
+                {hasNextPage && (
+                  <div 
+                    ref={loaderRef} 
+                    className="w-full"
+                    style={{ height: '5px' }} // Small height element at the bottom of the list
+                  />
+                )}
               </div>
             </div>
           </div>
-        </div>
+        </ResizablePanel>
         
-        {/* Content */}
-        <div className="flex-1 overflow-auto flex flex-col h-full">
-          <div className="flex-grow">
-            {viewMode === 'list' ? (
-              <BookmarkListView 
-                bookmarks={bookmarks}
-                selectedBookmarkId={selectedBookmarkId}
-                onSelectBookmark={handleSelectBookmark}
-                isLoading={isLoading || isLoadingCollections}
-              />
-            ) : (
-              <BookmarkGrid 
-                bookmarks={bookmarks}
-                selectedBookmarkId={selectedBookmarkId}
-                onSelectBookmark={handleSelectBookmark}
-                isLoading={isLoading || isLoadingCollections}
-              />
-            )}
-          </div>
-          
-          {/* Infinite scroll loader */}
-          {hasNextPage && (
-            <div ref={loaderRef} className="flex justify-center py-4">
-              {isFetchingNextPage ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Loading more...</span>
-                </div>
-              ) : (
-                <div className="h-10" />
-              )}
+        <ResizableHandle withHandle />
+        
+        <ResizablePanel defaultSize={30} minSize={30} className="min-w-[420px] h-full">
+          {selectedBookmarkId && selectedBookmark ? (
+            <BookmarkDetailPanel
+              bookmark={selectedBookmark}
+              onClose={handleCloseDetail}
+            />
+          ) : (
+            <div className="flex flex-col h-full w-full items-center justify-center p-6 text-center bg-gray-50 border-l">
+              <Bookmark className="h-12 w-12 text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium mb-2">No bookmark selected</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Select a bookmark from the collection to view its details.
+              </p>
             </div>
           )}
-        </div>
-      </ResizablePanel>
-      
-      {/* Bookmark detail panel - only render if a bookmark is selected */}
-      {selectedBookmarkId && (
-        <>
-          <ResizableHandle />
-          <ResizablePanel defaultSize={40} minSize={25} maxSize={60}>
-            <BookmarkDetailPanel
-              bookmarkId={selectedBookmarkId}
-              onClose={handleDetailsClose}
-              onUpdate={refetch}
-            />
-          </ResizablePanel>
-        </>
-      )}
-    </ResizablePanelGroup>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </div>
   );
 }

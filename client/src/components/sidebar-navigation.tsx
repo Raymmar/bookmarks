@@ -241,7 +241,10 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
             selectedCollections.includes(collection.id) 
               ? "bg-primary/10 text-primary font-medium" 
-              : "text-gray-700 hover:bg-gray-50"
+              : "text-gray-700 hover:bg-gray-50",
+            location === `/collection/${encodeURIComponent(collection.name)}`
+              ? "border border-primary/20"
+              : ""
           )}
           onClick={() => handleCollectionClick(collection.id)}
           title="Click to select or deselect. You can select multiple collections."
@@ -265,47 +268,56 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
           </span>
         </div>
         
-        {user && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6 p-0 ml-1">
-                <MoreHorizontal className="h-3 w-3 text-gray-500" />
-                <span className="sr-only">More options</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[160px]">
-              <DropdownMenuItem 
-                onClick={() => {
-                  setSelectedCollectionToEdit({
-                    id: collection.id,
-                    name: collection.name,
-                    description: collection.description,
-                    is_public: collection.is_public
-                  });
-                  setEditCollectionOpen(true);
-                }}
-              >
-                <Edit className="mr-2 h-4 w-4" />
-                <span>Edit</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedCollectionToEdit({
-                    id: collection.id,
-                    name: collection.name,
-                    description: collection.description,
-                    is_public: collection.is_public
-                  });
-                  setDeleteConfirmOpen(true);
-                }}
-                className="text-red-600"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Delete</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" className="h-6 w-6 p-0" asChild>
+            <Link href={`/collection/${encodeURIComponent(collection.name)}`}>
+              <FolderOpen className="h-3 w-3 text-gray-500" />
+              <span className="sr-only">View Collection</span>
+            </Link>
+          </Button>
+          
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6 p-0 ml-1">
+                  <MoreHorizontal className="h-3 w-3 text-gray-500" />
+                  <span className="sr-only">More options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[160px]">
+                <DropdownMenuItem 
+                  onClick={() => {
+                    setSelectedCollectionToEdit({
+                      id: collection.id,
+                      name: collection.name,
+                      description: collection.description,
+                      is_public: collection.is_public
+                    });
+                    setEditCollectionOpen(true);
+                  }}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  <span>Edit</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedCollectionToEdit({
+                      id: collection.id,
+                      name: collection.name,
+                      description: collection.description,
+                      is_public: collection.is_public
+                    });
+                    setDeleteConfirmOpen(true);
+                  }}
+                  className="text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Delete</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
     </li>
   );
@@ -515,33 +527,47 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 ) : (
                   publicCollections.map(collection => (
                     <li key={collection.id}>
-                      <div 
-                        className={cn(
-                          "flex items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
-                          selectedCollections.includes(collection.id) 
-                            ? "bg-primary/10 text-primary font-medium" 
-                            : "text-gray-700 hover:bg-gray-50"
-                        )}
-                        onClick={() => handleCollectionClick(collection.id)}
-                        title="Click to explore this collection"
-                      >
-                        <div className="flex h-4 w-4 items-center justify-center mr-2">
-                          {selectedCollections.includes(collection.id) ? (
-                            <Checkbox 
-                              id={`collection-${collection.id}`} 
-                              checked={true}
-                              className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                            />
-                          ) : (
-                            <Checkbox 
-                              id={`collection-${collection.id}`} 
-                              checked={false}
-                            />
+                      <div className="flex items-center">
+                        <div 
+                          className={cn(
+                            "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
+                            selectedCollections.includes(collection.id) 
+                              ? "bg-primary/10 text-primary font-medium" 
+                              : "text-gray-700 hover:bg-gray-50",
+                            location === `/collection/${encodeURIComponent(collection.name)}`
+                              ? "border border-primary/20"
+                              : ""
                           )}
+                          onClick={() => handleCollectionClick(collection.id)}
+                          title="Click to explore this collection"
+                        >
+                          <div className="flex h-4 w-4 items-center justify-center mr-2">
+                            {selectedCollections.includes(collection.id) ? (
+                              <Checkbox 
+                                id={`collection-${collection.id}`} 
+                                checked={true}
+                                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                              />
+                            ) : (
+                              <Checkbox 
+                                id={`collection-${collection.id}`} 
+                                checked={false}
+                              />
+                            )}
+                          </div>
+                          <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
+                            {collection.name}
+                          </span>
                         </div>
-                        <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
-                          {collection.name}
-                        </span>
+                        
+                        <div className="flex items-center">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 p-0" asChild>
+                            <Link href={`/collection/${encodeURIComponent(collection.name)}`}>
+                              <FolderOpen className="h-3 w-3 text-gray-500" />
+                              <span className="sr-only">View Collection</span>
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
                     </li>
                   ))
