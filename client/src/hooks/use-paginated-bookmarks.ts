@@ -58,10 +58,10 @@ export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOpti
     },
   });
 
-  // Reset to page 1 when sort order changes
+  // Reset to page 1 when sort order, user, or search query changes
   useEffect(() => {
     setPage(1);
-  }, [sortOrder, user?.id]);
+  }, [sortOrder, user?.id, searchQuery]);
 
   // Pagination controls
   const hasNextPage = page < totalPages;

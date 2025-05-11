@@ -47,7 +47,7 @@ export default function Feed() {
     return () => clearTimeout(timerId);
   }, [searchQuery]);
   
-  // Fetch paginated bookmarks
+  // Fetch paginated bookmarks with server-side search
   const {
     bookmarks,
     isLoading,
@@ -57,17 +57,12 @@ export default function Feed() {
     hasNextPage,
     hasPreviousPage,
     goToNextPage,
-    goToPreviousPage
-  } = usePaginatedBookmarks(50, sortOrder as 'newest' | 'oldest' | 'recently_updated');
+    goToPreviousPage,
+    refetch
+  } = usePaginatedBookmarks(50, sortOrder as 'newest' | 'oldest' | 'recently_updated', debouncedSearchQuery);
   
-  // Filter bookmarks by search query
-  const filteredBookmarks = debouncedSearchQuery
-    ? bookmarks.filter(bookmark => 
-        bookmark.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-        (bookmark.description && bookmark.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase())) ||
-        bookmark.url.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-      )
-    : bookmarks;
+  // Use bookmarks directly as they are now filtered on the server
+  const filteredBookmarks = bookmarks;
   
   // Fetch the selected bookmark's details
   const { data: selectedBookmark } = useQuery<BookmarkType>({

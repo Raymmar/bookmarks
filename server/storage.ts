@@ -62,7 +62,8 @@ export interface IStorage {
   deleteCollection(id: string): Promise<boolean>;
   
   // Collection Bookmarks
-  getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]>;
+  getBookmarksByCollectionId(collectionId: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]>;
+  getBookmarksByCollectionIdCount(collectionId: string, options?: { searchQuery?: string }): Promise<number>;
   getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]>;
   addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark>;
   removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean>;
