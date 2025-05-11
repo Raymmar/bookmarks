@@ -1093,11 +1093,57 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           {bookmark.insights?.summary ? (
             <div>
               <h5 className="text-xs font-medium text-gray-600 mb-1">Summary</h5>
-              <p className="text-sm text-gray-600 mb-3">
-                {bookmark.insights.summary}
-              </p>
-              
-
+              <div
+                className="text-sm text-gray-600 mb-3 border-b border-transparent hover:border-gray-300 focus-within:border-primary cursor-text"
+                onClick={(e) => {
+                  // Make sure the click was directly on the div and not on a child element
+                  if (e.currentTarget === e.target) {
+                    const textareaElement = e.currentTarget.querySelector('textarea');
+                    if (textareaElement) textareaElement.focus();
+                  }
+                }}
+              >
+                <textarea
+                  value={bookmark.insights.summary}
+                  className="w-full bg-transparent focus:outline-none resize-none overflow-hidden"
+                  rows={Math.max(1, bookmark.insights.summary.split('\n').length)}
+                  onChange={(e) => {
+                    setBookmark(prev => {
+                      if (!prev) return prev;
+                      return { 
+                        ...prev,
+                        insights: prev.insights ? {
+                          ...prev.insights,
+                          summary: e.target.value
+                        } : undefined
+                      } as Bookmark;
+                    });
+                  }}
+                  onBlur={(e) => {
+                    if (initialBookmark?.insights?.summary && e.target.value !== initialBookmark.insights.summary) {
+                      // Only make API call if summary has changed
+                      if (bookmark?.insights) {
+                        handleUpdateBookmark({
+                          insights: {
+                            id: bookmark.insights.id,
+                            bookmark_id: bookmark.insights.bookmark_id,
+                            summary: e.target.value,
+                            sentiment: bookmark.insights.sentiment,
+                            depth_level: bookmark.insights.depth_level,
+                            related_links: bookmark.insights.related_links
+                          }
+                        });
+                      }
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                  }}
+                />
+              </div>
             </div>
           ) : (
             <div className="text-sm text-gray-500 italic">
