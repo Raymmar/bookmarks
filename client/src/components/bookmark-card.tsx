@@ -18,11 +18,13 @@ interface Tag {
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
+  isSelected?: boolean;
+  onClick?: () => void;
   onEdit?: (bookmark: Bookmark) => void;
   onDelete?: (id: string) => void;
 }
 
-export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) {
+export function BookmarkCard({ bookmark, isSelected, onClick, onEdit, onDelete }: BookmarkCardProps) {
   const [tags, setTags] = useState<Tag[]>([]);
   
   // Fetch tags for this bookmark
@@ -42,7 +44,10 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
     fetchTags();
   }, [bookmark.id]);
   return (
-    <Card className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+    <Card 
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow ${isSelected ? "ring-2 ring-primary" : ""}`}
+      onClick={onClick}
+    >
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-3">
           <h3 className="font-medium text-base line-clamp-1">{bookmark.title}</h3>
