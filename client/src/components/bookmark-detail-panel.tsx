@@ -1027,7 +1027,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     <>
       <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10">
         <div className="flex w-full items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Details</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
