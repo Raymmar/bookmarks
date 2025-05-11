@@ -23,7 +23,7 @@ export function BookmarkGrid({
   };
 
   return (
-    <div className="p-3 overflow-auto h-full">
+    <div className="pl-3 pt-3 pb-3 overflow-auto h-full">
       {isLoading ? (
         <div className="flex items-center justify-center h-32">
           <div className="text-center">
