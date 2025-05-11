@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon } from "lucide-react";
+import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon, ZoomIn, ZoomOut } from "lucide-react";
 import { Bookmark, Highlight, Note, Tag as TagType } from "@shared/types";
 import { formatDate } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -31,6 +31,53 @@ interface BookmarkDetailPanelProps {
   onClose: () => void;
 }
 
+// Lightbox component for displaying images
+interface LightboxProps {
+  imageUrl: string;
+  alt: string;
+  onClose: () => void;
+}
+
+function Lightbox({ imageUrl, alt, onClose }: LightboxProps) {
+  // Close lightbox when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      <div className="relative max-w-[90vw] max-h-[90vh] flex flex-col">
+        <div className="absolute -top-12 right-0 flex gap-2">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="bg-black/50 text-white hover:bg-black/70 border-gray-700"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        <img 
+          src={imageUrl} 
+          alt={alt} 
+          className="max-h-[85vh] max-w-[85vw] object-contain"
+          onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image
+        />
+      </div>
+    </div>
+  );
+}
+
 export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: BookmarkDetailPanelProps) {
   const [bookmark, setBookmark] = useState<Bookmark | undefined>(initialBookmark);
   const [newNote, setNewNote] = useState("");
@@ -44,6 +91,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
+  const [lightbox, setLightbox] = useState<{ isOpen: boolean; imageUrl: string; alt: string }>({ 
+    isOpen: false, 
+    imageUrl: '', 
+    alt: '' 
+  });
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -971,17 +1023,15 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 {bookmark.media_urls
                   .filter(url => url.includes('pbs.twimg.com'))
                   .map((url, index) => (
-                    <a 
+                    <div 
                       key={`twitter-${index}`} 
-                      href={url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary"
+                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
+                      onClick={() => setLightbox({ isOpen: true, imageUrl: url, alt: `Media from ${bookmark.title}` })}
                     >
                       <img 
                         src={url} 
                         alt={`Media from ${bookmark.title}`}
-                        className="w-full h-auto object-cover max-h-96"
+                        className="w-full h-auto object-contain max-h-96"
                         loading="lazy"
                         onError={(e) => {
                           // If image fails to load, show fallback message
@@ -994,7 +1044,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                           }
                         }}
                       />
-                    </a>
+                    </div>
                   ))}
                 
                 {/* Handle other media URLs - only render actual URLs, not local paths */}
@@ -1020,17 +1070,15 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                     return isValidUrl && hasImageExtension;
                   })
                   .map((url, index) => (
-                    <a 
+                    <div 
                       key={`other-${index}`} 
-                      href={url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary"
+                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
+                      onClick={() => setLightbox({ isOpen: true, imageUrl: url, alt: `Media from ${bookmark.title}` })}
                     >
                       <img 
                         src={url} 
                         alt={`Media from ${bookmark.title}`}
-                        className="w-full h-auto object-cover max-h-96"
+                        className="w-full h-auto object-contain max-h-96"
                         loading="lazy"
                         onError={(e) => {
                           // If image fails to load, show fallback message
@@ -1043,9 +1091,18 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                           }
                         }}
                       />
-                    </a>
+                    </div>
                   ))}
               </div>
+            )}
+            
+            {/* Lightbox for enlarged images */}
+            {lightbox.isOpen && (
+              <Lightbox 
+                imageUrl={lightbox.imageUrl} 
+                alt={lightbox.alt} 
+                onClose={() => setLightbox({ isOpen: false, imageUrl: '', alt: '' })} 
+              />
             )}
             
             {/* Tweet stats - more compact design to prevent overflow */}
