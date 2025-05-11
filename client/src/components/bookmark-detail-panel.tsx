@@ -80,7 +80,7 @@ function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80"
       onClick={onClose}
     >
-      <div className="relative max-w-[90vw] max-h-[90vh] flex flex-col">
+      <div className="relative max-w-[80vw] max-h-[90vh] flex flex-col">
         {/* Controls */}
         <div className="absolute -top-12 right-0 flex gap-2">
           <Button 
@@ -96,14 +96,14 @@ function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
           </Button>
         </div>
         
-        {/* Navigation buttons */}
+        {/* Navigation buttons - moved outside the image area */}
         {images.length > 1 && (
           <>
             <Button
               variant="outline"
               size="icon"
               onClick={goToPrevious}
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-gray-700 z-10"
+              className="absolute left-[-50px] top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-gray-700 z-10"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
                 <polyline points="15 18 9 12 15 6"></polyline>
@@ -113,7 +113,7 @@ function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
               variant="outline"
               size="icon"
               onClick={goToNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-gray-700 z-10"
+              className="absolute right-[-50px] top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-gray-700 z-10"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
                 <polyline points="9 18 15 12 9 6"></polyline>
@@ -123,18 +123,18 @@ function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
         )}
         
         {/* Main image */}
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center w-[70vw] h-[70vh]">
           <img 
             src={currentImage.url} 
             alt={currentImage.alt} 
-            className="max-h-[75vh] max-w-[85vw] object-contain"
+            className="max-h-[70vh] max-w-[70vw] object-contain"
             onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image
           />
         </div>
         
         {/* Thumbnails at bottom */}
         {images.length > 1 && (
-          <div className="flex justify-center mt-4 space-x-2 overflow-x-auto max-w-[85vw]" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-center mt-6 space-x-2 overflow-x-auto max-w-[70vw]" onClick={(e) => e.stopPropagation()}>
             {images.map((image, index) => (
               <div
                 key={index}
@@ -155,7 +155,7 @@ function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
         
         {/* Image counter */}
         {images.length > 1 && (
-          <div className="absolute bottom-[-30px] left-0 right-0 text-center text-white text-sm">
+          <div className="absolute bottom-[-35px] left-0 right-0 text-center text-white text-sm font-medium">
             {currentIndex + 1} / {images.length}
           </div>
         )}
