@@ -9,9 +9,7 @@ import cron from 'node-cron';
 import { xService } from './x-service';
 import { aiProcessorService } from './ai-processor-service';
 import { db } from '../db';
-import { xCredentials, xFolders } from '@shared/schema';
-import { eq, lt, isNull } from 'drizzle-orm';
-import { or } from 'drizzle-orm/expressions';
+import { xCredentials } from '@shared/schema';
 
 /**
  * Set up all application schedulers

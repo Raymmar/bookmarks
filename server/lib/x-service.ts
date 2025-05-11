@@ -84,13 +84,6 @@ interface XTweet {
     media_keys?: string[];
     poll_ids?: string[];
   };
-  // Track local media files downloaded for this tweet
-  local_media: {
-    original_url: string;
-    local_path: string;
-    media_key: string;
-    type: string;
-  }[];
   // Flag to mark tweets that only have IDs and need full data fetching
   needsFetching?: boolean;
 }
@@ -465,9 +458,7 @@ export class XService {
           author_id: tweet.author_id,
           public_metrics: tweet.public_metrics,
           entities: tweet.entities,
-          attachments: tweet.attachments,
-          // Initialize local_media as empty array for each tweet
-          local_media: []
+          attachments: tweet.attachments
         }));
         
         // Extract users from includes
@@ -622,8 +613,7 @@ export class XService {
             id: item,
             text: '', // Empty text - will be filled later when fetched
             needsFetching: true, // Mark that this tweet needs its full content fetched
-            // Initialize local_media as empty array for each tweet
-            local_media: []
+            // No longer initializing local media
           };
         }
         
@@ -636,8 +626,7 @@ export class XService {
           id: item.id,
           text: '', // Will be filled with actual content after fetching
           needsFetching: true, // Always fetch the full tweet data
-          // Initialize local_media as empty array for each tweet
-          local_media: []
+          // No longer initializing local media
         };
       });
       
@@ -692,7 +681,7 @@ export class XService {
 
   /**
    * Convert an X tweet to a bookmark
-   * This method is async because it downloads media files
+   * This method processes tweet data and extracts media URLs without downloading them
    */
   async convertTweetToBookmark(tweet: XTweet, author?: XUser, mediaMap?: { [key: string]: XMedia }): Promise<InsertBookmark> {
     // Generate a normalized URL for the tweet using x.com instead of twitter.com
@@ -724,14 +713,10 @@ export class XService {
       });
     }
     
-    // Always initialize/reset the local media array
-    // The if/else is redundant, but keeping for clarity
-    tweet.local_media = [];
-    
-    // Then add URLs from media attachments if available
+    // Then add URLs from media attachments if available (without downloading)
     if (tweet.attachments && tweet.attachments.media_keys && mediaMap) {
-      // Use Promise.all to process all media downloads in parallel
-      const mediaPromises = tweet.attachments.media_keys.map(async (mediaKey) => {
+      // Process all media items
+      tweet.attachments.media_keys.forEach((mediaKey) => {
         const mediaItem = mediaMap[mediaKey];
         if (mediaItem && (mediaItem.url || mediaItem.preview_image_url)) {
           // Use the direct URL if available, otherwise use preview image
@@ -739,36 +724,10 @@ export class XService {
           if (mediaUrl) {
             // Add the original URL to mediaUrls
             mediaUrls.push(mediaUrl);
-            
-            // Download the media for local storage
-            const localPath = await this.downloadAndStoreMedia(
-              mediaKey, 
-              mediaUrl, 
-              tweet.id, 
-              mediaItem.type
-            );
-            
-            // If download was successful, store the local path
-            if (localPath) {
-              // Add to local media files for this tweet
-              tweet.local_media.push({
-                original_url: mediaUrl,
-                local_path: localPath,
-                media_key: mediaKey,
-                type: mediaItem.type
-              });
-              
-              // Also add the local path to mediaUrls for the bookmark
-              mediaUrls.push(localPath);
-              
-              console.log(`X Sync: Added local media ${localPath} for tweet ${tweet.id}`);
-            }
+            console.log(`X Sync: Added media URL ${mediaUrl} for tweet ${tweet.id}`);
           }
         }
       });
-      
-      // Wait for all media downloads to complete
-      await Promise.all(mediaPromises);
     }
     
     // Create a bookmark
@@ -800,90 +759,8 @@ export class XService {
     return bookmark;
   }
   
-  /**
-   * Download and store media locally
-   * Returns the local path to the downloaded file, or null if download failed
-   */
-  private async downloadAndStoreMedia(mediaKey: string, mediaUrl: string, tweetId: string, mediaType: string = 'photo'): Promise<string | null> {
-    try {
-      // Create directories for media storage if they don't exist
-      const mediaDir = `public/media/tweets/${tweetId}`;
-      
-      // Skip if URL is not valid or is already a local path
-      if (!mediaUrl || mediaUrl.startsWith('/')) {
-        return null;
-      }
-      
-      console.log(`X Sync: Downloading media from ${mediaUrl} for tweet ${tweetId}`);
-      
-      // Ensure the directory exists
-      const mkdir = promisify(fs.mkdir);
-      
-      try {
-        await mkdir(mediaDir, { recursive: true });
-      } catch (mkdirError) {
-        console.error(`X Sync: Error creating media directory for tweet ${tweetId}:`, mkdirError);
-        return null;
-      }
-      
-      // Get file extension from URL or default based on media type
-      let fileExt;
-      try {
-        const urlPath = new URL(mediaUrl).pathname;
-        fileExt = path.extname(urlPath);
-      } catch (urlError) {
-        // If URL parsing fails, use default extension based on media type
-        fileExt = '';
-      }
-      
-      // Set default extension based on media type if not found in URL
-      if (!fileExt) {
-        switch(mediaType) {
-          case 'photo':
-            fileExt = '.jpg';
-            break;
-          case 'video':
-            fileExt = '.mp4';
-            break;
-          case 'animated_gif':
-            fileExt = '.gif';
-            break;
-          default:
-            fileExt = '.jpg';
-        }
-      }
-      
-      // Create a unique filename based on the media key
-      const fileName = `${mediaKey}${fileExt}`;
-      const filePath = path.join(mediaDir, fileName);
-      
-      // Download the media file
-      try {
-        const response = await fetch(mediaUrl);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        // Save the file
-        const buffer = await response.buffer();
-        await fs.promises.writeFile(filePath, buffer);
-        
-        console.log(`X Sync: Successfully downloaded media to ${filePath}`);
-        
-        // Create a relative URL that can be used in the app
-        const relativeUrl = `/media/tweets/${tweetId}/${fileName}`;
-        
-        return relativeUrl;
-      } catch (fetchError) {
-        console.error(`X Sync: Error fetching media from ${mediaUrl}:`, fetchError);
-        return null;
-      }
-    } catch (error) {
-      console.error(`X Sync: Error downloading media for tweet ${tweetId}:`, error);
-      return null;
-    }
-  }
+  // The downloadAndStoreMedia method has been removed as per requirements
+  // We now use the original media URLs directly from X/Twitter
 
   /**
    * Get user's bookmark folders from X.com
@@ -1333,10 +1210,8 @@ export class XService {
           const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
           bookmarkData.user_id = userId;
           
-          // Log if we downloaded any media
-          if (tweet.local_media && tweet.local_media.length > 0) {
-            console.log(`X Sync: Downloaded ${tweet.local_media.length} media files for tweet ${tweet.id}`);
-          }
+          // No longer downloading media files
+          console.log(`X Sync: Using original media URLs for tweet ${tweet.id}`);
           
           // Create the new bookmark
           const newBookmark = await storage.createBookmark(bookmarkData);
@@ -2029,9 +1904,8 @@ export class XService {
         author_id: tweet.author_id,
         public_metrics: tweet.public_metrics,
         entities: tweet.entities,
-        attachments: tweet.attachments,
-        // Initialize local_media as empty array for each tweet
-        local_media: []
+        attachments: tweet.attachments
+        // No longer initializing local media
       }));
       
       // Extract users from includes
