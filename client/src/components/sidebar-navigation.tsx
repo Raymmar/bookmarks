@@ -526,7 +526,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       <li key={collection.id}>
                         <div className="flex items-center">
                           <Link 
-                            href={`/collection/${encodeURIComponent(collection.name)}`}
+                            href={`/collection/${createUrlSlug(collection.name)}`}
                             className="flex-1"
                           >
                             <div 
@@ -535,7 +535,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                                 selectedCollections.includes(collection.id) 
                                   ? "bg-primary/10 text-primary" 
                                   : "text-gray-700 hover:bg-gray-50",
-                                location === `/collection/${encodeURIComponent(collection.name)}`
+                                location === `/collection/${createUrlSlug(collection.name)}`
                                   ? "border border-primary/20 bg-secondary/10"
                                   : ""
                               )}
