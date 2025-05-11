@@ -1446,8 +1446,10 @@ export class DatabaseStorage implements IStorage {
       const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
       
       // Find bookmarks matching search criteria using UNION
+      console.log(`Collection search using search term: ${searchTerm}`);
+
       const matchingBookmarkIds = await db.execute(sql`
-        SELECT DISTINCT b.id
+        SELECT DISTINCT b.id, b.title
         FROM ${bookmarks} b
         JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
         WHERE cb.collection_id = ${collectionId}
@@ -1461,7 +1463,7 @@ export class DatabaseStorage implements IStorage {
         UNION
         
         -- Search in notes
-        SELECT DISTINCT b.id
+        SELECT DISTINCT b.id, b.title
         FROM ${bookmarks} b
         JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
         JOIN ${notes} n ON b.id = n.bookmark_id
@@ -1471,7 +1473,7 @@ export class DatabaseStorage implements IStorage {
         UNION
         
         -- Search in insights
-        SELECT DISTINCT b.id
+        SELECT DISTINCT b.id, b.title
         FROM ${bookmarks} b
         JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
         JOIN ${insights} i ON b.id = i.bookmark_id
@@ -1483,7 +1485,7 @@ export class DatabaseStorage implements IStorage {
         UNION
         
         -- Search in tags
-        SELECT DISTINCT b.id
+        SELECT DISTINCT b.id, b.title
         FROM ${bookmarks} b
         JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
         JOIN ${bookmarkTags} bt ON b.id = bt.bookmark_id
@@ -1491,6 +1493,8 @@ export class DatabaseStorage implements IStorage {
         WHERE cb.collection_id = ${collectionId}
           AND LOWER(t.name) LIKE ${searchTerm}
       `);
+      
+      console.log("Tag search results:", matchingBookmarkIds.rows);
       
       // Extract the bookmark IDs from the result
       const ids = matchingBookmarkIds.rows.map(row => row.id);
@@ -1559,6 +1563,8 @@ export class DatabaseStorage implements IStorage {
       const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
       
       // Build a count query that counts unique bookmark IDs matching any of our search criteria
+      console.log(`Collection count search using term: ${searchTerm}`);
+      
       const result = await db.execute(sql`
         SELECT COUNT(*) FROM (
           SELECT DISTINCT b.id
@@ -1750,11 +1756,13 @@ export class DatabaseStorage implements IStorage {
       
       // Build a complex query that finds bookmarks matching any of our search criteria
       // using a UNION approach to deduplicate bookmarks
+      const userIdFilter = userId ? sql`(b.user_id = ${userId})` : sql`(b.user_id IS NOT NULL OR b.user_id IS NULL)`;
+      
       const matchingBookmarkIds = await db.execute(sql`
         SELECT DISTINCT b.id
         FROM ${bookmarks} b
         WHERE
-          (${userId} IS NULL OR b.user_id = ${userId})
+          ${userIdFilter}
           AND (
             LOWER(b.title) LIKE ${searchTerm}
             OR LOWER(b.description) LIKE ${searchTerm}
@@ -1769,7 +1777,7 @@ export class DatabaseStorage implements IStorage {
         FROM ${bookmarks} b
         JOIN ${notes} n ON b.id = n.bookmark_id
         WHERE
-          (${userId} IS NULL OR b.user_id = ${userId})
+          ${userIdFilter}
           AND LOWER(n.text) LIKE ${searchTerm}
         
         UNION
@@ -1779,7 +1787,7 @@ export class DatabaseStorage implements IStorage {
         FROM ${bookmarks} b
         JOIN ${insights} i ON b.id = i.bookmark_id
         WHERE
-          (${userId} IS NULL OR b.user_id = ${userId})
+          ${userIdFilter}
           AND (
             LOWER(i.summary) LIKE ${searchTerm}
           )
@@ -1792,7 +1800,7 @@ export class DatabaseStorage implements IStorage {
         JOIN ${bookmarkTags} bt ON b.id = bt.bookmark_id
         JOIN ${tags} t ON bt.tag_id = t.id
         WHERE
-          (${userId} IS NULL OR b.user_id = ${userId})
+          ${userIdFilter}
           AND LOWER(t.name) LIKE ${searchTerm}
       `);
       
@@ -1863,12 +1871,14 @@ export class DatabaseStorage implements IStorage {
       const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
       
       // Build a count query that counts unique bookmark IDs matching any of our search criteria
+      const userIdFilter = userId ? sql`(b.user_id = ${userId})` : sql`(b.user_id IS NOT NULL OR b.user_id IS NULL)`;
+
       const result = await db.execute(sql`
         SELECT COUNT(*) FROM (
           SELECT DISTINCT b.id
           FROM ${bookmarks} b
           WHERE
-            (${userId} IS NULL OR b.user_id = ${userId})
+            ${userIdFilter}
             AND (
               LOWER(b.title) LIKE ${searchTerm}
               OR LOWER(b.description) LIKE ${searchTerm}
@@ -1883,7 +1893,7 @@ export class DatabaseStorage implements IStorage {
           FROM ${bookmarks} b
           JOIN ${notes} n ON b.id = n.bookmark_id
           WHERE
-            (${userId} IS NULL OR b.user_id = ${userId})
+            ${userIdFilter}
             AND LOWER(n.text) LIKE ${searchTerm}
           
           UNION
@@ -1893,7 +1903,7 @@ export class DatabaseStorage implements IStorage {
           FROM ${bookmarks} b
           JOIN ${insights} i ON b.id = i.bookmark_id
           WHERE
-            (${userId} IS NULL OR b.user_id = ${userId})
+            ${userIdFilter}
             AND (
               LOWER(i.summary) LIKE ${searchTerm}
             )
@@ -1906,7 +1916,7 @@ export class DatabaseStorage implements IStorage {
           JOIN ${bookmarkTags} bt ON b.id = bt.bookmark_id
           JOIN ${tags} t ON bt.tag_id = t.id
           WHERE
-            (${userId} IS NULL OR b.user_id = ${userId})
+            ${userIdFilter}
             AND LOWER(t.name) LIKE ${searchTerm}
         ) AS bookmark_search
       `);
