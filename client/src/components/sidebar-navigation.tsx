@@ -325,21 +325,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Dashboard</h2>
             <ul>
               <li className="mb-1">
-                <Link href="/graph">
-                  <div className={cn(
-                    "flex items-center px-2 py-2 text-sm rounded-lg",
-                    location === "/graph"
-                      ? "bg-secondary/20 text-primary border border-primary/20" 
-                      : "text-gray-700 hover:bg-gray-100"
-                  )}>
-                    <Waypoints className={cn("h-5 w-5 mr-2", 
-                      location === "/graph" ? "text-primary" : ""
-                    )} />
-                    Explore
-                  </div>
-                </Link>
-              </li>
-              <li className="mb-1">
                 <Link href="/">
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
@@ -351,6 +336,21 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       location === "/" || location === "/feed" ? "text-primary" : ""
                     )} />
                     Feed
+                  </div>
+                </Link>
+              </li>
+              <li className="mb-1">
+                <Link href="/graph">
+                  <div className={cn(
+                    "flex items-center px-2 py-2 text-sm rounded-lg",
+                    location === "/graph"
+                      ? "bg-secondary/20 text-primary border border-primary/20" 
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}>
+                    <Waypoints className={cn("h-5 w-5 mr-2", 
+                      location === "/graph" ? "text-primary" : ""
+                    )} />
+                    Graph
                   </div>
                 </Link>
               </li>
