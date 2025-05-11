@@ -6,7 +6,7 @@ import { setupSchedulers } from "./lib/scheduler";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
+console.log(Object.entries(process.env).sort((a, b) => (a[0] < b[0] ? -1 : 1)));
 // Logger middleware to log '/api' requests and responses
 app.use((req, res, next) => {
   const start = Date.now();
@@ -62,16 +62,21 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-    
-    // Set up all scheduled tasks
-    setupSchedulers()
-      .then(() => log('Background schedulers initialized successfully'))
-      .catch((err: Error) => log(`Error setting up schedulers: ${err.message}`));
-  });
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
+
+      // Set up all scheduled tasks
+      setupSchedulers()
+        .then(() => log("Background schedulers initialized successfully"))
+        .catch((err: Error) =>
+          log(`Error setting up schedulers: ${err.message}`),
+        );
+    },
+  );
 })();
