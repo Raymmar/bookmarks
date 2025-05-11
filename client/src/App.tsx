@@ -23,6 +23,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={GraphView} />
+      <Route path="/feed" component={Feed} />
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />
       <ProtectedRoute path="/settings" component={Settings} />
