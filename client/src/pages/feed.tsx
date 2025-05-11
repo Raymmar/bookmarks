@@ -64,7 +64,7 @@ export default function Feed() {
   const filteredBookmarks = bookmarks;
   
   // Fetch the selected bookmark's details
-  const { data: selectedBookmark } = useQuery<BookmarkType>({
+  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkType>({
     queryKey: ['/api/bookmarks', selectedBookmarkId],
     queryFn: async () => {
       if (!selectedBookmarkId) return null;
@@ -216,12 +216,34 @@ export default function Feed() {
         <ResizableHandle withHandle />
         
         <ResizablePanel defaultSize={30} minSize={30} className="min-w-[420px] h-full">
-          {selectedBookmarkId && selectedBookmark ? (
-            <BookmarkDetailPanel
-              bookmark={selectedBookmark}
-              onClose={handleCloseDetail}
-            />
+          {selectedBookmarkId ? (
+            isLoadingBookmark ? (
+              // Loading state for bookmark details
+              <div className="flex flex-col h-full">
+                <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10">
+                  <div className="flex w-full items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
+                    <Button variant="ghost" size="icon" onClick={handleCloseDetail}>
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading bookmark details...</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Bookmark details panel
+              <BookmarkDetailPanel
+                bookmark={selectedBookmark}
+                onClose={handleCloseDetail}
+              />
+            )
           ) : (
+            // Empty state (only shown when no bookmark is selected)
             <div className="flex flex-col h-full w-full items-center justify-center p-6 text-center bg-gray-50 border-l">
               <Bookmark className="h-12 w-12 text-gray-300 mb-4" />
               <h3 className="text-lg font-medium mb-2">No bookmark selected</h3>
