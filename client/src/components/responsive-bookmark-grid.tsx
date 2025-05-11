@@ -1,20 +1,41 @@
 import { Bookmark } from "@shared/types";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, RefObject } from "react";
 import Masonry from "react-masonry-css";
+import { Loader2 } from "lucide-react";
+
+// Helper function to merge multiple refs
+function useMergedRef<T>(ref1: RefObject<T>, ref2: React.ForwardedRef<T>) {
+  return (value: T | null) => {
+    if (ref1) {
+      (ref1 as React.MutableRefObject<T | null>).current = value;
+    }
+    if (typeof ref2 === 'function') {
+      ref2(value);
+    } else if (ref2) {
+      (ref2 as React.MutableRefObject<T | null>).current = value;
+    }
+  };
+}
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  loaderRef?: RefObject<HTMLDivElement>;
 }
 
-export function BookmarkGrid({
+export const BookmarkGrid = forwardRef<HTMLDivElement, BookmarkGridProps>(({
   bookmarks,
   selectedBookmarkId,
   onSelectBookmark,
   isLoading,
-}: BookmarkGridProps) {
+  hasNextPage,
+  isFetchingNextPage,
+  loaderRef
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [breakpointCols, setBreakpointCols] = useState(2);
   
@@ -59,8 +80,11 @@ export function BookmarkGrid({
     };
   }, []);
 
+  // Use the forwarded ref, but fallback to containerRef for internal calculations
+  const mergedRef = useMergedRef(containerRef, ref);
+
   return (
-    <div className="p-3 overflow-auto h-full flex-1 w-full" ref={containerRef}>
+    <div className="p-3 overflow-auto h-full flex-1 w-full" ref={mergedRef}>
       {isLoading ? (
         <div className="flex items-center justify-center h-full min-h-[200px] w-full">
           <div className="text-center">
@@ -75,24 +99,45 @@ export function BookmarkGrid({
           </div>
         </div>
       ) : (
-        <Masonry
-          breakpointCols={breakpointCols}
-          className="masonry-grid w-full h-full"
-          columnClassName="masonry-grid-column"
-        >
-          {bookmarks.map((bookmark) => (
-            <BookmarkCard
-              key={bookmark.id}
-              bookmark={bookmark}
-              isSelected={selectedBookmarkId === bookmark.id}
-              onClick={() => onSelectBookmark(bookmark.id)}
+        <div className="flex flex-col">
+          <Masonry
+            breakpointCols={breakpointCols}
+            className="masonry-grid w-full h-full"
+            columnClassName="masonry-grid-column"
+          >
+            {bookmarks.map((bookmark) => (
+              <BookmarkCard
+                key={bookmark.id}
+                bookmark={bookmark}
+                isSelected={selectedBookmarkId === bookmark.id}
+                onClick={() => onSelectBookmark(bookmark.id)}
+              />
+            ))}
+          </Masonry>
+          
+          {/* Loading indicator that appears after content */}
+          {isFetchingNextPage && (
+            <div className="flex justify-center items-center py-4 mt-6">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading more bookmarks...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Invisible element for intersection observer */}
+          {hasNextPage && (
+            <div 
+              ref={loaderRef} 
+              className="w-full mt-6"
+              style={{ height: '20px', opacity: 0 }} // Almost invisible but still detectable by intersection observer
             />
-          ))}
-        </Masonry>
+          )}
+        </div>
       )}
     </div>
   );
-}
+});
 
 interface BookmarkCardProps {
   bookmark: Bookmark;

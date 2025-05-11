@@ -1,22 +1,29 @@
 import { Bookmark } from "@shared/types";
-import { CalendarIcon, Clock, Link2 } from "lucide-react";
+import { CalendarIcon, Clock, Link2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { forwardRef, RefObject } from "react";
 
 interface BookmarkListViewProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  loaderRef?: RefObject<HTMLDivElement>;
 }
 
-export function BookmarkListView({
+export const BookmarkListView = forwardRef<HTMLDivElement, BookmarkListViewProps>(({
   bookmarks,
   selectedBookmarkId,
   onSelectBookmark,
   isLoading,
-}: BookmarkListViewProps) {
+  hasNextPage,
+  isFetchingNextPage,
+  loaderRef
+}, ref) => {
   return (
-    <div className="p-3 overflow-auto h-full flex-1 w-full">
+    <div className="p-3 overflow-auto h-full flex-1 w-full" ref={ref}>
       {isLoading ? (
         <div className="flex items-center justify-center h-full min-h-[200px] w-full">
           <div className="text-center">
@@ -40,11 +47,30 @@ export function BookmarkListView({
               onClick={() => onSelectBookmark(bookmark.id)}
             />
           ))}
+          
+          {/* Loading indicator that appears after content */}
+          {isFetchingNextPage && (
+            <div className="flex justify-center items-center py-4 mt-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading more bookmarks...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Invisible element for intersection observer */}
+          {hasNextPage && (
+            <div 
+              ref={loaderRef} 
+              className="w-full"
+              style={{ height: '20px', opacity: 0 }} // Almost invisible but still detectable by intersection observer
+            />
+          )}
         </div>
       )}
     </div>
   );
-}
+});
 
 interface BookmarkListItemProps {
   bookmark: Bookmark;
