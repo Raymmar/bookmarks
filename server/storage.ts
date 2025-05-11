@@ -19,7 +19,7 @@ import {
   xFolders, XFolder, InsertXFolder
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, inArray, and, or } from "drizzle-orm";
+import { eq, desc, asc, sql, inArray, and, or, ilike } from "drizzle-orm";
 
 // Storage interface
 export interface IStorage {
@@ -338,12 +338,92 @@ export class MemStorage implements IStorage {
   }
   
   // Collection Bookmarks methods
-  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
+  async getBookmarksByCollectionId(collectionId: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
     const collectionBookmarksEntries = Array.from(this.collectionBookmarks.values())
       .filter(cb => cb.collection_id === collectionId);
     
     const bookmarkIds = collectionBookmarksEntries.map(cb => cb.bookmark_id);
-    return bookmarkIds.map(id => this.bookmarks.get(id)!).filter(Boolean);
+    let bookmarks = bookmarkIds
+      .map(id => this.bookmarks.get(id))
+      .filter(Boolean) as Bookmark[];
+    
+    // Apply search filter if provided
+    if (options?.searchQuery) {
+      const query = options.searchQuery.toLowerCase();
+      bookmarks = bookmarks.filter(bookmark => 
+        bookmark.title.toLowerCase().includes(query) ||
+        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
+        bookmark.url.toLowerCase().includes(query) ||
+        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
+      );
+    }
+    
+    // Apply sorting
+    if (options?.sort) {
+      switch (options.sort) {
+        case 'newest':
+          bookmarks = bookmarks.sort((a, b) => 
+            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
+          break;
+        case 'oldest':
+          bookmarks = bookmarks.sort((a, b) => 
+            new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime());
+          break;
+        case 'recently_updated':
+          bookmarks = bookmarks.sort((a, b) => 
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+          break;
+        case 'created_newest':
+          bookmarks = bookmarks.sort((a, b) => {
+            const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+            const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+            return bCreatedAt - aCreatedAt;
+          });
+          break;
+        default:
+          // Default to newest first
+          bookmarks = bookmarks.sort((a, b) => 
+            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
+      }
+    } else {
+      // Default sort - newest first
+      bookmarks = bookmarks.sort((a, b) => 
+        new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
+    }
+    
+    // Apply pagination
+    if (options?.offset) {
+      bookmarks = bookmarks.slice(options.offset);
+    }
+    
+    if (options?.limit) {
+      bookmarks = bookmarks.slice(0, options.limit);
+    }
+    
+    return bookmarks;
+  }
+  
+  async getBookmarksByCollectionIdCount(collectionId: string, options?: { searchQuery?: string }): Promise<number> {
+    const collectionBookmarksEntries = Array.from(this.collectionBookmarks.values())
+      .filter(cb => cb.collection_id === collectionId);
+    
+    const bookmarkIds = collectionBookmarksEntries.map(cb => cb.bookmark_id);
+    let bookmarks = bookmarkIds
+      .map(id => this.bookmarks.get(id))
+      .filter(Boolean) as Bookmark[];
+    
+    // Apply search filter if provided
+    if (options?.searchQuery) {
+      const query = options.searchQuery.toLowerCase();
+      bookmarks = bookmarks.filter(bookmark => 
+        bookmark.title.toLowerCase().includes(query) ||
+        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
+        bookmark.url.toLowerCase().includes(query) ||
+        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
+      );
+    }
+    
+    return bookmarks.length;
   }
   
   async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
@@ -1314,8 +1394,8 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Collection Bookmarks
-  async getBookmarksByCollectionId(collectionId: string): Promise<Bookmark[]> {
-    const result = await db
+  async getBookmarksByCollectionId(collectionId: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
+    let query = db
       .select({
         bookmark: bookmarks
       })
@@ -1323,7 +1403,80 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
       .where(eq(collectionBookmarks.collection_id, collectionId));
     
+    // Apply search filter if provided
+    if (options?.searchQuery) {
+      const searchTerm = `%${options.searchQuery}%`;
+      query = query.where(
+        or(
+          ilike(bookmarks.title, searchTerm),
+          ilike(bookmarks.description, searchTerm),
+          ilike(bookmarks.url, searchTerm),
+          ilike(bookmarks.content_html, searchTerm)
+        )
+      );
+    }
+    
+    // Apply sorting
+    if (options?.sort) {
+      switch (options.sort) {
+        case 'newest':
+          query = query.orderBy(desc(bookmarks.date_saved));
+          break;
+        case 'oldest':
+          query = query.orderBy(asc(bookmarks.date_saved));
+          break;
+        case 'recently_updated':
+          query = query.orderBy(desc(bookmarks.updated_at));
+          break;
+        case 'created_newest':
+          query = query.orderBy(desc(bookmarks.created_at));
+          break;
+        default:
+          // Default to newest first
+          query = query.orderBy(desc(bookmarks.date_saved));
+      }
+    } else {
+      // Default sort - newest first
+      query = query.orderBy(desc(bookmarks.date_saved));
+    }
+    
+    // Apply pagination
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    if (options?.offset) {
+      query = query.offset(options.offset);
+    }
+    
+    const result = await query;
     return result.map(r => r.bookmark);
+  }
+  
+  async getBookmarksByCollectionIdCount(collectionId: string, options?: { searchQuery?: string }): Promise<number> {
+    let query = db
+      .select({
+        count: sql<number>`count(*)`
+      })
+      .from(collectionBookmarks)
+      .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
+      .where(eq(collectionBookmarks.collection_id, collectionId));
+    
+    // Apply search filter if provided
+    if (options?.searchQuery) {
+      const searchTerm = `%${options.searchQuery}%`;
+      query = query.where(
+        or(
+          ilike(bookmarks.title, searchTerm),
+          ilike(bookmarks.description, searchTerm),
+          ilike(bookmarks.url, searchTerm),
+          ilike(bookmarks.content_html, searchTerm)
+        )
+      );
+    }
+    
+    const result = await query;
+    return result[0]?.count || 0;
   }
   
   async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
