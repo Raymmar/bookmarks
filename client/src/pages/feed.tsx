@@ -106,8 +106,7 @@ export default function Feed() {
   return (
     <div className="h-full bg-gray-50">
       <ResizablePanelGroup direction="horizontal" className="h-full">
-        {/* Increased minSize to ensure bookmark panel doesn't get too narrow */}
-        <ResizablePanel defaultSize={70} minSize={55}>
+        <ResizablePanel defaultSize={70} minSize={50}>
           <div className="flex flex-col h-full">
             {/* Header */}
             <div className="flex justify-between items-center p-4 border-b">
