@@ -36,7 +36,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // If user is authenticated, filter bookmarks by user_id
       const userId = req.isAuthenticated() ? (req.user as Express.User).id : undefined;
-      const bookmarks = await storage.getBookmarks(userId);
+      
+      // Parse pagination parameters
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const sort = req.query.sort as string || 'newest';
+      
+      // Get bookmarks with pagination
+      const bookmarks = await storage.getBookmarks(userId, { limit, offset, sort });
       
       // Populate the bookmarks with related data
       const populatedBookmarks = await Promise.all(
@@ -58,6 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(populatedBookmarks);
     } catch (error) {
+      console.error("Error retrieving bookmarks:", error);
       res.status(500).json({ error: "Failed to retrieve bookmarks" });
     }
   });

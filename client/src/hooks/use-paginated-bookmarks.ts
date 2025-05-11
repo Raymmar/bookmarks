@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Bookmark } from '@shared/types';
+import { useState, useCallback } from 'react';
 
 interface PaginatedBookmarksResult {
   bookmarks: Bookmark[];
@@ -26,8 +27,8 @@ export function usePaginatedBookmarks(
   pageSize: number = 50,
   sortOrder: 'newest' | 'oldest' | 'recently_updated' = 'newest'
 ): PaginatedBookmarksResult {
-  // Use React Query's state management to keep track of the current page
-  const [page, setPage] = React.useState(1);
+  // Use state to keep track of the current page
+  const [page, setPage] = useState(1);
   
   // Calculate the offset based on page number and page size
   const offset = (page - 1) * pageSize;
@@ -60,13 +61,13 @@ export function usePaginatedBookmarks(
   const hasNextPage = page < totalPages;
   const hasPreviousPage = page > 1;
   
-  const goToNextPage = React.useCallback(() => {
+  const goToNextPage = useCallback(() => {
     if (hasNextPage) {
       setPage(page + 1);
     }
   }, [page, hasNextPage]);
   
-  const goToPreviousPage = React.useCallback(() => {
+  const goToPreviousPage = useCallback(() => {
     if (hasPreviousPage) {
       setPage(page - 1);
     }

@@ -46,7 +46,7 @@ export interface IStorage {
   resetPassword(token: string, newPassword: string): Promise<boolean>;
 
   // Bookmarks
-  getBookmarks(userId?: string): Promise<Bookmark[]>;
+  getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string }): Promise<Bookmark[]>;
   getBookmark(id: string): Promise<Bookmark | undefined>;
   createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
   updateBookmark(id: string, bookmark: Partial<InsertBookmark>): Promise<Bookmark | undefined>;
