@@ -375,13 +375,55 @@ export class MemStorage implements IStorage {
   }
 
   // Bookmarks
-  async getBookmarks(userId?: string): Promise<Bookmark[]> {
-    if (userId) {
-      return Array.from(this.bookmarks.values()).filter(
-        bookmark => bookmark.user_id === userId
-      );
+  async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string }): Promise<Bookmark[]> {
+    // Filter by user ID if provided
+    let result = userId 
+      ? Array.from(this.bookmarks.values()).filter(bookmark => bookmark.user_id === userId)
+      : Array.from(this.bookmarks.values());
+    
+    // Apply sorting
+    if (options?.sort) {
+      switch (options.sort) {
+        case 'newest':
+          result = result.sort((a, b) => 
+            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
+          break;
+        case 'oldest':
+          result = result.sort((a, b) => 
+            new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime());
+          break;
+        case 'recently_updated':
+          result = result.sort((a, b) => 
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+          break;
+        case 'created_newest':
+          result = result.sort((a, b) => {
+            const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
+            const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
+            return bCreatedAt - aCreatedAt;
+          });
+          break;
+        default:
+          // Default to newest first
+          result = result.sort((a, b) => 
+            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
+      }
+    } else {
+      // Default sort - newest first
+      result = result.sort((a, b) => 
+        new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
     }
-    return Array.from(this.bookmarks.values());
+    
+    // Apply pagination
+    if (options?.offset) {
+      result = result.slice(options.offset);
+    }
+    
+    if (options?.limit) {
+      result = result.slice(0, options.limit);
+    }
+    
+    return result;
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
@@ -1338,11 +1380,49 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Bookmarks
-  async getBookmarks(userId?: string): Promise<Bookmark[]> {
+  async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string }): Promise<Bookmark[]> {
+    let query = db.select().from(bookmarks);
+    
+    // Apply user filter if provided
     if (userId) {
-      return await db.select().from(bookmarks).where(eq(bookmarks.user_id, userId));
+      query = query.where(eq(bookmarks.user_id, userId));
     }
-    return await db.select().from(bookmarks);
+    
+    // Apply sorting
+    if (options?.sort) {
+      switch (options.sort) {
+        case 'newest':
+          query = query.orderBy(desc(bookmarks.date_saved));
+          break;
+        case 'oldest':
+          query = query.orderBy(bookmarks.date_saved);
+          break;
+        case 'recently_updated':
+          query = query.orderBy(desc(bookmarks.updated_at));
+          break;
+        case 'created_newest':
+          // If created_at exists, use it, otherwise fall back to date_saved
+          query = query.orderBy(desc(bookmarks.created_at), desc(bookmarks.date_saved));
+          break;
+        default:
+          // Default to newest
+          query = query.orderBy(desc(bookmarks.date_saved));
+      }
+    } else {
+      // Default sort - newest first
+      query = query.orderBy(desc(bookmarks.date_saved));
+    }
+    
+    // Apply pagination
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    if (options?.offset) {
+      query = query.offset(options.offset);
+    }
+    
+    return await query;
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {

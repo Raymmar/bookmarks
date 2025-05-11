@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Activity from "@/pages/activity";
+import Feed from "@/pages/feed";
 import GraphView from "@/pages/graph-view";
 import AiChat from "@/pages/ai-chat";
 import Settings from "@/pages/settings";
