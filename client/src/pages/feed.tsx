@@ -102,7 +102,10 @@ export default function Feed() {
           loadMoreBookmarks();
         }
       },
-      { threshold: 0.1 }
+      { 
+        threshold: 0.1,
+        rootMargin: '200px 0px' // Start loading more content before user fully reaches the bottom
+      }
     );
     
     const currentLoaderRef = loaderRef.current;
@@ -183,21 +186,23 @@ export default function Feed() {
                 />
               )}
               
-              {/* Infinite scroll loader */}
-              {(hasNextPage || isFetchingNextPage) && (
+              {/* Loading indicator that appears after content */}
+              {isFetchingNextPage && (
+                <div className="flex justify-center items-center py-4 border-t mt-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading more bookmarks...</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Invisible element for intersection observer */}
+              {hasNextPage && (
                 <div 
                   ref={loaderRef} 
-                  className="flex justify-center items-center p-4 border-t"
-                >
-                  {isFetchingNextPage ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Loading more...</span>
-                    </div>
-                  ) : (
-                    <div className="h-8" /> // Invisible element for intersection observer
-                  )}
-                </div>
+                  className="w-full mt-auto"
+                  style={{ height: '20px', opacity: 0 }} // Almost invisible but still detectable by intersection observer
+                />
               )}
             </div>
           </div>
