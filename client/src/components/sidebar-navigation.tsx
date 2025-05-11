@@ -325,7 +325,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Dashboard</h2>
             <ul>
               <li className="mb-1">
-                <Link href="/">
+                <Link href="/graph">
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
                     location === "/graph"
