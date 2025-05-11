@@ -104,7 +104,7 @@ export default function Feed() {
         <ResizablePanel defaultSize={70} minSize={50} className="h-full">
           <div className="flex flex-col h-full w-full">
             {/* Header with integrated search */}
-            <div className="flex justify-between items-center p-4 border-b">
+            <div className="flex justify-between items-center p-3 border-b">
               <div className="relative flex-1 mr-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
