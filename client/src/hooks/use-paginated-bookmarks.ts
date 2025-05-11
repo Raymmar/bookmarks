@@ -5,7 +5,12 @@ import { useAuth } from './use-auth';
 
 type SortOption = 'newest' | 'oldest' | 'recently_updated' | 'created_newest';
 
-export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOption = 'newest', searchQuery: string = '') {
+export function usePaginatedBookmarks(
+  pageSize: number = 50, 
+  sortOrder: SortOption = 'newest', 
+  searchQuery: string = '',
+  collectionId?: string | null
+) {
   const { user } = useAuth();
   const [totalItems, setTotalItems] = useState(0);
   const allBookmarksRef = useRef<Bookmark[]>([]);
@@ -27,8 +32,13 @@ export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOpti
       params.append('search', searchQuery);
     }
     
+    // Add collection filter if provided
+    if (collectionId) {
+      params.append('collection_id', collectionId);
+    }
+    
     return params;
-  }, [pageSize, sortOrder, user?.id, searchQuery]);
+  }, [pageSize, sortOrder, user?.id, searchQuery, collectionId]);
 
   // Use infinite query instead of regular query
   const {
@@ -42,7 +52,7 @@ export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOpti
     refetch,
     status
   } = useInfiniteQuery({
-    queryKey: ['/api/bookmarks/infinite', pageSize, sortOrder, user?.id, searchQuery],
+    queryKey: ['/api/bookmarks/infinite', pageSize, sortOrder, user?.id, searchQuery, collectionId],
     queryFn: async ({ pageParam = 1 }) => {
       const queryParams = buildQueryParams(pageParam);
       const response = await fetch(`/api/bookmarks?${queryParams.toString()}`);
