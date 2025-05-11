@@ -206,7 +206,7 @@ export default function Feed() {
         
         <ResizableHandle withHandle />
         
-        <ResizablePanel defaultSize={30} minSize={25}>
+        <ResizablePanel defaultSize={30} minSize={30} className="min-w-[420px]">
           {selectedBookmarkId && selectedBookmark ? (
             <BookmarkDetailPanel
               bookmark={selectedBookmark}
