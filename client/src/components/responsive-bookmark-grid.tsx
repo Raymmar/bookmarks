@@ -60,7 +60,7 @@ export function BookmarkGrid({
   }, []);
 
   return (
-    <div className="px-3 pt-3 overflow-auto h-full flex-1 w-full" ref={containerRef}>
+    <div className="p-3 overflow-auto h-full flex-1 w-full" ref={containerRef}>
       {isLoading ? (
         <div className="flex items-center justify-center h-full min-h-[200px] w-full">
           <div className="text-center">
