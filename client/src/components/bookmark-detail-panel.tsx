@@ -177,8 +177,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
-  // Always start with loading state true when initialBookmark exists or is being requested
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [lightbox, setLightbox] = useState<{ 
     isOpen: boolean; 
     images: Array<{url: string; alt: string}>;
@@ -211,19 +209,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   
   // Update bookmark state when the prop changes
   useEffect(() => {
-    if (initialBookmark?.id) {
-      // Set loading state first, but keep the previous bookmark in view
-      // until new data is loaded (don't clear previous bookmark data)
-      setIsLoading(true);
-      // Update bookmark reference to trigger data fetching
-      setBookmark(initialBookmark);
-    } else if (initialBookmark === undefined) {
-      // Only clear bookmark and show empty state when explicitly
-      // set to undefined (not just during transitions)
-      setBookmark(undefined);
-      setIsLoading(false);
-    }
-    // Note: we don't clear bookmark during transitions between bookmarks
+    setBookmark(initialBookmark);
   }, [initialBookmark]);
   
   // Listen for the custom showBookmarkDetail event
@@ -236,10 +222,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         if (!bookmarkId) return;
         
         console.log(`Custom event received to show bookmark: ${bookmarkId}`);
-        
-        // Set loading state immediately, but keep previous bookmark data visible
-        // Don't clear the bookmark here - this keeps previous bookmark visible during loading
-        setIsLoading(true);
         
         // Fetch the updated bookmark
         const { apiRequest } = await import('@/lib/queryClient');
@@ -267,9 +249,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         }
       } catch (error) {
         console.error("Error handling showBookmarkDetail event:", error);
-        // Turn off loading state in case of error but don't clear bookmark
-        // so we maintain the previous bookmark view
-        setIsLoading(false);
       }
     };
     
@@ -287,8 +266,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     if (bookmark) {
       const fetchTags = async () => {
         try {
-          // Keep isLoading true but don't modify bookmark state
-          // This preserves the previous bookmark view while loading new data
           const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
           if (response.ok) {
             const bookmarkTags = await response.json();
@@ -308,7 +285,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     if (bookmark) {
       const fetchNotes = async () => {
         try {
-          // Keep existing bookmark data visible during loading
           const notes = await apiRequest("GET", `/api/bookmarks/${bookmark.id}/notes`);
           if (notes && notes.length > 0) {
             setOptimisticNotes(notes);
@@ -326,19 +302,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           } else {
             setOptimisticNotes([]);
           }
-        } finally {
-          // Once all the data is loaded for this bookmark, turn off the loading state
-          // This is the last data fetch, so we can now show the complete bookmark data
-          setIsLoading(false);
         }
       };
       
       fetchNotes();
     } else {
-      // Only clear notes when there's explicitly no bookmark
-      // (Not just during transitions between bookmarks)
       setOptimisticNotes([]);
-      setIsLoading(false);
     }
   }, [bookmark?.id]);
   
@@ -361,7 +330,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       }
       
       // Fetch the current processing status
-      // But keep previous bookmark data visible during loading
       const checkProcessingStatus = async () => {
         try {
           const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
@@ -374,10 +342,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           }
         } catch (error) {
           console.error("Error checking AI processing status:", error);
-        } finally {
-          // Turn off loading state, but don't clear bookmark data
-          // This is also the last check in the sequence of data loading
-          setIsLoading(false);
         }
       };
       
@@ -561,29 +525,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   };
 
-  // Handle empty or loading states - check loading state first to prevent flickering
-  if (isLoading) {
-    return (
-      <>
-        <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10">
-          <div className="flex w-full items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-        <div className="p-4 h-[calc(100vh-64px)] flex flex-col items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-gray-500">Loading bookmark details...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
-  
-  // Only show empty state if we're not loading AND there's no bookmark
   if (!bookmark) {
     return (
       <>
