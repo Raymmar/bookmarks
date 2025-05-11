@@ -6,7 +6,7 @@ import { setupSchedulers } from "./lib/scheduler";
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-console.log(Object.entries(process.env).sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+
 // Logger middleware to log '/api' requests and responses
 app.use((req, res, next) => {
   const start = Date.now();
