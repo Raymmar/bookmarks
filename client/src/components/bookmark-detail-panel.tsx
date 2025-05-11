@@ -997,16 +997,28 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                     </a>
                   ))}
                 
-                {/* Handle other media URLs */}
+                {/* Handle other media URLs - only render actual URLs, not local paths */}
                 {bookmark.media_urls
-                  .filter(url => !url.includes('pbs.twimg.com') && (
-                    // Include common image extensions
-                    url.endsWith('.jpg') || 
-                    url.endsWith('.jpeg') || 
-                    url.endsWith('.png') || 
-                    url.endsWith('.gif') || 
-                    url.endsWith('.webp')
-                  ))
+                  .filter(url => {
+                    // Skip Twitter/X media URLs (already handled above)
+                    if (url.includes('pbs.twimg.com')) return false;
+                    
+                    // Skip local file paths (these are the problematic ones that lead to broken links)
+                    if (url.startsWith('/') || url.includes('media/tweets/')) return false;
+                    
+                    // Only include valid image URLs that include http/https protocol
+                    const isValidUrl = url.startsWith('http') || url.startsWith('https');
+                    
+                    // Only include common image extensions
+                    const hasImageExtension = 
+                      url.endsWith('.jpg') || 
+                      url.endsWith('.jpeg') || 
+                      url.endsWith('.png') || 
+                      url.endsWith('.gif') || 
+                      url.endsWith('.webp');
+                      
+                    return isValidUrl && hasImageExtension;
+                  })
                   .map((url, index) => (
                     <a 
                       key={`other-${index}`} 
