@@ -644,7 +644,10 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         updated_at: new Date(now) // Use Date object for local state to match Bookmark type
       };
       
-      // Update the local state with properly typed bookmark
+      // Store a reference to optimistic bookmark to use after API call completes
+      const optimisticBookmarkRef = { ...optimisticBookmark };
+      
+      // Update the local state with optimistic data immediately
       setBookmark(optimisticBookmark);
       
       // Get current bookmarks from the cache
@@ -672,28 +675,30 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       }
       
       // Make API request to update the bookmark
-      const updatedBookmark = await apiRequest(
+      await apiRequest(
         "PATCH", 
         `/api/bookmarks/${bookmark.id}`, 
         updateData
       );
       
-      // Update the local state with server response
-      setBookmark(updatedBookmark);
+      // Important: Don't set bookmark state directly from server response
+      // Instead, keep the optimistic update we already made
+      // This prevents the UI flicker when server data arrives
       
-      // Only invalidate queries if we're not in recently_updated sort mode
-      // For recently_updated, we keep our optimistic update intact with no server refresh
+      // Only update tags/refs in background without affecting current display
       if (sortOrder !== 'recently_updated') {
+        // Use a longer delay to ensure user's editing experience is complete
         setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-        }, 1000);
+          // Instead of invalidating, use setQueryData to update cache without triggering refetch
+          queryClient.setQueryData([`/api/bookmarks/${bookmark.id}`], optimisticBookmarkRef);
+        }, 2000);
       }
       
       // Dispatch a custom event to inform other components about the update
       const event = new CustomEvent('bookmarkUpdated', { 
         detail: { 
           bookmarkId: bookmark.id,
-          updatedBookmark
+          updatedBookmark: optimisticBookmarkRef
         } 
       });
       document.dispatchEvent(event);
