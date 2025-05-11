@@ -60,22 +60,24 @@ export function BookmarkGrid({
   }, []);
 
   return (
-    <div className="p-3 overflow-auto h-full" ref={containerRef}>
+    <div className="p-3 overflow-auto h-full flex-1 w-full" ref={containerRef}>
       {isLoading ? (
-        <div className="flex items-center justify-center h-32">
+        <div className="flex items-center justify-center h-full min-h-[200px] w-full">
           <div className="text-center">
             <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
             <p className="mt-2 text-gray-600">Loading bookmarks...</p>
           </div>
         </div>
       ) : bookmarks.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          No bookmarks found. Try adjusting your filters.
+        <div className="flex items-center justify-center h-full min-h-[200px] w-full">
+          <div className="text-center py-8 text-gray-500">
+            No bookmarks found. Try adjusting your filters.
+          </div>
         </div>
       ) : (
         <Masonry
           breakpointCols={breakpointCols}
-          className="masonry-grid"
+          className="masonry-grid w-full h-full"
           columnClassName="masonry-grid-column"
         >
           {bookmarks.map((bookmark) => (

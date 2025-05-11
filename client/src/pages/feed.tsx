@@ -99,10 +99,10 @@ export default function Feed() {
   // so that no bookmark is loaded in the detail view by default
 
   return (
-    <div className="h-full bg-gray-50">
+    <div className="h-full w-full bg-gray-50">
       <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={70} minSize={50}>
-          <div className="flex flex-col h-full">
+        <ResizablePanel defaultSize={70} minSize={50} className="h-full">
+          <div className="flex flex-col h-full w-full">
             {/* Header */}
             <div className="flex justify-between items-center p-4 border-b">
               <h1 className="text-xl font-semibold">Recent Bookmarks</h1>
@@ -152,7 +152,7 @@ export default function Feed() {
             </div>
             
             {/* Content */}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto flex flex-col h-full">
               {viewMode === 'list' ? (
                 <BookmarkListView 
                   bookmarks={filteredBookmarks}
@@ -201,14 +201,14 @@ export default function Feed() {
         
         <ResizableHandle withHandle />
         
-        <ResizablePanel defaultSize={30} minSize={30} className="min-w-[420px]">
+        <ResizablePanel defaultSize={30} minSize={30} className="min-w-[420px] h-full">
           {selectedBookmarkId && selectedBookmark ? (
             <BookmarkDetailPanel
               bookmark={selectedBookmark}
               onClose={handleCloseDetail}
             />
           ) : (
-            <div className="flex flex-col h-full items-center justify-center p-6 text-center bg-gray-50 border-l">
+            <div className="flex flex-col h-full w-full items-center justify-center p-6 text-center bg-gray-50 border-l">
               <Bookmark className="h-12 w-12 text-gray-300 mb-4" />
               <h3 className="text-lg font-medium mb-2">No bookmark selected</h3>
               <p className="text-sm text-gray-500 mb-4">
