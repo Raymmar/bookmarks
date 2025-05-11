@@ -971,9 +971,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 {bookmark.media_urls
                   .filter(url => url.includes('pbs.twimg.com'))
                   .map((url, index) => (
-                    <div 
+                    <a 
                       key={`twitter-${index}`} 
-                      className="block overflow-hidden rounded-lg border border-gray-200"
+                      href={url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary"
                     >
                       <img 
                         src={url} 
@@ -991,7 +994,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                           }
                         }}
                       />
-                    </div>
+                    </a>
                   ))}
                 
                 {/* Handle other media URLs */}
@@ -1005,9 +1008,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                     url.endsWith('.webp')
                   ))
                   .map((url, index) => (
-                    <div 
+                    <a 
                       key={`other-${index}`} 
-                      className="block overflow-hidden rounded-lg border border-gray-200"
+                      href={url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary"
                     >
                       <img 
                         src={url} 
@@ -1025,7 +1031,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                           }
                         }}
                       />
-                    </div>
+                    </a>
                   ))}
               </div>
             )}
