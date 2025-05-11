@@ -5,7 +5,12 @@ import { useAuth } from './use-auth';
 
 type SortOption = 'newest' | 'oldest' | 'recently_updated' | 'created_newest';
 
-export function usePaginatedBookmarks(pageSize: number = 50, sortOrder: SortOption = 'newest', searchQuery: string = '') {
+export function usePaginatedBookmarks(
+  pageSize: number = 50, 
+  sortOrder: SortOption = 'newest', 
+  searchQuery: string = '',
+  collectionId: string | null = null
+) {
   const { user } = useAuth();
   const [totalItems, setTotalItems] = useState(0);
   const allBookmarksRef = useRef<Bookmark[]>([]);
