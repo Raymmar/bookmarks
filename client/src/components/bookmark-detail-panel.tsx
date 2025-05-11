@@ -1094,7 +1094,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             <div>
               <h5 className="text-xs font-medium text-gray-600 mb-1">Summary</h5>
               <div
-                className="text-sm text-gray-600 mb-3 border-b border-transparent hover:border-gray-300 focus-within:border-primary cursor-text"
+                className="text-sm text-gray-600 mb-3 border border-transparent hover:border-gray-200 focus-within:border-primary rounded-md p-2 cursor-text bg-gray-50/50 hover:bg-gray-50"
                 onClick={(e) => {
                   // Make sure the click was directly on the div and not on a child element
                   if (e.currentTarget === e.target) {
@@ -1105,9 +1105,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               >
                 <textarea
                   value={bookmark.insights.summary}
-                  className="w-full bg-transparent focus:outline-none resize-none overflow-hidden"
-                  rows={Math.max(1, bookmark.insights.summary.split('\n').length)}
+                  className="w-full bg-transparent focus:outline-none resize-none min-h-[4rem] leading-relaxed"
+                  style={{ height: Math.max(80, bookmark.insights.summary.split('\n').length * 24) + 'px' }}
+                  placeholder="Click to edit summary..."
                   onChange={(e) => {
+                    // Adjust textarea height automatically to fit content
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                    
                     setBookmark(prev => {
                       if (!prev) return prev;
                       return { 
@@ -1118,21 +1123,48 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                         } : undefined
                       } as Bookmark;
                     });
+                    
+                    // Update local queryClient cache for immediate visual persistence
+                    queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], 
+                      (oldBookmarks = []) => oldBookmarks.map(b => 
+                        b.id === bookmark.id ? {
+                          ...b,
+                          insights: b.insights ? {
+                            ...b.insights,
+                            summary: e.target.value
+                          } : undefined
+                        } : b
+                      )
+                    );
                   }}
                   onBlur={(e) => {
                     if (initialBookmark?.insights?.summary && e.target.value !== initialBookmark.insights.summary) {
-                      // Only make API call if summary has changed
+                      // Create updated insights object
                       if (bookmark?.insights) {
-                        handleUpdateBookmark({
-                          insights: {
-                            id: bookmark.insights.id,
-                            bookmark_id: bookmark.insights.bookmark_id,
-                            summary: e.target.value,
-                            sentiment: bookmark.insights.sentiment,
-                            depth_level: bookmark.insights.depth_level,
-                            related_links: bookmark.insights.related_links
-                          }
-                        });
+                        const insightsUpdate = {
+                          id: bookmark.insights.id,
+                          bookmark_id: bookmark.insights.bookmark_id,
+                          summary: e.target.value,
+                          sentiment: bookmark.insights.sentiment,
+                          depth_level: bookmark.insights.depth_level,
+                          related_links: bookmark.insights.related_links
+                        };
+                        
+                        // Optimistically update the bookmark to prevent flashing/reverting
+                        queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], 
+                          (oldBookmarks = []) => oldBookmarks.map(b => 
+                            b.id === bookmark.id ? {
+                              ...b,
+                              insights: b.insights ? {
+                                ...b.insights,
+                                summary: e.target.value
+                              } : undefined
+                            } : b
+                          )
+                        );
+                        
+                        // Make the API call
+                        handleUpdateBookmark({ insights: insightsUpdate });
                       }
                     }
                   }}
