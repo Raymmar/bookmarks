@@ -23,7 +23,7 @@ import {
   FileText,
   ListFilter
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, createUrlSlug } from "@/lib/utils";
 import { AddBookmarkDialog } from "@/components/ui/add-bookmark-dialog";
 import { CreateCollectionDialog } from "@/components/ui/create-collection-dialog";
 import { EditCollectionDialog } from "@/components/ui/edit-collection-dialog";
@@ -238,7 +238,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
     <li key={collection.id}>
       <div className="flex items-center">
         <Link 
-          href={`/collection/${encodeURIComponent(collection.name)}`}
+          href={`/collection/${createUrlSlug(collection.name)}`}
           className="flex-1"
         >
           <div 
@@ -247,7 +247,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
               selectedCollections.includes(collection.id) 
                 ? "bg-primary/10 text-primary" 
                 : "text-gray-700 hover:bg-gray-50",
-              location === `/collection/${encodeURIComponent(collection.name)}`
+              location === `/collection/${createUrlSlug(collection.name)}`
                 ? "border border-primary/20 bg-secondary/10"
                 : ""
             )}
@@ -256,7 +256,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             <Folder className="h-3.5 w-3.5 mr-2 opacity-70" />
             <span className={cn("truncate flex-1", 
               (selectedCollections.includes(collection.id) || 
-               location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
+               location === `/collection/${createUrlSlug(collection.name)}`) && "font-medium"
             )}>
               {collection.name}
             </span>

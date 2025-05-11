@@ -15,21 +15,22 @@ import { useCollections } from "@/hooks/use-collection-queries";
 import { Bookmark as BookmarkType } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { createUrlSlug } from "@/lib/utils";
 
 export default function CollectionPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Get the collection name from the URL
+  // Get the collection slug from the URL
   const [, params] = useRoute<{ name: string }>("/collection/:name");
-  const collectionName = params?.name ? decodeURIComponent(params.name) : "";
+  const collectionSlug = params?.name || "";
   
-  // Get all collections to find the one matching the URL name
+  // Get all collections to find the one matching the URL slug
   const { data: collections = [], isLoading: collectionsLoading } = useCollections();
   
-  // Find the collection by name (case-insensitive)
+  // Find the collection by comparing the URL slug to the slug version of each collection name
   const collection = collections.find(
-    c => c.name.toLowerCase() === collectionName.toLowerCase()
+    c => createUrlSlug(c.name) === collectionSlug
   );
   
   // State for the selected bookmark
@@ -149,7 +150,7 @@ export default function CollectionPage() {
         <FolderOpen className="h-16 w-16 text-gray-300 mb-4" />
         <h2 className="text-2xl font-bold mb-2">Collection not found</h2>
         <p className="text-gray-500 mb-4 text-center">
-          The collection "{collectionName}" could not be found or you don't have permission to view it.
+          The collection "{collectionSlug}" could not be found or you don't have permission to view it.
         </p>
         <Button asChild>
           <a href="/feed">Back to Feed</a>

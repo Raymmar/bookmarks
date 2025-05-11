@@ -74,3 +74,21 @@ export function getDomainFromUrl(url: string): string {
     return url;
   }
 }
+
+/**
+ * Creates a URL-friendly slug from a string
+ * - Converts to lowercase
+ * - Removes special characters
+ * - Replaces spaces with dashes
+ * - Removes leading/trailing dashes
+ */
+export function createUrlSlug(text: string): string {
+  if (!text) return '';
+  
+  return text
+    .toLowerCase()                       // Convert to lowercase
+    .trim()                              // Remove leading/trailing whitespace
+    .replace(/[^\w\s-]/g, '')           // Remove special characters except spaces and dashes
+    .replace(/[\s_]+/g, '-')            // Replace spaces and underscores with dashes
+    .replace(/^-+|-+$/g, '');           // Remove leading/trailing dashes
+}
