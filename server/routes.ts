@@ -45,21 +45,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse search query if provided
       const searchQuery = req.query.search ? (req.query.search as string).trim() : undefined;
       
+      // Parse collection_id if provided
+      const collectionId = req.query.collection_id ? (req.query.collection_id as string) : undefined;
+      
       console.log(`Search query received: "${searchQuery}"`); // Debug log
       
-      // Get total count before pagination for accurate pagination info
-      const totalCount = await storage.getBookmarksCount(userId, { searchQuery });
+      let bookmarks;
+      let totalCount;
       
-      // Add count to response headers
-      res.setHeader('X-Total-Count', totalCount.toString());
-      
-      // Get bookmarks with pagination and search
-      const bookmarks = await storage.getBookmarks(userId, { 
-        limit, 
-        offset, 
-        sort,
-        searchQuery 
-      });
+      // If collection_id is provided, get bookmarks from the collection
+      if (collectionId) {
+        // Check if the collection exists and is accessible by the user
+        const collection = await storage.getCollection(collectionId);
+        
+        if (!collection) {
+          return res.status(404).json({ error: "Collection not found" });
+        }
+        
+        // Check if user can access this collection
+        if (!collection.is_public && (!req.isAuthenticated() || collection.user_id !== userId)) {
+          return res.status(403).json({ error: "Access denied to private collection" });
+        }
+        
+        // Get bookmarks from this collection
+        totalCount = await storage.getBookmarksByCollectionIdCount(collectionId, { searchQuery });
+        res.setHeader('X-Total-Count', totalCount.toString());
+        
+        bookmarks = await storage.getBookmarksByCollectionId(collectionId, { 
+          limit, 
+          offset, 
+          sort,
+          searchQuery 
+        });
+      } else {
+        // Get all bookmarks (or filtered by user_id if authenticated)
+        totalCount = await storage.getBookmarksCount(userId, { searchQuery });
+        res.setHeader('X-Total-Count', totalCount.toString());
+        
+        bookmarks = await storage.getBookmarks(userId, { 
+          limit, 
+          offset, 
+          sort,
+          searchQuery 
+        });
+      }
       
       // Populate the bookmarks with related data
       const populatedBookmarks = await Promise.all(

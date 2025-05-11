@@ -15,6 +15,7 @@ import Reports from "@/pages/reports";
 import AuthPage from "@/pages/auth-page";
 import VerifyEmail from "@/pages/verify-email";
 import ResetPassword from "@/pages/reset-password";
+import CollectionPage from "@/pages/collection";
 import MainLayout from "@/layouts/main-layout";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -30,6 +31,7 @@ function Router() {
       <ProtectedRoute path="/settings" component={Settings} />
       <ProtectedRoute path="/x-integration" component={XIntegration} />
       <ProtectedRoute path="/reports" component={Reports} />
+      <Route path="/collection/:name" component={CollectionPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/reset-password" component={ResetPassword} />

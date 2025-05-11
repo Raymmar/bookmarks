@@ -32,8 +32,13 @@ export function usePaginatedBookmarks(
       params.append('search', searchQuery);
     }
     
+    // Add collection ID if provided
+    if (collectionId) {
+      params.append('collection_id', collectionId);
+    }
+    
     return params;
-  }, [pageSize, sortOrder, user?.id, searchQuery]);
+  }, [pageSize, sortOrder, user?.id, searchQuery, collectionId]);
 
   // Use infinite query instead of regular query
   const {
@@ -47,7 +52,7 @@ export function usePaginatedBookmarks(
     refetch,
     status
   } = useInfiniteQuery({
-    queryKey: ['/api/bookmarks/infinite', pageSize, sortOrder, user?.id, searchQuery],
+    queryKey: ['/api/bookmarks/infinite', pageSize, sortOrder, user?.id, searchQuery, collectionId],
     queryFn: async ({ pageParam = 1 }) => {
       const queryParams = buildQueryParams(pageParam);
       const response = await fetch(`/api/bookmarks?${queryParams.toString()}`);
@@ -82,10 +87,10 @@ export function usePaginatedBookmarks(
   const totalPages = Math.ceil(totalItems / pageSize);
   const hasNextPage = hasMore;
   
-  // Reset the query when sort order or search changes
+  // Reset the query when sort order, search, or collection ID changes
   useEffect(() => {
     refetch();
-  }, [sortOrder, user?.id, searchQuery, refetch]);
+  }, [sortOrder, user?.id, searchQuery, collectionId, refetch]);
 
   // Function to load more bookmarks
   const loadMoreBookmarks = useCallback(() => {
