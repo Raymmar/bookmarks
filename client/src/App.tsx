@@ -26,7 +26,7 @@ function Router() {
       <Route path="/" component={Feed} />
       <Route path="/graph" component={GraphView} />
       <Route path="/feed" component={Feed} />
-      <Route path="/collection/:collectionId" component={() => import("@/pages/collection").then(module => module.default())} />
+      <Route path="/collection/:collectionId" component={CollectionPage} />
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />
       <ProtectedRoute path="/settings" component={Settings} />
