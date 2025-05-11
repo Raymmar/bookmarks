@@ -33,27 +33,55 @@ interface BookmarkDetailPanelProps {
 
 // Lightbox component for displaying images
 interface LightboxProps {
-  imageUrl: string;
-  alt: string;
+  images: Array<{url: string; alt: string}>;
+  initialIndex: number;
   onClose: () => void;
 }
 
-function Lightbox({ imageUrl, alt, onClose }: LightboxProps) {
-  // Close lightbox when clicking outside or pressing Escape
+function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  
+  // Handle keyboard navigation
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowRight') {
+        setCurrentIndex(prev => (prev + 1) % images.length);
+      } else if (e.key === 'ArrowLeft') {
+        setCurrentIndex(prev => (prev - 1 + images.length) % images.length);
+      }
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [images.length, onClose]);
+
+  const goToNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(prev => (prev + 1) % images.length);
+  };
+
+  const goToPrevious = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(prev => (prev - 1 + images.length) % images.length);
+  };
+  
+  const goToImage = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(index);
+  };
+
+  // Current image details
+  const currentImage = images[currentIndex];
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80"
       onClick={onClose}
     >
       <div className="relative max-w-[90vw] max-h-[90vh] flex flex-col">
+        {/* Controls */}
         <div className="absolute -top-12 right-0 flex gap-2">
           <Button 
             variant="outline" 
@@ -67,12 +95,70 @@ function Lightbox({ imageUrl, alt, onClose }: LightboxProps) {
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <img 
-          src={imageUrl} 
-          alt={alt} 
-          className="max-h-[85vh] max-w-[85vw] object-contain"
-          onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image
-        />
+        
+        {/* Navigation buttons */}
+        {images.length > 1 && (
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goToPrevious}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-gray-700 z-10"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goToNext}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70 border-gray-700 z-10"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </Button>
+          </>
+        )}
+        
+        {/* Main image */}
+        <div className="flex items-center justify-center">
+          <img 
+            src={currentImage.url} 
+            alt={currentImage.alt} 
+            className="max-h-[75vh] max-w-[85vw] object-contain"
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image
+          />
+        </div>
+        
+        {/* Thumbnails at bottom */}
+        {images.length > 1 && (
+          <div className="flex justify-center mt-4 space-x-2 overflow-x-auto max-w-[85vw]" onClick={(e) => e.stopPropagation()}>
+            {images.map((image, index) => (
+              <div
+                key={index}
+                className={`w-16 h-16 overflow-hidden rounded cursor-pointer transition-all border-2 ${
+                  index === currentIndex ? 'border-primary' : 'border-transparent'
+                }`}
+                onClick={(e) => goToImage(index, e)}
+              >
+                <img
+                  src={image.url}
+                  alt={`Thumbnail ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Image counter */}
+        {images.length > 1 && (
+          <div className="absolute bottom-[-30px] left-0 right-0 text-center text-white text-sm">
+            {currentIndex + 1} / {images.length}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -91,10 +177,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
-  const [lightbox, setLightbox] = useState<{ isOpen: boolean; imageUrl: string; alt: string }>({ 
+  const [lightbox, setLightbox] = useState<{ 
+    isOpen: boolean; 
+    images: Array<{url: string; alt: string}>;
+    initialIndex: number;
+  }>({ 
     isOpen: false, 
-    imageUrl: '', 
-    alt: '' 
+    images: [],
+    initialIndex: 0
   });
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1026,7 +1116,38 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                     <div 
                       key={`twitter-${index}`} 
                       className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
-                      onClick={() => setLightbox({ isOpen: true, imageUrl: url, alt: `Media from ${bookmark.title}` })}
+                      onClick={() => {
+                        // Get all eligible images for the lightbox
+                        const imageUrls = [...bookmark.media_urls || []].filter(u => {
+                          // Only include image URLs
+                          if (u.startsWith('/') || u.includes('media/tweets/')) return false;
+                          const isValidUrl = u.startsWith('http') || u.startsWith('https');
+                          const hasImageExtension = 
+                            u.endsWith('.jpg') || 
+                            u.endsWith('.jpeg') || 
+                            u.endsWith('.png') || 
+                            u.endsWith('.gif') || 
+                            u.endsWith('.webp') ||
+                            u.includes('pbs.twimg.com'); // Twitter images don't always have extensions
+                          return isValidUrl && hasImageExtension;
+                        });
+                        
+                        // Format images for the lightbox
+                        const images = imageUrls.map(imgUrl => ({
+                          url: imgUrl,
+                          alt: `Media from ${bookmark.title}`
+                        }));
+                        
+                        // Find index of this image in the array
+                        const currentIndex = imageUrls.findIndex(imgUrl => imgUrl === url);
+                        
+                        // Open lightbox with all images
+                        setLightbox({
+                          isOpen: true,
+                          images,
+                          initialIndex: currentIndex >= 0 ? currentIndex : 0
+                        });
+                      }}
                     >
                       <img 
                         src={url} 
@@ -1073,7 +1194,38 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                     <div 
                       key={`other-${index}`} 
                       className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
-                      onClick={() => setLightbox({ isOpen: true, imageUrl: url, alt: `Media from ${bookmark.title}` })}
+                      onClick={() => {
+                        // Get all eligible images for the lightbox
+                        const imageUrls = [...bookmark.media_urls || []].filter(u => {
+                          // Only include image URLs 
+                          if (u.startsWith('/') || u.includes('media/tweets/')) return false;
+                          const isValidUrl = u.startsWith('http') || u.startsWith('https');
+                          const hasImageExtension = 
+                            u.endsWith('.jpg') || 
+                            u.endsWith('.jpeg') || 
+                            u.endsWith('.png') || 
+                            u.endsWith('.gif') || 
+                            u.endsWith('.webp') ||
+                            u.includes('pbs.twimg.com'); // Twitter images don't always have extensions
+                          return isValidUrl && hasImageExtension;
+                        });
+                        
+                        // Format images for the lightbox
+                        const images = imageUrls.map(imgUrl => ({
+                          url: imgUrl,
+                          alt: `Media from ${bookmark.title}`
+                        }));
+                        
+                        // Find index of this image in the array
+                        const currentIndex = imageUrls.findIndex(imgUrl => imgUrl === url);
+                        
+                        // Open lightbox with all images
+                        setLightbox({
+                          isOpen: true,
+                          images,
+                          initialIndex: currentIndex >= 0 ? currentIndex : 0
+                        });
+                      }}
                     >
                       <img 
                         src={url} 
@@ -1099,9 +1251,9 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             {/* Lightbox for enlarged images */}
             {lightbox.isOpen && (
               <Lightbox 
-                imageUrl={lightbox.imageUrl} 
-                alt={lightbox.alt} 
-                onClose={() => setLightbox({ isOpen: false, imageUrl: '', alt: '' })} 
+                images={lightbox.images}
+                initialIndex={lightbox.initialIndex}
+                onClose={() => setLightbox({ isOpen: false, images: [], initialIndex: 0 })} 
               />
             )}
             
