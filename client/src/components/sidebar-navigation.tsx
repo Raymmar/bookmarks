@@ -11,6 +11,7 @@ import {
   User, 
   LogOut,
   Plus,
+  Folder,
   FolderOpen,
   Check,
   MoreHorizontal,
@@ -242,9 +243,9 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
         >
           <div 
             className={cn(
-              "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
+              "flex flex-1 items-center px-2 py-1.5 text-sm rounded-md cursor-pointer",
               selectedCollections.includes(collection.id) 
-                ? "bg-primary/10 text-primary font-medium" 
+                ? "bg-primary/10 text-primary" 
                 : "text-gray-700 hover:bg-gray-50",
               location === `/collection/${encodeURIComponent(collection.name)}`
                 ? "border border-primary/20 bg-secondary/10"
@@ -252,6 +253,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             )}
             title="View collection"
           >
+            <Folder className="h-3.5 w-3.5 mr-2 opacity-70" />
             <span className={cn("truncate flex-1", 
               (selectedCollections.includes(collection.id) || 
                location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
@@ -466,16 +468,18 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
               </div>
             ) : user ? (
               /* Logged in users see accordion with public and private collections */
-              <Accordion type="multiple" defaultValue={["public", "private"]} className="space-y-1">
+              <Accordion type="multiple" defaultValue={["public", "private"]} className="space-y-2">
                 {/* Public Collections */}
                 <AccordionItem value="public" className="border-none">
-                  <AccordionTrigger className="py-1 px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded">
+                  <AccordionTrigger 
+                    className="py-1.5 px-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded bg-gray-100 mb-1"
+                  >
                     Public Collections ({publicCollections.length})
                   </AccordionTrigger>
-                  <AccordionContent className="pt-1 pb-0 px-0">
-                    <ul className="space-y-0.5">
+                  <AccordionContent className="pt-1 pb-2 px-1">
+                    <ul className="space-y-1 pl-2 border-l-2 border-gray-100">
                       {publicCollections.length === 0 ? (
-                        <li className="text-xs text-gray-500 pl-6 py-1 italic">
+                        <li className="text-xs text-gray-500 pl-3 py-1 italic">
                           No public collections
                         </li>
                       ) : (
@@ -487,13 +491,15 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
 
                 {/* Private Collections */}
                 <AccordionItem value="private" className="border-none">
-                  <AccordionTrigger className="py-1 px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded">
+                  <AccordionTrigger 
+                    className="py-1.5 px-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded bg-gray-100 mb-1"
+                  >
                     Private Collections ({privateCollections.length})
                   </AccordionTrigger>
-                  <AccordionContent className="pt-1 pb-0 px-0">
-                    <ul className="space-y-0.5">
+                  <AccordionContent className="pt-1 pb-2 px-1">
+                    <ul className="space-y-1 pl-2 border-l-2 border-gray-100">
                       {privateCollections.length === 0 ? (
-                        <li className="text-xs text-gray-500 pl-6 py-1 italic">
+                        <li className="text-xs text-gray-500 pl-3 py-1 italic">
                           No private collections
                         </li>
                       ) : (
@@ -505,44 +511,51 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
               </Accordion>
             ) : (
               /* Logged out users only see public collections */
-              <ul className="space-y-0.5">
-                {publicCollections.length === 0 ? (
-                  <li className="text-sm text-gray-500 py-1 px-2 italic">
-                    No public collections available
-                  </li>
-                ) : (
-                  publicCollections.map(collection => (
-                    <li key={collection.id}>
-                      <div className="flex items-center">
-                        <Link 
-                          href={`/collection/${encodeURIComponent(collection.name)}`}
-                          className="flex-1"
-                        >
-                          <div 
-                            className={cn(
-                              "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
-                              selectedCollections.includes(collection.id) 
-                                ? "bg-primary/10 text-primary font-medium" 
-                                : "text-gray-700 hover:bg-gray-50",
-                              location === `/collection/${encodeURIComponent(collection.name)}`
-                                ? "border border-primary/20 bg-secondary/10"
-                                : ""
-                            )}
-                            title="View collection"
-                          >
-                            <span className={cn("truncate flex-1", 
-                              (selectedCollections.includes(collection.id) || 
-                               location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
-                            )}>
-                              {collection.name}
-                            </span>
-                          </div>
-                        </Link>
-                      </div>
+              <div className="space-y-2">
+                <div className="py-1.5 px-2.5 text-xs font-semibold text-gray-700 bg-gray-100 rounded mb-1">
+                  Public Collections ({publicCollections.length})
+                </div>
+                
+                <ul className="space-y-1 pl-3 border-l-2 border-gray-100">
+                  {publicCollections.length === 0 ? (
+                    <li className="text-sm text-gray-500 py-1 px-2 italic">
+                      No public collections available
                     </li>
-                  ))
-                )}
-              </ul>
+                  ) : (
+                    publicCollections.map(collection => (
+                      <li key={collection.id}>
+                        <div className="flex items-center">
+                          <Link 
+                            href={`/collection/${encodeURIComponent(collection.name)}`}
+                            className="flex-1"
+                          >
+                            <div 
+                              className={cn(
+                                "flex flex-1 items-center px-2 py-1.5 text-sm rounded-md cursor-pointer",
+                                selectedCollections.includes(collection.id) 
+                                  ? "bg-primary/10 text-primary" 
+                                  : "text-gray-700 hover:bg-gray-50",
+                                location === `/collection/${encodeURIComponent(collection.name)}`
+                                  ? "border border-primary/20 bg-secondary/10"
+                                  : ""
+                              )}
+                              title="View collection"
+                            >
+                              <Folder className="h-3.5 w-3.5 mr-2 opacity-70" />
+                              <span className={cn("truncate flex-1", 
+                                (selectedCollections.includes(collection.id) || 
+                                 location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
+                              )}>
+                                {collection.name}
+                              </span>
+                            </div>
+                          </Link>
+                        </div>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             )}
           </div>
         </div>
