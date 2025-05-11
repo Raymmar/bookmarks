@@ -22,7 +22,8 @@ import { ProtectedRoute } from "@/lib/protected-route";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={GraphView} />
+      <Route path="/" component={Feed} />
+      <Route path="/graph" component={GraphView} />
       <Route path="/feed" component={Feed} />
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />

@@ -328,27 +328,27 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 <Link href="/">
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
-                    location === "/" || location === "/graph"
+                    location === "/graph"
                       ? "bg-secondary/20 text-primary border border-primary/20" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
                     <Waypoints className={cn("h-5 w-5 mr-2", 
-                      location === "/" || location === "/graph" ? "text-primary" : ""
+                      location === "/graph" ? "text-primary" : ""
                     )} />
                     Explore
                   </div>
                 </Link>
               </li>
               <li className="mb-1">
-                <Link href="/feed">
+                <Link href="/">
                   <div className={cn(
                     "flex items-center px-2 py-2 text-sm rounded-lg",
-                    location === "/feed"
+                    location === "/" || location === "/feed"
                       ? "bg-secondary/20 text-primary border border-primary/20" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
                     <ListFilter className={cn("h-5 w-5 mr-2", 
-                      location === "/feed" ? "text-primary" : ""
+                      location === "/" || location === "/feed" ? "text-primary" : ""
                     )} />
                     Feed
                   </div>

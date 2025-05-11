@@ -89,12 +89,24 @@ export default function Feed() {
   // Handle selecting a bookmark (opens the detail panel)
   const handleSelectBookmark = (id: string) => {
     setSelectedBookmarkId(id);
+    // Save the selected bookmark ID to session storage for persistence
+    sessionStorage.setItem('lastSelectedBookmarkId', id);
   };
   
   // Handle closing the detail panel
   const handleCloseDetail = () => {
     setSelectedBookmarkId(null);
+    // Remove the stored bookmark ID when deliberately closing
+    sessionStorage.removeItem('lastSelectedBookmarkId');
   };
+  
+  // Restore selected bookmark when component mounts
+  useEffect(() => {
+    const lastSelectedId = sessionStorage.getItem('lastSelectedBookmarkId');
+    if (lastSelectedId) {
+      setSelectedBookmarkId(lastSelectedId);
+    }
+  }, []);
 
   return (
     <div className="h-full bg-gray-50">
