@@ -96,25 +96,13 @@ export default function Feed() {
   
   // Setup intersection observer for infinite scroll
   useEffect(() => {
-    // Only set up the observer if there are more pages to load
-    if (!hasNextPage) return;
-    
     const observer = new IntersectionObserver(
       (entries) => {
-        // Only load more when the loader element is visible
-        // and we're not already loading
-        if (entries[0].isIntersecting && !isLoading && !isFetchingNextPage) {
+        if (entries[0].isIntersecting && hasNextPage && !isLoading && !isFetchingNextPage) {
           loadMoreBookmarks();
         }
       },
-      { 
-        // Root margin adds a buffer of 200px below the viewport,
-        // meaning the loader will trigger before it's fully visible
-        rootMargin: "0px 0px 200px 0px",
-        // Threshold of 0 means the callback will run as soon as
-        // even a single pixel of the target element is visible
-        threshold: 0 
-      }
+      { threshold: 0.1 }
     );
     
     const currentLoaderRef = loaderRef.current;
@@ -195,22 +183,19 @@ export default function Feed() {
                 />
               )}
               
-              {/* Infinite scroll loader - only shown if there are more pages */}
-              {hasNextPage && (
+              {/* Infinite scroll loader */}
+              {(hasNextPage || isFetchingNextPage) && (
                 <div 
                   ref={loaderRef} 
-                  className="flex justify-center items-center py-6 mt-2"
-                  style={{ minHeight: '100px' }} // Ensure enough height to be detected before scrolling all the way
+                  className="flex justify-center items-center p-4 border-t"
                 >
                   {isFetchingNextPage ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Loading more bookmarks...</span>
+                      <span>Loading more...</span>
                     </div>
                   ) : (
-                    // Invisible element for intersection observer
-                    // This is the element that triggers loading when it becomes visible
-                    <div className="h-4 w-full opacity-0" aria-hidden="true" />
+                    <div className="h-8" /> // Invisible element for intersection observer
                   )}
                 </div>
               )}
