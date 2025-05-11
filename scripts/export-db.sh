@@ -8,26 +8,34 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-# Parse DATABASE_URL to extract connection details
-# Example URL: postgres://username:password@host:port/database
-# Extract host (remove any leading/trailing slashes)
-HOST=$(echo $DATABASE_URL | sed -n 's/.*@\([^:]*\).*/\1/p')
+echo "Analyzing database connection string..."
 
-# Extract port (if present)
-PORT=$(echo $DATABASE_URL | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-PORT_PARAM=""
-if [ ! -z "$PORT" ]; then
-  PORT_PARAM="-p $PORT"
+# For Neon DB URLs like: postgresql://username:password@host/database?sslmode=require
+
+# Extract host - everything between @ and / before the database name
+HOST=$(echo $DATABASE_URL | grep -o '@.*/' | sed 's/@\(.*\)\/.*/\1/')
+echo "Host: $HOST"
+
+# Extract port (if present) - if not present, use default PostgreSQL port
+if [[ $DATABASE_URL == *":@"* ]]; then
+  PORT=$(echo $DATABASE_URL | grep -o ":[0-9]*/" | sed 's/[:/]//g')
+else
+  PORT="5432" # Default PostgreSQL port
 fi
+PORT_PARAM="-p $PORT"
+echo "Port: $PORT"
 
-# Extract username
-USERNAME=$(echo $DATABASE_URL | sed -n 's/.*:\/\/\([^:]*\):.*/\1/p')
+# Extract username - everything between :// and : before password
+USERNAME=$(echo $DATABASE_URL | grep -o "://.*:" | sed 's/:\/\/\(.*\):.*/\1/')
+echo "Username: $USERNAME"
 
-# Extract password
-PASSWORD=$(echo $DATABASE_URL | sed -n 's/.*:\/\/[^:]*:\([^@]*\).*/\1/p')
+# Extract password - everything between username: and @host
+PASSWORD=$(echo $DATABASE_URL | grep -o ":.*@" | sed 's/:\(.*\)@/\1/')
+echo "Password: [REDACTED]"
 
-# Extract database name
-DB_NAME=$(echo $DATABASE_URL | sed -n 's/.*\/\(.*\).*/\1/p')
+# Extract database name - everything between host/ and ?params (if any)
+DB_NAME=$(echo $DATABASE_URL | grep -o "/[^?]*" | sed 's/\///g' | sed 's/?.*//')
+echo "Database: $DB_NAME"
 
 # Create timestamp for filename
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
