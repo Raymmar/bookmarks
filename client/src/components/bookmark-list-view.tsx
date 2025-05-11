@@ -1,16 +1,12 @@
 import { Bookmark } from "@shared/types";
-import { CalendarIcon, Clock, Link2, Loader2 } from "lucide-react";
+import { CalendarIcon, Clock, Link2 } from "lucide-react";
 import { format } from "date-fns";
-import { RefObject } from "react";
 
 interface BookmarkListViewProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
-  hasNextPage?: boolean;
-  isFetchingNextPage?: boolean;
-  loaderRef?: RefObject<HTMLDivElement>;
 }
 
 export function BookmarkListView({
@@ -18,9 +14,6 @@ export function BookmarkListView({
   selectedBookmarkId,
   onSelectBookmark,
   isLoading,
-  hasNextPage,
-  isFetchingNextPage,
-  loaderRef
 }: BookmarkListViewProps) {
   return (
     <div className="p-3 overflow-auto h-full flex-1 w-full">
@@ -47,25 +40,6 @@ export function BookmarkListView({
               onClick={() => onSelectBookmark(bookmark.id)}
             />
           ))}
-          
-          {/* Loading indicator that appears after content */}
-          {isFetchingNextPage && (
-            <div className="flex justify-center items-center py-4 mt-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Loading more bookmarks...</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Invisible element for intersection observer */}
-          {hasNextPage && (
-            <div 
-              ref={loaderRef} 
-              className="w-full"
-              style={{ height: '20px', opacity: 0 }} // Almost invisible but still detectable by intersection observer
-            />
-          )}
         </div>
       )}
     </div>

@@ -176,9 +176,6 @@ export default function Feed() {
                   selectedBookmarkId={selectedBookmarkId}
                   onSelectBookmark={handleSelectBookmark}
                   isLoading={isLoading}
-                  hasNextPage={hasNextPage}
-                  isFetchingNextPage={isFetchingNextPage}
-                  loaderRef={loaderRef}
                 />
               ) : (
                 <BookmarkGrid 
@@ -186,9 +183,25 @@ export default function Feed() {
                   selectedBookmarkId={selectedBookmarkId}
                   onSelectBookmark={handleSelectBookmark}
                   isLoading={isLoading}
-                  hasNextPage={hasNextPage}
-                  isFetchingNextPage={isFetchingNextPage}
-                  loaderRef={loaderRef}
+                />
+              )}
+              
+              {/* Loading indicator that appears after content */}
+              {isFetchingNextPage && (
+                <div className="flex justify-center items-center py-4 border-t mt-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading more bookmarks...</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Invisible element for intersection observer */}
+              {hasNextPage && (
+                <div 
+                  ref={loaderRef} 
+                  className="w-full mt-auto"
+                  style={{ height: '20px', opacity: 0 }} // Almost invisible but still detectable by intersection observer
                 />
               )}
             </div>

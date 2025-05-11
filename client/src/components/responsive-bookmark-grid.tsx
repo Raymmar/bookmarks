@@ -1,17 +1,12 @@
 import { Bookmark } from "@shared/types";
-import { useState, useEffect, useRef, RefObject } from "react";
+import { useState, useEffect, useRef } from "react";
 import Masonry from "react-masonry-css";
-import { Loader2 } from "lucide-react";
-import { BookmarkCard } from "./bookmark-card";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
   selectedBookmarkId: string | null;
   onSelectBookmark: (id: string) => void;
   isLoading: boolean;
-  hasNextPage?: boolean;
-  isFetchingNextPage?: boolean;
-  loaderRef?: RefObject<HTMLDivElement>;
 }
 
 export function BookmarkGrid({
@@ -19,9 +14,6 @@ export function BookmarkGrid({
   selectedBookmarkId,
   onSelectBookmark,
   isLoading,
-  hasNextPage,
-  isFetchingNextPage,
-  loaderRef
 }: BookmarkGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [breakpointCols, setBreakpointCols] = useState(2);
@@ -83,43 +75,83 @@ export function BookmarkGrid({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col">
-          <Masonry
-            breakpointCols={breakpointCols}
-            className="masonry-grid w-full h-full"
-            columnClassName="masonry-grid-column"
-          >
-            {bookmarks.map((bookmark) => (
-              <BookmarkCard
-                key={bookmark.id}
-                bookmark={bookmark}
-                isSelected={selectedBookmarkId === bookmark.id}
-                onClick={() => onSelectBookmark(bookmark.id)}
-              />
-            ))}
-          </Masonry>
-          
-          {/* Loading indicator that appears after content */}
-          {isFetchingNextPage && (
-            <div className="flex justify-center items-center py-4 mt-6">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Loading more bookmarks...</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Invisible element for intersection observer */}
-          {hasNextPage && (
-            <div 
-              ref={loaderRef} 
-              className="w-full mt-6"
-              style={{ height: '20px', opacity: 0 }} // Almost invisible but still detectable by intersection observer
+        <Masonry
+          breakpointCols={breakpointCols}
+          className="masonry-grid w-full h-full"
+          columnClassName="masonry-grid-column"
+        >
+          {bookmarks.map((bookmark) => (
+            <BookmarkCard
+              key={bookmark.id}
+              bookmark={bookmark}
+              isSelected={selectedBookmarkId === bookmark.id}
+              onClick={() => onSelectBookmark(bookmark.id)}
             />
-          )}
-        </div>
+          ))}
+        </Masonry>
       )}
     </div>
   );
 }
 
+interface BookmarkCardProps {
+  bookmark: Bookmark;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
+  const hasImage = bookmark.media_urls && 
+                  bookmark.media_urls.length > 0 && 
+                  bookmark.media_urls.some(url => url.includes('pbs.twimg.com'));
+
+  return (
+    <div 
+      className={`cursor-pointer bg-white overflow-hidden border border-gray-200 rounded-xl hover:shadow-md transition-all mb-4 inline-block w-full break-inside-avoid ${
+        isSelected
+          ? "ring-2 ring-primary" 
+          : ""
+      } ${hasImage ? 'group' : ''}`}
+      onClick={onClick}
+    >
+      {/* Media section */}
+      {hasImage && (
+        <div className="overflow-hidden relative">
+          {bookmark.media_urls
+            ?.filter(url => url.includes('pbs.twimg.com'))
+            .slice(0, 1) // Only show the first image in the card
+            .map((url, index) => (
+              <div 
+                key={index}
+                className="overflow-hidden"
+              >
+                <img 
+                  src={url} 
+                  alt=""
+                  className="w-full h-auto object-cover"
+                  loading="lazy"
+                  onError={(e) => {
+                    // If image fails to load, hide it
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </div>
+            ))}
+          
+          {/* Overlay title for image cards - shows on hover */}
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent h-3/5 flex flex-col justify-end text-white">
+            <h3 className="text-sm font-medium line-clamp-2">{bookmark.title}</h3>
+          </div>
+        </div>
+      )}
+      
+      {/* Title section for cards without images */}
+      {!hasImage && (
+        <div className="p-3">
+          <h3 className="text-sm font-medium line-clamp-3">{bookmark.title}</h3>
+        </div>
+      )}
+    </div>
+  );
+}
