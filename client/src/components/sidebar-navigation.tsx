@@ -117,26 +117,45 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
     }
   }, [selectedCollections]);
   
-  // Navigate to collection page
+  // Handle collection selection with improved multi-select
   const handleCollectionClick = (collectionId: string) => {
-    // Navigate to the collection page
-    window.location.href = `/collection/${collectionId}`;
-  };
-  
-  // Load collection in graph view
-  const handleViewInGraph = (collectionId: string) => {
-    // Save selection to localStorage for persistence
-    localStorage.setItem('selectedCollections', JSON.stringify([collectionId]));
-    setSelectedCollections([collectionId]);
-    setSelectedCollectionId(collectionId);
+    // Check if collection is already selected
+    const isSelected = selectedCollections.includes(collectionId);
+    let newSelection: string[];
     
-    // Dispatch custom event to filter graph by this collection
-    window.dispatchEvent(new CustomEvent('filterByCollection', { 
-      detail: { collectionId, collectionIds: [collectionId] } 
-    }));
+    if (isSelected) {
+      // Remove from selection if already selected
+      newSelection = selectedCollections.filter(id => id !== collectionId);
+    } else {
+      // Add to selection
+      newSelection = [...selectedCollections, collectionId];
+    }
     
-    // Navigate to graph view
-    window.location.href = '/graph';
+    // Save to localStorage immediately to ensure persistence
+    localStorage.setItem('selectedCollections', JSON.stringify(newSelection));
+    
+    setSelectedCollections(newSelection);
+    
+    if (newSelection.length === 0) {
+      // Clear all filters if nothing selected
+      setSelectedCollectionId(null);
+      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+        detail: { collectionId: null, collectionIds: [] } 
+      }));
+    } else if (newSelection.length === 1) {
+      // Single collection selected
+      const singleId = newSelection[0];
+      setSelectedCollectionId(singleId);
+      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+        detail: { collectionId: singleId, collectionIds: newSelection } 
+      }));
+    } else {
+      // Multiple collections selected
+      setSelectedCollectionId(null); // Clear single selection
+      window.dispatchEvent(new CustomEvent('filterByCollection', { 
+        detail: { collectionId: null, collectionIds: newSelection } 
+      }));
+    }
   };
 
   // Keep the selected collection available for new bookmarks
@@ -220,17 +239,28 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
         <div 
           className={cn(
             "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
-            location.includes(`/collection/${collection.id}`)
+            selectedCollections.includes(collection.id) 
               ? "bg-primary/10 text-primary font-medium" 
               : "text-gray-700 hover:bg-gray-50"
           )}
           onClick={() => handleCollectionClick(collection.id)}
-          title="View this collection"
+          title="Click to select or deselect. You can select multiple collections."
         >
           <div className="flex h-4 w-4 items-center justify-center mr-2">
-            <FolderIcon className="h-4 w-4" />
+            {selectedCollections.includes(collection.id) ? (
+              <Checkbox 
+                id={`collection-${collection.id}`} 
+                checked={true}
+                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+              />
+            ) : (
+              <Checkbox 
+                id={`collection-${collection.id}`} 
+                checked={false}
+              />
+            )}
           </div>
-          <span className={cn("truncate flex-1", location.includes(`/collection/${collection.id}`) && "font-medium")}>
+          <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
             {collection.name}
           </span>
         </div>
@@ -244,11 +274,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[160px]">
-              <DropdownMenuItem onClick={() => handleViewInGraph(collection.id)}>
-                <Network className="mr-2 h-4 w-4" />
-                <span>View in Graph</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => {
                   setSelectedCollectionToEdit({

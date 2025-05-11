@@ -8,7 +8,6 @@ import Home from "@/pages/home";
 import Activity from "@/pages/activity";
 import Feed from "@/pages/feed";
 import GraphView from "@/pages/graph-view";
-import CollectionPage from "@/pages/collection";
 import AiChat from "@/pages/ai-chat";
 import Settings from "@/pages/settings";
 import XIntegration from "@/pages/x-integration";
@@ -26,7 +25,6 @@ function Router() {
       <Route path="/" component={Feed} />
       <Route path="/graph" component={GraphView} />
       <Route path="/feed" component={Feed} />
-      <Route path="/collection/:collectionId" component={CollectionPage} />
       <Route path="/activity" component={Activity} />
       <Route path="/ai-chat" component={AiChat} />
       <ProtectedRoute path="/settings" component={Settings} />
