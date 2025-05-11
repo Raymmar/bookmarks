@@ -105,7 +105,7 @@ export default function Feed() {
           <div className="flex flex-col h-full w-full">
             {/* Header with integrated search */}
             <div className="flex justify-between items-center p-4 border-b">
-              <div className="relative w-[300px]">
+              <div className="relative flex-1 mr-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   className="pl-9" 
@@ -124,7 +124,7 @@ export default function Feed() {
                   </Button>
                 )}
               </div>
-              <div className="flex space-x-2">
+              <div className="flex space-x-2 flex-shrink-0">
                 <ViewModeSwitcher
                   initialViewMode={viewMode}
                   onViewModeChange={setViewMode}
