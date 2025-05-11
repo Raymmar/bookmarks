@@ -103,9 +103,27 @@ export default function Feed() {
       <ResizablePanelGroup direction="horizontal" className="h-full">
         <ResizablePanel defaultSize={70} minSize={50} className="h-full">
           <div className="flex flex-col h-full w-full">
-            {/* Header */}
+            {/* Header with integrated search */}
             <div className="flex justify-between items-center p-4 border-b">
-              <h1 className="text-xl font-semibold">Recent Bookmarks</h1>
+              <div className="relative w-[300px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  className="pl-9" 
+                  placeholder="Search bookmarks..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
               <div className="flex space-x-2">
                 <ViewModeSwitcher
                   initialViewMode={viewMode}
@@ -125,29 +143,6 @@ export default function Feed() {
                     <SelectItem value="created_newest">Date Created (Newest)</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-            
-            {/* Search */}
-            <div className="flex items-center p-4 border-b">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  className="pl-9" 
-                  placeholder="Search bookmarks..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground hover:text-foreground"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
             </div>
             
