@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon, Bookmark } from "lucide-react";
-import { Bookmark as BookmarkType, Highlight, Note, Tag as TagType } from "@shared/types";
+import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon } from "lucide-react";
+import { Bookmark, Highlight, Note, Tag as TagType } from "@shared/types";
 import { formatDate } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,13 +24,15 @@ import {
   useCollectionMutations 
 } from "@/hooks/use-collection-queries";
 
+// Use the imported Tag type
+
 interface BookmarkDetailPanelProps {
-  bookmark?: BookmarkType;
+  bookmark?: Bookmark;
   onClose: () => void;
 }
 
 export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: BookmarkDetailPanelProps) {
-  const [bookmark, setBookmark] = useState<BookmarkType | undefined>(initialBookmark);
+  const [bookmark, setBookmark] = useState<Bookmark | undefined>(initialBookmark);
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -381,6 +383,24 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   };
 
+  if (!bookmark) {
+    return (
+      <>
+        <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10">
+          <div className="flex w-full items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+        <div className="py-8 text-center text-gray-500">
+          Select a bookmark to view details
+        </div>
+      </>
+    );
+  }
+  
   // Filter tags that aren't already added to this bookmark
   const filteredTags = allTags.filter(tag => 
     !tags.some(existingTag => existingTag.id === tag.id)
@@ -418,33 +438,50 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             description: "Bookmark has been removed from all collections",
           });
         }
+        return;
       } catch (error) {
-        console.error("Error removing bookmark from collections:", error);
+        console.error("Error removing from collections:", error);
         toast({
-          title: "Error removing from collections",
-          description: "There was an error removing the bookmark from collections",
+          title: "Collection update failed",
+          description: "There was an error updating collections. Please try again.",
           variant: "destructive",
         });
+        return;
       }
-      return;
     }
     
+    // Check if bookmark is already in the selected collection
+    const isInCollection = bookmarkCollections.some(c => c.id === collectionId);
+    
     try {
-      // Add to the selected collection
-      await addBookmarkToCollection.mutateAsync({
-        collectionId,
-        bookmarkId: bookmark.id
-      });
-      
-      toast({
-        title: "Added to collection",
-        description: `The bookmark has been added to the collection`,
-      });
+      if (isInCollection) {
+        // Remove bookmark from collection
+        await removeBookmarkFromCollection.mutateAsync({
+          collectionId,
+          bookmarkId: bookmark.id
+        });
+        
+        toast({
+          title: "Removed from collection",
+          description: "Bookmark has been removed from the collection",
+        });
+      } else {
+        // Add bookmark to collection
+        await addBookmarkToCollection.mutateAsync({
+          collectionId,
+          bookmarkId: bookmark.id
+        });
+        
+        toast({
+          title: "Added to collection",
+          description: "Bookmark has been added to the collection",
+        });
+      }
     } catch (error) {
-      console.error("Error adding bookmark to collection:", error);
+      console.error("Error managing collection:", error);
       toast({
-        title: "Error adding to collection",
-        description: "There was an error adding the bookmark to the collection",
+        title: "Collection update failed",
+        description: "There was an error updating collections. Please try again.",
         variant: "destructive",
       });
     }
@@ -458,46 +495,56 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     if (!user) {
       toast({
         title: "Authentication required",
-        description: "Please log in to add tags",
+        description: "Please log in to add tags to bookmarks",
         variant: "destructive",
       });
       return;
     }
     
-    const tagToAdd = allTags.find(tag => tag.id === tagId);
-    if (!tagToAdd) return;
+    setIsSubmittingTag(true);
     
     try {
-      // First make the API call to add the tag
-      await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags`, { tagId });
+      // Find the tag to add from all available tags
+      const tagToAdd = allTags.find(tag => tag.id === tagId);
+      if (!tagToAdd) return;
       
       // Optimistically update the UI
-      setTags(prevTags => [...prevTags, tagToAdd]);
+      setTags(prev => [...prev, tagToAdd]);
       
-      // Show success message
+      // Make the API request
+      await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {});
+      
       toast({
         title: "Tag added",
-        description: `The tag "${tagToAdd.name}" has been added to the bookmark`,
+        description: `Tag "${tagToAdd.name}" has been added to the bookmark`,
       });
       
-      // Dispatch a custom event for the graph view to update
+      // Invalidate ALL related queries to ensure UI consistency across components
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+      
+      // Dispatch a custom event to notify the graph of the tag change
       const event = new CustomEvent('tagChanged', { 
         detail: { 
-          bookmarkId: bookmark.id, 
-          tagId: tagToAdd.id,
-          tagName: tagToAdd.name,
+          bookmarkId: bookmark.id,
+          tagId: tagId,
           action: 'add'
         } 
       });
       document.dispatchEvent(event);
       
     } catch (error) {
-      console.error("Error adding tag:", error);
+      // Revert the optimistic update on error
+      setTags(prev => prev.filter(tag => tag.id !== tagId));
+      
       toast({
         title: "Error adding tag",
-        description: "There was an error adding the tag to the bookmark",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingTag(false);
     }
   };
   
@@ -505,49 +552,61 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const handleCreateAndAddTag = async () => {
     if (!newTagText.trim() || !bookmark) return;
     
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to create and add tags",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmittingTag(true);
     
     try {
-      // First create the tag
-      const newTag = await apiRequest("POST", "/api/tags", { 
+      // Create the new tag
+      const newTag = await apiRequest<TagType>("POST", "/api/tags", {
         name: newTagText.trim(),
         type: "user"
       });
       
-      if (newTag) {
-        // Then add it to the bookmark
-        await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags`, { tagId: newTag.id });
-        
-        // Update our state
-        setTags(prevTags => [...prevTags, newTag]);
-        setAllTags(prevTags => [...prevTags, newTag]);
-        
-        // Reset the input
-        setNewTagText("");
-        setIsAddingTag(false);
-        
-        // Show success toast
-        toast({
-          title: "Tag created and added",
-          description: `The tag "${newTag.name}" has been created and added to the bookmark`,
-        });
-        
-        // Dispatch a custom event for the graph view to update
-        const event = new CustomEvent('tagChanged', { 
-          detail: { 
-            bookmarkId: bookmark.id, 
-            tagId: newTag.id,
-            tagName: newTag.name,
-            action: 'add'
-          } 
-        });
-        document.dispatchEvent(event);
-      }
+      // Optimistically update the UI
+      setTags(prev => [...prev, newTag]);
+      setAllTags(prev => [...prev, newTag]); // Update the local cache of all tags
+      
+      // Add tag to bookmark
+      await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${newTag.id}`, {});
+      
+      toast({
+        title: "Tag added",
+        description: `New tag "${newTag.name}" has been created and added to the bookmark`,
+      });
+      
+      // Invalidate ALL related queries to ensure UI consistency across components
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+      
+      // Dispatch a custom event to notify the graph of the tag change
+      const event = new CustomEvent('tagChanged', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          tagId: newTag.id,
+          action: 'add',
+          tagName: newTag.name
+        } 
+      });
+      document.dispatchEvent(event);
+      
+      // Reset the input
+      setNewTagText("");
+      setIsAddingTag(false);
+      
     } catch (error) {
-      console.error("Error creating and adding tag:", error);
       toast({
         title: "Error creating tag",
-        description: "There was an error creating and adding the tag",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     } finally {
@@ -556,51 +615,112 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   };
   
   // Handle updating bookmark fields
-  const handleUpdateBookmark = async (updateData: Partial<BookmarkType>) => {
+  const handleUpdateBookmark = async (updateData: Partial<Bookmark>) => {
     if (!bookmark) return;
 
     // Check if user is logged in
     if (!user) {
       toast({
         title: "Authentication required",
-        description: "Please log in to update bookmarks",
+        description: "Please log in to update bookmark information",
         variant: "destructive",
       });
+      // Revert any visual changes
+      if (initialBookmark) {
+        setBookmark(initialBookmark);
+      }
       return;
     }
     
     try {
-      // Optimistically update the UI
-      setBookmark(prevBookmark => {
-        if (!prevBookmark) return undefined;
-        return { ...prevBookmark, ...updateData };
-      });
+      // Immediately set the updated_at timestamp to the current time for optimistic updates
+      const now = new Date().toISOString();
       
-      // Make the API call
+      // Create the optimistically updated bookmark with current timestamp
+      // Type-safe conversion: Convert the ISO string to a Date object for state update
+      const optimisticBookmark = {
+        ...bookmark,
+        ...updateData,
+        updated_at: new Date(now) // Use Date object for local state to match Bookmark type
+      };
+      
+      // Update the local state with properly typed bookmark
+      setBookmark(optimisticBookmark);
+      
+      // Get current bookmarks from the cache
+      const currentBookmarks = queryClient.getQueryData<Bookmark[]>(["/api/bookmarks"]) || [];
+      
+      // Get current localStorage sort setting
+      const sortOrder = localStorage.getItem('bookmarkSortOrder') || 'newest';
+      
+      // Check if we need to reorder (only for "recently_updated" sort)
+      if (sortOrder === 'recently_updated') {
+        // For recently_updated sort, create a new sorted list with the updated bookmark at the top
+        const filteredBookmarks = currentBookmarks.filter(b => b.id !== bookmark.id);
+        // Cast optimisticBookmark as Bookmark to ensure proper typing
+        const sortedBookmarks = [optimisticBookmark as Bookmark, ...filteredBookmarks];
+        
+        // Update the cache with the reordered list in a single operation
+        queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], sortedBookmarks);
+      } else {
+        // For other sort orders, just update the bookmark in the current list without resorting
+        queryClient.setQueryData<Bookmark[]>(["/api/bookmarks"], 
+          (oldBookmarks = []) => oldBookmarks.map(b => 
+            b.id === bookmark.id ? optimisticBookmark : b
+          )
+        );
+      }
+      
+      // Make API request to update the bookmark
       const updatedBookmark = await apiRequest(
         "PATCH", 
         `/api/bookmarks/${bookmark.id}`, 
         updateData
       );
       
-      // Update with the result from the server
-      if (updatedBookmark) {
-        setBookmark(updatedBookmark);
-        
-        toast({
-          title: "Bookmark updated",
-          description: "The bookmark has been updated successfully",
-        });
+      // Update the local state with server response
+      setBookmark(updatedBookmark);
+      
+      // Only invalidate queries if we're not in recently_updated sort mode
+      // For recently_updated, we keep our optimistic update intact with no server refresh
+      if (sortOrder !== 'recently_updated') {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+        }, 1000);
       }
+      
+      // Dispatch a custom event to inform other components about the update
+      const event = new CustomEvent('bookmarkUpdated', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          updatedBookmark
+        } 
+      });
+      document.dispatchEvent(event);
+      
+      // Show success toast
+      toast({
+        title: "Bookmark updated",
+        description: "Your bookmark has been updated successfully",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Error updating bookmark:", error);
       
-      // Revert optimistic update if there was an error
+      // Show error toast
       toast({
-        title: "Error updating bookmark",
-        description: "There was an error updating the bookmark",
+        title: "Update failed",
+        description: "There was a problem updating your bookmark. Please try again.",
         variant: "destructive",
       });
+      
+      // Revert to original data if it exists
+      if (initialBookmark) {
+        setBookmark(initialBookmark);
+      }
+      
+      // Invalidate queries to refresh the data from server
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
     }
   };
 
@@ -612,102 +732,148 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     if (!user) {
       toast({
         title: "Authentication required",
-        description: "Please log in to remove tags",
+        description: "Please log in to remove tags from bookmarks",
         variant: "destructive",
       });
       return;
     }
     
+    // Find the tag to remove
     const tagToRemove = tags.find(tag => tag.id === tagId);
     if (!tagToRemove) return;
     
+    // Optimistically update the UI
+    setTags(prev => prev.filter(tag => tag.id !== tagId));
+    
     try {
-      // First make the API call to remove the tag
-      await apiRequest("DELETE", `/api/bookmarks/${bookmark.id}/tags/${tagId}`);
-      
-      // Optimistically update the UI
-      setTags(prevTags => prevTags.filter(tag => tag.id !== tagId));
-      
-      // Show success message
-      toast({
-        title: "Tag removed",
-        description: `The tag "${tagToRemove.name}" has been removed from the bookmark`,
+      // Make the API request using fetch directly to better handle empty responses
+      const response = await fetch(`/api/bookmarks/${bookmark.id}/tags/${tagId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
-      // Dispatch a custom event for the graph view to update
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+      
+      toast({
+        title: "Tag removed",
+        description: `Tag "${tagToRemove.name}" has been removed from the bookmark`,
+      });
+      
+      // Invalidate ALL related queries to ensure UI consistency across components
+      // This ensures the graph, sidebar, and detail panel all update correctly
+      queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/tags`] });
+      
+      // Dispatch a custom event to notify the graph of the tag change
       const event = new CustomEvent('tagChanged', { 
         detail: { 
-          bookmarkId: bookmark.id, 
-          tagId: tagToRemove.id,
-          tagName: tagToRemove.name,
-          action: 'remove'
+          bookmarkId: bookmark.id,
+          tagId: tagId,
+          action: 'remove',
+          tagName: tagToRemove.name
         } 
       });
       document.dispatchEvent(event);
       
+      console.log(`Tag ${tagToRemove.name} (${tagId}) successfully removed from bookmark ${bookmark.id}`);
+      
     } catch (error) {
       console.error("Error removing tag:", error);
+      
+      // Revert the optimistic update on error
+      if (tagToRemove) {
+        setTags(prev => [...prev, tagToRemove]);
+      }
+      
       toast({
         title: "Error removing tag",
-        description: "There was an error removing the tag from the bookmark",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     }
   };
-  
-  // Add a note to the bookmark
+
   const handleAddNote = async () => {
     if (!newNote.trim() || !bookmark) return;
     
+    // Check if user is logged in
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to add notes to bookmarks",
+        variant: "destructive",
+      });
+      // Clear the note input and close the form
+      setNewNote("");
+      setIsAddingNote(false);
+      return;
+    }
+    
     setIsSubmitting(true);
     
+    // Create a temporary ID for the optimistic update
+    const tempId = `temp-${Date.now()}`;
+    
+    // Create an optimistic note
+    const optimisticNote: Note = {
+      id: tempId,
+      bookmark_id: bookmark.id,
+      text: newNote.trim(),
+      timestamp: new Date().toISOString() as any // Type cast to handle expected Date type
+    };
+    
+    // Optimistically update the UI
+    setOptimisticNotes(prev => [optimisticNote, ...prev]);
+    
     try {
-      // Create a temporary optimistic note
-      const optimisticNote: Note = {
-        id: `temp-${Date.now()}`,
-        bookmark_id: bookmark.id,
-        content: newNote,
-        created_at: new Date(),
-        updated_at: new Date(),
-        user_id: user?.id || null
-      };
+      // Make the API request
+      const createdNote = await apiRequest<Note>("POST", `/api/bookmarks/${bookmark.id}/notes`, {
+        text: newNote.trim(),
+      });
       
-      // Optimistically add to the notes array
-      setOptimisticNotes(prev => [optimisticNote, ...prev]);
+      // Update the optimistic note with the real data
+      setOptimisticNotes(prev => 
+        prev.map(note => note.id === tempId ? createdNote : note)
+      );
       
-      // Clear the input
+      toast({
+        title: "Note added",
+        description: "Your note was successfully added to the bookmark",
+      });
+      
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/bookmarks/${bookmark.id}/notes`] });
+      
+      // Dispatch a custom event for potential event listeners
+      const event = new CustomEvent('noteAdded', { 
+        detail: { 
+          bookmarkId: bookmark.id,
+          noteId: createdNote.id,
+          text: createdNote.text
+        } 
+      });
+      document.dispatchEvent(event);
+      
+      console.log(`Note "${createdNote.text.substring(0, 30)}..." successfully added to bookmark ${bookmark.id}`);
+      
       setNewNote("");
       setIsAddingNote(false);
       
-      // Make the API call
-      const createdNote = await apiRequest("POST", `/api/bookmarks/${bookmark.id}/notes`, {
-        content: newNote
-      });
-      
-      if (createdNote) {
-        // Replace the optimistic note with the real one
-        setOptimisticNotes(prev => 
-          prev.map(note => 
-            note.id === optimisticNote.id ? createdNote : note
-          )
-        );
-        
-        toast({
-          title: "Note added",
-          description: "Your note has been added to the bookmark",
-        });
-      }
     } catch (error) {
       console.error("Error adding note:", error);
       
       // Remove the optimistic note on error
-      setOptimisticNotes(prev => 
-        prev.filter(note => !note.id.startsWith('temp-'))
-      );
+      setOptimisticNotes(prev => prev.filter(note => note.id !== tempId));
       
       toast({
         title: "Error adding note",
-        description: "There was an error adding your note",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     } finally {
@@ -716,8 +882,8 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10 flex-shrink-0">
+    <>
+      <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10">
         <div className="flex w-full items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -726,291 +892,507 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         </div>
       </div>
       
-      {!bookmark ? (
-        <div className="flex flex-col h-full items-center justify-center p-6 text-center bg-gray-50">
-          <Bookmark className="h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium mb-2">No bookmark selected</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Select a bookmark from the list to view its details.
-          </p>
-        </div>
-      ) : (
-        <div className="p-4 overflow-y-auto flex-grow">
-          <div className="mb-4">
-            <div
-              className="font-medium text-base mb-1 border-b border-transparent hover:border-gray-300 focus-within:border-primary cursor-text"
-              onClick={(e) => {
-                // Make sure the click was directly on the div and not on a child element
-                if (e.target === e.currentTarget) {
-                  // Create a contenteditable span and focus it
-                  const span = document.createElement('span');
-                  span.contentEditable = 'true';
-                  span.textContent = bookmark.title;
-                  span.className = 'outline-none block w-full';
-                  span.onblur = () => {
-                    // When the user clicks away, update the bookmark title
-                    if (span.textContent !== bookmark.title) {
-                      handleUpdateBookmark({ title: span.textContent || bookmark.title });
-                    }
-                    // Replace the span with the text content
-                    e.currentTarget.textContent = span.textContent;
-                  };
-                  span.onkeydown = (e) => {
-                    // Submit on Enter
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      span.blur();
-                    }
-                  };
-                  
-                  // Clear the div and append the span
-                  e.currentTarget.textContent = '';
-                  e.currentTarget.appendChild(span);
-                  span.focus();
+      <div className="p-4 overflow-auto">
+        <div className="mb-4">
+          <div
+            className="font-medium text-base mb-1 border-b border-transparent hover:border-gray-300 focus-within:border-primary cursor-text"
+            onClick={(e) => {
+              // Make sure the click was directly on the div and not on a child element
+              if (e.currentTarget === e.target) {
+                const inputElement = e.currentTarget.querySelector('input');
+                if (inputElement) inputElement.focus();
+              }
+            }}
+          >
+            <input
+              type="text"
+              value={bookmark.title}
+              className="w-full bg-transparent focus:outline-none font-medium"
+              onChange={(e) => {
+                setBookmark(prev => prev ? { ...prev, title: e.target.value } : prev);
+              }}
+              onBlur={(e) => {
+                if (initialBookmark && e.target.value !== initialBookmark.title) {
+                  // Only make API call if title has changed
+                  handleUpdateBookmark({ title: e.target.value });
                 }
               }}
-            >
-              {bookmark.title}
-            </div>
-            
-            <div className="text-blue-600 hover:underline text-sm mb-2">
-              <a href={bookmark.url} target="_blank" rel="noopener noreferrer" className="flex items-center">
-                {bookmark.url.length > 50 ? `${bookmark.url.substring(0, 50)}...` : bookmark.url}
-                <ExternalLink className="h-3 w-3 ml-1" />
-              </a>
-            </div>
-            
-            <div className="text-sm text-gray-500 mb-4">
-              Saved on {formatDate(bookmark.date_saved)}
-            </div>
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+            />
           </div>
-          
-          {/* Tags section */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-700">Tags</h3>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 text-xs px-2" 
-                  onClick={() => setIsAddingTag(!isAddingTag)}
-                >
-                  <Plus className="h-3 w-3 mr-1" /> New Tag
-                </Button>
+          <a 
+            href={bookmark.url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-sm text-blue-600 hover:underline block truncate"
+          >
+            {bookmark.url}
+          </a>
+        </div>
+        
+        {/* Twitter Card for X.com bookmarks */}
+        {bookmark.source === 'x' && (
+          <div className="mb-4 mt-4 bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            {/* Tweet author info */}
+            {bookmark.author_username && (
+              <div className="flex items-start mb-3">
+                {/* We've removed the Twitter bird icon placeholder avatar as requested */}
+                <div>
+                  <div className="font-bold">{bookmark.author_name || 'Twitter User'}</div>
+                  <div className="text-gray-500 text-sm">@{bookmark.author_username}</div>
+                </div>
+                <div className="ml-auto">
+                  <a 
+                    href={`https://twitter.com/${bookmark.author_username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-600"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+            )}
+            
+            {/* Tweet content */}
+            <div className="mb-4 text-gray-800">
+              {bookmark.description}
+            </div>
+            
+            {/* Tweet media (if any) */}
+            {bookmark.media_urls && bookmark.media_urls.length > 0 && (
+              <div className="mb-4 grid grid-cols-1 gap-2">
+                {bookmark.media_urls
+                  .filter(url => 
+                    // Only include Twitter/X media URLs (skip local paths and other URLs)
+                    url.includes('pbs.twimg.com')
+                  )
+                  .map((url, index) => (
+                    <a 
+                      key={index} 
+                      href={url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary"
+                    >
+                      {/* Render the image directly for Twitter/X media URLs */}
+                      <img 
+                        src={url} 
+                        alt={`Media from ${bookmark.title}`}
+                        className="w-full h-auto object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          // If image fails to load, show fallback message
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          target.parentElement?.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
+                          target.parentElement!.innerHTML = 'Media unavailable';
+                        }}
+                      />
+                    </a>
+                  ))}
+              </div>
+            )}
+            
+            {/* Tweet stats - more compact design to prevent overflow */}
+            <div className="border-t border-gray-100 pt-3 text-xs">
+              {/* Engagement stats in a more compact format */}
+              <div className="flex flex-wrap justify-items-stretch gap-4 text-gray-500">
+                {bookmark.like_count !== undefined && (
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <Heart className="h-3 w-3 mr-2" />
+                    {bookmark.like_count}
+                  </span>
+                )}
+                {bookmark.repost_count !== undefined && (
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <Repeat className="h-3 w-3 mr-1" />
+                    {bookmark.repost_count}
+                  </span>
+                )}
+                {bookmark.reply_count !== undefined && (
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <MessagesSquare className="h-3 w-3 mr-1" />
+                    {bookmark.reply_count}
+                  </span>
+                )}
+                {bookmark.quote_count !== undefined && (
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <Quote className="h-3 w-3 mr-1" />
+                    {bookmark.quote_count}
+                  </span>
+                )}
               </div>
             </div>
-            
-            {isAddingTag && (
-              <div className="mb-2 flex items-center">
+          </div>
+        )}
+        
+        {/* AI Insights Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2 w-full">
+            <h4 className="text-sm font-medium text-gray-700">AI Insights</h4>
+            {/* AI Processing Status & Trigger Button */}
+            {aiProcessingStatus === 'pending' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 text-xs font-medium"
+                onClick={handleTriggerAiProcessing}
+                disabled={isProcessingAi}
+              >
+                <Brain className="h-3.5 w-3.5 mr-1" />
+                Analyze Content
+              </Button>
+            )}
+            {aiProcessingStatus === 'processing' && (
+              <div className="flex items-center text-xs text-amber-600">
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                Processing...
+              </div>
+            )}
+            {aiProcessingStatus === 'completed' && bookmark.insights?.summary && (
+              <div className="flex items-center text-xs text-green-600">
+                <RefreshCw 
+                  className="h-3.5 w-3.5 mr-1 cursor-pointer hover:text-primary" 
+                  onClick={handleTriggerAiProcessing}
+                />
+                <span title="Re-analyze content">Analysis Complete</span>
+              </div>
+            )}
+            {aiProcessingStatus === 'completed' && !bookmark.insights?.summary && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 text-xs font-medium"
+                onClick={handleTriggerAiProcessing}
+                disabled={isProcessingAi}
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                Re-analyze
+              </Button>
+            )}
+            {aiProcessingStatus === 'failed' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 text-xs text-destructive font-medium"
+                onClick={handleTriggerAiProcessing}
+                disabled={isProcessingAi}
+              >
+                <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                Retry Analysis
+              </Button>
+            )}
+          </div>
+          
+          {bookmark.insights?.summary ? (
+            <div>
+              <h5 className="text-xs font-medium text-gray-600 mb-1">Summary</h5>
+              <p className="text-sm text-gray-600 mb-3">
+                {bookmark.insights.summary}
+              </p>
+              
+
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 italic">
+              {aiProcessingStatus === 'pending' && "AI hasn't analyzed this content yet. Click 'Analyze Content' to start."}
+              {aiProcessingStatus === 'processing' && "AI is currently analyzing this content..."}
+              {aiProcessingStatus === 'completed' && "No insights available. Try re-analyzing the content."}
+              {aiProcessingStatus === 'failed' && "AI analysis failed. Please try again."}
+            </div>
+          )}
+        </div>
+        
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-700">Tags</h4>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 text-xs text-primary font-medium"
+              onClick={() => {
+                if (!user) {
+                  toast({
+                    title: "Authentication required",
+                    description: "Please log in to add tags to bookmarks",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setIsAddingTag(true);
+              }}
+              title={!user ? "Login required to add tags" : "Add tags"}
+            >
+              {!user && (
+                <span className="inline-flex items-center">
+                  <LockIcon className="h-3 w-3 mr-1" />
+                </span>
+              )}
+              + Add Tag
+            </Button>
+          </div>
+          
+          {isAddingTag && (
+            <div className="mb-3">
+              <div className="relative mb-2">
                 <Input
-                  type="text"
-                  placeholder="Enter tag name..."
                   value={newTagText}
                   onChange={(e) => setNewTagText(e.target.value)}
-                  className="mr-2 h-8 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleCreateAndAddTag();
-                    }
-                  }}
+                  placeholder="Type to add or find tags"
+                  className="pr-8"
                 />
-                <Button 
-                  size="sm"
-                  className="h-8"
-                  onClick={handleCreateAndAddTag}
-                  disabled={isSubmittingTag || !newTagText.trim()}
-                >
-                  {isSubmittingTag ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    "Add"
+                {newTagText.trim() !== "" && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                    onClick={() => setNewTagText("")}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              
+              {/* Show matching tags or option to create new tag */}
+              {newTagText.trim() !== "" && (
+                <div className="border rounded p-2 mb-2 max-h-32 overflow-y-auto">
+                  {!allTags.some(tag => tag.name.toLowerCase() === newTagText.trim().toLowerCase()) && (
+                    <div 
+                      className="flex items-center gap-1 p-1 hover:bg-gray-100 rounded cursor-pointer"
+                      onClick={handleCreateAndAddTag}
+                    >
+                      <Plus className="h-3 w-3 text-primary" />
+                      <span className="text-sm">Create new tag "<span className="font-semibold">{newTagText.trim()}</span>"</span>
+                    </div>
                   )}
+                  
+                  {filteredTags
+                    .filter(tag => tag.name.toLowerCase().includes(newTagText.toLowerCase()))
+                    .slice(0, 5)
+                    .map(tag => (
+                    <div 
+                      key={tag.id}
+                      className="flex items-center justify-between p-1 hover:bg-gray-100 rounded cursor-pointer"
+                      onClick={() => handleAddTag(tag.id)}
+                    >
+                      <span className="text-sm">{tag.name}</span>
+                      <span className="text-xs text-gray-500">Used {tag.count} times</span>
+                    </div>
+                  ))}
+                  
+                  {filteredTags.filter(tag => tag.name.toLowerCase().includes(newTagText.toLowerCase())).length === 0 && 
+                   allTags.some(tag => tag.name.toLowerCase() === newTagText.trim().toLowerCase()) && (
+                    <div className="text-sm text-gray-500 p-1">
+                      This tag is already added to this bookmark
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setIsAddingTag(false);
+                    setNewTagText("");
+                  }}
+                  disabled={isSubmittingTag}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    setIsAddingTag(false);
+                    setNewTagText("");
+                  }}
+                  disabled={isSubmittingTag}
+                >
+                  Done
                 </Button>
               </div>
-            )}
-            
-            <div className="flex flex-wrap gap-2 mb-2">
-              {tags.map((tag) => (
-                <Badge 
-                  key={tag.id} 
-                  variant={tag.type === 'system' ? "outline" : "default"}
-                  className="flex items-center gap-1 group"
-                >
-                  {tag.name}
-                  {tag.type !== 'system' && (
-                    <button
-                      onClick={() => handleRemoveTag(tag.id)}
-                      className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label="Remove tag"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </Badge>
-              ))}
-              
-              {tags.length === 0 && (
-                <span className="text-sm text-gray-500">No tags yet</span>
-              )}
-            </div>
-            
-            {filteredTags.length > 0 && (
-              <Select onValueChange={handleAddTag}>
-                <SelectTrigger className="w-full h-8 text-sm">
-                  <SelectValue placeholder="Add existing tag..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredTags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          
-          {/* AI Insights Section */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-700">AI Insights</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 text-xs px-2"
-                onClick={handleTriggerAiProcessing}
-                disabled={isProcessingAi || aiProcessingStatus === 'processing'}
-              >
-                {isProcessingAi || aiProcessingStatus === 'processing' ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing...
-                  </>
-                ) : aiProcessingStatus === 'completed' ? (
-                  <>
-                    <RefreshCw className="h-3 w-3 mr-1" /> Refresh Analysis
-                  </>
-                ) : (
-                  <>
-                    <Brain className="h-3 w-3 mr-1" /> Analyze Content
-                  </>
-                )}
-              </Button>
-            </div>
-            
-            {aiProcessingStatus === 'processing' && (
-              <div className="bg-blue-50 p-3 rounded-md flex items-center mb-2">
-                <Loader2 className="h-4 w-4 text-blue-500 animate-spin mr-2" />
-                <span className="text-sm text-blue-700">
-                  AI is processing this bookmark. This may take a minute...
-                </span>
-              </div>
-            )}
-            
-            {aiProcessingStatus === 'failed' && (
-              <div className="bg-red-50 p-3 rounded-md flex items-center mb-2">
-                <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
-                <span className="text-sm text-red-700">
-                  There was an error processing this bookmark. Please try again.
-                </span>
-              </div>
-            )}
-            
-            {aiProcessingStatus === 'completed' && bookmark.insights?.summary && (
-              <div className="border rounded-md p-3 mb-3 bg-gray-50">
-                <h4 className="text-sm font-medium mb-1">Summary</h4>
-                <p className="text-sm text-gray-700">{bookmark.insights.summary}</p>
-              </div>
-            )}
-            
-            {aiProcessingStatus === 'completed' && !bookmark.insights?.summary && (
-              <div className="border rounded-md p-3 mb-3 bg-gray-50">
-                <h4 className="text-sm font-medium mb-1">No Insights Available</h4>
-                <p className="text-sm text-gray-700">
-                  We couldn't generate insights for this bookmark. This can happen with very short content or private pages.
-                </p>
-              </div>
-            )}
-            
-            {aiProcessingStatus === 'pending' && (
-              <div className="border border-dashed rounded-md p-3 mb-3 bg-gray-50 text-center">
-                <p className="text-sm text-gray-500 mb-2">No AI analysis yet</p>
-                <p className="text-xs text-gray-400">
-                  Click "Analyze Content" to generate AI insights for this bookmark
-                </p>
-              </div>
-            )}
-          </div>
-          
-          {/* Highlights section */}
-          {bookmark.highlights && bookmark.highlights.length > 0 && (
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Highlights</h3>
-              {bookmark.highlights.map((highlight: Highlight, index: number) => (
-                <div key={highlight.id || index} className="border-l-2 border-yellow-400 pl-3 py-1 mb-2 bg-yellow-50 rounded-r-md">
-                  <p className="text-sm italic">{highlight.text}</p>
-                </div>
-              ))}
             </div>
           )}
           
-          {/* Notes section */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-700">Notes</h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 text-xs px-2" 
-                onClick={() => setIsAddingNote(!isAddingNote)}
+          <div className="flex flex-wrap gap-1">
+            {/* User-added tags with remove capability */}
+            {tags.map(tag => (
+              <Badge 
+                key={tag.id} 
+                variant="outline" 
+                className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200 pl-2 pr-1 py-1 flex items-center gap-1"
               >
-                <Plus className="h-3 w-3 mr-1" /> Add Note
-              </Button>
-            </div>
-            
-            {isAddingNote && (
-              <div className="mb-3">
-                <Textarea
-                  placeholder="Enter your note..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  className="mb-2"
-                  rows={3}
-                />
-                <Button 
+                {tag.name}
+                <Button
+                  variant="ghost"
                   size="sm"
+                  className="h-4 w-4 p-0 hover:bg-indigo-200 rounded-full"
+                  onClick={() => {
+                    if (!user) {
+                      toast({
+                        title: "Authentication required",
+                        description: "Please log in to remove tags from bookmarks",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    handleRemoveTag(tag.id);
+                  }}
+                  title={!user ? "Login required to remove tags" : "Remove tag"}
+                >
+                  <X className="h-2 w-2" />
+                </Button>
+              </Badge>
+            ))}
+            
+            {tags.length === 0 && (
+              <div className="text-sm text-gray-500 italic">No tags</div>
+            )}
+          </div>
+        </div>
+        
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-700">Highlights</h4>
+            <span className="text-xs text-gray-500">
+              {bookmark.highlights ? bookmark.highlights.length : 0} highlights
+            </span>
+          </div>
+          
+          {bookmark.highlights && bookmark.highlights.length > 0 ? (
+            <div className="space-y-3">
+              {bookmark.highlights.map((highlight: Highlight, index: number) => (
+                <div key={index} className="p-3 bg-yellow-50 rounded-md border-l-2 border-yellow-300">
+                  <p className="text-sm text-gray-800">{highlight.quote}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 italic">No highlights yet</div>
+          )}
+        </div>
+        
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-700">Notes</h4>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 text-xs text-primary font-medium"
+              onClick={() => {
+                if (!user) {
+                  toast({
+                    title: "Authentication required",
+                    description: "Please log in to add notes to bookmarks",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setIsAddingNote(true);
+              }}
+              title={!user ? "Login required to add notes" : "Add note"}
+            >
+              {!user && (
+                <span className="inline-flex items-center">
+                  <LockIcon className="h-3 w-3 mr-1" />
+                </span>
+              )}
+              + Add Note
+            </Button>
+          </div>
+          
+          {isAddingNote && (
+            <div className="mb-3">
+              <Textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="Type your note here..."
+                className="mb-2"
+              />
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setIsAddingNote(false);
+                    setNewNote("");
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  size="sm" 
                   onClick={handleAddNote}
                   disabled={isSubmitting || !newNote.trim()}
                 >
-                  {isSubmitting ? (
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  ) : null}
-                  Save Note
+                  {isSubmitting ? "Adding..." : "Save"}
                 </Button>
               </div>
-            )}
-            
-            {optimisticNotes.map((note: Note, index: number) => (
-              <div key={note.id || index} className="border-l-2 border-primary pl-3 py-1 mb-2 bg-primary/5 rounded-r-md">
-                <p className="text-sm">{note.content}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {formatDate(note.created_at)}
-                </p>
-              </div>
-            ))}
-            
-            {optimisticNotes.length === 0 && (
-              <p className="text-sm text-gray-500">No notes yet</p>
-            )}
-          </div>
+            </div>
+          )}
           
-          {/* Collections section */}
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Collections</h3>
-            
-            <Select onValueChange={handleCollectionChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Add to collection..." />
+          {optimisticNotes.length > 0 ? (
+            <div className="space-y-3">
+              {optimisticNotes.map((note: Note, index: number) => (
+                <div 
+                  key={note.id} 
+                  className={`p-3 rounded-md ${
+                    note.id.startsWith('temp-') 
+                      ? 'bg-blue-50 border border-blue-100' 
+                      : 'bg-gray-50'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <p className="text-sm text-gray-800">{note.text}</p>
+                    {note.id.startsWith('temp-') && (
+                      <div className="ml-2 flex-shrink-0">
+                        <RefreshCw className="h-3 w-3 animate-spin text-blue-500" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Added {formatDate(note.timestamp)}
+                    {note.id.startsWith('temp-') && ' (saving...)'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 italic">No notes yet</div>
+          )}
+        </div>
+        
+        {/* Collections Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-700">Collection</h4>
+            <div className="flex items-center">
+              {!user && (
+                <span title="Login required to manage collections">
+                  <LockIcon className="h-3 w-3 mr-1 text-gray-500" />
+                </span>
+              )}
+              <FolderIcon className="h-3.5 w-3.5 mr-2 text-gray-500" />
+            </div>
+          </div>
+          <div className="mb-2">
+            <Select 
+              onValueChange={handleCollectionChange}
+              disabled={!user}
+            >
+              <SelectTrigger className="w-full" title={!user ? "Login required to manage collections" : ""}>
+                <SelectValue placeholder={bookmarkCollections.length > 0 
+                  ? `${bookmarkCollections.length} collection${bookmarkCollections.length !== 1 ? 's' : ''}` 
+                  : !user ? "Login to manage collections" : "Select a collection"} 
+                />
               </SelectTrigger>
               <SelectContent>
                 {/* Option to remove from all collections */}
@@ -1037,7 +1419,9 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             </Select>
           </div>
         </div>
-      )}
-    </div>
+        
+
+      </div>
+    </>
   );
 }
