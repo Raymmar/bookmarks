@@ -244,16 +244,16 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
           <div 
             className={cn(
               "flex flex-1 items-center px-2 py-1.5 text-sm rounded-md cursor-pointer",
-              selectedCollections.includes(collection.id) 
+              selectedCollections.includes(collection.id) && location !== `/collection/${createUrlSlug(collection.name)}`
                 ? "bg-primary/10 text-primary" 
-                : "text-gray-700 hover:bg-gray-50",
+                : "text-gray-700 hover:bg-gray-100",
               location === `/collection/${createUrlSlug(collection.name)}`
-                ? "border border-primary/20 bg-secondary/10"
+                ? "bg-secondary/20 text-primary border border-primary/20"
                 : ""
             )}
             title="View collection"
           >
-            <Folder className="h-3.5 w-3.5 mr-2 opacity-70" />
+            <Folder className={cn("h-3.5 w-3.5 mr-2")} />
             <span className={cn("truncate flex-1", 
               (selectedCollections.includes(collection.id) || 
                location === `/collection/${createUrlSlug(collection.name)}`) && "font-medium"
