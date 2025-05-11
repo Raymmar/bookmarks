@@ -135,8 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: req.body.description,
           notes: req.body.notes,
           tags: req.body.tags || [], // Get tags from req.body.tags
-          source: req.body.source,
-          insights: req.body.insights // Add insights to update data
+          source: req.body.source
         });
         
         // Create activity log for bookmark update

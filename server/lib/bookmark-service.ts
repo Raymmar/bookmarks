@@ -36,14 +36,6 @@ export interface BookmarkCreationOptions {
   insightDepth?: number;
   screenshotUrl?: string;
   highlights?: { quote: string; noteText?: string }[];
-  insights?: {
-    id?: string;
-    bookmark_id?: string;
-    summary?: string | null;
-    sentiment?: number | null;
-    depth_level?: number | null;
-    related_links?: string[] | null;
-  };
   source: string;
   user_id?: string | null; // Add user_id field to associate bookmarks with users
 }
@@ -1094,36 +1086,6 @@ ${summaryPrompt?.value || ""}
         text: updateData.notes,
         timestamp: new Date(),
       });
-    }
-
-    // If insights are provided, update the insights
-    if (updateData.insights) {
-      try {
-        // Check if insights already exist
-        const existingInsight = await this.storage.getInsightByBookmarkId(bookmarkId);
-
-        if (existingInsight) {
-          console.log(`Updating existing insights for bookmark ${bookmarkId}`);
-          await this.storage.updateInsight(existingInsight.id, {
-            summary: updateData.insights.summary ?? existingInsight.summary,
-            sentiment: updateData.insights.sentiment ?? existingInsight.sentiment,
-            depth_level: updateData.insights.depth_level ?? existingInsight.depth_level,
-            related_links: updateData.insights.related_links ?? existingInsight.related_links
-          });
-        } else if (updateData.insights.summary) {
-          // Create new insights if they don't exist but a summary is provided
-          console.log(`Creating new insights for bookmark ${bookmarkId}`);
-          await this.storage.createInsight({
-            bookmark_id: bookmarkId,
-            summary: updateData.insights.summary,
-            sentiment: updateData.insights.sentiment || null,
-            depth_level: updateData.insights.depth_level || 1,
-            related_links: updateData.insights.related_links || []
-          });
-        }
-      } catch (error) {
-        console.error(`Error updating insights for bookmark ${bookmarkId}:`, error);
-      }
     }
 
     return updatedBookmark;

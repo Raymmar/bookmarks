@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon } from "lucide-react";
 import { Bookmark, Highlight, Note, Tag as TagType } from "@shared/types";
 import { formatDate } from "@/lib/utils";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
@@ -44,8 +44,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
-  const [isSavingSummary, setIsSavingSummary] = useState(false);
-  const summaryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -71,49 +69,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   useEffect(() => {
     setBookmark(initialBookmark);
   }, [initialBookmark]);
-  
-  // Cleanup timeout on unmount or when bookmark changes
-  useEffect(() => {
-    return () => {
-      if (summaryTimeoutRef.current) {
-        clearTimeout(summaryTimeoutRef.current);
-      }
-    };
-  }, [bookmark?.id]);
-  
-  // Function to handle debounced saving of summary data
-  const debounceSummaryUpdate = (summaryText: string) => {
-    // Clear any existing timeout
-    if (summaryTimeoutRef.current) {
-      clearTimeout(summaryTimeoutRef.current);
-    }
-    
-    // Only schedule API call if we have a bookmark with insights to update
-    if (bookmark?.insights) {
-      const bookmarkInsights = bookmark.insights; // Create a reference for type safety
-      
-      // Set a new timeout for the API call
-      summaryTimeoutRef.current = setTimeout(() => {
-        setIsSavingSummary(true);
-        
-        // Prepare the updated insights object
-        const updatedInsights = {
-          id: bookmarkInsights.id,
-          bookmark_id: bookmarkInsights.bookmark_id,
-          summary: summaryText,
-          sentiment: bookmarkInsights.sentiment,
-          depth_level: bookmarkInsights.depth_level,
-          related_links: bookmarkInsights.related_links
-        };
-        
-        // Call the update function
-        handleUpdateBookmark({ insights: updatedInsights })
-          .finally(() => {
-            setIsSavingSummary(false);
-          });
-      }, 1500); // 1.5 second debounce
-    }
-  };
   
   // Listen for the custom showBookmarkDetail event
   useEffect(() => {
@@ -689,10 +644,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         updated_at: new Date(now) // Use Date object for local state to match Bookmark type
       };
       
-      // Store a reference to optimistic bookmark to use after API call completes
-      const optimisticBookmarkRef = { ...optimisticBookmark };
-      
-      // Update the local state with optimistic data immediately
+      // Update the local state with properly typed bookmark
       setBookmark(optimisticBookmark);
       
       // Get current bookmarks from the cache
@@ -720,30 +672,28 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       }
       
       // Make API request to update the bookmark
-      await apiRequest(
+      const updatedBookmark = await apiRequest(
         "PATCH", 
         `/api/bookmarks/${bookmark.id}`, 
         updateData
       );
       
-      // Important: Don't set bookmark state directly from server response
-      // Instead, keep the optimistic update we already made
-      // This prevents the UI flicker when server data arrives
+      // Update the local state with server response
+      setBookmark(updatedBookmark);
       
-      // Only update tags/refs in background without affecting current display
+      // Only invalidate queries if we're not in recently_updated sort mode
+      // For recently_updated, we keep our optimistic update intact with no server refresh
       if (sortOrder !== 'recently_updated') {
-        // Use a longer delay to ensure user's editing experience is complete
         setTimeout(() => {
-          // Instead of invalidating, use setQueryData to update cache without triggering refetch
-          queryClient.setQueryData([`/api/bookmarks/${bookmark.id}`], optimisticBookmarkRef);
-        }, 2000);
+          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+        }, 1000);
       }
       
       // Dispatch a custom event to inform other components about the update
       const event = new CustomEvent('bookmarkUpdated', { 
         detail: { 
           bookmarkId: bookmark.id,
-          updatedBookmark: optimisticBookmarkRef
+          updatedBookmark
         } 
       });
       document.dispatchEvent(event);
@@ -1143,52 +1093,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           {bookmark.insights?.summary ? (
             <div>
               <h5 className="text-xs font-medium text-gray-600 mb-1">Summary</h5>
-              <div
-                className="text-sm text-gray-600 mb-3 border-b border-transparent hover:border-gray-300 focus-within:border-primary cursor-text"
-                onClick={(e) => {
-                  // Make sure the click was directly on the div and not on a child element
-                  if (e.currentTarget === e.target) {
-                    const textareaElement = e.currentTarget.querySelector('textarea');
-                    if (textareaElement) textareaElement.focus();
-                  }
-                }}
-              >
-                <div className="relative">
-                  <textarea
-                    value={bookmark.insights.summary}
-                    className="w-full bg-transparent focus:outline-none resize-none overflow-hidden pr-8"
-                    rows={Math.max(3, bookmark.insights.summary.split('\n').length)}
-                    onChange={(e) => {
-                      // Update the UI immediately for a responsive experience
-                      setBookmark(prev => {
-                        if (!prev) return prev;
-                        return { 
-                          ...prev,
-                          insights: prev.insights ? {
-                            ...prev.insights,
-                            summary: e.target.value
-                          } : undefined
-                        } as Bookmark;
-                      });
-                      
-                      // Trigger the debounced save
-                      debounceSummaryUpdate(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      // Allow multiline text by only handling Ctrl+Enter
-                      if (e.key === 'Enter' && e.ctrlKey) {
-                        e.preventDefault();
-                        e.currentTarget.blur();
-                      }
-                    }}
-                  />
-                  {isSavingSummary && (
-                    <div className="absolute right-1 top-1 text-xs text-muted-foreground animate-pulse">
-                      Saving...
-                    </div>
-                  )}
-                </div>
-              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                {bookmark.insights.summary}
+              </p>
+              
+
             </div>
           ) : (
             <div className="text-sm text-gray-500 italic">
