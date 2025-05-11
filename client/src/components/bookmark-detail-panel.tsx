@@ -177,7 +177,8 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
-  const [isLoading, setIsLoading] = useState<boolean>(!!initialBookmark?.id);
+  // Always start with loading state true when initialBookmark exists or is being requested
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [lightbox, setLightbox] = useState<{ 
     isOpen: boolean; 
     images: Array<{url: string; alt: string}>;
@@ -211,10 +212,12 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   // Update bookmark state when the prop changes
   useEffect(() => {
     if (initialBookmark?.id) {
-      setIsLoading(true);
+      // Keep loading state true, will be turned off after data is loaded
       setBookmark(initialBookmark);
     } else {
       setBookmark(initialBookmark);
+      // Only turn off loading when we know there's no bookmark to show
+      // This prevents flashing empty state before loading state
       setIsLoading(false);
     }
   }, [initialBookmark]);
@@ -545,7 +548,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   };
 
-  // Handle empty or loading states
+  // Handle empty or loading states - check loading state first to prevent flickering
   if (isLoading) {
     return (
       <>
@@ -567,6 +570,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     );
   }
   
+  // Only show empty state if we're not loading AND there's no bookmark
   if (!bookmark) {
     return (
       <>
