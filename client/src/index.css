@@ -16,8 +16,10 @@
 @layer components {
   /* react-masonry-css styles */
   .masonry-grid {
-    display: flex;
+    display: flex; 
+    flex-shrink: expand;
     width: 100%;
+    gap: .75rem; 
   }
   
   .masonry-grid-column {
