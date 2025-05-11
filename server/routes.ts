@@ -45,6 +45,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse search query if provided
       const searchQuery = req.query.search ? (req.query.search as string).trim() : undefined;
       
+      console.log(`Search query received: "${searchQuery}"`); // Debug log
+      
       // Get total count before pagination for accurate pagination info
       const totalCount = await storage.getBookmarksCount(userId, { searchQuery });
       
