@@ -1395,88 +1395,220 @@ export class DatabaseStorage implements IStorage {
   
   // Collection Bookmarks
   async getBookmarksByCollectionId(collectionId: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
-    let query = db
-      .select({
-        bookmark: bookmarks
-      })
-      .from(collectionBookmarks)
-      .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
-      .where(eq(collectionBookmarks.collection_id, collectionId));
-    
-    // Apply search filter if provided
-    if (options?.searchQuery) {
-      const searchTerm = `%${options.searchQuery}%`;
-      query = query.where(
-        or(
-          ilike(bookmarks.title, searchTerm),
-          ilike(bookmarks.description, searchTerm),
-          ilike(bookmarks.url, searchTerm),
-          ilike(bookmarks.content_html, searchTerm)
-        )
-      );
-    }
-    
-    // Apply sorting
-    if (options?.sort) {
-      switch (options.sort) {
-        case 'newest':
-          query = query.orderBy(desc(bookmarks.date_saved));
-          break;
-        case 'oldest':
-          query = query.orderBy(asc(bookmarks.date_saved));
-          break;
-        case 'recently_updated':
-          query = query.orderBy(desc(bookmarks.updated_at));
-          break;
-        case 'created_newest':
-          query = query.orderBy(desc(bookmarks.created_at));
-          break;
-        default:
-          // Default to newest first
-          query = query.orderBy(desc(bookmarks.date_saved));
+    if (!options?.searchQuery) {
+      // If no search query, use the standard query without complex joins
+      let query = db
+        .select({
+          bookmark: bookmarks
+        })
+        .from(collectionBookmarks)
+        .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
+        .where(eq(collectionBookmarks.collection_id, collectionId));
+      
+      // Apply sorting
+      if (options?.sort) {
+        switch (options.sort) {
+          case 'newest':
+            query = query.orderBy(desc(bookmarks.date_saved));
+            break;
+          case 'oldest':
+            query = query.orderBy(asc(bookmarks.date_saved));
+            break;
+          case 'recently_updated':
+            query = query.orderBy(desc(bookmarks.updated_at));
+            break;
+          case 'created_newest':
+            query = query.orderBy(desc(bookmarks.created_at));
+            break;
+          default:
+            // Default to newest first
+            query = query.orderBy(desc(bookmarks.date_saved));
+        }
+      } else {
+        // Default sort - newest first
+        query = query.orderBy(desc(bookmarks.date_saved));
       }
+      
+      // Apply pagination
+      if (options?.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      if (options?.offset) {
+        query = query.offset(options.offset);
+      }
+      
+      const result = await query;
+      return result.map(r => r.bookmark);
     } else {
-      // Default sort - newest first
-      query = query.orderBy(desc(bookmarks.date_saved));
+      // Enhanced search that includes tags, notes, and insights
+      // First, prepare the search term
+      const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
+      
+      // Find bookmarks matching search criteria using UNION
+      const matchingBookmarkIds = await db.execute(sql`
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+        WHERE cb.collection_id = ${collectionId}
+          AND (
+            LOWER(b.title) LIKE ${searchTerm}
+            OR LOWER(b.description) LIKE ${searchTerm}
+            OR LOWER(b.url) LIKE ${searchTerm}
+            OR LOWER(b.content_html) LIKE ${searchTerm}
+          )
+          
+        UNION
+        
+        -- Search in notes
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+        JOIN ${notes} n ON b.id = n.bookmark_id
+        WHERE cb.collection_id = ${collectionId}
+          AND LOWER(n.text) LIKE ${searchTerm}
+        
+        UNION
+        
+        -- Search in insights
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+        JOIN ${insights} i ON b.id = i.bookmark_id
+        WHERE cb.collection_id = ${collectionId}
+          AND (
+            LOWER(i.summary) LIKE ${searchTerm}
+          )
+        
+        UNION
+        
+        -- Search in tags
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+        JOIN ${bookmarkTags} bt ON b.id = bt.bookmark_id
+        JOIN ${tags} t ON bt.tag_id = t.id
+        WHERE cb.collection_id = ${collectionId}
+          AND LOWER(t.name) LIKE ${searchTerm}
+      `);
+      
+      // Extract the bookmark IDs from the result
+      const ids = matchingBookmarkIds.rows.map(row => row.id);
+      
+      // If no results, return empty array
+      if (ids.length === 0) {
+        return [];
+      }
+      
+      // Now get the actual bookmarks with full details
+      let query = db.select().from(bookmarks)
+        .where(inArray(bookmarks.id, ids));
+      
+      // Apply sorting
+      if (options?.sort) {
+        switch (options.sort) {
+          case 'newest':
+            query = query.orderBy(desc(bookmarks.date_saved));
+            break;
+          case 'oldest':
+            query = query.orderBy(asc(bookmarks.date_saved));
+            break;
+          case 'recently_updated':
+            query = query.orderBy(desc(bookmarks.updated_at));
+            break;
+          case 'created_newest':
+            query = query.orderBy(desc(bookmarks.created_at));
+            break;
+          default:
+            // Default to newest first
+            query = query.orderBy(desc(bookmarks.date_saved));
+        }
+      } else {
+        // Default sort - newest first
+        query = query.orderBy(desc(bookmarks.date_saved));
+      }
+      
+      // Apply pagination
+      if (options?.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      if (options?.offset) {
+        query = query.offset(options.offset);
+      }
+      
+      return await query;
     }
-    
-    // Apply pagination
-    if (options?.limit) {
-      query = query.limit(options.limit);
-    }
-    
-    if (options?.offset) {
-      query = query.offset(options.offset);
-    }
-    
-    const result = await query;
-    return result.map(r => r.bookmark);
   }
   
   async getBookmarksByCollectionIdCount(collectionId: string, options?: { searchQuery?: string }): Promise<number> {
-    let query = db
-      .select({
-        count: sql<number>`count(*)`
-      })
-      .from(collectionBookmarks)
-      .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
-      .where(eq(collectionBookmarks.collection_id, collectionId));
-    
-    // Apply search filter if provided
-    if (options?.searchQuery) {
-      const searchTerm = `%${options.searchQuery}%`;
-      query = query.where(
-        or(
-          ilike(bookmarks.title, searchTerm),
-          ilike(bookmarks.description, searchTerm),
-          ilike(bookmarks.url, searchTerm),
-          ilike(bookmarks.content_html, searchTerm)
-        )
-      );
+    if (!options?.searchQuery) {
+      // Standard count without enhanced search
+      let query = db
+        .select({
+          count: sql<number>`count(*)`
+        })
+        .from(collectionBookmarks)
+        .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
+        .where(eq(collectionBookmarks.collection_id, collectionId));
+      
+      const result = await query;
+      return result[0]?.count || 0;
+    } else {
+      // Enhanced search count including notes, insights, and tags
+      const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
+      
+      // Build a count query that counts unique bookmark IDs matching any of our search criteria
+      const result = await db.execute(sql`
+        SELECT COUNT(*) FROM (
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+          WHERE cb.collection_id = ${collectionId}
+            AND (
+              LOWER(b.title) LIKE ${searchTerm}
+              OR LOWER(b.description) LIKE ${searchTerm}
+              OR LOWER(b.url) LIKE ${searchTerm}
+              OR LOWER(b.content_html) LIKE ${searchTerm}
+            )
+            
+          UNION
+          
+          -- Search in notes
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+          JOIN ${notes} n ON b.id = n.bookmark_id
+          WHERE cb.collection_id = ${collectionId}
+            AND LOWER(n.text) LIKE ${searchTerm}
+          
+          UNION
+          
+          -- Search in insights
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+          JOIN ${insights} i ON b.id = i.bookmark_id
+          WHERE cb.collection_id = ${collectionId}
+            AND (
+              LOWER(i.summary) LIKE ${searchTerm}
+            )
+          
+          UNION
+          
+          -- Search in tags
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
+          JOIN ${bookmarkTags} bt ON b.id = bt.bookmark_id
+          JOIN ${tags} t ON bt.tag_id = t.id
+          WHERE cb.collection_id = ${collectionId}
+            AND LOWER(t.name) LIKE ${searchTerm}
+        ) AS bookmark_search
+      `);
+      
+      return parseInt(result.rows[0].count) || 0;
     }
-    
-    const result = await query;
-    return result[0]?.count || 0;
   }
   
   async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
@@ -1567,90 +1699,220 @@ export class DatabaseStorage implements IStorage {
   
   // Bookmarks
   async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
-    let query = db.select().from(bookmarks);
-    
-    // Apply user filter if provided
-    if (userId) {
-      query = query.where(eq(bookmarks.user_id, userId));
-    }
-    
-    // Apply search query if provided
-    if (options?.searchQuery) {
+    if (!options?.searchQuery) {
+      // If no search query, use the standard query without joins
+      let query = db.select().from(bookmarks);
+      
+      // Apply user filter if provided
+      if (userId) {
+        query = query.where(eq(bookmarks.user_id, userId));
+      }
+      
+      // Apply sorting
+      if (options?.sort) {
+        switch (options.sort) {
+          case 'newest':
+            query = query.orderBy(desc(bookmarks.date_saved));
+            break;
+          case 'oldest':
+            query = query.orderBy(bookmarks.date_saved);
+            break;
+          case 'recently_updated':
+            query = query.orderBy(desc(bookmarks.updated_at));
+            break;
+          case 'created_newest':
+            // If created_at exists, use it, otherwise fall back to date_saved
+            query = query.orderBy(desc(bookmarks.created_at), desc(bookmarks.date_saved));
+            break;
+          default:
+            // Default to newest
+            query = query.orderBy(desc(bookmarks.date_saved));
+        }
+      } else {
+        // Default sort - newest first
+        query = query.orderBy(desc(bookmarks.date_saved));
+      }
+      
+      // Apply pagination
+      if (options?.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      if (options?.offset) {
+        query = query.offset(options.offset);
+      }
+      
+      return await query;
+    } else {
+      // Enhanced search that includes tags, notes, and insights
+      // First, prepare the search term
       const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
       
-      query = query.where(
-        or(
-          sql`LOWER(${bookmarks.title}) LIKE ${searchTerm}`,
-          sql`LOWER(${bookmarks.description}) LIKE ${searchTerm}`,
-          sql`LOWER(${bookmarks.url}) LIKE ${searchTerm}`,
-          sql`LOWER(${bookmarks.content_html}) LIKE ${searchTerm}`
-        )
-      );
-    }
-    
-    // Apply sorting
-    if (options?.sort) {
-      switch (options.sort) {
-        case 'newest':
-          query = query.orderBy(desc(bookmarks.date_saved));
-          break;
-        case 'oldest':
-          query = query.orderBy(bookmarks.date_saved);
-          break;
-        case 'recently_updated':
-          query = query.orderBy(desc(bookmarks.updated_at));
-          break;
-        case 'created_newest':
-          // If created_at exists, use it, otherwise fall back to date_saved
-          query = query.orderBy(desc(bookmarks.created_at), desc(bookmarks.date_saved));
-          break;
-        default:
-          // Default to newest
-          query = query.orderBy(desc(bookmarks.date_saved));
+      // Build a complex query that finds bookmarks matching any of our search criteria
+      // using a UNION approach to deduplicate bookmarks
+      const matchingBookmarkIds = await db.execute(sql`
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        WHERE
+          (${userId} IS NULL OR b.user_id = ${userId})
+          AND (
+            LOWER(b.title) LIKE ${searchTerm}
+            OR LOWER(b.description) LIKE ${searchTerm}
+            OR LOWER(b.url) LIKE ${searchTerm}
+            OR LOWER(b.content_html) LIKE ${searchTerm}
+          )
+          
+        UNION
+        
+        -- Search in notes
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        JOIN ${notes} n ON b.id = n.bookmark_id
+        WHERE
+          (${userId} IS NULL OR b.user_id = ${userId})
+          AND LOWER(n.text) LIKE ${searchTerm}
+        
+        UNION
+        
+        -- Search in insights
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        JOIN ${insights} i ON b.id = i.bookmark_id
+        WHERE
+          (${userId} IS NULL OR b.user_id = ${userId})
+          AND (
+            LOWER(i.summary) LIKE ${searchTerm}
+          )
+        
+        UNION
+        
+        -- Search in tags
+        SELECT DISTINCT b.id
+        FROM ${bookmarks} b
+        JOIN ${bookmarkTags} bt ON b.id = bt.bookmark_id
+        JOIN ${tags} t ON bt.tag_id = t.id
+        WHERE
+          (${userId} IS NULL OR b.user_id = ${userId})
+          AND LOWER(t.name) LIKE ${searchTerm}
+      `);
+      
+      // Extract the bookmark IDs from the result
+      const ids = matchingBookmarkIds.rows.map(row => row.id);
+      
+      // If no results, return empty array
+      if (ids.length === 0) {
+        return [];
       }
-    } else {
-      // Default sort - newest first
-      query = query.orderBy(desc(bookmarks.date_saved));
+      
+      // Now get the actual bookmarks with full details
+      let query = db.select().from(bookmarks)
+        .where(inArray(bookmarks.id, ids));
+      
+      // Apply sorting
+      if (options?.sort) {
+        switch (options.sort) {
+          case 'newest':
+            query = query.orderBy(desc(bookmarks.date_saved));
+            break;
+          case 'oldest':
+            query = query.orderBy(bookmarks.date_saved);
+            break;
+          case 'recently_updated':
+            query = query.orderBy(desc(bookmarks.updated_at));
+            break;
+          case 'created_newest':
+            // If created_at exists, use it, otherwise fall back to date_saved
+            query = query.orderBy(desc(bookmarks.created_at), desc(bookmarks.date_saved));
+            break;
+          default:
+            // Default to newest
+            query = query.orderBy(desc(bookmarks.date_saved));
+        }
+      } else {
+        // Default sort - newest first
+        query = query.orderBy(desc(bookmarks.date_saved));
+      }
+      
+      // Apply pagination
+      if (options?.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      if (options?.offset) {
+        query = query.offset(options.offset);
+      }
+      
+      return await query;
     }
-    
-    // Apply pagination
-    if (options?.limit) {
-      query = query.limit(options.limit);
-    }
-    
-    if (options?.offset) {
-      query = query.offset(options.offset);
-    }
-    
-    return await query;
   }
   
   async getBookmarksCount(userId?: string, options?: { searchQuery?: string }): Promise<number> {
-    const result = await db.select({ count: sql<number>`COUNT(*)` }).from(bookmarks).as('count');
-    
-    let query = db.select({ count: sql<number>`COUNT(*)` }).from(bookmarks);
-    
-    // Apply user filter if provided
-    if (userId) {
-      query = query.where(eq(bookmarks.user_id, userId));
-    }
-    
-    // Apply search query if provided
-    if (options?.searchQuery) {
+    if (!options?.searchQuery) {
+      // Standard count without search
+      let query = db.select({ count: sql<number>`COUNT(*)` }).from(bookmarks);
+      
+      // Apply user filter if provided
+      if (userId) {
+        query = query.where(eq(bookmarks.user_id, userId));
+      }
+      
+      const [{ count }] = await query;
+      return count || 0;
+    } else {
+      // Enhanced search count including tags, notes, and insights
       const searchTerm = `%${options.searchQuery.toLowerCase()}%`;
       
-      query = query.where(
-        or(
-          sql`LOWER(${bookmarks.title}) LIKE ${searchTerm}`,
-          sql`LOWER(${bookmarks.description}) LIKE ${searchTerm}`,
-          sql`LOWER(${bookmarks.url}) LIKE ${searchTerm}`,
-          sql`LOWER(${bookmarks.content_html}) LIKE ${searchTerm}`
-        )
-      );
+      // Build a count query that counts unique bookmark IDs matching any of our search criteria
+      const result = await db.execute(sql`
+        SELECT COUNT(*) FROM (
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          WHERE
+            (${userId} IS NULL OR b.user_id = ${userId})
+            AND (
+              LOWER(b.title) LIKE ${searchTerm}
+              OR LOWER(b.description) LIKE ${searchTerm}
+              OR LOWER(b.url) LIKE ${searchTerm}
+              OR LOWER(b.content_html) LIKE ${searchTerm}
+            )
+            
+          UNION
+          
+          -- Search in notes
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          JOIN ${notes} n ON b.id = n.bookmark_id
+          WHERE
+            (${userId} IS NULL OR b.user_id = ${userId})
+            AND LOWER(n.text) LIKE ${searchTerm}
+          
+          UNION
+          
+          -- Search in insights
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          JOIN ${insights} i ON b.id = i.bookmark_id
+          WHERE
+            (${userId} IS NULL OR b.user_id = ${userId})
+            AND (
+              LOWER(i.summary) LIKE ${searchTerm}
+            )
+          
+          UNION
+          
+          -- Search in tags
+          SELECT DISTINCT b.id
+          FROM ${bookmarks} b
+          JOIN ${bookmarkTags} bt ON b.id = bt.bookmark_id
+          JOIN ${tags} t ON bt.tag_id = t.id
+          WHERE
+            (${userId} IS NULL OR b.user_id = ${userId})
+            AND LOWER(t.name) LIKE ${searchTerm}
+        ) AS bookmark_search
+      `);
+      
+      return parseInt(result.rows[0].count) || 0;
     }
-    
-    const [{ count }] = await query;
-    return count || 0;
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
