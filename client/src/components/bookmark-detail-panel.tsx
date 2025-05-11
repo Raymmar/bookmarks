@@ -892,7 +892,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         </div>
       </div>
       
-      <div className="p-4 overflow-auto">
+      <div className="p-4 overflow-auto h-[calc(100vh-64px)]">
         <div className="mb-4">
           <div
             className="font-medium text-base mb-1 border-b border-transparent hover:border-gray-300 focus-within:border-primary cursor-text"
@@ -960,31 +960,62 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
             )}
             
             {/* Tweet content */}
-            <div className="mb-4 text-gray-800">
+            <div className="mb-4 text-gray-800 break-words">
               {bookmark.description}
             </div>
             
-            {/* Tweet media (if any) */}
+            {/* Media content (from any source) */}
             {bookmark.media_urls && bookmark.media_urls.length > 0 && (
               <div className="mb-4 grid grid-cols-1 gap-2">
+                {/* Handle Twitter/X media URLs */}
                 {bookmark.media_urls
-                  .filter(url => 
-                    // Only include Twitter/X media URLs (skip local paths and other URLs)
-                    url.includes('pbs.twimg.com')
-                  )
+                  .filter(url => url.includes('pbs.twimg.com'))
                   .map((url, index) => (
                     <a 
-                      key={index} 
+                      key={`twitter-${index}`} 
                       href={url} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary"
                     >
-                      {/* Render the image directly for Twitter/X media URLs */}
                       <img 
                         src={url} 
                         alt={`Media from ${bookmark.title}`}
-                        className="w-full h-auto object-cover"
+                        className="w-full h-auto object-cover max-h-96"
+                        loading="lazy"
+                        onError={(e) => {
+                          // If image fails to load, show fallback message
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          target.parentElement?.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
+                          target.parentElement!.innerHTML = 'Media unavailable';
+                        }}
+                      />
+                    </a>
+                  ))}
+                
+                {/* Handle other media URLs */}
+                {bookmark.media_urls
+                  .filter(url => !url.includes('pbs.twimg.com') && (
+                    // Include common image extensions
+                    url.endsWith('.jpg') || 
+                    url.endsWith('.jpeg') || 
+                    url.endsWith('.png') || 
+                    url.endsWith('.gif') || 
+                    url.endsWith('.webp')
+                  ))
+                  .map((url, index) => (
+                    <a 
+                      key={`other-${index}`} 
+                      href={url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary"
+                    >
+                      <img 
+                        src={url} 
+                        alt={`Media from ${bookmark.title}`}
+                        className="w-full h-auto object-cover max-h-96"
                         loading="lazy"
                         onError={(e) => {
                           // If image fails to load, show fallback message

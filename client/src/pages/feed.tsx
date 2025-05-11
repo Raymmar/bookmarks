@@ -100,13 +100,8 @@ export default function Feed() {
     sessionStorage.removeItem('lastSelectedBookmarkId');
   };
   
-  // Restore selected bookmark when component mounts
-  useEffect(() => {
-    const lastSelectedId = sessionStorage.getItem('lastSelectedBookmarkId');
-    if (lastSelectedId) {
-      setSelectedBookmarkId(lastSelectedId);
-    }
-  }, []);
+  // We've removed the automatic loading of bookmarks on component mount
+  // so that no bookmark is loaded in the detail view by default
 
   return (
     <div className="h-full bg-gray-50">
