@@ -1090,10 +1090,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 </div>
                 <div className="ml-auto">
                   <a 
-                    href={`https://twitter.com/${bookmark.author_username}`}
+                    href={bookmark.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-500 hover:text-blue-600"
+                    title="Open original post"
                   >
                     <ExternalLink className="h-4 w-4" />
                   </a>
