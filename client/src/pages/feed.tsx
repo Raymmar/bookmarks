@@ -110,212 +110,124 @@ export default function Feed() {
 
   return (
     <div className="h-full bg-gray-50">
-      {selectedBookmarkId && selectedBookmark ? (
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-          <ResizablePanel defaultSize={70} minSize={50}>
-            <div className="flex flex-col h-full">
-              {/* Header */}
-              <div className="flex justify-between items-center p-4 border-b">
-                <h1 className="text-xl font-semibold">Recent Bookmarks</h1>
-                <div className="flex space-x-2">
-                  <ViewModeSwitcher
-                    initialViewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                  />
-                  <Select
-                    value={sortOrder}
-                    onValueChange={handleSortChange}
+      <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanel defaultSize={70} minSize={50}>
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b">
+              <h1 className="text-xl font-semibold">Recent Bookmarks</h1>
+              <div className="flex space-x-2">
+                <ViewModeSwitcher
+                  initialViewMode={viewMode}
+                  onViewModeChange={setViewMode}
+                />
+                <Select
+                  value={sortOrder}
+                  onValueChange={handleSortChange}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Date Saved (Newest)</SelectItem>
+                    <SelectItem value="oldest">Date Saved (Oldest)</SelectItem>
+                    <SelectItem value="recently_updated">Recently Updated</SelectItem>
+                    <SelectItem value="created_newest">Date Created (Newest)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Search */}
+            <div className="flex items-center p-4 border-b">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  className="pl-9" 
+                  placeholder="Search bookmarks..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setSearchQuery('')}
                   >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="newest">Date Saved (Newest)</SelectItem>
-                      <SelectItem value="oldest">Date Saved (Oldest)</SelectItem>
-                      <SelectItem value="recently_updated">Recently Updated</SelectItem>
-                      <SelectItem value="created_newest">Date Created (Newest)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              {/* Search */}
-              <div className="flex items-center p-4 border-b">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    className="pl-9" 
-                    placeholder="Search bookmarks..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  {searchQuery && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground hover:text-foreground"
-                      onClick={() => setSearchQuery('')}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-              
-              {/* Content */}
-              <div className="flex-1 overflow-auto">
-                {viewMode === 'list' ? (
-                  <BookmarkListView 
-                    bookmarks={filteredBookmarks}
-                    selectedBookmarkId={selectedBookmarkId}
-                    onSelectBookmark={handleSelectBookmark}
-                    isLoading={isLoading}
-                  />
-                ) : (
-                  <BookmarkGrid 
-                    bookmarks={filteredBookmarks}
-                    selectedBookmarkId={selectedBookmarkId}
-                    onSelectBookmark={handleSelectBookmark}
-                    isLoading={isLoading}
-                  />
+                    <X className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
-              
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-center p-4 border-t">
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToPreviousPage}
-                      disabled={!hasPreviousPage}
-                    >
-                      Previous
-                    </Button>
-                    <div className="flex items-center space-x-1">
-                      <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToNextPage}
-                      disabled={!hasNextPage}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 overflow-auto">
+              {viewMode === 'list' ? (
+                <BookmarkListView 
+                  bookmarks={filteredBookmarks}
+                  selectedBookmarkId={selectedBookmarkId}
+                  onSelectBookmark={handleSelectBookmark}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <BookmarkGrid 
+                  bookmarks={filteredBookmarks}
+                  selectedBookmarkId={selectedBookmarkId}
+                  onSelectBookmark={handleSelectBookmark}
+                  isLoading={isLoading}
+                />
               )}
             </div>
-          </ResizablePanel>
-          
-          <ResizableHandle withHandle />
-          
-          <ResizablePanel defaultSize={30} minSize={25}>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center p-4 border-t">
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToPreviousPage}
+                    disabled={!hasPreviousPage}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToNextPage}
+                    disabled={!hasNextPage}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </ResizablePanel>
+        
+        <ResizableHandle withHandle />
+        
+        <ResizablePanel defaultSize={30} minSize={25}>
+          {selectedBookmarkId && selectedBookmark ? (
             <BookmarkDetailPanel
               bookmark={selectedBookmark}
               onClose={handleCloseDetail}
             />
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex justify-between items-center p-4 border-b">
-            <h1 className="text-xl font-semibold">Recent Bookmarks</h1>
-            <div className="flex space-x-2">
-              <ViewModeSwitcher
-                initialViewMode={viewMode}
-                onViewModeChange={setViewMode}
-              />
-              <Select
-                value={sortOrder}
-                onValueChange={handleSortChange}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Date Saved (Newest)</SelectItem>
-                  <SelectItem value="oldest">Date Saved (Oldest)</SelectItem>
-                  <SelectItem value="recently_updated">Recently Updated</SelectItem>
-                  <SelectItem value="created_newest">Date Created (Newest)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          {/* Search */}
-          <div className="flex items-center p-4 border-b">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                className="pl-9" 
-                placeholder="Search bookmarks..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground hover:text-foreground"
-                  onClick={() => setSearchQuery('')}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          {/* Content */}
-          <div className="flex-1 overflow-auto">
-            {viewMode === 'list' ? (
-              <BookmarkListView 
-                bookmarks={filteredBookmarks}
-                selectedBookmarkId={selectedBookmarkId}
-                onSelectBookmark={handleSelectBookmark}
-                isLoading={isLoading}
-              />
-            ) : (
-              <BookmarkGrid 
-                bookmarks={filteredBookmarks}
-                selectedBookmarkId={selectedBookmarkId}
-                onSelectBookmark={handleSelectBookmark}
-                isLoading={isLoading}
-              />
-            )}
-          </div>
-          
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center p-4 border-t">
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToPreviousPage}
-                  disabled={!hasPreviousPage}
-                >
-                  Previous
-                </Button>
-                <div className="flex items-center space-x-1">
-                  <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNextPage}
-                  disabled={!hasNextPage}
-                >
-                  Next
-                </Button>
-              </div>
+          ) : (
+            <div className="flex flex-col h-full items-center justify-center p-6 text-center bg-gray-50 border-l">
+              <Bookmark className="h-12 w-12 text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium mb-2">No bookmark selected</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Select a bookmark from the list to view its details.
+              </p>
             </div>
           )}
-        </div>
-      )}
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
