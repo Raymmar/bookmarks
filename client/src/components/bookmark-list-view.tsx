@@ -1,7 +1,7 @@
 import { Bookmark } from "@shared/types";
 import { CalendarIcon, Clock, Link2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { forwardRef, RefObject } from "react";
+import { RefObject } from "react";
 
 interface BookmarkListViewProps {
   bookmarks: Bookmark[];
@@ -13,7 +13,7 @@ interface BookmarkListViewProps {
   loaderRef?: RefObject<HTMLDivElement>;
 }
 
-export const BookmarkListView = forwardRef<HTMLDivElement, BookmarkListViewProps>(({
+export function BookmarkListView({
   bookmarks,
   selectedBookmarkId,
   onSelectBookmark,
@@ -21,9 +21,9 @@ export const BookmarkListView = forwardRef<HTMLDivElement, BookmarkListViewProps
   hasNextPage,
   isFetchingNextPage,
   loaderRef
-}, ref) => {
+}: BookmarkListViewProps) {
   return (
-    <div className="p-3 overflow-auto h-full flex-1 w-full" ref={ref}>
+    <div className="p-3 overflow-auto h-full flex-1 w-full">
       {isLoading ? (
         <div className="flex items-center justify-center h-full min-h-[200px] w-full">
           <div className="text-center">
@@ -70,7 +70,7 @@ export const BookmarkListView = forwardRef<HTMLDivElement, BookmarkListViewProps
       )}
     </div>
   );
-});
+}
 
 interface BookmarkListItemProps {
   bookmark: Bookmark;
