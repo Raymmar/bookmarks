@@ -18,11 +18,13 @@
   .masonry-grid {
     display: flex;
     width: 100%;
-    margin-left: -0.75rem; /* Slightly smaller gutter to optimize space */
+    margin-left: -0.75rem; /* Left margin to offset the padding */
+    margin-right: -0.75rem; /* Right margin to balance the layout */
   }
   
   .masonry-grid-column {
-    padding-left: 0.75rem; /* Gutter size */
+    padding-left: 0.75rem; /* Gutter size left */
+    padding-right: 0.75rem; /* Gutter size right */
     background-clip: padding-box;
   }
   
