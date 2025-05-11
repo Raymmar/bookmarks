@@ -236,47 +236,33 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   const renderCollectionItem = (collection: any) => (
     <li key={collection.id}>
       <div className="flex items-center">
-        <div 
-          className={cn(
-            "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
-            selectedCollections.includes(collection.id) 
-              ? "bg-primary/10 text-primary font-medium" 
-              : "text-gray-700 hover:bg-gray-50",
-            location === `/collection/${encodeURIComponent(collection.name)}`
-              ? "border border-primary/20"
-              : ""
-          )}
-          onClick={() => handleCollectionClick(collection.id)}
-          title="Click to select or deselect. You can select multiple collections."
+        <Link 
+          href={`/collection/${encodeURIComponent(collection.name)}`}
+          className="flex-1"
         >
-          <div className="flex h-4 w-4 items-center justify-center mr-2">
-            {selectedCollections.includes(collection.id) ? (
-              <Checkbox 
-                id={`collection-${collection.id}`} 
-                checked={true}
-                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-              />
-            ) : (
-              <Checkbox 
-                id={`collection-${collection.id}`} 
-                checked={false}
-              />
+          <div 
+            className={cn(
+              "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
+              selectedCollections.includes(collection.id) 
+                ? "bg-primary/10 text-primary font-medium" 
+                : "text-gray-700 hover:bg-gray-50",
+              location === `/collection/${encodeURIComponent(collection.name)}`
+                ? "border border-primary/20 bg-secondary/10"
+                : ""
             )}
+            title="View collection"
+          >
+            <span className={cn("truncate flex-1", 
+              (selectedCollections.includes(collection.id) || 
+               location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
+            )}>
+              {collection.name}
+            </span>
           </div>
-          <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
-            {collection.name}
-          </span>
-        </div>
+        </Link>
         
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" className="h-6 w-6 p-0" asChild>
-            <Link href={`/collection/${encodeURIComponent(collection.name)}`}>
-              <FolderOpen className="h-3 w-3 text-gray-500" />
-              <span className="sr-only">View Collection</span>
-            </Link>
-          </Button>
-          
-          {user && (
+        {user && (
+          <div className="flex items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-6 w-6 p-0 ml-1">
@@ -316,8 +302,8 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </li>
   );
@@ -528,46 +514,30 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   publicCollections.map(collection => (
                     <li key={collection.id}>
                       <div className="flex items-center">
-                        <div 
-                          className={cn(
-                            "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
-                            selectedCollections.includes(collection.id) 
-                              ? "bg-primary/10 text-primary font-medium" 
-                              : "text-gray-700 hover:bg-gray-50",
-                            location === `/collection/${encodeURIComponent(collection.name)}`
-                              ? "border border-primary/20"
-                              : ""
-                          )}
-                          onClick={() => handleCollectionClick(collection.id)}
-                          title="Click to explore this collection"
+                        <Link 
+                          href={`/collection/${encodeURIComponent(collection.name)}`}
+                          className="flex-1"
                         >
-                          <div className="flex h-4 w-4 items-center justify-center mr-2">
-                            {selectedCollections.includes(collection.id) ? (
-                              <Checkbox 
-                                id={`collection-${collection.id}`} 
-                                checked={true}
-                                className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                              />
-                            ) : (
-                              <Checkbox 
-                                id={`collection-${collection.id}`} 
-                                checked={false}
-                              />
+                          <div 
+                            className={cn(
+                              "flex flex-1 items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer",
+                              selectedCollections.includes(collection.id) 
+                                ? "bg-primary/10 text-primary font-medium" 
+                                : "text-gray-700 hover:bg-gray-50",
+                              location === `/collection/${encodeURIComponent(collection.name)}`
+                                ? "border border-primary/20 bg-secondary/10"
+                                : ""
                             )}
+                            title="View collection"
+                          >
+                            <span className={cn("truncate flex-1", 
+                              (selectedCollections.includes(collection.id) || 
+                               location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
+                            )}>
+                              {collection.name}
+                            </span>
                           </div>
-                          <span className={cn("truncate flex-1", selectedCollections.includes(collection.id) && "font-medium")}>
-                            {collection.name}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 p-0" asChild>
-                            <Link href={`/collection/${encodeURIComponent(collection.name)}`}>
-                              <FolderOpen className="h-3 w-3 text-gray-500" />
-                              <span className="sr-only">View Collection</span>
-                            </Link>
-                          </Button>
-                        </div>
+                        </Link>
                       </div>
                     </li>
                   ))
