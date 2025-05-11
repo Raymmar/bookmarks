@@ -170,40 +170,45 @@ export default function Feed() {
             
             {/* Content */}
             <div className="flex-1 overflow-auto flex flex-col h-full">
-              {viewMode === 'list' ? (
-                <BookmarkListView 
-                  bookmarks={filteredBookmarks}
-                  selectedBookmarkId={selectedBookmarkId}
-                  onSelectBookmark={handleSelectBookmark}
-                  isLoading={isLoading}
-                />
-              ) : (
-                <BookmarkGrid 
-                  bookmarks={filteredBookmarks}
-                  selectedBookmarkId={selectedBookmarkId}
-                  onSelectBookmark={handleSelectBookmark}
-                  isLoading={isLoading}
-                />
-              )}
+              <div className="flex-grow">
+                {viewMode === 'list' ? (
+                  <BookmarkListView 
+                    bookmarks={filteredBookmarks}
+                    selectedBookmarkId={selectedBookmarkId}
+                    onSelectBookmark={handleSelectBookmark}
+                    isLoading={isLoading}
+                  />
+                ) : (
+                  <BookmarkGrid 
+                    bookmarks={filteredBookmarks}
+                    selectedBookmarkId={selectedBookmarkId}
+                    onSelectBookmark={handleSelectBookmark}
+                    isLoading={isLoading}
+                  />
+                )}
+              </div>
               
-              {/* Loading indicator that appears after content */}
-              {isFetchingNextPage && (
-                <div className="flex justify-center items-center py-4 border-t mt-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Loading more bookmarks...</span>
+              {/* Footer area with loading status and intersection observer target */}
+              <div className="min-h-[60px] w-full">
+                {/* Loading indicator that appears after content */}
+                {isFetchingNextPage && (
+                  <div className="flex justify-center items-center py-4 border-t">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loading more bookmarks...</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              {/* Invisible element for intersection observer */}
-              {hasNextPage && (
-                <div 
-                  ref={loaderRef} 
-                  className="w-full mt-auto"
-                  style={{ height: '20px', opacity: 0 }} // Almost invisible but still detectable by intersection observer
-                />
-              )}
+                )}
+                
+                {/* Intersection observer target positioned at the bottom */}
+                {hasNextPage && (
+                  <div 
+                    ref={loaderRef} 
+                    className="w-full"
+                    style={{ height: '5px' }} // Small height element at the bottom of the list
+                  />
+                )}
+              </div>
             </div>
           </div>
         </ResizablePanel>
