@@ -316,19 +316,17 @@ export class ReportService {
       console.log("Generating descriptive title from report content");
       
       // Create a system prompt for title generation
-      const systemPrompt = `You are a professional title generator for content digests.
-Your task is to create a concise, descriptive title for a content digest report.
-The title should capture the main themes and insights from the report content in 8-12 words maximum.
+      const systemPrompt = `You are an expert at creating compelling titles that cpture the context of a users submitted bookmarks and turning the related report into a short and impactful title.
+The title should capture the main themes and insights from the report content in 6-10 words maximum.
 DO NOT include the date range in the title.
 DO NOT use generic phrases like "Weekly Digest" or "Content Roundup".
-Instead, focus on the specific topics, themes, or takeaways in the report.
+Instead, focus on the specific topics, themes, or takeaways in the report. Specifically trying to wrap it into something compelling that will entice others to click but not be hyperbolic.
 The title should be engaging but professional, using sentence case capitalization.`;
 
-      // Take the first 2000 characters of the content as a sample
-      const contentSample = content.substring(0, 2000);
+      const contentSample = content.substring(0, 3000);
       
       // Create a user prompt
-      const userPrompt = `Generate a concise, descriptive title (8-12 words max) for this report content:
+      const userPrompt = `Use the submitted content and the system prompt to create a title for this bookmark digest that is 6-10 words max:
       
 ${contentSample}
 
