@@ -1168,14 +1168,19 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
               className="rounded-xl overflow-hidden"
             />
             
-            {/* Fallback for when embedding fails or for debugging (disabled by default) */}
-            {false && (
+            {/* Error handling: if tweet embedding fails */}
+            <noscript>
               <div className="border rounded-xl p-4 mt-2 text-sm text-gray-500">
-                Tweet ID: {bookmark.external_id || 'N/A'}<br />
-                Author: {bookmark.author_name || 'Unknown'} (@{bookmark.author_username || 'unknown'})<br />
-                Stats: {bookmark.like_count || 0} likes, {bookmark.repost_count || 0} reposts
+                <a 
+                  href={bookmark.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-blue-600 hover:underline block"
+                >
+                  View original tweet on X.com
+                </a>
               </div>
-            )}
+            </noscript>
             
             {/* Lightbox for enlarged images when clicked */}
             {lightbox.isOpen && (

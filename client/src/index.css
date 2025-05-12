@@ -12,6 +12,15 @@
   }
 }
 
+/* Twitter/X Embed Styling */
+.tweet-embed-container {
+  @apply overflow-hidden rounded-xl border border-gray-200 shadow-sm transition-shadow hover:shadow-md;
+}
+
+.tweet-embed-container iframe {
+  @apply w-full !important;
+}
+
 /* Custom styles for the Pinterest-style masonry grid */
 @layer components {
   /* react-masonry-css styles */
