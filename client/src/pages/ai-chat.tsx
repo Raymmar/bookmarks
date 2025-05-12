@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import ReactMarkdown from "react-markdown";
 
 // Client-side message format
 interface Message {
