@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon, ZoomIn, ZoomOut } from "lucide-react";
+import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon, ZoomIn, ZoomOut, Trash2 } from "lucide-react";
 import { Bookmark, Highlight, Note, Tag as TagType } from "@shared/types";
 import { formatDate } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -18,6 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   useBookmarkCollections, 
   useCollections, 
@@ -177,6 +187,8 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([]);
   const [aiProcessingStatus, setAiProcessingStatus] = useState<"pending" | "processing" | "completed" | "failed">("pending");
   const [isProcessingAi, setIsProcessingAi] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [lightbox, setLightbox] = useState<{ 
     isOpen: boolean; 
     images: Array<{url: string; alt: string}>;
@@ -193,6 +205,48 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
   const { data: allCollections = [] } = useCollections();
   const { addBookmarkToCollection, removeBookmarkFromCollection } = useCollectionMutations();
+  
+  // Handle bookmark deletion
+  const handleDeleteBookmark = async () => {
+    if (!bookmark) return;
+    
+    // Only bookmark owners should be able to delete
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to delete bookmarks",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsDeleting(true);
+    
+    try {
+      await apiRequest("DELETE", `/api/bookmarks/${bookmark.id}`, undefined);
+      
+      toast({
+        title: "Bookmark deleted",
+        description: "Your bookmark was successfully deleted",
+      });
+      
+      // Invalidate queries to refresh lists
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      
+      // Close the detail panel
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Error deleting bookmark",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteConfirmOpen(false);
+    }
+  };
   
   // Fetch all available tags for selection
   const { data: availableTags = [] } = useQuery<TagType[]>({
@@ -1679,7 +1733,49 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           </div>
         </div>
         
-
+        {/* Delete button - only visible to authenticated users */}
+        {user && (
+          <div className="mt-8 mb-4 border-t pt-6 border-gray-200">
+            <Button
+              variant="outline"
+              className="w-full h-9 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              disabled={isDeleting}
+              onClick={() => setIsDeleteConfirmOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Bookmark
+            </Button>
+          </div>
+        )}
+        
+        {/* Delete confirmation dialog */}
+        <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete bookmark</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this bookmark? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteBookmark}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 focus:bg-red-700"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>Delete</>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </>
   );
