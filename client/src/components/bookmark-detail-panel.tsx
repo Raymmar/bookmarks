@@ -1294,78 +1294,116 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                   .filter(url => {
                     // Skip Twitter/X media URLs (already handled above)
                     if (url.includes('pbs.twimg.com')) return false;
+                    if (url.includes('video.twimg.com')) return false;
+                    if (url.includes('.mp4') && (url.includes('amplify_video') || url.includes('tweet_video'))) return false;
                     
                     // Skip local file paths (these are the problematic ones that lead to broken links)
                     if (url.startsWith('/') || url.includes('media/tweets/')) return false;
                     
-                    // Only include valid image URLs that include http/https protocol
+                    // Only include valid URLs that include http/https protocol
                     const isValidUrl = url.startsWith('http') || url.startsWith('https');
                     
-                    // Only include common image extensions
+                    // Check for supported media extensions
                     const hasImageExtension = 
                       url.endsWith('.jpg') || 
                       url.endsWith('.jpeg') || 
                       url.endsWith('.png') || 
                       url.endsWith('.gif') || 
                       url.endsWith('.webp');
+                    
+                    const hasVideoExtension =
+                      url.endsWith('.mp4') ||
+                      url.endsWith('.mov') ||
+                      url.endsWith('.webm');
                       
-                    return isValidUrl && hasImageExtension;
+                    return isValidUrl && (hasImageExtension || hasVideoExtension);
                   })
-                  .map((url, index) => (
-                    <div 
-                      key={`other-${index}`} 
-                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
-                      onClick={() => {
-                        // Get all eligible images for the lightbox
-                        const imageUrls = [...bookmark.media_urls || []].filter(u => {
-                          // Only include image URLs 
-                          if (u.startsWith('/') || u.includes('media/tweets/')) return false;
-                          const isValidUrl = u.startsWith('http') || u.startsWith('https');
-                          const hasImageExtension = 
-                            u.endsWith('.jpg') || 
-                            u.endsWith('.jpeg') || 
-                            u.endsWith('.png') || 
-                            u.endsWith('.gif') || 
-                            u.endsWith('.webp') ||
-                            u.includes('pbs.twimg.com'); // Twitter images don't always have extensions
-                          return isValidUrl && hasImageExtension;
-                        });
+                  .map((url, index) => {
+                    // Determine if this is a video URL
+                    const isVideo = 
+                      url.endsWith('.mp4') || 
+                      url.endsWith('.mov') || 
+                      url.endsWith('.webm');
+                    
+                    return (
+                      <div 
+                        key={`other-${index}`} 
+                        className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
+                      >
+                        {!isVideo && (
+                          // For images, use the lightbox
+                          <img 
+                            src={url} 
+                            alt={`Media from ${bookmark.title}`}
+                            className="w-full h-auto object-contain max-h-96"
+                            loading="lazy"
+                            onClick={() => {
+                              // Get all eligible images for the lightbox
+                              const imageUrls = [...bookmark.media_urls || []].filter(u => {
+                                // Only include image URLs 
+                                if (u.startsWith('/') || u.includes('media/tweets/')) return false;
+                                const isValidUrl = u.startsWith('http') || u.startsWith('https');
+                                const hasImageExtension = 
+                                  u.endsWith('.jpg') || 
+                                  u.endsWith('.jpeg') || 
+                                  u.endsWith('.png') || 
+                                  u.endsWith('.gif') || 
+                                  u.endsWith('.webp') ||
+                                  u.includes('pbs.twimg.com'); // Twitter images don't always have extensions
+                                return isValidUrl && hasImageExtension;
+                              });
+                              
+                              // Format images for the lightbox
+                              const images = imageUrls.map(imgUrl => ({
+                                url: imgUrl,
+                                alt: `Media from ${bookmark.title}`
+                              }));
+                              
+                              // Find index of this image in the array
+                              const currentIndex = imageUrls.findIndex(imgUrl => imgUrl === url);
+                              
+                              // Open lightbox with all images
+                              setLightbox({
+                                isOpen: true,
+                                images,
+                                initialIndex: currentIndex >= 0 ? currentIndex : 0
+                              });
+                            }}
+                            onError={(e) => {
+                              // If image fails to load, show fallback message
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
+                                parent.innerHTML = 'Media unavailable';
+                              }
+                            }}
+                          />
+                        )}
                         
-                        // Format images for the lightbox
-                        const images = imageUrls.map(imgUrl => ({
-                          url: imgUrl,
-                          alt: `Media from ${bookmark.title}`
-                        }));
-                        
-                        // Find index of this image in the array
-                        const currentIndex = imageUrls.findIndex(imgUrl => imgUrl === url);
-                        
-                        // Open lightbox with all images
-                        setLightbox({
-                          isOpen: true,
-                          images,
-                          initialIndex: currentIndex >= 0 ? currentIndex : 0
-                        });
-                      }}
-                    >
-                      <img 
-                        src={url} 
-                        alt={`Media from ${bookmark.title}`}
-                        className="w-full h-auto object-contain max-h-96"
-                        loading="lazy"
-                        onError={(e) => {
-                          // If image fails to load, show fallback message
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
-                            parent.innerHTML = 'Media unavailable';
-                          }
-                        }}
-                      />
-                    </div>
-                  ))}
+                        {isVideo && (
+                          // For videos, use the video player
+                          <video 
+                            src={url}
+                            controls
+                            autoPlay={false}
+                            className="w-full h-auto max-h-96"
+                            onError={(e) => {
+                              // If video fails to load, show fallback message
+                              const target = e.target as HTMLVideoElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
+                                parent.innerHTML = 'Video unavailable';
+                              }
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             )}
             
