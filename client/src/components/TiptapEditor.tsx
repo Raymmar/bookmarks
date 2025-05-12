@@ -70,11 +70,11 @@ const TiptapEditor = ({
     return md.render(markdown);
   }, []);
 
-  // Create a debounced onChange handler with increased delay
+  // Create a debounced onChange handler
   const debouncedOnChange = useMemo(
     () => debounce((markdown: string) => {
       onChange(markdown);
-    }, 3000), // 3 seconds delay
+    }, 2000), // 2 seconds delay
     [onChange]
   );
 

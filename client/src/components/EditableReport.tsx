@@ -86,11 +86,10 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     return `Saved ${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
   };
 
-  // Debounced save functions to avoid too many API calls
-  // Increase debounce time to reduce API calls
+  // Debounced save functions with 2-second timeout
   const debouncedSaveContent = debounce((newContent: string) => {
     saveReport({ content: newContent });
-  }, 4000); // 4 seconds
+  }, 2000); // 2 seconds
 
   const debouncedSaveTitle = debounce((newTitle: string) => {
     saveReport({ title: newTitle });
