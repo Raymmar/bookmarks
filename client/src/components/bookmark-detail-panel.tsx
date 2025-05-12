@@ -424,9 +424,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   }, [bookmark?.id, bookmark?.notes, detailNotes]);
   
-  // Check AI processing status
+  // Check AI processing status using consolidated data when available
   useEffect(() => {
-    if (bookmark) {
+    // If we have the processing status from the consolidated endpoint, use it
+    if (detailProcessingStatus) {
+      setAiProcessingStatus(detailProcessingStatus as any);
+    }
+    // Otherwise fall back to bookmark data and manual fetch
+    else if (bookmark) {
       // Set initial status based on bookmark data
       if (bookmark.ai_processing_status) {
         setAiProcessingStatus(bookmark.ai_processing_status as any);
@@ -442,25 +447,28 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         }
       }
       
-      // Fetch the current processing status
-      const checkProcessingStatus = async () => {
-        try {
-          const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
-          if (response.ok) {
-            const statusData = await response.json();
-            
-            if (statusData.aiProcessingComplete) {
-              setAiProcessingStatus('completed');
+      // Only fetch status separately if we don't have it from the consolidated endpoint
+      if (!detailProcessingStatus) {
+        // Fetch the current processing status
+        const checkProcessingStatus = async () => {
+          try {
+            const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
+            if (response.ok) {
+              const statusData = await response.json();
+              
+              if (statusData.aiProcessingComplete) {
+                setAiProcessingStatus('completed');
+              }
             }
+          } catch (error) {
+            console.error("Error checking AI processing status:", error);
           }
-        } catch (error) {
-          console.error("Error checking AI processing status:", error);
-        }
-      };
-      
-      checkProcessingStatus();
+        };
+        
+        checkProcessingStatus();
+      }
     }
-  }, [bookmark, tags]);
+  }, [bookmark, tags, detailProcessingStatus]);
   
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
