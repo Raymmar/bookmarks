@@ -17,7 +17,7 @@ interface EditableReportProps {
     created_at: string;
     status: 'generating' | 'completed' | 'failed';
   };
-  dateRange: string;
+  dateRange: string; // This is now the created_at date formatted as a string
 }
 
 const EditableReport = ({ report, dateRange }: EditableReportProps) => {

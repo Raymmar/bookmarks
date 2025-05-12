@@ -148,28 +148,27 @@ const Reports = () => {
       'failed': 'text-red-500'
     }[report.status];
 
-    // Format dates for display
-    let dateRange = '';
+    // Format created date for display
+    let createdDate = '';
     try {
-      // Ensure time period values exist and are valid 
-      if (report.time_period_start && report.time_period_end) {
-        const startDate = new Date(report.time_period_start);
-        const endDate = new Date(report.time_period_end);
+      // Get the date when the report was created
+      if (report.created_at) {
+        const createdAtDate = new Date(report.created_at);
         
-        // Verify that the dates are valid
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          dateRange = `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+        // Verify that the date is valid
+        if (!isNaN(createdAtDate.getTime())) {
+          createdDate = `Generated on ${format(createdAtDate, 'MMM d, yyyy')}`;
         } else {
-          console.error("Invalid date objects created from report time periods");
-          dateRange = 'Date range unavailable';
+          console.error("Invalid date object created from report created_at");
+          createdDate = 'Created date unavailable';
         }
       } else {
-        console.error("Missing date values in formatted report");
-        dateRange = 'Date range unavailable';
+        console.error("Missing created_at value in report");
+        createdDate = 'Created date unavailable';
       }
     } catch (error) {
-      console.error("Error formatting report dates:", error);
-      dateRange = 'Date range unavailable';
+      console.error("Error formatting report created date:", error);
+      createdDate = 'Created date unavailable';
     }
 
     return (
@@ -185,7 +184,7 @@ const Reports = () => {
             <h3 className="text-lg font-medium">{report.title}</h3>
             <div className="text-sm text-gray-500 flex items-center gap-1">
               <Calendar className="w-4 h-4" /> 
-              {dateRange}
+              {createdDate}
             </div>
           </div>
           <div className={`text-sm font-medium ${statusClass}`}>
@@ -266,35 +265,34 @@ const Reports = () => {
       );
     }
 
-    // Format dates for display
-    let dateRange = '';
+    // Format created date for display
+    let createdDate = '';
     try {
-      // Ensure time period values exist and are valid 
-      if (selectedReport.time_period_start && selectedReport.time_period_end) {
-        const startDate = new Date(selectedReport.time_period_start);
-        const endDate = new Date(selectedReport.time_period_end);
+      // Get the date when the report was created
+      if (selectedReport.created_at) {
+        const createdAtDate = new Date(selectedReport.created_at);
         
-        // Verify that the dates are valid
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          dateRange = `${format(startDate, 'MMMM d')} - ${format(endDate, 'MMMM d, yyyy')}`;
+        // Verify that the date is valid
+        if (!isNaN(createdAtDate.getTime())) {
+          createdDate = `Generated on ${format(createdAtDate, 'MMMM d, yyyy')}`;
         } else {
-          console.error("Invalid date objects created from report time periods");
-          dateRange = 'Date range unavailable';
+          console.error("Invalid date object created from report created_at");
+          createdDate = 'Created date unavailable';
         }
       } else {
-        console.error("Missing date values in formatted report");
-        dateRange = 'Date range unavailable';
+        console.error("Missing created_at value in report");
+        createdDate = 'Created date unavailable';
       }
     } catch (error) {
-      console.error("Error formatting report dates:", error);
-      dateRange = 'Date range unavailable';
+      console.error("Error formatting report created date:", error);
+      createdDate = 'Created date unavailable';
     }
 
     if (selectedReport && selectedReport.status === 'completed') {
       return (
         <EditableReport 
           report={selectedReport}
-          dateRange={dateRange}
+          dateRange={createdDate}
         />
       );
     }
@@ -305,7 +303,7 @@ const Reports = () => {
         <h2 className="text-2xl font-bold mb-2">{selectedReport?.title || 'Report'}</h2>
         <div className="text-sm text-gray-500 mb-6 flex items-center gap-2">
           <Calendar className="w-4 h-4" /> 
-          {dateRange}
+          {createdDate}
         </div>
         
         <div className="prose dark:prose-invert max-w-none">
