@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import TiptapEditor from './TiptapEditor';
-import { Calendar } from 'lucide-react';
+import { Calendar, Save } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { debounce } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface EditableReportProps {
   report: {
@@ -21,11 +22,14 @@ interface EditableReportProps {
 
 const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState(report.title);
   const [content, setContent] = useState(report.content);
   const [isSaving, setIsSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
+  // Update local state when report changes from props
   useEffect(() => {
     setTitle(report.title);
     setContent(report.content);
@@ -37,6 +41,14 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     setIsSaving(true);
     try {
       await apiRequest(`/api/reports/${report.id}`, 'PUT', updates);
+      
+      // Set the last saved timestamp
+      setLastSavedAt(new Date());
+      
+      // Invalidate the report queries to ensure we get fresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/reports'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/reports/${report.id}`] });
+      
       toast({
         title: 'Report saved',
         description: 'Your changes have been saved successfully.',
@@ -52,6 +64,22 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Format the last saved time for display
+  const getLastSavedText = () => {
+    if (!lastSavedAt) return '';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - lastSavedAt.getTime();
+    const diffSec = Math.round(diffMs / 1000);
+    
+    if (diffSec < 60) {
+      return `Saved ${diffSec} seconds ago`;
+    }
+    
+    const diffMin = Math.round(diffSec / 60);
+    return `Saved ${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
   };
 
   // Debounced save functions to avoid too many API calls
@@ -89,11 +117,25 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
         value={title}
         onChange={handleTitleChange}
         onKeyDown={handleTitleKeyDown}
+        placeholder="Enter report title..."
       />
-      <div className="text-sm text-gray-500 mb-6 flex items-center gap-2">
-        <Calendar className="w-4 h-4" /> 
-        {dateRange}
-        {isSaving && <span className="text-xs ml-2">(Saving...)</span>}
+      <div className="text-sm text-gray-500 mb-6 flex items-center gap-2 justify-between">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4" /> 
+          {dateRange}
+        </div>
+        <div className="flex items-center gap-2">
+          {isSaving ? (
+            <span className="text-xs italic flex items-center">
+              <Save className="w-3 h-3 mr-1 animate-pulse" />
+              Saving...
+            </span>
+          ) : lastSavedAt ? (
+            <span className="text-xs italic">
+              {getLastSavedText()}
+            </span>
+          ) : null}
+        </div>
       </div>
       
       <TiptapEditor 

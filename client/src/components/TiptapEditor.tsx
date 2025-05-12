@@ -23,6 +23,7 @@ const TiptapEditor = ({
 }: TiptapEditorProps) => {
   const [isMounted, setIsMounted] = useState(false);
 
+  // Initialize the editor with the given content
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -39,7 +40,7 @@ const TiptapEditor = ({
         levels: [1, 2, 3],
       }),
     ],
-    content,
+    content: content, // Initialize with markdown content
     editable,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -50,21 +51,31 @@ const TiptapEditor = ({
     setIsMounted(true);
   }, []);
 
+  // Update editor content when the content prop changes
   useEffect(() => {
-    if (editor && content !== editor.getHTML() && isMounted) {
-      editor.commands.setContent(content);
+    if (editor && isMounted) {
+      // Only update if the content has changed
+      const currentContent = editor.getHTML();
+      if (content !== currentContent) {
+        editor.commands.setContent(content);
+      }
     }
   }, [editor, content, isMounted]);
 
+  // Update editor editable state when the editable prop changes
   useEffect(() => {
     if (editor) {
       editor.setEditable(editable);
     }
   }, [editor, editable]);
 
+  // Add custom styles for the editor
   return (
     <div className={cn('prose prose-slate dark:prose-invert max-w-none', className)}>
-      <EditorContent editor={editor} />
+      <EditorContent 
+        editor={editor} 
+        className="min-h-[300px] focus-within:outline-none border-0"
+      />
     </div>
   );
 };
