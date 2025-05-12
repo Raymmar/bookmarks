@@ -51,7 +51,7 @@ export default function AiChat() {
   
   // Filter state
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState("day"); // Default to 24 hours
+  const [dateRange, setDateRange] = useState("month"); // Default to 30 days for more context
   const [sources, setSources] = useState<string[]>(["extension", "web", "import", "x"]);
   
   // Session state
@@ -129,7 +129,11 @@ export default function AiChat() {
       let startDate: string | undefined;
       
       const now = new Date();
-      if (dateRange === "week") {
+      if (dateRange === "month") {
+        const monthAgo = new Date();
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        startDate = monthAgo.toISOString();
+      } else if (dateRange === "week") {
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
         startDate = weekAgo.toISOString();
@@ -249,9 +253,11 @@ export default function AiChat() {
             setDateRange("day");
           } else if (daysDiff <= 7) {
             setDateRange("week");
+          } else if (daysDiff <= 30) {
+            setDateRange("month");
           } else {
-            // Default to week if it's an older filter setting
-            setDateRange("week");
+            // Default to month if it's an older filter setting
+            setDateRange("month");
           }
         }
       }
@@ -270,7 +276,7 @@ export default function AiChat() {
       // Reset the UI first
       setMessages([]);
       setSelectedTags([]);
-      setDateRange("day"); // Default to 24 hours
+      setDateRange("month"); // Default to 30 days for more comprehensive context
       setSources(["extension", "web", "import", "x"]);
       
       // Create chat filters
@@ -341,7 +347,7 @@ export default function AiChat() {
           setActiveChatId(null);
           setMessages([]);
           setSelectedTags([]);
-          setDateRange("day"); // Default to 24 hours
+          setDateRange("month"); // Default to 30 days for more context
           setSources(["extension", "web", "import", "x"]);
         }
       } else {
