@@ -94,17 +94,12 @@ interface XTweet {
  */
 interface XMedia {
   media_key: string;
-  type: 'photo' | 'video' | 'animated_gif';
+  type: 'photo' | 'video' | 'animated_gif' | 'video';
   url?: string;
   preview_image_url?: string;
   width?: number;
   height?: number;
   alt_text?: string;
-  variants?: Array<{
-    bit_rate?: number;
-    content_type: string;
-    url: string;
-  }>;
 }
 
 /**
@@ -444,8 +439,7 @@ export class XService {
             "alt_text",
             "type",
             "width",
-            "height",
-            "variants"
+            "height"
           ],
           "max_results": 100,
           "pagination_token": paginationToken
@@ -724,99 +718,13 @@ export class XService {
       // Process all media items
       tweet.attachments.media_keys.forEach((mediaKey) => {
         const mediaItem = mediaMap[mediaKey];
-        
-        // Debug the media item to understand what we're getting from Twitter
-        console.log(`DEBUG - Media item for ${tweet.id}:`, JSON.stringify(mediaItem, null, 2));
-        
-        if (mediaItem) {
-          // Handle media based on its type
-          if (mediaItem.type === 'photo' && (mediaItem.url || mediaItem.preview_image_url)) {
-            // For photos, use the direct URL if available, otherwise use preview image
-            const mediaUrl = mediaItem.url || mediaItem.preview_image_url;
-            if (mediaUrl) {
-              mediaUrls.push(mediaUrl);
-              console.log(`X Sync: Added photo media URL ${mediaUrl} for tweet ${tweet.id}`);
-            }
-          } 
-          else if ((mediaItem.type === 'video' || mediaItem.type === 'animated_gif')) {
-            // Log what media we have for debugging
-            console.log(`DEBUG - Found ${mediaItem.type} for tweet ${tweet.id}`);
-            console.log(`DEBUG - Preview image: ${mediaItem.preview_image_url}`);
-            console.log(`DEBUG - Has variants: ${mediaItem.variants ? mediaItem.variants.length : 'none'}`);
-            
-            // Always add preview image if available
-            if (mediaItem.preview_image_url) {
-              mediaUrls.push(mediaItem.preview_image_url);
-              console.log(`X Sync: Added preview image URL ${mediaItem.preview_image_url} for ${mediaItem.type}`);
-            }
-            
-            // Process variants if available
-            if (mediaItem.variants && mediaItem.variants.length > 0) {
-              // For videos and animated GIFs, get the direct video URL from variants
-              // Find the highest quality video URL (highest bit rate)
-              const videoVariants = mediaItem.variants
-                .filter(variant => variant.content_type === 'video/mp4')
-                .sort((a, b) => (b.bit_rate || 0) - (a.bit_rate || 0));
-              
-              console.log(`DEBUG - Variants found: ${videoVariants.length}`);
-              videoVariants.forEach((v, i) => {
-                console.log(`DEBUG - Variant ${i}: bitrate=${v.bit_rate}, url=${v.url}`);
-              });
-              
-              if (videoVariants.length > 0) {
-                const videoUrl = videoVariants[0].url;
-                mediaUrls.push(videoUrl);
-                console.log(`X Sync: Added ${mediaItem.type} URL ${videoUrl} for tweet ${tweet.id}`);
-              }
-            } 
-            
-            // If we don't have variants, handle special case with video URL construction
-            // Twitter sometimes doesn't provide variants in the API
-            if ((!mediaItem.variants || mediaItem.variants.length === 0) && mediaItem.preview_image_url) {
-              // Try to construct a video URL from the preview image URL pattern
-              // Example: transform from "https://pbs.twimg.com/amplify_video_thumb/1921645363426934784/img/jp8HsMJ0Q_jv6D1L.jpg"
-              // to a potential video URL
-              
-              try {
-                const previewUrl = mediaItem.preview_image_url;
-                if (previewUrl && previewUrl.includes('amplify_video_thumb')) {
-                  // Extract the video ID from the preview URL
-                  const match = previewUrl.match(/amplify_video_thumb\/(\d+)/);
-                  if (match && match[1]) {
-                    const videoId = match[1];
-                    
-                    // Construct potential video URLs - we don't know the exact format, but we can try
-                    // common patterns used by Twitter for different resolutions
-                    // Based on observed Twitter video URL patterns
-                    const potentialVideoUrls = [
-                      // Amplify videos (various resolutions)
-                      `https://video.twimg.com/amplify_video/${videoId}/vid/1280x720/video.mp4`,
-                      `https://video.twimg.com/amplify_video/${videoId}/vid/720x720/video.mp4`,
-                      `https://video.twimg.com/amplify_video/${videoId}/vid/720x406/video.mp4`,
-                      `https://video.twimg.com/amplify_video/${videoId}/vid/480x480/video.mp4`, 
-                      `https://video.twimg.com/amplify_video/${videoId}/vid/480x270/video.mp4`,
-                      `https://video.twimg.com/amplify_video/${videoId}/vid/320x320/video.mp4`,
-                      
-                      // Extended tweet videos (various resolutions)
-                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/1280x720/video.mp4`,
-                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/720x720/video.mp4`,
-                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/720x406/video.mp4`,
-                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/480x480/video.mp4`,
-                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/480x270/video.mp4`,
-                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/320x320/video.mp4`
-                    ];
-                    
-                    // Add the constructed URLs with a marker indicating they're guesses
-                    potentialVideoUrls.forEach(url => {
-                      mediaUrls.push(url);
-                      console.log(`X Sync: Added potential video URL ${url} for tweet ${tweet.id} (constructed from preview)`);
-                    });
-                  }
-                }
-              } catch (error) {
-                console.error(`Error constructing video URL from preview: ${error}`);
-              }
-            }
+        if (mediaItem && (mediaItem.url || mediaItem.preview_image_url)) {
+          // Use the direct URL if available, otherwise use preview image
+          const mediaUrl = mediaItem.url || mediaItem.preview_image_url;
+          if (mediaUrl) {
+            // Add the original URL to mediaUrls
+            mediaUrls.push(mediaUrl);
+            console.log(`X Sync: Added media URL ${mediaUrl} for tweet ${tweet.id}`);
           }
         }
       });
@@ -1953,7 +1861,7 @@ export class XService {
       params.append("expansions", "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id");
       params.append("tweet.fields", "created_at,public_metrics,entities,attachments");
       params.append("user.fields", "name,username,profile_image_url");
-      params.append("media.fields", "url,preview_image_url,alt_text,type,width,height,variants");
+      params.append("media.fields", "url,preview_image_url,alt_text,type,width,height");
       
       url.search = params.toString();
       
