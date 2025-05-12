@@ -10,7 +10,7 @@ import { InsertReport, Report } from "@shared/schema";
 import OpenAI from "openai";
 import { addWeeks, subWeeks, startOfWeek, endOfWeek, format, subDays } from "date-fns";
 
-// Define report status types
+// Define report status types - matches the schema enum values
 type ReportStatus = "generating" | "completed" | "failed";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -163,14 +163,14 @@ export class ReportService {
     let reportObj: Report;
 
     try {
-      // Create the report first with "generating" status
+      // Create the report first with initial values
+      // Note: Status is automatically set to "generating" in the schema definition
       const report = await storage.createReport({
         user_id: userId,
         title: initialTitle,
         content: "Generating report...",
         time_period_start: timePeriodStart,
         time_period_end: timePeriodEnd,
-        status: "generating" as ReportStatus,
       });
 
       // Store the report for the catch block
@@ -184,10 +184,12 @@ export class ReportService {
       );
 
       if (bookmarksWithData.length === 0) {
+        // Update the content and set status to completed
+        await storage.updateReportStatus(report.id, "completed");
         await storage.updateReport(report.id, {
           content: "No bookmarks found for this time period.",
-          status: "completed",
         });
+        
         return {
           ...report,
           content: "No bookmarks found for this time period.",
@@ -280,33 +282,58 @@ export class ReportService {
       
       console.log(`Generated title: "${generatedTitle}"`);
 
+      // Update the report status first
+      await storage.updateReportStatus(report.id, "completed");
+      
       // Update the report with the generated content and title
       const updatedReport = await storage.updateReport(report.id, {
         title: generatedTitle,
         content,
-        status: "completed",
       });
 
       return updatedReport || report;
     } catch (error) {
       console.error("Error generating weekly report:", error);
 
-      if (!reportObj) {
-        // If we failed even before creating the report, return a minimal error response
-        return {
-          id: "",
-          user_id: userId,
-          title: reportTitle,
-          content: "Error generating report",
-          created_at: new Date(),
-          updated_at: new Date(),
-          time_period_start: timePeriodStart,
-          time_period_end: timePeriodEnd,
-          status: "failed" as ReportStatus,
-        };
+      // Format date range for error case
+      const formattedStartDate = format(timePeriodStart, "MMM d, yyyy");
+      const formattedEndDate = format(timePeriodEnd, "MMM d, yyyy");
+      const fallbackTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
+
+      // If the report object isn't defined yet (error before report creation)
+      if (typeof reportObj === 'undefined') {
+        // Create a minimal report with failed status
+        try {
+          // Create a new report with failed status
+          const errorReport = await storage.createReport({
+            user_id: userId,
+            title: fallbackTitle,
+            content: "Error generating report",
+            time_period_start: timePeriodStart,
+            time_period_end: timePeriodEnd,
+          });
+          
+          // Set the status to failed
+          await storage.updateReportStatus(errorReport.id, "failed");
+          
+          return errorReport;
+        } catch (createError) {
+          // If even creating the error report fails, return a minimal object
+          console.error("Failed to create error report:", createError);
+          return {
+            id: "",
+            user_id: userId,
+            title: fallbackTitle,
+            content: "Error generating report",
+            created_at: new Date().toISOString(),
+            time_period_start: timePeriodStart.toISOString(),
+            time_period_end: timePeriodEnd.toISOString(),
+            status: "failed",
+          } as Report;
+        }
       }
 
-      // Update the report with error status
+      // Update the existing report with error status
       const failedReport = await storage.updateReportStatus(
         reportObj.id,
         "failed",

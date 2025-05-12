@@ -26,6 +26,7 @@ export function setupReportRoutes(app: Express) {
       // Validate request body
       const requestSchema = z.object({
         customSystemPrompt: z.string().optional(),
+        customTitleSystemPrompt: z.string().optional(),
         timePeriodStart: z.string().optional(), // ISO date string
         timePeriodEnd: z.string().optional(),   // ISO date string
         maxBookmarks: z.number().min(1).max(500).optional(),
@@ -44,6 +45,7 @@ export function setupReportRoutes(app: Express) {
       const options = {
         userId,
         customSystemPrompt: parseResult.data.customSystemPrompt,
+        customTitleSystemPrompt: parseResult.data.customTitleSystemPrompt,
         timePeriodStart: parseResult.data.timePeriodStart ? new Date(parseResult.data.timePeriodStart) : undefined,
         timePeriodEnd: parseResult.data.timePeriodEnd ? new Date(parseResult.data.timePeriodEnd) : undefined,
         maxBookmarks: parseResult.data.maxBookmarks,
