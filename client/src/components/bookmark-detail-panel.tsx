@@ -216,9 +216,13 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const queryClient = useQueryClient();
   
   // Collection related hooks and state 
-  // These are kept for compatibility with existing component
+  // We'll use data from both sources for backwards compatibility
   const { data: allCollections = [] } = useCollections();
+  const { data: bookmarkCollectionsFromHook = [] } = useBookmarkCollections(bookmark?.id || "");
   const { addBookmarkToCollection, removeBookmarkFromCollection } = useCollectionMutations();
+  
+  // Use collections from our consolidated endpoint if available, otherwise use the hook
+  const bookmarkCollections = detailCollections || bookmarkCollectionsFromHook;
   
   // Handle bookmark deletion with better optimistic updates
   const handleDeleteBookmark = async () => {
@@ -303,10 +307,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   }, [availableTags]);
   
-  // Update bookmark state when the prop changes
+  // Update bookmark state when the prop changes or when details are loaded
   useEffect(() => {
-    setBookmark(initialBookmark);
-  }, [initialBookmark]);
+    // If we have data from the consolidated endpoint, use that
+    if (detailBookmark) {
+      setBookmark(detailBookmark);
+    } else {
+      // Otherwise fall back to the prop
+      setBookmark(initialBookmark);
+    }
+  }, [initialBookmark, detailBookmark]);
   
   // Listen for the custom showBookmarkDetail event
   useEffect(() => {
@@ -357,9 +367,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     };
   }, [toast]);
   
-  // Fetch tags for this bookmark
+  // Update tags from consolidated API response
   useEffect(() => {
-    if (bookmark) {
+    // If we have tags from the consolidated API, use those
+    if (detailTags && detailTags.length > 0) {
+      setTags(detailTags);
+    } 
+    // Otherwise fall back to the original API call if we have a bookmark and don't have details yet
+    else if (bookmark && !detailTags) {
       const fetchTags = async () => {
         try {
           const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
@@ -374,38 +389,40 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       
       fetchTags();
     }
-  }, [bookmark?.id]);
+  }, [bookmark?.id, detailTags]);
   
-  // Fetch notes whenever the bookmark ID changes
+  // Update notes from consolidated API response or fetch separately
   useEffect(() => {
-    if (bookmark) {
+    // If we have notes from the consolidated API, use those
+    if (detailNotes && detailNotes.length > 0) {
+      setOptimisticNotes(detailNotes);
+    } 
+    // Fall back to bookmark notes if available
+    else if (bookmark?.notes) {
+      setOptimisticNotes(bookmark.notes);
+    }
+    // Otherwise use the original API call if we have a bookmark but no detailNotes yet
+    else if (bookmark && !detailNotes) {
       const fetchNotes = async () => {
         try {
           const notes = await apiRequest("GET", `/api/bookmarks/${bookmark.id}/notes`);
           if (notes && notes.length > 0) {
             setOptimisticNotes(notes);
-          } else if (bookmark.notes) {
-            // Fallback to notes from the bookmark object if API call returns empty
-            setOptimisticNotes(bookmark.notes);
           } else {
             setOptimisticNotes([]);
           }
         } catch (error) {
           console.error("Error fetching notes for bookmark:", error);
-          // Fallback to notes from the bookmark object if API call fails
-          if (bookmark.notes) {
-            setOptimisticNotes(bookmark.notes);
-          } else {
-            setOptimisticNotes([]);
-          }
+          setOptimisticNotes([]);
         }
       };
       
       fetchNotes();
     } else {
+      // Default to empty array if nothing available
       setOptimisticNotes([]);
     }
-  }, [bookmark?.id]);
+  }, [bookmark?.id, bookmark?.notes, detailNotes]);
   
   // Check AI processing status
   useEffect(() => {
