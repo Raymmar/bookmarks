@@ -40,7 +40,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
 
     setIsSaving(true);
     try {
-      await apiRequest(`/api/reports/${report.id}`, 'PUT', updates);
+      await apiRequest('PUT', `/api/reports/${report.id}`, updates);
       
       // Set the last saved timestamp
       setLastSavedAt(new Date());
