@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, subWeeks, subDays } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { useReportPreferences, ReportType } from '@/hooks/use-report-preferences';
+import EditableReport from '@/components/EditableReport';
 
 // UI Components
 import { Button } from '@/components/ui/button';
@@ -65,32 +66,7 @@ const Reports = () => {
     isLoading: isLoadingSelectedReport
   } = useQuery<Report>({
     queryKey: [`/api/reports/${selectedReportId}`], // Direct path to specific report
-    enabled: !!selectedReportId, // Only run if we have a selected report ID
-    onSuccess: (data) => {
-      // Log the report data to see what we're getting
-      console.log('Selected report data:', data);
-      
-      // Add detailed debugging information about the time period values
-      console.log('Time period start (raw):', data.time_period_start);
-      console.log('Time period start type:', typeof data.time_period_start);
-      console.log('Time period start instanceof Date:', data.time_period_start instanceof Date);
-      
-      console.log('Time period end (raw):', data.time_period_end);
-      console.log('Time period end type:', typeof data.time_period_end);
-      console.log('Time period end instanceof Date:', data.time_period_end instanceof Date);
-      
-      // Try to manually convert to ensure it's a valid date
-      try {
-        const startDate = new Date(data.time_period_start);
-        const endDate = new Date(data.time_period_end);
-        console.log('Start date conversion result:', startDate);
-        console.log('End date conversion result:', endDate);
-        console.log('IsValid start:', !isNaN(startDate.getTime()));
-        console.log('IsValid end:', !isNaN(endDate.getTime()));
-      } catch (error) {
-        console.error('Error converting dates:', error);
-      }
-    }
+    enabled: !!selectedReportId // Only run if we have a selected report ID
   });
 
   // Mutation for generating a new report
@@ -314,16 +290,26 @@ const Reports = () => {
       dateRange = 'Date range unavailable';
     }
 
+    if (selectedReport && selectedReport.status === 'completed') {
+      return (
+        <EditableReport 
+          report={selectedReport}
+          dateRange={dateRange}
+        />
+      );
+    }
+    
+    // Return an error view if we have a report but not completed
     return (
       <div className="p-6">
-        <h2 className="text-2xl font-bold mb-2">{selectedReport.title}</h2>
+        <h2 className="text-2xl font-bold mb-2">{selectedReport?.title || 'Report'}</h2>
         <div className="text-sm text-gray-500 mb-6 flex items-center gap-2">
           <Calendar className="w-4 h-4" /> 
           {dateRange}
         </div>
         
         <div className="prose dark:prose-invert max-w-none">
-          <ReactMarkdown>{selectedReport.content}</ReactMarkdown>
+          <ReactMarkdown>{selectedReport?.content || 'Report content unavailable.'}</ReactMarkdown>
         </div>
       </div>
     );

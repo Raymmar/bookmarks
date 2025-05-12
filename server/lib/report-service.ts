@@ -8,7 +8,7 @@
 import { storage } from "../storage";
 import { InsertReport, Report } from "@shared/schema";
 import OpenAI from "openai";
-import { addWeeks, subWeeks, startOfWeek, endOfWeek, format } from "date-fns";
+import { addWeeks, subWeeks, startOfWeek, endOfWeek, format, subDays } from "date-fns";
 
 // Define report status types
 type ReportStatus = "generating" | "completed" | "failed";

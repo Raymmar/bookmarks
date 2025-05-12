@@ -12,6 +12,9 @@ interface EditableReportProps {
     content: string;
     time_period_start: string | Date;
     time_period_end: string | Date;
+    user_id: string;
+    created_at: string;
+    status: 'generating' | 'completed' | 'failed';
   };
   dateRange: string;
 }
@@ -33,10 +36,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
 
     setIsSaving(true);
     try {
-      await apiRequest(`/api/reports/${report.id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      });
+      await apiRequest(`/api/reports/${report.id}`, 'PUT', updates);
       toast({
         title: 'Report saved',
         description: 'Your changes have been saved successfully.',
