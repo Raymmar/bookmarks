@@ -444,7 +444,8 @@ export class XService {
             "alt_text",
             "type",
             "width",
-            "height"
+            "height",
+            "variants"
           ],
           "max_results": 100,
           "pagination_token": paginationToken
@@ -1892,7 +1893,7 @@ export class XService {
       params.append("expansions", "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id");
       params.append("tweet.fields", "created_at,public_metrics,entities,attachments");
       params.append("user.fields", "name,username,profile_image_url");
-      params.append("media.fields", "url,preview_image_url,alt_text,type,width,height");
+      params.append("media.fields", "url,preview_image_url,alt_text,type,width,height,variants");
       
       url.search = params.toString();
       
