@@ -1175,51 +1175,36 @@ export class XService {
         const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
         
         // Check if bookmark already exists in our cache
-        const existingBookmark = existingBookmarkCache.get(tweet.id);
-        
-        if (existingBookmark) {
-          // Bookmark exists - only update engagement metrics, preserving user customizations
-          console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
+        // Use our new transaction-based method that handles race conditions
+        try {
+          console.log(`X Sync: Processing tweet ${tweet.id} using transaction-based approach`);
           
-          // Extract just the engagement metrics
-          // Note: updated_at isn't part of InsertBookmark, we handle this at the database level
-          const updateData: Partial<InsertBookmark> = {
-            like_count: tweet.public_metrics?.like_count,
-            repost_count: tweet.public_metrics?.retweet_count,
-            reply_count: tweet.public_metrics?.reply_count,
-            quote_count: tweet.public_metrics?.quote_count
-          };
+          // This will handle finding, creating, or updating the bookmark in a single transaction
+          const result = await this.createOrUpdateBookmark(userId, tweet, author, allBookmarks.media);
           
-          // Specifically check for created_at and backfill it if the tweet has this data
-          if (tweet.created_at) {
-            // If existing bookmark has no created_at (null) or it's undefined
-            if (!existingBookmark.created_at) {
-              console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
-              updateData.created_at = new Date(tweet.created_at);
-            }
+          if (result.isNew) {
+            console.log(`X Sync: Created new bookmark for tweet ${tweet.id}`);
+            added++;
+          } else {
+            console.log(`X Sync: Updated existing bookmark for tweet ${tweet.id}`);
+            updated++;
           }
-          
-          // Update only the engagement metrics for the existing bookmark
-          await storage.updateBookmark(existingBookmark.id, updateData);
-          updated++;
-        } else {
-          // This is a new bookmark - create it with all data
-          console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
-          
-          // Convert tweet to full bookmark (now async to handle media downloads)
-          const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
-          bookmarkData.user_id = userId;
-          
-          // No longer downloading media files
-          console.log(`X Sync: Using original media URLs for tweet ${tweet.id}`);
-          
-          // Create the new bookmark
-          const newBookmark = await storage.createBookmark(bookmarkData);
-          added++;
-          
-          // Skip folder processing during main bookmark sync
-          // Note: In the regular syncBookmarks method, we don't process folder mappings
-          // This is only done in syncBookmarksFromSpecificFolder
+        } catch (error) {
+          console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
+          errors++;
+        }
+      } catch (error) {
+        console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
+        errors++;
+      }
+    }
+    
+    // Update last sync time
+    try {
+      console.log(`X Sync: Updating last sync time for user ${userId}`);
+      await this.updateLastSync(userId);
+    } catch (error) {
+      console.error(`X Sync: Error updating last sync time:`, error);
           console.log(`X Sync: Skipping folder mapping check for tweet ${tweet.id} during main sync`);
           // The folderTweetMap will always be empty here, so there's no need to process it
         }
@@ -1515,6 +1500,93 @@ export class XService {
       );
     
     return bookmark;
+  }
+  
+  /**
+   * Create a bookmark from a tweet, handling duplicates with an upsert pattern
+   * This is more reliable than separate find/create operations when concurrent syncs might happen
+   */
+  private async createOrUpdateBookmark(userId: string, tweet: XTweet, author?: XUser, mediaMap?: { [key: string]: XMedia }): Promise<{ bookmark: Bookmark, isNew: boolean }> {
+    try {
+      // First check if the bookmark already exists using a transaction to avoid race conditions
+      const bookmarkData = await this.convertTweetToBookmark(tweet, author, mediaMap);
+      bookmarkData.user_id = userId;
+      
+      // We'll use a transaction to handle the upsert pattern
+      const result = await db.transaction(async (tx) => {
+        // First try to find the existing bookmark inside the transaction
+        const [existingBookmark] = await tx.select()
+          .from(bookmarks)
+          .where(
+            and(
+              eq(bookmarks.user_id, userId),
+              eq(bookmarks.external_id, tweet.id),
+              eq(bookmarks.source, 'x')
+            )
+          );
+        
+        // If it exists, just update the engagement metrics
+        if (existingBookmark) {
+          console.log(`X Sync: Transaction - Found existing bookmark for tweet ${tweet.id}, updating metrics`);
+          
+          // Extract just the engagement metrics 
+          const updateData: Partial<InsertBookmark> = {
+            like_count: tweet.public_metrics?.like_count,
+            repost_count: tweet.public_metrics?.retweet_count,
+            reply_count: tweet.public_metrics?.reply_count,
+            quote_count: tweet.public_metrics?.quote_count
+          };
+          
+          // Specifically check for created_at and backfill it if the tweet has this data
+          if (tweet.created_at && !existingBookmark.created_at) {
+            console.log(`X Sync: Transaction - Backfilling created_at date for tweet ${tweet.id}`);
+            updateData.created_at = new Date(tweet.created_at);
+          }
+          
+          // Update the bookmark
+          const [updatedBookmark] = await tx
+            .update(bookmarks)
+            .set(updateData)
+            .where(eq(bookmarks.id, existingBookmark.id))
+            .returning();
+          
+          return { bookmark: updatedBookmark, isNew: false };
+        }
+        
+        // If it doesn't exist, create a new bookmark
+        console.log(`X Sync: Transaction - Creating new bookmark for tweet ${tweet.id}`);
+        const [newBookmark] = await tx
+          .insert(bookmarks)
+          .values(bookmarkData)
+          .returning();
+        
+        return { bookmark: newBookmark, isNew: true };
+      });
+      
+      return result;
+    } catch (error) {
+      // If we get a unique constraint violation, it means another transaction
+      // created the bookmark while we were processing - in this case, just find it
+      if (error instanceof Error && error.message.includes('unique_user_external_id_source')) {
+        console.log(`X Sync: Caught unique constraint violation for tweet ${tweet.id} - another thread created it`);
+        const [existingBookmark] = await db.select()
+          .from(bookmarks)
+          .where(
+            and(
+              eq(bookmarks.user_id, userId),
+              eq(bookmarks.external_id, tweet.id),
+              eq(bookmarks.source, 'x')
+            )
+          );
+        
+        if (existingBookmark) {
+          return { bookmark: existingBookmark, isNew: false };
+        }
+      }
+      
+      // For other errors, rethrow
+      throw error;
+    }
   }
   
   /**
