@@ -85,21 +85,7 @@ export default function AiChat() {
     queryKey: ["/api/tags"],
   });
   
-  // Extract all unique tags from system_tags and normalized tags table
-  const allTags = useMemo(() => {
-    // Get system tags from bookmarks if they exist
-    const systemTags = new Set(
-      bookmarks.flatMap((bookmark: any) => bookmark.system_tags || [])
-    );
-    
-    // Get normalized tags from the tags table
-    const normalizedTagNames = new Set(
-      normalizedTags.map((tag: any) => tag.name)
-    );
-    
-    // Combine both sets and convert to sorted array
-    return Array.from(new Set([...systemTags, ...normalizedTagNames])).sort();
-  }, [bookmarks, normalizedTags]);
+  // The TagSelector component now handles tag fetching and filtering directly
   
   // Tag selection is now handled directly by the TagSelector component
   
