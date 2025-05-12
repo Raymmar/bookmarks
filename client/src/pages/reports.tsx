@@ -224,8 +224,8 @@ const Reports = () => {
                   <SelectValue placeholder="Select report type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Daily Report</SelectItem>
-                  <SelectItem value="weekly">Weekly Report</SelectItem>
+                  <SelectItem value="daily">24 Hours</SelectItem>
+                  <SelectItem value="weekly">Past week</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -326,8 +326,8 @@ const Reports = () => {
               <SelectValue placeholder="Report type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="daily">Daily Report</SelectItem>
-              <SelectItem value="weekly">Weekly Report</SelectItem>
+              <SelectItem value="daily">24 Hours</SelectItem>
+              <SelectItem value="weekly">Past Week</SelectItem>
             </SelectContent>
           </Select>
           <Button 
