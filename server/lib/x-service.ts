@@ -17,8 +17,7 @@ import type { Bookmark } from '@shared/schema';
 import { 
   xCredentials, XCredentials, InsertXCredentials, 
   xFolders, XFolder, InsertXFolder, 
-  bookmarks,
-  InsertCollection, InsertBookmark
+  bookmarks, InsertCollection, InsertBookmark
 } from '@shared/schema';
 import crypto from 'crypto';
 import { URLSearchParams } from 'url';
@@ -27,6 +26,9 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
+
+// Sync lock to prevent concurrent syncs for the same user
+const activeSyncs = new Map<string, boolean>();
 
 /**
  * X API configuration
