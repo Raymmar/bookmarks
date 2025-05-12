@@ -1,7 +1,6 @@
 import { Bookmark } from "@shared/types";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Masonry from "react-masonry-css";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
@@ -105,57 +104,6 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   const hasImage = bookmark.media_urls && 
                   bookmark.media_urls.length > 0 && 
                   bookmark.media_urls.some(url => url.includes('pbs.twimg.com'));
-                  
-  // Setup prefetching on hover
-  const [isPrefetching, setIsPrefetching] = useState(false);
-  const hoverDelayRef = useRef<NodeJS.Timeout | null>(null);
-  const queryClient = useQueryClient();
-  
-  // Handle mouse enter/hover
-  const handleMouseEnter = useCallback(() => {
-    // Set a delay before prefetching to avoid unnecessary API calls for quick cursor movements
-    hoverDelayRef.current = setTimeout(() => {
-      // Only prefetch if we're not already doing so
-      if (!isPrefetching) {
-        setIsPrefetching(true);
-        
-        // Start prefetching the bookmark details - this is the main consolidated endpoint
-        queryClient.prefetchQuery({
-          queryKey: [`/api/bookmarks/${bookmark.id}/details`],
-          staleTime: 60000, // 1 minute stale time for prefetched data
-        });
-        
-        // Also prefetch the basic bookmark data as a fallback
-        queryClient.prefetchQuery({
-          queryKey: [`/api/bookmarks/${bookmark.id}`],
-          staleTime: 60000,
-        });
-        
-        console.log(`Prefetching details for bookmark ${bookmark.id}`);
-      }
-    }, 300); // 300ms delay - only prefetch if the user hovers for at least this long
-  }, [bookmark.id, isPrefetching, queryClient]);
-  
-  // Handle mouse leave
-  const handleMouseLeave = useCallback(() => {
-    // Clear the timeout if the user moves away before the delay completes
-    if (hoverDelayRef.current) {
-      clearTimeout(hoverDelayRef.current);
-      hoverDelayRef.current = null;
-    }
-    
-    // Reset prefetching state
-    setIsPrefetching(false);
-  }, []);
-  
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverDelayRef.current) {
-        clearTimeout(hoverDelayRef.current);
-      }
-    };
-  }, []);
 
   return (
     <div 
@@ -165,8 +113,6 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
           : ""
       } ${hasImage ? 'group' : ''}`}
       onClick={onClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       {/* Media section */}
       {hasImage && (
