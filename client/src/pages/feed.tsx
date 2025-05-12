@@ -8,12 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { Search, Filter, Bookmark, X, Loader2 } from "lucide-react";
+import { Search, Filter, Bookmark, X, Loader2, Zap } from "lucide-react";
 import { usePaginatedBookmarks } from "@/hooks/use-paginated-bookmarks";
 import { useFuzzySearch } from "@/hooks/use-fuzzy-search";
 import { Bookmark as BookmarkType } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { testBookmarkDetailsPerformance } from "@/lib/performance-monitor";
 
 export default function Feed() {
   const { user } = useAuth();
@@ -233,6 +234,48 @@ export default function Feed() {
                 )}
               </div>
               <div className="flex space-x-2 flex-shrink-0">
+                {/* Performance test button */}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center"
+                  onClick={() => {
+                    if (filteredBookmarks.length > 0) {
+                      const bookmarkToTest = filteredBookmarks[0].id;
+                      toast({
+                        title: "Running performance test",
+                        description: "Comparing loading methods for bookmark details...",
+                      });
+                      
+                      testBookmarkDetailsPerformance(bookmarkToTest)
+                        .then(results => {
+                          toast({
+                            title: "Performance test complete",
+                            description: `Consolidated endpoint is ${results.speedupFactor.toFixed(2)}x faster!`,
+                            variant: "success"
+                          });
+                        })
+                        .catch(error => {
+                          console.error("Performance test failed:", error);
+                          toast({
+                            title: "Performance test failed",
+                            description: "Check console for details",
+                            variant: "destructive"
+                          });
+                        });
+                    } else {
+                      toast({
+                        title: "No bookmarks available",
+                        description: "Need at least one bookmark to run the test",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                >
+                  <Zap className="h-4 w-4 mr-1" />
+                  Test Performance
+                </Button>
+                
                 <ViewModeSwitcher
                   initialViewMode={viewMode}
                   onViewModeChange={setViewMode}
