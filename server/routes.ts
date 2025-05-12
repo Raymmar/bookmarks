@@ -128,50 +128,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to retrieve bookmark" });
     }
   });
-  
-  // New consolidated endpoint for bookmark details
-  app.get("/api/bookmarks/:id/details", async (req, res) => {
-    try {
-      console.time(`Bookmark details for ${req.params.id}`);
-      const bookmarkId = req.params.id;
-      
-      // Run all queries in parallel for maximum performance
-      const [
-        bookmark,
-        notes,
-        tags,
-        collections,
-        processingStatus
-      ] = await Promise.all([
-        storage.getBookmark(bookmarkId),
-        storage.getNotesByBookmarkId(bookmarkId),
-        storage.getTagsByBookmarkId(bookmarkId),
-        storage.getCollectionsByBookmarkId(bookmarkId),
-        storage.getBookmark(bookmarkId).then(bookmark => bookmark?.ai_processing_status || 'pending')
-      ]);
-      
-      if (!bookmark) {
-        return res.status(404).json({ error: "Bookmark not found" });
-      }
-      
-      // Don't fetch all tags - this is expensive and unnecessary for the detail view
-      // Instead, include only the tags for this bookmark
-      
-      const result = {
-        bookmark,
-        notes,
-        tags,
-        collections,
-        processingStatus
-      };
-      
-      console.timeEnd(`Bookmark details for ${req.params.id}`);
-      res.json(result);
-    } catch (error) {
-      console.error("Error retrieving bookmark details:", error);
-      res.status(500).json({ error: "Failed to retrieve bookmark details" });
-    }
-  });
 
   app.post("/api/bookmarks", async (req, res) => {
     try {

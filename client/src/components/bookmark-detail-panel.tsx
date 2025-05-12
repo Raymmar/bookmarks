@@ -33,7 +33,6 @@ import {
   useCollections, 
   useCollectionMutations 
 } from "@/hooks/use-collection-queries";
-import { useBookmarkDetails } from "@/hooks/use-bookmark-details";
 
 // Use the imported Tag type
 
@@ -176,18 +175,6 @@ function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
 }
 
 export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: BookmarkDetailPanelProps) {
-  // Use our consolidated API endpoint hook if we have a bookmark ID
-  const {
-    bookmark: detailBookmark,
-    notes: detailNotes,
-    tags: detailTags,
-    collections: detailCollections,
-    processingStatus: detailProcessingStatus,
-    isLoading: isLoadingDetails
-  } = useBookmarkDetails(initialBookmark?.id || null);
-  
-  // Combine data from both sources (initial passed bookmark and detail API)
-  // This ensures backwards compatibility while also using the efficient endpoint
   const [bookmark, setBookmark] = useState<Bookmark | undefined>(initialBookmark);
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -215,14 +202,10 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
-  // Collection related hooks and state 
-  // We'll use data from both sources for backwards compatibility
+  // Collection related hooks and state
+  const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
   const { data: allCollections = [] } = useCollections();
-  const { data: bookmarkCollectionsFromHook = [] } = useBookmarkCollections(bookmark?.id || "");
   const { addBookmarkToCollection, removeBookmarkFromCollection } = useCollectionMutations();
-  
-  // Use collections from our consolidated endpoint if available, otherwise use the hook
-  const bookmarkCollections = detailCollections || bookmarkCollectionsFromHook;
   
   // Handle bookmark deletion with better optimistic updates
   const handleDeleteBookmark = async () => {
@@ -307,16 +290,10 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   }, [availableTags]);
   
-  // Update bookmark state when the prop changes or when details are loaded
+  // Update bookmark state when the prop changes
   useEffect(() => {
-    // If we have data from the consolidated endpoint, use that
-    if (detailBookmark) {
-      setBookmark(detailBookmark);
-    } else {
-      // Otherwise fall back to the prop
-      setBookmark(initialBookmark);
-    }
-  }, [initialBookmark, detailBookmark]);
+    setBookmark(initialBookmark);
+  }, [initialBookmark]);
   
   // Listen for the custom showBookmarkDetail event
   useEffect(() => {
@@ -367,14 +344,9 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     };
   }, [toast]);
   
-  // Update tags from consolidated API response
+  // Fetch tags for this bookmark
   useEffect(() => {
-    // If we have tags from the consolidated API, use those
-    if (detailTags && detailTags.length > 0) {
-      setTags(detailTags);
-    } 
-    // Otherwise fall back to the original API call if we have a bookmark and don't have details yet
-    else if (bookmark && !detailTags) {
+    if (bookmark) {
       const fetchTags = async () => {
         try {
           const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
@@ -389,49 +361,42 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       
       fetchTags();
     }
-  }, [bookmark?.id, detailTags]);
+  }, [bookmark?.id]);
   
-  // Update notes from consolidated API response or fetch separately
+  // Fetch notes whenever the bookmark ID changes
   useEffect(() => {
-    // If we have notes from the consolidated API, use those
-    if (detailNotes && detailNotes.length > 0) {
-      setOptimisticNotes(detailNotes);
-    } 
-    // Fall back to bookmark notes if available
-    else if (bookmark?.notes) {
-      setOptimisticNotes(bookmark.notes);
-    }
-    // Otherwise use the original API call if we have a bookmark but no detailNotes yet
-    else if (bookmark && !detailNotes) {
+    if (bookmark) {
       const fetchNotes = async () => {
         try {
           const notes = await apiRequest("GET", `/api/bookmarks/${bookmark.id}/notes`);
           if (notes && notes.length > 0) {
             setOptimisticNotes(notes);
+          } else if (bookmark.notes) {
+            // Fallback to notes from the bookmark object if API call returns empty
+            setOptimisticNotes(bookmark.notes);
           } else {
             setOptimisticNotes([]);
           }
         } catch (error) {
           console.error("Error fetching notes for bookmark:", error);
-          setOptimisticNotes([]);
+          // Fallback to notes from the bookmark object if API call fails
+          if (bookmark.notes) {
+            setOptimisticNotes(bookmark.notes);
+          } else {
+            setOptimisticNotes([]);
+          }
         }
       };
       
       fetchNotes();
     } else {
-      // Default to empty array if nothing available
       setOptimisticNotes([]);
     }
-  }, [bookmark?.id, bookmark?.notes, detailNotes]);
+  }, [bookmark?.id]);
   
-  // Check AI processing status using consolidated data when available
+  // Check AI processing status
   useEffect(() => {
-    // If we have the processing status from the consolidated endpoint, use it
-    if (detailProcessingStatus) {
-      setAiProcessingStatus(detailProcessingStatus as any);
-    }
-    // Otherwise fall back to bookmark data and manual fetch
-    else if (bookmark) {
+    if (bookmark) {
       // Set initial status based on bookmark data
       if (bookmark.ai_processing_status) {
         setAiProcessingStatus(bookmark.ai_processing_status as any);
@@ -447,28 +412,25 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         }
       }
       
-      // Only fetch status separately if we don't have it from the consolidated endpoint
-      if (!detailProcessingStatus) {
-        // Fetch the current processing status
-        const checkProcessingStatus = async () => {
-          try {
-            const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
-            if (response.ok) {
-              const statusData = await response.json();
-              
-              if (statusData.aiProcessingComplete) {
-                setAiProcessingStatus('completed');
-              }
+      // Fetch the current processing status
+      const checkProcessingStatus = async () => {
+        try {
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
+          if (response.ok) {
+            const statusData = await response.json();
+            
+            if (statusData.aiProcessingComplete) {
+              setAiProcessingStatus('completed');
             }
-          } catch (error) {
-            console.error("Error checking AI processing status:", error);
           }
-        };
-        
-        checkProcessingStatus();
-      }
+        } catch (error) {
+          console.error("Error checking AI processing status:", error);
+        }
+      };
+      
+      checkProcessingStatus();
     }
-  }, [bookmark, tags, detailProcessingStatus]);
+  }, [bookmark, tags]);
   
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
