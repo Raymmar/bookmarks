@@ -144,4 +144,48 @@ export function setupReportRoutes(app: Express) {
       res.status(500).json({ message: "Failed to retrieve report bookmarks" });
     }
   });
+
+  // Update a report's content
+  app.put("/api/reports/:reportId", ensureAuthenticated, async (req, res) => {
+    try {
+      const reportId = req.params.reportId;
+      const report = await reportService.getReport(reportId);
+      
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+      
+      // Check if the report belongs to the authenticated user
+      if (report.user_id !== (req.user as Express.User).id) {
+        return res.status(403).json({ message: "Unauthorized access to report" });
+      }
+      
+      // Validate request body
+      const updateSchema = z.object({
+        title: z.string().optional(),
+        content: z.string().optional(),
+      });
+      
+      const parseResult = updateSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body",
+          errors: parseResult.error.errors
+        });
+      }
+      
+      // Only update the fields that were provided
+      const updatedReport = await reportService.updateReport(reportId, parseResult.data);
+      
+      if (!updatedReport) {
+        return res.status(500).json({ message: "Failed to update report" });
+      }
+      
+      res.json(updatedReport);
+    } catch (error) {
+      console.error("Error updating report:", error);
+      res.status(500).json({ message: "Failed to update report" });
+    }
+  });
 }

@@ -92,3 +92,24 @@ export function createUrlSlug(text: string): string {
     .replace(/[\s_]+/g, '-')            // Replace spaces and underscores with dashes
     .replace(/^-+|-+$/g, '');           // Remove leading/trailing dashes
 }
+
+/**
+ * Debounce function that delays invoking the provided function
+ * until after the specified wait time has elapsed since the last time
+ * the debounced function was invoked.
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  
+  return function(...args: Parameters<T>) {
+    if (timeout) clearTimeout(timeout);
+    
+    timeout = setTimeout(() => {
+      func(...args);
+      timeout = null;
+    }, wait);
+  };
+}

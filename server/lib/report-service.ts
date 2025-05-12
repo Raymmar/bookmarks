@@ -269,6 +269,13 @@ export class ReportService {
   async deleteReport(reportId: string): Promise<boolean> {
     return await storage.deleteReport(reportId);
   }
+
+  /**
+   * Update a report's content and/or title
+   */
+  async updateReport(reportId: string, updates: { title?: string; content?: string }): Promise<Report | undefined> {
+    return await storage.updateReport(reportId, updates);
+  }
 }
 
 // Export a singleton instance
