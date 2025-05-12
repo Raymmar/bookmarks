@@ -1054,213 +1054,219 @@ export class XService {
     let updated = 0;
     let errors = 0;
     
-    // Get all bookmarks from X.com
-    let allBookmarks: { 
-      tweets: XTweet[], 
-      users: { [key: string]: XUser },
-      media: { [key: string]: XMedia },
-      // The folderTweetMap will always be empty in this method to avoid folder sync
-      // Folder sync is handled separately by syncBookmarksFromSpecificFolder
-      folderTweetMap: Map<string, Set<string>>
-    } = { 
-      tweets: [], 
-      users: {},
-      media: {},
-      folderTweetMap: new Map<string, Set<string>>()
-    };
-    
-    // Create a cache to hold existing bookmark metadata for more efficient updates
-    const existingBookmarkCache = new Map<string, Bookmark>();
-    
     try {
-      // Check if user has valid X.com credentials
-      const credentials = await this.getUserCredentials(userId);
-      if (!credentials) {
-        console.error(`X Sync: User ${userId} is not connected to X.com`);
-        throw new Error('User is not connected to X.com');
-      }
-      console.log(`X Sync: Found credentials for user ${userId}, username: ${credentials.x_username}`);
+      // Get all bookmarks from X.com
+      let allBookmarks: { 
+        tweets: XTweet[], 
+        users: { [key: string]: XUser },
+        media: { [key: string]: XMedia },
+        // The folderTweetMap will always be empty in this method to avoid folder sync
+        // Folder sync is handled separately by syncBookmarksFromSpecificFolder
+        folderTweetMap: Map<string, Set<string>>
+      } = { 
+        tweets: [], 
+        users: {},
+        media: {},
+        folderTweetMap: new Map<string, Set<string>>()
+      };
       
-      // Check if token is expired
-      const isTokenExpired = credentials.token_expires_at && credentials.token_expires_at < new Date();
+      // Create a cache to hold existing bookmark metadata for more efficient updates
+      const existingBookmarkCache = new Map<string, Bookmark>();
       
-      // If token is expired and we have a refresh token, try to refresh it
-      if (isTokenExpired) {
-        console.log(`X Sync: Token expired, attempting to refresh...`);
-        
-        // Check if we have a refresh token
-        if (!credentials.refresh_token) {
-          console.error(`X Sync: No refresh token available for user ${userId}`);
-          return { 
-            added: 0, 
-            updated: 0, 
-            errors: 1 
-          };
-        }
-        
-        try {
-          // Try to refresh the token
-          const refreshedCreds = await this.refreshAccessToken(credentials.refresh_token);
-          await storage.updateXCredentials(credentials.id, refreshedCreds);
-          console.log(`X Sync: Token refreshed successfully`);
-        } catch (refreshError) {
-          console.error(`X Sync: Failed to refresh token:`, refreshError);
-          // Token refresh failed, user needs to re-authenticate
-          console.log(`X Sync: User needs to reconnect to X.com`);
-          
-          return { 
-            added: 0, 
-            updated: 0, 
-            errors: 1 
-          };
-        }
-      }
-      
-      // Fetch existing bookmarks for this user to avoid duplicates and optimize updates
-      const existingXBookmarks = await this.getExistingXBookmarks(userId);
-      console.log(`X Sync: Found ${existingXBookmarks.size} existing X.com bookmarks`);
-      
-      // For each existing bookmark, store it in our cache so we can access it quickly later
-      // Convert keys() to array to avoid TypeScript error with Map iterator
-      Array.from(existingXBookmarks.keys()).forEach(bookmarkId => {
-        const bookmark = existingXBookmarks.get(bookmarkId);
-        if (bookmark) {
-          existingBookmarkCache.set(bookmarkId, bookmark);
-        }
-      });
-      
-      // Skip folder sync during main bookmark sync to avoid rate limits
-      console.log(`X Sync: Skipping folder sync during main bookmark sync to avoid rate limits`);
-      console.log(`X Sync: Users can sync individual folders using the folder-specific sync buttons`);
-      console.log(`X Sync: Continuing with main bookmarks sync`);
-    } catch (setupError) {
-      console.error(`X Sync: Error in sync setup:`, setupError);
-      return { added: 0, updated: 0, errors: 1 };
-    }
-    
-    // Step 2: Now fetch the main bookmarks (unfiled bookmarks)
-    try {
-      console.log(`X Sync: Fetching unfiled bookmarks`);
-      let nextToken: string | undefined = undefined;
-      
-      // Fetch bookmarks with pagination
-      do {
-        try {
-          console.log(`X Sync: Fetching bookmarks${nextToken ? ' with pagination token' : ''}`);
-          const result = await this.getBookmarks(userId, nextToken);
-          console.log(`X Sync: Fetched ${result.tweets.length} tweets, ${Object.keys(result.users).length} users, and ${Object.keys(result.media).length} media items`);
-          
-          allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
-          allBookmarks.users = { ...allBookmarks.users, ...result.users };
-          allBookmarks.media = { ...allBookmarks.media, ...result.media };
-          nextToken = result.nextToken;
-          
-          if (nextToken) {
-            console.log(`X Sync: More bookmarks available, will paginate`);
-          }
-        } catch (error) {
-          console.error('X Sync: Error fetching bookmarks from X.com:', error);
-          errors++;
-          break;
-        }
-      } while (nextToken);
-    } catch (mainSyncError) {
-      console.error(`X Sync: Error fetching main bookmarks:`, mainSyncError);
-      errors++;
-    }
-    
-    console.log(`X Sync: Total fetched - ${allBookmarks.tweets.length} tweets, ${Object.keys(allBookmarks.users).length} users, and ${Object.keys(allBookmarks.media).length} media items`);
-    
-    // Step 3: Process all the collected bookmarks
-    // Use a Set to track processed tweet IDs to avoid duplicates from different folders
-    const processedTweetIds = new Set<string>();
-    
-    for (const tweet of allBookmarks.tweets) {
       try {
-        // Skip if we've already processed this tweet (could be in multiple folders)
-        if (processedTweetIds.has(tweet.id)) {
-          continue;
+        // Check if user has valid X.com credentials
+        const credentials = await this.getUserCredentials(userId);
+        if (!credentials) {
+          console.error(`X Sync: User ${userId} is not connected to X.com`);
+          throw new Error('User is not connected to X.com');
         }
+        console.log(`X Sync: Found credentials for user ${userId}, username: ${credentials.x_username}`);
         
-        processedTweetIds.add(tweet.id);
-        const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
+        // Check if token is expired
+        const isTokenExpired = credentials.token_expires_at && credentials.token_expires_at < new Date();
         
-        // Check if bookmark already exists in our cache
-        const existingBookmark = existingBookmarkCache.get(tweet.id);
-        
-        if (existingBookmark) {
-          // Bookmark exists - only update engagement metrics, preserving user customizations
-          console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
+        // If token is expired and we have a refresh token, try to refresh it
+        if (isTokenExpired) {
+          console.log(`X Sync: Token expired, attempting to refresh...`);
           
-          // Extract just the engagement metrics
-          // Note: updated_at isn't part of InsertBookmark, we handle this at the database level
-          const updateData: Partial<InsertBookmark> = {
-            like_count: tweet.public_metrics?.like_count,
-            repost_count: tweet.public_metrics?.retweet_count,
-            reply_count: tweet.public_metrics?.reply_count,
-            quote_count: tweet.public_metrics?.quote_count
-          };
-          
-          // Specifically check for created_at and backfill it if the tweet has this data
-          if (tweet.created_at) {
-            // If existing bookmark has no created_at (null) or it's undefined
-            if (!existingBookmark.created_at) {
-              console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
-              updateData.created_at = new Date(tweet.created_at);
-            }
+          // Check if we have a refresh token
+          if (!credentials.refresh_token) {
+            console.error(`X Sync: No refresh token available for user ${userId}`);
+            return { 
+              added: 0, 
+              updated: 0, 
+              errors: 1 
+            };
           }
           
-          // Update only the engagement metrics for the existing bookmark
-          await storage.updateBookmark(existingBookmark.id, updateData);
-          updated++;
-        } else {
-          // This is a new bookmark - create it with all data
-          console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
-          
-          // Convert tweet to full bookmark (now async to handle media downloads)
-          const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
-          bookmarkData.user_id = userId;
-          
-          // No longer downloading media files
-          console.log(`X Sync: Using original media URLs for tweet ${tweet.id}`);
-          
-          // Create the new bookmark
-          const newBookmark = await storage.createBookmark(bookmarkData);
-          added++;
-          
-          // Skip folder processing during main bookmark sync
-          // Note: In the regular syncBookmarks method, we don't process folder mappings
-          // This is only done in syncBookmarksFromSpecificFolder
-          console.log(`X Sync: Skipping folder mapping check for tweet ${tweet.id} during main sync`);
-          // The folderTweetMap will always be empty here, so there's no need to process it
+          try {
+            // Try to refresh the token
+            const refreshedCreds = await this.refreshAccessToken(credentials.refresh_token);
+            await storage.updateXCredentials(credentials.id, refreshedCreds);
+            console.log(`X Sync: Token refreshed successfully`);
+          } catch (refreshError) {
+            console.error(`X Sync: Failed to refresh token:`, refreshError);
+            // Token refresh failed, user needs to re-authenticate
+            console.log(`X Sync: User needs to reconnect to X.com`);
+            
+            return { 
+              added: 0, 
+              updated: 0, 
+              errors: 1 
+            };
+          }
         }
-      } catch (error) {
-        console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
+        
+        // Fetch existing bookmarks for this user to avoid duplicates and optimize updates
+        const existingXBookmarks = await this.getExistingXBookmarks(userId);
+        console.log(`X Sync: Found ${existingXBookmarks.size} existing X.com bookmarks`);
+        
+        // For each existing bookmark, store it in our cache so we can access it quickly later
+        // Convert keys() to array to avoid TypeScript error with Map iterator
+        Array.from(existingXBookmarks.keys()).forEach(bookmarkId => {
+          const bookmark = existingXBookmarks.get(bookmarkId);
+          if (bookmark) {
+            existingBookmarkCache.set(bookmarkId, bookmark);
+          }
+        });
+        
+        // Skip folder sync during main bookmark sync to avoid rate limits
+        console.log(`X Sync: Skipping folder sync during main bookmark sync to avoid rate limits`);
+        console.log(`X Sync: Users can sync individual folders using the folder-specific sync buttons`);
+        console.log(`X Sync: Continuing with main bookmarks sync`);
+      } catch (setupError) {
+        console.error(`X Sync: Error in sync setup:`, setupError);
+        return { added: 0, updated: 0, errors: 1 };
+      }
+      
+      // Step 2: Now fetch the main bookmarks (unfiled bookmarks)
+      try {
+        console.log(`X Sync: Fetching unfiled bookmarks`);
+        let nextToken: string | undefined = undefined;
+        
+        // Fetch bookmarks with pagination
+        do {
+          try {
+            console.log(`X Sync: Fetching bookmarks${nextToken ? ' with pagination token' : ''}`);
+            const result = await this.getBookmarks(userId, nextToken);
+            console.log(`X Sync: Fetched ${result.tweets.length} tweets, ${Object.keys(result.users).length} users, and ${Object.keys(result.media).length} media items`);
+            
+            allBookmarks.tweets = [...allBookmarks.tweets, ...result.tweets];
+            allBookmarks.users = { ...allBookmarks.users, ...result.users };
+            allBookmarks.media = { ...allBookmarks.media, ...result.media };
+            nextToken = result.nextToken;
+            
+            if (nextToken) {
+              console.log(`X Sync: More bookmarks available, will paginate`);
+            }
+          } catch (error) {
+            console.error('X Sync: Error fetching bookmarks from X.com:', error);
+            errors++;
+            break;
+          }
+        } while (nextToken);
+      } catch (mainSyncError) {
+        console.error(`X Sync: Error fetching main bookmarks:`, mainSyncError);
         errors++;
       }
-    }
-    
-    // Update last sync time
-    try {
-      console.log(`X Sync: Updating last sync time for user ${userId}`);
-      await this.updateLastSync(userId);
-    } catch (error) {
-      console.error(`X Sync: Error updating last sync time:`, error);
-    }
-    
-    // Trigger AI processing for newly added bookmarks
-    if (added > 0) {
-      console.log(`X Sync: Triggering AI processing for user ${userId} after sync (${added} new bookmarks)`);
       
-      // We'll trigger the processing asynchronously but not wait for it to complete
-      // This allows the sync API to return quickly while processing happens in the background
-      aiProcessorService.processAfterSync(userId).catch(err => {
-        console.error(`X Sync: Error triggering AI processing after sync: ${err}`);
-      });
+      console.log(`X Sync: Total fetched - ${allBookmarks.tweets.length} tweets, ${Object.keys(allBookmarks.users).length} users, and ${Object.keys(allBookmarks.media).length} media items`);
+      
+      // Step 3: Process all the collected bookmarks
+      // Use a Set to track processed tweet IDs to avoid duplicates from different folders
+      const processedTweetIds = new Set<string>();
+      
+      for (const tweet of allBookmarks.tweets) {
+        try {
+          // Skip if we've already processed this tweet (could be in multiple folders)
+          if (processedTweetIds.has(tweet.id)) {
+            continue;
+          }
+          
+          processedTweetIds.add(tweet.id);
+          const author = tweet.author_id ? allBookmarks.users[tweet.author_id] : undefined;
+          
+          // Check if bookmark already exists in our cache
+          const existingBookmark = existingBookmarkCache.get(tweet.id);
+          
+          if (existingBookmark) {
+            // Bookmark exists - only update engagement metrics, preserving user customizations
+            console.log(`X Sync: Updating engagement metrics for existing bookmark (tweet ${tweet.id})`);
+            
+            // Extract just the engagement metrics
+            // Note: updated_at isn't part of InsertBookmark, we handle this at the database level
+            const updateData: Partial<InsertBookmark> = {
+              like_count: tweet.public_metrics?.like_count,
+              repost_count: tweet.public_metrics?.retweet_count,
+              reply_count: tweet.public_metrics?.reply_count,
+              quote_count: tweet.public_metrics?.quote_count
+            };
+            
+            // Specifically check for created_at and backfill it if the tweet has this data
+            if (tweet.created_at) {
+              // If existing bookmark has no created_at (null) or it's undefined
+              if (!existingBookmark.created_at) {
+                console.log(`X Sync: Backfilling created_at date for tweet ${tweet.id}`);
+                updateData.created_at = new Date(tweet.created_at);
+              }
+            }
+            
+            // Update only the engagement metrics for the existing bookmark
+            await storage.updateBookmark(existingBookmark.id, updateData);
+            updated++;
+          } else {
+            // This is a new bookmark - create it with all data
+            console.log(`X Sync: Creating new bookmark for tweet ${tweet.id}`);
+            
+            // Convert tweet to full bookmark (now async to handle media downloads)
+            const bookmarkData = await this.convertTweetToBookmark(tweet, author, allBookmarks.media);
+            bookmarkData.user_id = userId;
+            
+            // No longer downloading media files
+            console.log(`X Sync: Using original media URLs for tweet ${tweet.id}`);
+            
+            // Create the new bookmark
+            const newBookmark = await storage.createBookmark(bookmarkData);
+            added++;
+            
+            // Skip folder processing during main bookmark sync
+            // Note: In the regular syncBookmarks method, we don't process folder mappings
+            // This is only done in syncBookmarksFromSpecificFolder
+            console.log(`X Sync: Skipping folder mapping check for tweet ${tweet.id} during main sync`);
+            // The folderTweetMap will always be empty here, so there's no need to process it
+          }
+        } catch (error) {
+          console.error(`X Sync: Error processing tweet ${tweet.id}:`, error);
+          errors++;
+        }
+      }
+      
+      // Update last sync time
+      try {
+        console.log(`X Sync: Updating last sync time for user ${userId}`);
+        await this.updateLastSync(userId);
+      } catch (error) {
+        console.error(`X Sync: Error updating last sync time:`, error);
+      }
+      
+      // Trigger AI processing for newly added bookmarks
+      if (added > 0) {
+        console.log(`X Sync: Triggering AI processing for user ${userId} after sync (${added} new bookmarks)`);
+        
+        // We'll trigger the processing asynchronously but not wait for it to complete
+        // This allows the sync API to return quickly while processing happens in the background
+        aiProcessorService.processAfterSync(userId).catch(err => {
+          console.error(`X Sync: Error triggering AI processing after sync: ${err}`);
+        });
+      }
+      
+      console.log(`X Sync: Finished - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
+      return { added, updated, errors };
+    } finally {
+      // Always release the lock, even if an error occurs
+      activeSyncs.delete(userId);
+      console.log(`X Sync: Released sync lock for user ${userId}`);
     }
-    
-    console.log(`X Sync: Finished - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
-    return { added, updated, errors };
   }
   
   /**
@@ -1533,6 +1539,17 @@ export class XService {
    * This is exposed to API consumers for manual folder syncing
    */
   async syncBookmarksFromSpecificFolder(userId: string, folderId: string): Promise<{ added: number, updated: number, errors: number, associated: number, fetched: number }> {
+    // Generate a unique lock key for this user and folder
+    const syncLockKey = `${userId}:folder:${folderId}`;
+    
+    // Check if a sync is already in progress for this user+folder
+    if (activeSyncs.has(syncLockKey)) {
+      console.log(`X Sync: Skipping folder sync for user ${userId} and folder ${folderId} because another sync is already in progress`);
+      return { added: 0, updated: 0, errors: 0, associated: 0, fetched: 0 };
+    }
+    
+    // Add to active syncs
+    activeSyncs.add(syncLockKey);
     console.log(`X Sync: Starting folder-specific sync for user ${userId}, folder ${folderId}`);
     
     let added = 0;
@@ -1778,6 +1795,11 @@ export class XService {
     } catch (error) {
       console.error(`X Sync: Error syncing folder ${folderId}:`, error);
       throw error;
+    } finally {
+      // Always release the lock, even if an error occurs
+      const syncLockKey = `${userId}:folder:${folderId}`;
+      activeSyncs.delete(syncLockKey);
+      console.log(`X Sync: Released sync lock for user ${userId} and folder ${folderId}`);
     }
   }
 
