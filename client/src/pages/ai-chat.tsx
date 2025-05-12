@@ -10,6 +10,7 @@ import {
   Plus, MoreVertical, Trash, Edit,
   Check, LogIn
 } from "lucide-react";
+import { TagSelector } from "@/components/ui/tag-selector";
 import { 
   chatWithBookmarks, 
   getChatSessions, 
@@ -100,13 +101,7 @@ export default function AiChat() {
     return Array.from(new Set([...systemTags, ...normalizedTagNames])).sort();
   }, [bookmarks, normalizedTags]);
   
-  const toggleTagSelection = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter(t => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
-    }
-  };
+  // Tag selection is now handled directly by the TagSelector component
   
   const toggleSource = (source: string) => {
     if (sources.includes(source)) {
@@ -648,27 +643,10 @@ export default function AiChat() {
             
             <div className="mb-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Tags</h4>
-              <div className="flex flex-wrap gap-1">
-                {allTags.map(tag => (
-                  <Badge 
-                    key={tag}
-                    variant={selectedTags.includes(tag) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleTagSelection(tag)}
-                  >
-                    {tag}
-                    {selectedTags.includes(tag) && (
-                      <X 
-                        className="h-3 w-3 ml-1" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleTagSelection(tag);
-                        }}
-                      />
-                    )}
-                  </Badge>
-                ))}
-              </div>
+              <TagSelector 
+                selectedTags={selectedTags}
+                onTagsChange={setSelectedTags}
+              />
             </div>
             
             <div className="mb-4">
