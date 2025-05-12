@@ -708,10 +708,10 @@ export async function generateChatResponse(
       }
     }
     
-    // Limit to 200 bookmarks max to prevent overwhelming the AI
-    if (bookmarks.length > 200) {
-      console.log(`Limiting from ${bookmarks.length} to 200 bookmarks to prevent context overflow`);
-      bookmarks = bookmarks.slice(0, 200);
+    // Limit to 100 bookmarks max to prevent overwhelming the AI
+    if (bookmarks.length > 100) {
+      console.log(`Limiting from ${bookmarks.length} to 100 bookmarks to prevent context overflow`);
+      bookmarks = bookmarks.slice(0, 100);
     }
     
     // Fetch insights for the filtered bookmarks
