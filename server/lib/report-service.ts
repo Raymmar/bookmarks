@@ -100,9 +100,6 @@ export class ReportService {
     const formattedEndDate = format(timePeriodEnd, "MMM d, yyyy");
     const reportTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
-    // Used to store the report for reference in the catch block
-    let reportObj: Report;
-
     try {
       // Create the report first with "generating" status
       const report = await storage.createReport({
@@ -111,11 +108,10 @@ export class ReportService {
         content: "Generating report...",
         time_period_start: timePeriodStart,
         time_period_end: timePeriodEnd,
-        status: "generating" as ReportStatus,
       });
-
-      // Store the report for the catch block
-      reportObj = report;
+      
+      // Update the status after creation
+      await storage.updateReportStatus(report.id, "generating");
 
       // Fetch bookmarks with insights and tags
       const bookmarksWithData = await storage.getBookmarksWithInsightsAndTags(
@@ -125,14 +121,19 @@ export class ReportService {
       );
 
       if (bookmarksWithData.length === 0) {
+        // Update the content
         await storage.updateReport(report.id, {
           content: "No bookmarks found for this time period.",
-          status: "completed",
         });
+        
+        // Update the status separately
+        await storage.updateReportStatus(report.id, "completed");
+        
+        // Return the updated report data
         return {
           ...report,
           content: "No bookmarks found for this time period.",
-          status: "completed",
+          status: "completed" as ReportStatus,
         };
       }
 
@@ -219,39 +220,48 @@ export class ReportService {
       // Generate a descriptive title based on the report content
       const descriptiveTitle = await this.generateDescriptiveTitle(content, reportType, formattedStartDate, formattedEndDate);
 
-      // Update the report with the generated content and title
+      // Update the report content and title
       const updatedReport = await storage.updateReport(report.id, {
         content,
         title: descriptiveTitle, // Use the AI-generated title
-        status: "completed",
       });
+      
+      // Update status separately
+      await storage.updateReportStatus(report.id, "completed");
 
       return updatedReport || report;
     } catch (error) {
       console.error("Error generating weekly report:", error);
 
-      if (!reportObj) {
-        // If we failed even before creating the report, return a minimal error response
+      try {
+        // Try to create an error report if one doesn't already exist
+        const errorReport = await storage.createReport({
+          user_id: userId,
+          title: reportTitle,
+          content: "Error generating report",
+          time_period_start: timePeriodStart,
+          time_period_end: timePeriodEnd,
+        });
+        
+        // Set status to failed
+        await storage.updateReportStatus(errorReport.id, "failed");
+        
+        return errorReport;
+      } catch (nestedError) {
+        console.error("Failed to create error report:", nestedError);
+        
+        // Return a minimal object if we can't create an error report
         return {
           id: "",
           user_id: userId,
           title: reportTitle,
           content: "Error generating report",
-          created_at: new Date(),
-          updated_at: new Date(),
-          time_period_start: timePeriodStart,
-          time_period_end: timePeriodEnd,
+          created_at: new Date().toISOString(),
+          time_period_start: timePeriodStart instanceof Date ? timePeriodStart.toISOString() : timePeriodStart,
+          time_period_end: timePeriodEnd instanceof Date ? timePeriodEnd.toISOString() : timePeriodEnd,
           status: "failed" as ReportStatus,
-        };
+        } as Report;
       }
-
-      // Update the report with error status
-      const failedReport = await storage.updateReportStatus(
-        reportObj.id,
-        "failed",
-      );
-
-      return failedReport || reportObj;
     }
   }
 
