@@ -618,12 +618,13 @@ export async function generateChatResponse(
     startDate?: string;
     endDate?: string;
     source?: string[];
-  }
+  },
+  userId?: string
 ): Promise<string> {
   try {
-    // Get all bookmarks first
-    let bookmarks = await storage.getBookmarks();
-    console.log(`Starting with ${bookmarks.length} total bookmarks`);
+    // Get bookmarks for the specific user only (or all bookmarks if userId is undefined, for backward compatibility)
+    let bookmarks = await storage.getBookmarks(userId);
+    console.log(`Starting with ${bookmarks.length} total bookmarks${userId ? ' for user ' + userId : ''}`);
     
     // Apply filters if provided
     if (filters) {

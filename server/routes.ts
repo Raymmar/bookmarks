@@ -673,8 +673,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "OpenAI API key is not configured" });
       }
       
-      console.log("Processing chat request with filters:", filters);
-      const response = await generateChatResponse(query, filters);
+      // Get the user ID if authenticated
+      const userId = req.isAuthenticated() ? req.user.id : undefined;
+      
+      console.log(`Processing chat request with filters: ${JSON.stringify(filters)} for user: ${userId || 'anonymous'}`);
+      const response = await generateChatResponse(query, filters, userId);
       console.log("Chat response generated successfully");
       res.json({ response });
     } catch (error) {
@@ -1047,8 +1050,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Message is required" });
       }
       
-      // Generate a response from the AI
-      const response = await generateChatResponse(message, filters);
+      // Get the user ID if authenticated
+      const userId = req.isAuthenticated() ? req.user.id : undefined;
+      
+      // Generate a response from the AI, passing the user ID to filter bookmarks
+      const response = await generateChatResponse(message, filters, userId);
       
       // If a session ID is provided, save the conversation
       if (sessionId) {
