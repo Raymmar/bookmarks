@@ -13,8 +13,8 @@ import { storage, IStorage } from "../storage";
 import { BookmarkService, bookmarkService } from "./bookmark-service";
 import { aiProcessorService } from "./ai-processor-service";
 import { db } from "../db";
-import { bookmarks, xCredentials } from "../../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { bookmarks, xCredentials, xSyncLocks } from "../../shared/schema";
+import { eq, and, gt } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
 // X.com API constants
@@ -34,6 +34,70 @@ export class XService {
   
   constructor() {
     this.storage = storage;
+  }
+  
+  /**
+   * Acquire a sync lock for a user
+   * @param userId The ID of the user to lock
+   * @returns true if lock was acquired, false if already locked
+   */
+  private async acquireSyncLock(userId: string): Promise<boolean> {
+    try {
+      // First, clean up any expired locks
+      const now = new Date();
+      await db.delete(xSyncLocks).where(
+        and(
+          eq(xSyncLocks.user_id, userId),
+          sql`${xSyncLocks.expires_at} < ${now}`
+        )
+      );
+      
+      // Check if there's an existing active lock
+      const existingLock = await db.select().from(xSyncLocks)
+        .where(
+          and(
+            eq(xSyncLocks.user_id, userId),
+            gt(xSyncLocks.expires_at, now)
+          )
+        )
+        .limit(1);
+      
+      if (existingLock.length > 0) {
+        // Already locked
+        console.log(`X Sync: User ${userId} is already being synced (locked at ${existingLock[0].locked_at})`);
+        return false;
+      }
+      
+      // Create a new lock that expires in 5 minutes
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+      
+      await db.insert(xSyncLocks).values({
+        id: uuid(),
+        user_id: userId,
+        locked_at: now,
+        expires_at: expiresAt
+      });
+      
+      console.log(`X Sync: Lock acquired for user ${userId}, expires at ${expiresAt}`);
+      return true;
+    } catch (error) {
+      console.error(`X Sync: Error acquiring lock for user ${userId}:`, error);
+      return false;
+    }
+  }
+  
+  /**
+   * Release a sync lock for a user
+   * @param userId The ID of the user to unlock
+   */
+  private async releaseSyncLock(userId: string): Promise<void> {
+    try {
+      await db.delete(xSyncLocks).where(eq(xSyncLocks.user_id, userId));
+      console.log(`X Sync: Lock released for user ${userId}`);
+    } catch (error) {
+      console.error(`X Sync: Error releasing lock for user ${userId}:`, error);
+    }
   }
 
   /**
@@ -217,6 +281,13 @@ export class XService {
     let updated = 0;
     let errors = 0;
     
+    // Acquire a lock for this user to prevent concurrent syncs
+    const lockAcquired = await this.acquireSyncLock(userId);
+    if (!lockAcquired) {
+      console.log(`X Sync: Sync already in progress for user ${userId}, skipping`);
+      return { added: 0, updated: 0, errors: 0, skipped: true };
+    }
+    
     try {
       // Get user credentials
       const credentials = await this.storage.getXCredentials(userId);
@@ -324,6 +395,9 @@ export class XService {
     } catch (error) {
       console.error(`X Sync: Error syncing bookmarks:`, error);
       errors++;
+      
+      // Make sure to release the lock even if there's an error
+      await this.releaseSyncLock(userId);
     }
     
     // Trigger AI processing for newly added bookmarks
@@ -338,6 +412,10 @@ export class XService {
     }
     
     console.log(`X Sync: Finished - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
+    
+    // Always release the lock at the end
+    await this.releaseSyncLock(userId);
+    
     return { added, updated, errors };
   }
   
@@ -476,8 +554,28 @@ export class XService {
    * Sync bookmarks from a specific X.com folder
    */
   async syncBookmarksFromSpecificFolder(userId: string, folderId: string) {
-    // Implementation similar to syncBookmarks but for a specific folder
-    return { added: 0, updated: 0, errors: 0 };
+    console.log(`X Sync: Starting folder-specific sync for user ${userId}, folder ${folderId}`);
+    
+    // Acquire a lock for this user to prevent concurrent syncs
+    const lockAcquired = await this.acquireSyncLock(userId);
+    if (!lockAcquired) {
+      console.log(`X Sync: Sync already in progress for user ${userId}, skipping folder sync`);
+      return { added: 0, updated: 0, errors: 0, skipped: true };
+    }
+    
+    try {
+      // Implementation similar to syncBookmarks but for a specific folder would go here
+      // For now, this is a stub
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate work
+      
+      return { added: 0, updated: 0, errors: 0 };
+    } catch (error) {
+      console.error(`X Sync: Error syncing folder bookmarks:`, error);
+      return { added: 0, updated: 0, errors: 1 };
+    } finally {
+      // Always release the lock
+      await this.releaseSyncLock(userId);
+    }
   }
 
   /**
