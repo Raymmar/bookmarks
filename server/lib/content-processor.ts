@@ -807,7 +807,7 @@ ${context}`
         }
       ],
       temperature: 0.3,  // Lower temperature for more focused, detailed analysis
-      max_tokens: 1500   // Increase token limit for more comprehensive responses
+      max_tokens: 4000   // Increased token limit for more comprehensive responses
     });
     
     return response.choices[0].message.content || "I couldn't generate a response. Please try a different question.";

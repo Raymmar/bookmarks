@@ -49,7 +49,7 @@ export default function AiChat() {
   
   // Filter state
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState("all");
+  const [dateRange, setDateRange] = useState("week"); // Default to one week instead of all time
   const [sources, setSources] = useState<string[]>(["extension", "web", "import", "x"]);
   
   // Session state
@@ -295,7 +295,7 @@ export default function AiChat() {
       // Reset the UI first
       setMessages([]);
       setSelectedTags([]);
-      setDateRange("all");
+      setDateRange("week"); // Default to one week instead of all time
       setSources(["extension", "web", "import", "x"]);
       
       // Create chat filters
@@ -366,7 +366,7 @@ export default function AiChat() {
           setActiveChatId(null);
           setMessages([]);
           setSelectedTags([]);
-          setDateRange("all");
+          setDateRange("week"); // Default to one week instead of all time
           setSources(["extension", "web", "import", "x"]);
         }
       } else {
