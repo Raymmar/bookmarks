@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Bookmark } from '@shared/types';
 import { useAuth } from './use-auth';
 
@@ -76,12 +76,23 @@ export function usePaginatedBookmarks(
   });
   
   // Combine all pages of bookmarks into a single array
-  const bookmarks = data?.pages.flatMap(page => page.bookmarks) || [];
+  const [bookmarks, setLocalBookmarks] = useState<Bookmark[]>([]);
   
-  // Keep reference to all bookmarks for optimizations
+  // Update local state when data changes
   useEffect(() => {
-    allBookmarksRef.current = bookmarks;
-  }, [bookmarks]);
+    const newBookmarks = data?.pages.flatMap(page => page.bookmarks) || [];
+    setLocalBookmarks(newBookmarks);
+    allBookmarksRef.current = newBookmarks;
+  }, [data]);
+  
+  // Custom setter function that modifies our local state directly
+  const setBookmarks = useCallback((updaterFn: (bookmarks: Bookmark[]) => Bookmark[]) => {
+    setLocalBookmarks(prevBookmarks => {
+      const newBookmarks = updaterFn(prevBookmarks);
+      allBookmarksRef.current = newBookmarks;
+      return newBookmarks;
+    });
+  }, []);
   
   // Calculate if there are more pages
   const totalPages = Math.ceil(totalItems / pageSize);
@@ -101,6 +112,7 @@ export function usePaginatedBookmarks(
 
   return {
     bookmarks,
+    setBookmarks,
     isLoading,
     isError,
     error,

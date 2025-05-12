@@ -144,6 +144,9 @@ export default function CollectionPage() {
     };
   }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreBookmarks]);
   
+  // State for tracking deleted bookmarks
+  const [deletedBookmarkIds, setDeletedBookmarkIds] = useState<Set<string>>(new Set());
+
   // Listen for bookmark deletion events with true optimistic UI updates
   useEffect(() => {
     const handleBookmarkDeleted = (e: Event) => {
@@ -152,16 +155,19 @@ export default function CollectionPage() {
       const deletedId = event.detail?.bookmarkId;
       
       if (deletedId) {
-        console.log(`Bookmark deleted event received for ID: ${deletedId}`);
+        console.log(`Bookmark deleted event received in collection view for ID: ${deletedId}`);
         
         // If the deleted bookmark is the currently selected one, clear selection
         if (deletedId === selectedBookmarkId) {
           setSelectedBookmarkId(null);
         }
         
-        // Immediately update our local bookmarks array to remove the deleted bookmark
-        // This is a true optimistic update that will be visible right away
-        const updatedBookmarks = bookmarks.filter(b => b.id !== deletedId);
+        // Add to our local set of deleted IDs - this filters the UI immediately
+        setDeletedBookmarkIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(deletedId);
+          return newSet; 
+        });
         
         // Update the React Query cache optimistically - use the correct query key for collections
         const queryKey = ['/api/bookmarks', { collectionId: collection?.id }];
@@ -171,6 +177,17 @@ export default function CollectionPage() {
           }
           return oldData;
         });
+        
+        // Also update the main bookmarks query which might be used elsewhere
+        queryClient.setQueryData(['/api/bookmarks'], (oldData: any) => {
+          if (Array.isArray(oldData)) {
+            return oldData.filter(b => b.id !== deletedId);
+          }
+          return oldData;
+        });
+        
+        // Invalidate the specific bookmark endpoint to avoid stale data
+        queryClient.invalidateQueries({ queryKey: ["/api/bookmarks", deletedId] });
         
         // Also refresh in the background to ensure we're in sync
         setTimeout(() => {
@@ -186,7 +203,10 @@ export default function CollectionPage() {
     return () => {
       window.removeEventListener('bookmarkDeleted', handleBookmarkDeleted);
     };
-  }, [selectedBookmarkId, refetch, bookmarks, collection, queryClient]);
+  }, [selectedBookmarkId, refetch, collection, queryClient]);
+  
+  // Filter bookmarks to exclude deleted ones
+  const filteredBookmarks = bookmarks.filter(b => !deletedBookmarkIds.has(b.id));
 
   // Show a message if collection not found
   if (!collectionsLoading && !collection) {
@@ -267,14 +287,14 @@ export default function CollectionPage() {
               <div className="flex-grow">
                 {viewMode === 'list' ? (
                   <BookmarkListView 
-                    bookmarks={bookmarks}
+                    bookmarks={filteredBookmarks}
                     selectedBookmarkId={selectedBookmarkId}
                     onSelectBookmark={handleSelectBookmark}
                     isLoading={isLoading || collectionsLoading}
                   />
                 ) : (
                   <BookmarkGrid 
-                    bookmarks={bookmarks}
+                    bookmarks={filteredBookmarks}
                     selectedBookmarkId={selectedBookmarkId}
                     onSelectBookmark={handleSelectBookmark}
                     isLoading={isLoading || collectionsLoading}

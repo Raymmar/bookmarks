@@ -61,8 +61,7 @@ export default function Feed() {
     refetch
   } = usePaginatedBookmarks(50, sortOrder as 'newest' | 'oldest' | 'recently_updated', debouncedSearchQuery);
   
-  // Use bookmarks directly as they are now filtered on the server
-  const filteredBookmarks = bookmarks;
+  // We'll filter the bookmarks after checking for deleted ones below
   
   // Fetch the selected bookmark's details
   const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkType>({
@@ -121,6 +120,9 @@ export default function Feed() {
     };
   }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreBookmarks]);
   
+  // State for manually tracking bookmarks to filter
+  const [deletedBookmarkIds, setDeletedBookmarkIds] = useState<Set<string>>(new Set());
+
   // Listen for bookmark deletion events with true optimistic UI updates
   useEffect(() => {
     const handleBookmarkDeleted = (e: Event) => {
@@ -136,37 +138,20 @@ export default function Feed() {
           setSelectedBookmarkId(null);
         }
         
-        // Update all possible query keys for the current view
-        // This ensures the UI updates immediately in all views and states
+        // Add this ID to our list of deleted IDs
+        setDeletedBookmarkIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(deletedId);
+          return newSet;
+        });
         
-        // Main feed query
+        // Update the React Query cache
         queryClient.setQueryData(["/api/bookmarks"], (oldData: any) => {
           if (Array.isArray(oldData)) {
             return oldData.filter(b => b.id !== deletedId);
           }
           return oldData;
         });
-        
-        // Search-filtered query (if we have an active search)
-        if (debouncedSearchQuery) {
-          queryClient.setQueryData(["/api/bookmarks", { query: debouncedSearchQuery }], (oldData: any) => {
-            if (Array.isArray(oldData)) {
-              return oldData.filter(b => b.id !== deletedId);
-            }
-            return oldData;
-          });
-        }
-        
-        // Sort-specific query
-        queryClient.setQueryData(["/api/bookmarks", { sort: sortOrder }], (oldData: any) => {
-          if (Array.isArray(oldData)) {
-            return oldData.filter(b => b.id !== deletedId);
-          }
-          return oldData;
-        });
-        
-        // Invalidate the specific bookmark endpoint to avoid stale data
-        queryClient.invalidateQueries({ queryKey: ["/api/bookmarks", deletedId] });
         
         // Also refresh in the background to ensure we're in sync with server
         setTimeout(() => {
@@ -182,7 +167,10 @@ export default function Feed() {
     return () => {
       window.removeEventListener('bookmarkDeleted', handleBookmarkDeleted);
     };
-  }, [selectedBookmarkId, refetch, debouncedSearchQuery, sortOrder, queryClient]);
+  }, [selectedBookmarkId, refetch, queryClient]);
+  
+  // Filter the bookmarks to exclude deleted ones
+  const filteredBookmarks = bookmarks.filter(b => !deletedBookmarkIds.has(b.id));
 
   return (
     <div className="h-full w-full bg-gray-50">
