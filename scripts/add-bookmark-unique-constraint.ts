@@ -60,8 +60,7 @@ async function addUniqueConstraintToBookmarks() {
     const addConstraintQuery = `
       ALTER TABLE bookmarks
       ADD CONSTRAINT unique_user_external_id_source
-      UNIQUE (user_id, external_id, source)
-      WHERE external_id IS NOT NULL AND external_id != '';
+      UNIQUE (user_id, external_id, source);
     `;
     
     await db.execute(sql.raw(addConstraintQuery));
