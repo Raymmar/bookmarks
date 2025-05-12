@@ -1,8 +1,6 @@
 import { Bookmark } from "@shared/types";
 import { useState, useEffect, useRef } from "react";
 import Masonry from "react-masonry-css";
-import { useBookmarkPrefetch } from "@/hooks/use-bookmark-prefetch";
-import { useViewportPrefetch } from "@/hooks/use-viewport-prefetch";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
@@ -19,9 +17,6 @@ export function BookmarkGrid({
 }: BookmarkGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [breakpointCols, setBreakpointCols] = useState(2);
-  
-  // Use the viewport prefetching hook to automatically prefetch visible bookmarks
-  useViewportPrefetch(bookmarks, containerRef);
   
   // Constants for minimum and maximum card widths (in pixels)
   const MIN_CARD_WIDTH = 270;
@@ -109,18 +104,6 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
   const hasImage = bookmark.media_urls && 
                   bookmark.media_urls.length > 0 && 
                   bookmark.media_urls.some(url => url.includes('pbs.twimg.com'));
-  
-  // Use our prefetching hook to load details when hovering
-  const { prefetchBookmarkDetails, cancelPrefetch } = useBookmarkPrefetch();
-  
-  // Handle hover events to trigger prefetching
-  const handleMouseEnter = () => {
-    prefetchBookmarkDetails(bookmark.id);
-  };
-  
-  const handleMouseLeave = () => {
-    cancelPrefetch();
-  };
 
   return (
     <div 
@@ -130,9 +113,6 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
           : ""
       } ${hasImage ? 'group' : ''}`}
       onClick={onClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      data-bookmark-id={bookmark.id}
     >
       {/* Media section */}
       {hasImage && (

@@ -202,39 +202,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
-  // Use the consolidated details endpoint for fast loading
-  const { data: consolidatedData, isLoading: isLoadingDetails } = useQuery({
-    queryKey: ['/api/bookmarks/details', bookmark?.id],
-    queryFn: async () => {
-      if (!bookmark?.id) return null;
-      const response = await fetch(`/api/bookmarks/${bookmark.id}/details`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch bookmark details');
-      }
-      return response.json();
-    },
-    enabled: !!bookmark?.id,
-    // Short stale time so it refreshes if user stays on a bookmark for a while
-    staleTime: 60 * 1000,
-  });
-  
-  // Use the prefetched data if available
-  useEffect(() => {
-    if (consolidatedData) {
-      // Update bookmark with the latest data
-      setBookmark(consolidatedData.bookmark);
-      
-      // Update tags
-      setTags(consolidatedData.tags || []);
-      
-      // Update notes
-      setOptimisticNotes(consolidatedData.notes || []);
-      
-      // Update AI processing status
-      setAiProcessingStatus(consolidatedData.processing_status || 'pending');
-    }
-  }, [consolidatedData]);
-  
   // Collection related hooks and state
   const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
   const { data: allCollections = [] } = useCollections();
@@ -328,7 +295,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     setBookmark(initialBookmark);
   }, [initialBookmark]);
   
-  // Listen for the custom showBookmarkDetail event and use consolidated endpoint
+  // Listen for the custom showBookmarkDetail event
   useEffect(() => {
     const handleShowBookmarkDetail = async (e: Event) => {
       try {
@@ -339,26 +306,23 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         
         console.log(`Custom event received to show bookmark: ${bookmarkId}`);
         
-        // Use the consolidated endpoint for better performance
-        const response = await fetch(`/api/bookmarks/${bookmarkId}/details`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch bookmark details');
-        }
+        // Fetch the updated bookmark
+        const { apiRequest } = await import('@/lib/queryClient');
+        const updatedBookmark = await apiRequest("GET", `/api/bookmarks/${bookmarkId}`);
         
-        const detailsData = await response.json();
-        
-        if (detailsData) {
+        if (updatedBookmark) {
           // Update the bookmark state with the latest data
-          setBookmark(detailsData.bookmark);
+          setBookmark(updatedBookmark);
           
-          // Update tags from the consolidated data
-          setTags(detailsData.tags || []);
+          // Fetch the tags for this bookmark
+          const fetchedTags = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/tags`);
+          setTags(fetchedTags || []);
           
-          // Update notes from the consolidated data
-          setOptimisticNotes(detailsData.notes || []);
-          
-          // Update AI processing status
-          setAiProcessingStatus(detailsData.processing_status || 'pending');
+          // Fetch and update notes if available
+          const notes = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/notes`);
+          if (notes && notes.length > 0) {
+            setOptimisticNotes(notes);
+          }
           
           toast({
             title: "Bookmark updated",
@@ -380,44 +344,93 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     };
   }, [toast]);
   
-  // We no longer need to fetch tags or notes separately
-  // since we're using the consolidated details endpoint
-  // All of this data is already available in consolidatedData
-  
-  // Set default empty notes if no bookmark is selected
+  // Fetch tags for this bookmark
   useEffect(() => {
-    if (!bookmark) {
+    if (bookmark) {
+      const fetchTags = async () => {
+        try {
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
+          if (response.ok) {
+            const bookmarkTags = await response.json();
+            setTags(bookmarkTags);
+          }
+        } catch (error) {
+          console.error("Error fetching tags for bookmark:", error);
+        }
+      };
+      
+      fetchTags();
+    }
+  }, [bookmark?.id]);
+  
+  // Fetch notes whenever the bookmark ID changes
+  useEffect(() => {
+    if (bookmark) {
+      const fetchNotes = async () => {
+        try {
+          const notes = await apiRequest("GET", `/api/bookmarks/${bookmark.id}/notes`);
+          if (notes && notes.length > 0) {
+            setOptimisticNotes(notes);
+          } else if (bookmark.notes) {
+            // Fallback to notes from the bookmark object if API call returns empty
+            setOptimisticNotes(bookmark.notes);
+          } else {
+            setOptimisticNotes([]);
+          }
+        } catch (error) {
+          console.error("Error fetching notes for bookmark:", error);
+          // Fallback to notes from the bookmark object if API call fails
+          if (bookmark.notes) {
+            setOptimisticNotes(bookmark.notes);
+          } else {
+            setOptimisticNotes([]);
+          }
+        }
+      };
+      
+      fetchNotes();
+    } else {
       setOptimisticNotes([]);
     }
-  }, [bookmark]);
+  }, [bookmark?.id]);
   
-  // Poll AI processing status if it's in progress
+  // Check AI processing status
   useEffect(() => {
-    // Only poll if we're in processing state
-    if (bookmark?.id && aiProcessingStatus === "processing") {
-      const intervalId = setInterval(async () => {
+    if (bookmark) {
+      // Set initial status based on bookmark data
+      if (bookmark.ai_processing_status) {
+        setAiProcessingStatus(bookmark.ai_processing_status as any);
+      } else {
+        // Check if we have insights or system-generated tags
+        const hasInsights = bookmark.insights && Object.keys(bookmark.insights).length > 0;
+        const hasSystemTags = tags.some(tag => tag.type === 'system');
+        
+        if (hasInsights || hasSystemTags) {
+          setAiProcessingStatus('completed');
+        } else {
+          setAiProcessingStatus('pending');
+        }
+      }
+      
+      // Fetch the current processing status
+      const checkProcessingStatus = async () => {
         try {
           const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
           if (response.ok) {
-            const data = await response.json();
-            setAiProcessingStatus(data.status);
+            const statusData = await response.json();
             
-            // If processing completes, refresh the bookmark data to get updated content
-            if (data.status === "completed") {
-              // Invalidate and refetch to get fresh data
-              queryClient.invalidateQueries({ 
-                queryKey: ['/api/bookmarks/details', bookmark.id] 
-              });
+            if (statusData.aiProcessingComplete) {
+              setAiProcessingStatus('completed');
             }
           }
         } catch (error) {
-          console.error("Error polling AI processing status:", error);
+          console.error("Error checking AI processing status:", error);
         }
-      }, 5000);
+      };
       
-      return () => clearInterval(intervalId);
+      checkProcessingStatus();
     }
-  }, [bookmark?.id, aiProcessingStatus, queryClient]);
+  }, [bookmark, tags]);
   
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
