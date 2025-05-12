@@ -586,7 +586,19 @@ export default function AiChat() {
                         </div>
                         {message.sender === "ai" ? (
                           <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-headings:my-2 prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                            <ReactMarkdown
+                              components={{
+                                a: ({ node, ...props }) => (
+                                  <a 
+                                    {...props} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                  />
+                                ),
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
                           </div>
                         ) : (
                           <div className="whitespace-pre-wrap">{message.content}</div>
