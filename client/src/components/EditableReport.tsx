@@ -26,7 +26,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const [title, setTitle] = useState(report.title);
   const [content, setContent] = useState(report.content);
   const [isSaving, setIsSaving] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   // Update local state when report changes from props
@@ -34,6 +34,22 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     setTitle(report.title);
     setContent(report.content);
   }, [report.id, report.title, report.content]);
+  
+  // Auto-resize textarea for title
+  useEffect(() => {
+    const resizeTextarea = () => {
+      const textarea = titleInputRef.current;
+      if (textarea) {
+        // Reset height to auto to get the correct scrollHeight
+        textarea.style.height = 'auto';
+        // Set the height to match the content
+        textarea.style.height = `${textarea.scrollHeight}px`;
+      }
+    };
+    
+    // Resize when component mounts and when title changes
+    resizeTextarea();
+  }, [title]);
 
   const saveReport = async (updates: { title?: string; content?: string }) => {
     if (!updates.title && !updates.content) return;
@@ -100,13 +116,13 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     debouncedSaveContent(newContent);
   };
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
     debouncedSaveTitle(newTitle);
   };
 
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       titleInputRef.current?.blur();
@@ -115,13 +131,21 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
 
   return (
     <div className="p-6">
-      <input
+      <textarea
         ref={titleInputRef}
-        className="text-2xl font-bold mb-2 w-full bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/20 rounded px-2 py-1 -ml-2"
+        className="text-2xl font-bold mb-2 w-full bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/20 rounded px-2 py-1 -ml-2 resize-none overflow-hidden leading-tight"
         value={title}
         onChange={handleTitleChange}
         onKeyDown={handleTitleKeyDown}
         placeholder="Enter report title..."
+        rows={1}
+        style={{ 
+          minHeight: "2.5rem", 
+          height: "auto",
+          lineHeight: "1.2", 
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word" 
+        }}
       />
       <div className="text-sm text-gray-500 mb-6 flex items-center gap-2 justify-between">
         <div className="flex items-center gap-2">
