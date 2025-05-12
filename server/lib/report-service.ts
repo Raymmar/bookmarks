@@ -10,7 +10,7 @@ import { InsertReport, Report } from "@shared/schema";
 import OpenAI from "openai";
 import { addWeeks, subWeeks, startOfWeek, endOfWeek, format, subDays } from "date-fns";
 
-// Define report status types - matches the schema enum values
+// Define report status types
 type ReportStatus = "generating" | "completed" | "failed";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -20,14 +20,6 @@ const MODEL = "gpt-4o";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-// Default system prompt for title generation
-const DEFAULT_TITLE_SYSTEM_PROMPT = `You are a concise headline writer who creates accurate, descriptive titles.
-Given a report about bookmarks, create a brief, engaging title that captures the essence of the content.
-The title should be 8-12 words maximum and reflect the main themes or insights found in the report.
-Focus on being specific and informative rather than generic.
-DO NOT include phrases like "Daily Insights" or date ranges in your title.
-Return ONLY the title with no additional text, quotes, or explanations.`;
 
 // Default system prompt for report generation
 const DEFAULT_SYSTEM_PROMPT = `You are a casual yet professional research assistant with a direct and straightforward tone.
@@ -68,7 +60,6 @@ Remember you're writing for a casual reader who wants useful information present
 export interface GenerateReportOptions {
   userId: string;
   customSystemPrompt?: string;
-  customTitleSystemPrompt?: string;
   timePeriodStart?: Date;
   timePeriodEnd?: Date;
   maxBookmarks?: number;
@@ -80,54 +71,6 @@ export interface GenerateReportOptions {
  */
 export class ReportService {
   constructor() {}
-  
-  /**
-   * Generate a title for a report based on its content
-   * @param content The report content
-   * @param customTitleSystemPrompt Optional custom system prompt for title generation
-   * @returns A title string
-   */
-  async generateReportTitle(
-    content: string,
-    customTitleSystemPrompt?: string
-  ): Promise<string> {
-    try {
-      // Use default or custom system prompt
-      const systemPrompt = customTitleSystemPrompt || DEFAULT_TITLE_SYSTEM_PROMPT;
-      
-      // Create a shortened version of the content for the title generation
-      // to avoid token limits - 4000 characters should be enough context
-      const shortenedContent = content.length > 4000 
-        ? content.substring(0, 4000) + "..." 
-        : content;
-      
-      // Use OpenAI to generate a title
-      const response = await openai.chat.completions.create({
-        model: MODEL,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: `Generate a concise title for this report content: \n\n${shortenedContent}`,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 50, // Titles are short
-      });
-      
-      // Extract the title from the response
-      const title = response.choices[0].message.content?.trim() || 
-                   "Bookmark Insights Report"; // Fallback title
-      
-      return title;
-    } catch (error) {
-      console.error("Error generating report title:", error);
-      return "Bookmark Insights Report"; // Fallback title on error
-    }
-  }
 
   /**
    * Generate a report for the user's recent bookmarks
@@ -136,7 +79,6 @@ export class ReportService {
     const {
       userId,
       customSystemPrompt,
-      customTitleSystemPrompt,
       maxBookmarks = 100,
       reportType = "weekly",
     } = options;
@@ -153,24 +95,23 @@ export class ReportService {
       timePeriodStart = options.timePeriodStart || subWeeks(timePeriodEnd, 1);
     }
 
-    // Format date range for the initial report title (will be replaced later)
+    // Format date range for the report title
     const formattedStartDate = format(timePeriodStart, "MMM d, yyyy");
     const formattedEndDate = format(timePeriodEnd, "MMM d, yyyy");
-    // This is a temporary title that will be updated after content generation
-    const initialTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
+    const reportTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
     // Used to store the report for reference in the catch block
-    let reportObj: Report | undefined;
+    let reportObj: Report;
 
     try {
-      // Create the report first with initial values
-      // Note: Status is automatically set to "generating" in the schema definition
+      // Create the report first with "generating" status
       const report = await storage.createReport({
         user_id: userId,
-        title: initialTitle,
+        title: reportTitle,
         content: "Generating report...",
         time_period_start: timePeriodStart,
         time_period_end: timePeriodEnd,
+        status: "generating" as ReportStatus,
       });
 
       // Store the report for the catch block
@@ -184,12 +125,10 @@ export class ReportService {
       );
 
       if (bookmarksWithData.length === 0) {
-        // Update the content and set status to completed
-        await storage.updateReportStatus(report.id, "completed");
         await storage.updateReport(report.id, {
           content: "No bookmarks found for this time period.",
+          status: "completed",
         });
-        
         return {
           ...report,
           content: "No bookmarks found for this time period.",
@@ -274,70 +213,33 @@ export class ReportService {
       const content =
         response.choices[0].message.content ||
         "Failed to generate report content";
-        
-      console.log("Report content generated, now generating title...");
-        
-      // Generate a title for the report based on the content
-      const generatedTitle = await this.generateReportTitle(content, customTitleSystemPrompt);
-      
-      console.log(`Generated title: "${generatedTitle}"`);
 
-      // Update the report status first
-      await storage.updateReportStatus(report.id, "completed");
-      
-      // Update the report with the generated content and title
+      // Update the report with the generated content
       const updatedReport = await storage.updateReport(report.id, {
-        title: generatedTitle,
         content,
+        status: "completed",
       });
 
       return updatedReport || report;
     } catch (error) {
       console.error("Error generating weekly report:", error);
 
-      // Format date range for error case
-      const formattedStartDate = format(timePeriodStart, "MMM d, yyyy");
-      const formattedEndDate = format(timePeriodEnd, "MMM d, yyyy");
-      const fallbackTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
-
-      // If the report object isn't defined yet (error before report creation)
       if (!reportObj) {
-        // Create a minimal report with failed status
-        try {
-          // Create a new report with failed status
-          const errorReport = await storage.createReport({
-            user_id: userId,
-            title: fallbackTitle,
-            content: "Error generating report",
-            time_period_start: timePeriodStart,
-            time_period_end: timePeriodEnd,
-          });
-          
-          // Set the status to failed
-          await storage.updateReportStatus(errorReport.id, "failed");
-          
-          return errorReport;
-        } catch (createError) {
-          // If even creating the error report fails, return a minimal object
-          console.error("Failed to create error report:", createError);
-          // Since we're having type issues, create a compatible object structure
-          // that matches what the API expects to return
-          const errorObject = {
-            id: "",
-            user_id: userId,
-            title: fallbackTitle,
-            content: "Error generating report",
-            created_at: new Date(), // Use Date object as required by Report type
-            time_period_start: timePeriodStart,
-            time_period_end: timePeriodEnd,
-            status: "failed" as const, // Use const assertion to match the enum
-          };
-          
-          return errorObject;
-        }
+        // If we failed even before creating the report, return a minimal error response
+        return {
+          id: "",
+          user_id: userId,
+          title: reportTitle,
+          content: "Error generating report",
+          created_at: new Date(),
+          updated_at: new Date(),
+          time_period_start: timePeriodStart,
+          time_period_end: timePeriodEnd,
+          status: "failed" as ReportStatus,
+        };
       }
 
-      // Update the existing report with error status
+      // Update the report with error status
       const failedReport = await storage.updateReportStatus(
         reportObj.id,
         "failed",
