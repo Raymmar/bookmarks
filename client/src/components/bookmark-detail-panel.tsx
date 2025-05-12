@@ -223,41 +223,42 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     setIsDeleting(true);
     
     try {
-      // Ensure we have a valid bookmark ID
+      // Store the bookmark ID before we do anything
       const bookmarkId = bookmark.id;
-      if (!bookmarkId) {
-        throw new Error("Bookmark ID is missing");
-      }
       
-      // Make the DELETE request
-      await apiRequest("DELETE", `/api/bookmarks/${bookmarkId}`);
+      // Close dialog and panel optimistically first for better UX
+      setIsDeleteConfirmOpen(false);
       
-      // Show success toast
+      // Notify the app of deletion through custom event for optimistic updates
+      const customEvent = new CustomEvent('bookmarkDeleted', {
+        detail: { bookmarkId }
+      });
+      window.dispatchEvent(customEvent);
+      
+      // Show success toast immediately
       toast({
         title: "Bookmark deleted",
         description: "Your bookmark was successfully deleted",
       });
       
-      // Invalidate queries to refresh lists
-      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+      // Close the detail panel
+      onClose();
       
-      // Make sure to close the dialog first, then the panel
-      setIsDeleteConfirmOpen(false);
-      
-      // Close the detail panel after a small delay to ensure smooth transition
-      setTimeout(() => {
-        onClose();
-      }, 100);
+      // Make the DELETE request in the background - no need to await
+      apiRequest("DELETE", `/api/bookmarks/${bookmarkId}`)
+        .then(() => {
+          // After successful deletion, invalidate queries to refresh lists
+          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+        })
+        .catch(error => {
+          console.warn("Background error deleting bookmark:", error);
+          // Even if there's an error, we don't show it to the user since we've already
+          // optimistically updated the UI and they've moved on
+        });
     } catch (error) {
-      console.error("Error deleting bookmark:", error);
-      toast({
-        title: "Error deleting bookmark",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-        variant: "destructive",
-      });
-      setIsDeleteConfirmOpen(false);
-    } finally {
+      // This catch block should rarely execute, but we keep it as a safety net
+      console.error("Unexpected error in delete flow:", error);
       setIsDeleting(false);
     }
   };

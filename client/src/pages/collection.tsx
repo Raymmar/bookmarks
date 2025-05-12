@@ -142,6 +142,37 @@ export default function CollectionPage() {
       }
     };
   }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreBookmarks]);
+  
+  // Listen for bookmark deletion events
+  useEffect(() => {
+    const handleBookmarkDeleted = (e: Event) => {
+      // Cast to CustomEvent with the expected detail type
+      const event = e as CustomEvent<{bookmarkId: string}>;
+      const deletedId = event.detail?.bookmarkId;
+      
+      if (deletedId) {
+        console.log(`Bookmark deleted event received for ID: ${deletedId}`);
+        
+        // If the deleted bookmark is the currently selected one, clear selection
+        if (deletedId === selectedBookmarkId) {
+          setSelectedBookmarkId(null);
+        }
+        
+        // Refresh the bookmark list after a short delay
+        setTimeout(() => {
+          refetch();
+        }, 300);
+      }
+    };
+    
+    // Add event listener for bookmark deletion
+    window.addEventListener('bookmarkDeleted', handleBookmarkDeleted);
+    
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.removeEventListener('bookmarkDeleted', handleBookmarkDeleted);
+    };
+  }, [selectedBookmarkId, refetch]);
 
   // Show a message if collection not found
   if (!collectionsLoading && !collection) {
