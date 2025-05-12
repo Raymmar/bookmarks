@@ -662,6 +662,7 @@ export default function AiChat() {
                 <SelectContent>
                   <SelectItem value="day">Past 24 Hours</SelectItem>
                   <SelectItem value="week">Past 7 Days</SelectItem>
+                  <SelectItem value="month">Past 30 Days</SelectItem>
                 </SelectContent>
               </Select>
             </div>
