@@ -202,6 +202,39 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
+  // Use the consolidated details endpoint for fast loading
+  const { data: consolidatedData, isLoading: isLoadingDetails } = useQuery({
+    queryKey: ['/api/bookmarks/details', bookmark?.id],
+    queryFn: async () => {
+      if (!bookmark?.id) return null;
+      const response = await fetch(`/api/bookmarks/${bookmark.id}/details`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch bookmark details');
+      }
+      return response.json();
+    },
+    enabled: !!bookmark?.id,
+    // Short stale time so it refreshes if user stays on a bookmark for a while
+    staleTime: 60 * 1000,
+  });
+  
+  // Use the prefetched data if available
+  useEffect(() => {
+    if (consolidatedData) {
+      // Update bookmark with the latest data
+      setBookmark(consolidatedData.bookmark);
+      
+      // Update tags
+      setTags(consolidatedData.tags || []);
+      
+      // Update notes
+      setOptimisticNotes(consolidatedData.notes || []);
+      
+      // Update AI processing status
+      setAiProcessingStatus(consolidatedData.processing_status || 'pending');
+    }
+  }, [consolidatedData]);
+  
   // Collection related hooks and state
   const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
   const { data: allCollections = [] } = useCollections();
