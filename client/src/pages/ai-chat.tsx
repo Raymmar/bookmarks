@@ -50,7 +50,7 @@ export default function AiChat() {
   // Filter state
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState("all");
-  const [sources, setSources] = useState<string[]>(["extension", "web", "import"]);
+  const [sources, setSources] = useState<string[]>(["extension", "web", "import", "x"]);
   
   // Session state
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -296,7 +296,7 @@ export default function AiChat() {
       setMessages([]);
       setSelectedTags([]);
       setDateRange("all");
-      setSources(["extension", "web", "import"]);
+      setSources(["extension", "web", "import", "x"]);
       
       // Create chat filters
       const chatFilters = {
@@ -367,7 +367,7 @@ export default function AiChat() {
           setMessages([]);
           setSelectedTags([]);
           setDateRange("all");
-          setSources(["extension", "web", "import"]);
+          setSources(["extension", "web", "import", "x"]);
         }
       } else {
         // Just refresh the sessions list
@@ -725,6 +725,16 @@ export default function AiChat() {
                     onChange={() => toggleSource("import")}
                   />
                   <label htmlFor="source-import" className="text-sm">Import</label>
+                </div>
+                <div className="flex items-center">
+                  <input 
+                    type="checkbox" 
+                    id="source-x"
+                    className="rounded text-primary mr-2"
+                    checked={sources.includes("x")}
+                    onChange={() => toggleSource("x")}
+                  />
+                  <label htmlFor="source-x" className="text-sm">X.com</label>
                 </div>
               </div>
             </div>
