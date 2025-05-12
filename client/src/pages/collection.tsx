@@ -166,16 +166,8 @@ export default function CollectionPage() {
           <div className="flex flex-col h-full w-full">
             {/* Header with collection title and search */}
             <div className="border-b">
-              <div className="px-4 py-3">
-                <h1 className="text-xl font-bold truncate">
-                  {collection?.name || "Loading..."}
-                </h1>
-                {collection?.description && (
-                  <p className="text-sm text-gray-500 mt-1">{collection.description}</p>
-                )}
-              </div>
-              <div className="flex justify-between items-center p-3 border-t">
-                <div className="relative flex-1 mr-4">
+              <div className="flex justify-between items-center p-3">
+                <div className="relative flex-1 mr-3">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input 
                     className="pl-9" 
@@ -219,6 +211,14 @@ export default function CollectionPage() {
             
             {/* Content */}
             <div className="flex-1 overflow-auto flex flex-col h-full">
+              <div className="px-4 py-3">
+                <h1 className="text-xl font-bold truncate">
+                  {collection?.name || "Loading..."}
+                </h1>
+                {collection?.description && (
+                  <p className="text-sm text-gray-500 mt-1">{collection.description}</p>
+                )}
+              </div>
               <div className="flex-grow">
                 {viewMode === 'list' ? (
                   <BookmarkListView 
