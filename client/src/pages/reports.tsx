@@ -157,7 +157,7 @@ const Reports = () => {
         
         // Verify that the date is valid
         if (!isNaN(createdAtDate.getTime())) {
-          createdDate = `Generated on ${format(createdAtDate, 'MMM d, yyyy')}`;
+          createdDate = `${format(createdAtDate, 'MMM d, yyyy')}`;
         } else {
           console.error("Invalid date object created from report created_at");
           createdDate = 'Created date unavailable';
@@ -274,7 +274,7 @@ const Reports = () => {
         
         // Verify that the date is valid
         if (!isNaN(createdAtDate.getTime())) {
-          createdDate = `Generated on ${format(createdAtDate, 'MMMM d, yyyy')}`;
+          createdDate = `${format(createdAtDate, 'MMMM d, yyyy')}`;
         } else {
           console.error("Invalid date object created from report created_at");
           createdDate = 'Created date unavailable';
@@ -316,7 +316,7 @@ const Reports = () => {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6 px-2">
-        <h1 className="text-3xl font-bold">{preferences.reportType === 'daily' ? 'Daily' : 'Weekly'} Insights Reports</h1>
+        <h1 className="text-3xl font-bold">Bookmarks Digest</h1>
         <div className="flex items-center space-x-3">
           <Select
             value={preferences.reportType}
@@ -359,12 +359,6 @@ const Reports = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-2">
         {/* Reports list panel */}
         <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Your Reports</CardTitle>
-            <CardDescription>
-              View insights from your saved content
-            </CardDescription>
-          </CardHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {isLoadingReports ? (
               renderReportSkeletons()
