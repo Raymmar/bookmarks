@@ -121,7 +121,7 @@ export default function Feed() {
     };
   }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreBookmarks]);
   
-  // Listen for bookmark deletion events for optimistic UI updates
+  // Listen for bookmark deletion events with true optimistic UI updates
   useEffect(() => {
     const handleBookmarkDeleted = (e: Event) => {
       // Cast to CustomEvent with the expected detail type
@@ -136,14 +136,39 @@ export default function Feed() {
           setSelectedBookmarkId(null);
         }
         
-        // Immediately update our local bookmarks array to remove the deleted bookmark
-        // This is a true optimistic update that will be visible right away
-        const updatedBookmarks = bookmarks.filter(b => b.id !== deletedId);
+        // Update all possible query keys for the current view
+        // This ensures the UI updates immediately in all views and states
         
-        // Update the React Query cache optimistically
-        queryClient.setQueryData(["/api/bookmarks"], updatedBookmarks);
+        // Main feed query
+        queryClient.setQueryData(["/api/bookmarks"], (oldData: any) => {
+          if (Array.isArray(oldData)) {
+            return oldData.filter(b => b.id !== deletedId);
+          }
+          return oldData;
+        });
         
-        // Also refresh in the background to ensure we're in sync
+        // Search-filtered query (if we have an active search)
+        if (debouncedSearchQuery) {
+          queryClient.setQueryData(["/api/bookmarks", { query: debouncedSearchQuery }], (oldData: any) => {
+            if (Array.isArray(oldData)) {
+              return oldData.filter(b => b.id !== deletedId);
+            }
+            return oldData;
+          });
+        }
+        
+        // Sort-specific query
+        queryClient.setQueryData(["/api/bookmarks", { sort: sortOrder }], (oldData: any) => {
+          if (Array.isArray(oldData)) {
+            return oldData.filter(b => b.id !== deletedId);
+          }
+          return oldData;
+        });
+        
+        // Invalidate the specific bookmark endpoint to avoid stale data
+        queryClient.invalidateQueries({ queryKey: ["/api/bookmarks", deletedId] });
+        
+        // Also refresh in the background to ensure we're in sync with server
         setTimeout(() => {
           refetch();
         }, 500);
@@ -157,7 +182,7 @@ export default function Feed() {
     return () => {
       window.removeEventListener('bookmarkDeleted', handleBookmarkDeleted);
     };
-  }, [selectedBookmarkId, refetch, bookmarks, queryClient]);
+  }, [selectedBookmarkId, refetch, debouncedSearchQuery, sortOrder, queryClient]);
 
   return (
     <div className="h-full w-full bg-gray-50">
