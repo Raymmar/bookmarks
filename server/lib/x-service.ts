@@ -17,7 +17,8 @@ import type { Bookmark } from '@shared/schema';
 import { 
   xCredentials, XCredentials, InsertXCredentials, 
   xFolders, XFolder, InsertXFolder, 
-  bookmarks, InsertCollection, InsertBookmark
+  bookmarks,
+  InsertCollection, InsertBookmark
 } from '@shared/schema';
 import crypto from 'crypto';
 import { URLSearchParams } from 'url';
@@ -26,9 +27,6 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
-
-// Sync lock to prevent concurrent syncs for the same user
-const activeSyncs = new Map<string, boolean>();
 
 /**
  * X API configuration
@@ -1040,21 +1038,10 @@ export class XService {
   async syncBookmarks(userId: string): Promise<{ added: number, updated: number, errors: number }> {
     console.log(`X Sync: Starting bookmark sync for user ${userId}`);
     
-    // Check if a sync is already in progress for this user
-    if (activeSyncs.has(userId)) {
-      console.log(`X Sync: Sync already in progress for user ${userId}, skipping duplicate sync`);
-      return { added: 0, updated: 0, errors: 0 };
-    }
-    
-    // Set lock to prevent concurrent syncs
-    activeSyncs.set(userId, true);
-    
     // Track statistics
     let added = 0;
     let updated = 0;
     let errors = 0;
-    
-    try {
     
     // Get all bookmarks from X.com
     let allBookmarks: { 
@@ -1263,13 +1250,6 @@ export class XService {
     
     console.log(`X Sync: Finished - Added: ${added}, Updated: ${updated}, Errors: ${errors}`);
     return { added, updated, errors };
-  } catch (error) {
-    console.error(`X Sync: Error during sync process for user ${userId}:`, error);
-    throw error;
-  } finally {
-    // Always release the lock when sync is complete, even if there was an error
-    console.log(`X Sync: Releasing sync lock for user ${userId}`);
-    activeSyncs.delete(userId);
   }
   
   /**
