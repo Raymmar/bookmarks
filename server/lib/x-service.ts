@@ -13,8 +13,8 @@ import { storage, IStorage } from "../storage";
 import { BookmarkService, bookmarkService } from "./bookmark-service";
 import { aiProcessorService } from "./ai-processor-service";
 import { db } from "../db";
-import { bookmarks, xCredentials } from "../../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { bookmarks, xCredentials, xSyncLocks } from "../../shared/schema";
+import { eq, and, gt } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
 // X.com API constants
