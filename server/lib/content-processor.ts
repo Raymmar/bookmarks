@@ -709,9 +709,9 @@ export async function generateChatResponse(
     }
     
     // Limit to 200 bookmarks max to prevent overwhelming the AI
-    if (bookmarks.length > 200) {
-      console.log(`Limiting from ${bookmarks.length} to 200 bookmarks to prevent context overflow`);
-      bookmarks = bookmarks.slice(0, 200);
+    if (bookmarks.length > 100) {
+      console.log(`Limiting from ${bookmarks.length} to 100 bookmarks to prevent context overflow`);
+      bookmarks = bookmarks.slice(0, 100);
     }
     
     // Fetch insights for the filtered bookmarks
@@ -814,7 +814,7 @@ ${context}`
         }
       ],
       temperature: 0.3,  // Lower temperature for more focused, detailed analysis
-      max_tokens: 4000   // Increased token limit for more comprehensive responses
+      max_tokens: 8000   // Increased token limit for more comprehensive responses
     });
     
     return response.choices[0].message.content || "I couldn't generate a response. Please try a different question.";
