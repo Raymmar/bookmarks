@@ -180,11 +180,11 @@ const Reports = () => {
         onClick={() => setSelectedReportId(report.id)}
       >
         <div className="flex flex-col">
-          <h3 className="text-lg font-medium">{report.title}</h3>
           <div className="text-sm text-gray-500 flex items-center gap-1">
             <Calendar className="w-4 h-4" /> 
             {createdDate}
           </div>
+          <h3 className="text-lg font-medium">{report.title}</h3>
           <div className={`text-sm font-medium ${statusClass} mt-1`}>
             {statusLabel}
           </div>
