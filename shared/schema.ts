@@ -431,21 +431,6 @@ export const xCredentialsRelations = relations(xCredentials, ({ one }) => ({
   }),
 }));
 
-// X Sync locks table to prevent multiple syncs for the same user
-export const xSyncLocks = pgTable("x_sync_locks", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  user_id: uuid("user_id").references(() => users.id).notNull().unique(),
-  locked_at: timestamp("locked_at").defaultNow().notNull(),
-  expires_at: timestamp("expires_at").notNull(), // Lock will auto-expire after this time
-});
-
-export const xSyncLocksRelations = relations(xSyncLocks, ({ one }) => ({
-  user: one(users, {
-    fields: [xSyncLocks.user_id],
-    references: [users.id],
-  }),
-}));
-
 export const xFoldersRelations = relations(xFolders, ({ one }) => ({
   user: one(users, {
     fields: [xFolders.user_id],
