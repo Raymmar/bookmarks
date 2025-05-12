@@ -49,7 +49,7 @@ export default function AiChat() {
   
   // Filter state
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState("week"); // Default to one week instead of all time
+  const [dateRange, setDateRange] = useState("day"); // Default to 24 hours
   const [sources, setSources] = useState<string[]>(["extension", "web", "import", "x"]);
   
   // Session state
@@ -146,21 +146,15 @@ export default function AiChat() {
       // Prepare date filters
       let startDate: string | undefined;
       
-      if (dateRange !== "all") {
-        const now = new Date();
-        if (dateRange === "week") {
-          const weekAgo = new Date();
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          startDate = weekAgo.toISOString();
-        } else if (dateRange === "month") {
-          const monthAgo = new Date();
-          monthAgo.setMonth(monthAgo.getMonth() - 1);
-          startDate = monthAgo.toISOString();
-        } else if (dateRange === "year") {
-          const yearAgo = new Date();
-          yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-          startDate = yearAgo.toISOString();
-        }
+      const now = new Date();
+      if (dateRange === "week") {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        startDate = weekAgo.toISOString();
+      } else if (dateRange === "day") {
+        const dayAgo = new Date();
+        dayAgo.setDate(dayAgo.getDate() - 1);
+        startDate = dayAgo.toISOString();
       }
       
       // Prepare chat filters
@@ -269,14 +263,13 @@ export default function AiChat() {
           const startDate = new Date(session.filters.startDate);
           const daysDiff = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
           
-          if (daysDiff <= 7) {
+          if (daysDiff <= 1) {
+            setDateRange("day");
+          } else if (daysDiff <= 7) {
             setDateRange("week");
-          } else if (daysDiff <= 30) {
-            setDateRange("month");
-          } else if (daysDiff <= 365) {
-            setDateRange("year");
           } else {
-            setDateRange("all");
+            // Default to week if it's an older filter setting
+            setDateRange("week");
           }
         }
       }
@@ -295,7 +288,7 @@ export default function AiChat() {
       // Reset the UI first
       setMessages([]);
       setSelectedTags([]);
-      setDateRange("week"); // Default to one week instead of all time
+      setDateRange("day"); // Default to 24 hours
       setSources(["extension", "web", "import", "x"]);
       
       // Create chat filters
@@ -366,7 +359,7 @@ export default function AiChat() {
           setActiveChatId(null);
           setMessages([]);
           setSelectedTags([]);
-          setDateRange("week"); // Default to one week instead of all time
+          setDateRange("day"); // Default to 24 hours
           setSources(["extension", "web", "import", "x"]);
         }
       } else {
@@ -685,10 +678,8 @@ export default function AiChat() {
                   <SelectValue placeholder="Select time range" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="week">Past Week</SelectItem>
-                  <SelectItem value="month">Past Month</SelectItem>
-                  <SelectItem value="year">Past Year</SelectItem>
+                  <SelectItem value="day">Past 24 Hours</SelectItem>
+                  <SelectItem value="week">Past 7 Days</SelectItem>
                 </SelectContent>
               </Select>
             </div>
