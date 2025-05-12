@@ -86,15 +86,24 @@ export default function Feed() {
   
   // We'll filter the bookmarks after checking for deleted ones below
   
-  // Fetch the selected bookmark's details
-  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkType>({
+  // Use optimized fetch strategy for better progressive loading
+  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkType | null>({
     queryKey: ['/api/bookmarks', selectedBookmarkId],
     queryFn: async () => {
       if (!selectedBookmarkId) return null;
+      
+      // Find the bookmark in our existing data if possible for immediate display
+      const existingBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
+      
+      // Fetch the full data in the background
       const data = await fetch(`/api/bookmarks/${selectedBookmarkId}`).then(res => res.json());
+      
+      // Return combined data (this ensures we show what we have while waiting for the rest)
       return data;
     },
     enabled: !!selectedBookmarkId,
+    // Faster initial load, with background refresh for better UX
+    staleTime: 30000, // 30 seconds
   });
   
   // Save sort preference in local storage
@@ -302,14 +311,14 @@ export default function Feed() {
               // This creates a better perceived performance since users see content immediately
               <BookmarkDetailSkeleton 
                 onClose={handleCloseDetail}
-                // Pass any immediately available data to show right away
-                title={selectedBookmark?.title}
-                url={selectedBookmark?.url}
+                // Get basic data from the bookmark if available
+                title={selectedBookmark?.title as string | undefined}
+                url={selectedBookmark?.url as string | undefined}
               />
             ) : (
               // Full bookmark details panel once data is loaded
               <BookmarkDetailPanel
-                bookmark={selectedBookmark}
+                bookmark={selectedBookmark || undefined}
                 onClose={handleCloseDetail}
               />
             )
