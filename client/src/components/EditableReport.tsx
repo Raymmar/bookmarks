@@ -40,6 +40,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
 
     setIsSaving(true);
     try {
+      // Send the update to the API
       await apiRequest('PUT', `/api/reports/${report.id}`, updates);
       
       // Set the last saved timestamp
@@ -49,11 +50,14 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       queryClient.invalidateQueries({ queryKey: ['/api/reports'] });
       queryClient.invalidateQueries({ queryKey: [`/api/reports/${report.id}`] });
       
-      toast({
-        title: 'Report saved',
-        description: 'Your changes have been saved successfully.',
-        variant: 'default',
-      });
+      // Only show the success toast the first time in a session
+      if (!lastSavedAt) {
+        toast({
+          title: 'Report saved',
+          description: 'Your changes have been saved successfully.',
+          variant: 'default',
+        });
+      }
     } catch (error) {
       console.error('Error saving report:', error);
       toast({
@@ -83,13 +87,14 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   };
 
   // Debounced save functions to avoid too many API calls
+  // Increase debounce time to reduce API calls
   const debouncedSaveContent = debounce((newContent: string) => {
     saveReport({ content: newContent });
-  }, 1500);
+  }, 4000); // 4 seconds
 
   const debouncedSaveTitle = debounce((newTitle: string) => {
     saveReport({ title: newTitle });
-  }, 1000);
+  }, 2000); // 2 seconds
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent);

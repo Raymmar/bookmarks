@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
@@ -7,6 +7,15 @@ import Heading from '@tiptap/extension-heading';
 import { Markdown } from 'tiptap-markdown';
 import MarkdownIt from 'markdown-it';
 import { cn } from '@/lib/utils';
+import { debounce } from '@/lib/utils';
+import { 
+  Bold, 
+  Italic, 
+  ListOrdered, 
+  List, 
+  Link as LinkIcon,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface TiptapEditorProps {
   content: string;
@@ -15,6 +24,31 @@ interface TiptapEditorProps {
   placeholder?: string;
   editable?: boolean;
 }
+
+// Menu button component for bubble menu
+const MenuButton = ({ 
+  active = false, 
+  onClick, 
+  children 
+}: { 
+  active?: boolean; 
+  onClick: () => void; 
+  children: React.ReactNode 
+}) => {
+  return (
+    <Button
+      variant={active ? "default" : "ghost"}
+      size="icon"
+      className={cn(
+        "h-8 w-8 p-0 rounded-full",
+        active && "bg-primary text-primary-foreground"
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+};
 
 const TiptapEditor = ({
   content,
@@ -35,6 +69,14 @@ const TiptapEditor = ({
     });
     return md.render(markdown);
   }, []);
+
+  // Create a debounced onChange handler with increased delay
+  const debouncedOnChange = useMemo(
+    () => debounce((markdown: string) => {
+      onChange(markdown);
+    }, 3000), // 3 seconds delay
+    [onChange]
+  );
 
   // Initialize the editor with the given content
   const editor = useEditor({
@@ -71,7 +113,8 @@ const TiptapEditor = ({
       if (isInitialized) {
         // Get content as markdown
         const markdown = editor.storage.markdown.getMarkdown();
-        onChange(markdown);
+        // Use debounced onChange
+        debouncedOnChange(markdown);
       }
     },
   });
@@ -103,9 +146,74 @@ const TiptapEditor = ({
     }
   }, [editor, editable]);
 
+  if (!editor) {
+    return null;
+  }
+
   // Add custom styles for the editor
   return (
     <div className={cn('prose prose-slate dark:prose-invert max-w-none', className)}>
+      {/* Bubble menu for text formatting */}
+      <BubbleMenu 
+        editor={editor} 
+        tippyOptions={{ duration: 150 }}
+        shouldShow={({ editor, from, to }) => {
+          // Only show when text is selected
+          return from !== to && editor.isEditable;
+        }}
+        className="bg-popover text-popover-foreground shadow-md rounded-md p-1.5 flex gap-1"
+      >
+        <MenuButton 
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          active={editor.isActive('bold')}
+        >
+          <Bold className="h-4 w-4" />
+        </MenuButton>
+        
+        <MenuButton 
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          active={editor.isActive('italic')}
+        >
+          <Italic className="h-4 w-4" />
+        </MenuButton>
+        
+        <div className="w-px h-6 bg-border mx-1"></div>
+        
+        <MenuButton 
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          active={editor.isActive('bulletList')}
+        >
+          <List className="h-4 w-4" />
+        </MenuButton>
+        
+        <MenuButton 
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          active={editor.isActive('orderedList')}
+        >
+          <ListOrdered className="h-4 w-4" />
+        </MenuButton>
+        
+        <div className="w-px h-6 bg-border mx-1"></div>
+        
+        <MenuButton 
+          onClick={() => {
+            if (editor.isActive('link')) {
+              // If a link is active, unset it
+              editor.chain().focus().unsetLink().run();
+            } else {
+              // Prompt user for URL
+              const url = window.prompt('Enter link URL:');
+              if (url) {
+                editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+              }
+            }
+          }}
+          active={editor.isActive('link')}
+        >
+          <LinkIcon className="h-4 w-4" />
+        </MenuButton>
+      </BubbleMenu>
+      
       <EditorContent 
         editor={editor} 
         className="min-h-[300px] focus-within:outline-none border-0"
