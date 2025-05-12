@@ -160,7 +160,7 @@ export class ReportService {
     const initialTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
     // Used to store the report for reference in the catch block
-    let reportObj: Report;
+    let reportObj: Report | undefined;
 
     try {
       // Create the report first with initial values
@@ -301,7 +301,7 @@ export class ReportService {
       const fallbackTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
       // If the report object isn't defined yet (error before report creation)
-      if (typeof reportObj === 'undefined') {
+      if (!reportObj) {
         // Create a minimal report with failed status
         try {
           // Create a new report with failed status
@@ -320,16 +320,20 @@ export class ReportService {
         } catch (createError) {
           // If even creating the error report fails, return a minimal object
           console.error("Failed to create error report:", createError);
-          return {
+          // Since we're having type issues, create a compatible object structure
+          // that matches what the API expects to return
+          const errorObject = {
             id: "",
             user_id: userId,
             title: fallbackTitle,
             content: "Error generating report",
-            created_at: new Date().toISOString(),
-            time_period_start: timePeriodStart.toISOString(),
-            time_period_end: timePeriodEnd.toISOString(),
-            status: "failed",
-          } as Report;
+            created_at: new Date(), // Use Date object as required by Report type
+            time_period_start: timePeriodStart,
+            time_period_end: timePeriodEnd,
+            status: "failed" as const, // Use const assertion to match the enum
+          };
+          
+          return errorObject;
         }
       }
 
