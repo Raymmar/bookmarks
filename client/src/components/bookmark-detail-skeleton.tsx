@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 
 interface BookmarkDetailSkeletonProps {
   onClose: () => void;
-  title?: string;
-  url?: string;
+  title?: string | null;
+  url?: string | null;
 }
 
 export function BookmarkDetailSkeleton({ onClose, title, url }: BookmarkDetailSkeletonProps) {

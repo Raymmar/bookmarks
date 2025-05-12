@@ -87,7 +87,7 @@ export default function Feed() {
   // We'll filter the bookmarks after checking for deleted ones below
   
   // Use optimized fetch strategy for better progressive loading
-  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkType | null>({
+  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<any>({
     queryKey: ['/api/bookmarks', selectedBookmarkId],
     queryFn: async () => {
       if (!selectedBookmarkId) return null;
@@ -311,9 +311,9 @@ export default function Feed() {
               // This creates a better perceived performance since users see content immediately
               <BookmarkDetailSkeleton 
                 onClose={handleCloseDetail}
-                // Get basic data from the bookmark if available
-                title={selectedBookmark?.title as string | undefined}
-                url={selectedBookmark?.url as string | undefined}
+                // Use basic bookmark data when available (empty string as fallback)
+                title={selectedBookmark?.title || ''}
+                url={selectedBookmark?.url || ''}
               />
             ) : (
               // Full bookmark details panel once data is loaded

@@ -426,49 +426,58 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   
   // Check AI processing status using consolidated data when available
   useEffect(() => {
-    // If we have the processing status from the consolidated endpoint, use it
+    // Early exit if no bookmark
+    if (!bookmark) return;
+    
+    // If we have the processing status from the consolidated endpoint, use it and exit early
     if (detailProcessingStatus) {
       setAiProcessingStatus(detailProcessingStatus as any);
+      return;
     }
-    // Otherwise fall back to bookmark data and manual fetch
-    else if (bookmark) {
-      // Set initial status based on bookmark data
-      if (bookmark.ai_processing_status) {
-        setAiProcessingStatus(bookmark.ai_processing_status as any);
-      } else {
-        // Check if we have insights or system-generated tags
-        const hasInsights = bookmark.insights && Object.keys(bookmark.insights).length > 0;
-        const hasSystemTags = tags.some(tag => tag.type === 'system');
-        
-        if (hasInsights || hasSystemTags) {
-          setAiProcessingStatus('completed');
-        } else {
-          setAiProcessingStatus('pending');
-        }
-      }
+    
+    // Set initial status based on bookmark data
+    if (bookmark.ai_processing_status) {
+      setAiProcessingStatus(bookmark.ai_processing_status as any);
+    } else {
+      // Check if we have insights or system-generated tags
+      const hasInsights = bookmark.insights && Object.keys(bookmark.insights).length > 0;
+      const hasSystemTags = tags.some(tag => tag.type === 'system');
       
-      // Only fetch status separately if we don't have it from the consolidated endpoint
-      if (!detailProcessingStatus) {
-        // Fetch the current processing status
-        const checkProcessingStatus = async () => {
-          try {
-            const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
-            if (response.ok) {
-              const statusData = await response.json();
-              
-              if (statusData.aiProcessingComplete) {
-                setAiProcessingStatus('completed');
-              }
-            }
-          } catch (error) {
-            console.error("Error checking AI processing status:", error);
-          }
-        };
-        
-        checkProcessingStatus();
+      if (hasInsights || hasSystemTags) {
+        setAiProcessingStatus('completed');
+      } else {
+        setAiProcessingStatus('pending');
       }
     }
-  }, [bookmark, tags, detailProcessingStatus]);
+    
+    // Only make an API call if necessary and we haven't already determined status
+    // Store the bookmark ID in a local variable to avoid closure issues
+    const bookmarkId = bookmark.id;
+    
+    // Create a function to check processing status without re-creating it on every render
+    const checkProcessingStatus = async () => {
+      try {
+        const response = await fetch(`/api/bookmarks/${bookmarkId}/processing-status`);
+        if (response.ok) {
+          const statusData = await response.json();
+          
+          if (statusData.aiProcessingComplete) {
+            setAiProcessingStatus('completed');
+          }
+        }
+      } catch (error) {
+        console.error("Error checking AI processing status:", error);
+      }
+    };
+    
+    // Only make the API call if we don't already know the status
+    if (aiProcessingStatus === 'pending') {
+      checkProcessingStatus();
+    }
+  // Only depend on essential values that should trigger a re-run
+  // Use bookmark.id instead of the entire bookmark object
+  // Use tags.length instead of the entire tags array
+  }, [bookmark?.id, tags.length, detailProcessingStatus, aiProcessingStatus]);
   
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
