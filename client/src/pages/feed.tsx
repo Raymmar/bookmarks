@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
+import { BookmarkDetailSkeleton } from "@/components/bookmark-detail-skeleton";
 import { BookmarkGrid } from "@/components/responsive-bookmark-grid";
 import { BookmarkListView } from "@/components/bookmark-list-view";
 import { ViewModeSwitcher } from "@/components/view-mode-switcher";
@@ -297,25 +298,16 @@ export default function Feed() {
         <ResizablePanel defaultSize={30} minSize={30} className="min-w-[420px] h-full">
           {selectedBookmarkId ? (
             isLoadingBookmark ? (
-              // Loading state for bookmark details
-              <div className="flex flex-col h-full">
-                <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10">
-                  <div className="flex w-full items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
-                    <Button variant="ghost" size="icon" onClick={handleCloseDetail}>
-                      <X className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
-                    <p className="mt-2 text-gray-600">Loading bookmark details...</p>
-                  </div>
-                </div>
-              </div>
+              // Progressive loading with skeleton UI that shows partial data immediately
+              // This creates a better perceived performance since users see content immediately
+              <BookmarkDetailSkeleton 
+                onClose={handleCloseDetail}
+                // Pass any immediately available data to show right away
+                title={selectedBookmark?.title}
+                url={selectedBookmark?.url}
+              />
             ) : (
-              // Bookmark details panel
+              // Full bookmark details panel once data is loaded
               <BookmarkDetailPanel
                 bookmark={selectedBookmark}
                 onClose={handleCloseDetail}
