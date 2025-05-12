@@ -249,7 +249,18 @@ export class XService {
    * Get user credentials for X.com
    */
   async getUserCredentials(userId: string) {
-    return this.storage.getXCredentials(userId);
+    return this.storage.getXCredentialsByUserId(userId);
+  }
+  
+  /**
+   * Get all X.com folders for a user
+   * 
+   * Note: This is currently a stub implementation as X.com API doesn't directly support folders yet
+   */
+  async getAllFolders(userId: string): Promise<any[]> {
+    // Currently X.com doesn't have an official folders API, so we return an empty array
+    console.log(`Retrieving X.com folders for user ${userId}`);
+    return [];
   }
 
   /**
@@ -257,7 +268,7 @@ export class XService {
    */
   async deleteUserCredentials(userId: string): Promise<boolean> {
     try {
-      const credentials = await this.storage.getXCredentials(userId);
+      const credentials = await this.storage.getXCredentialsByUserId(userId);
       if (!credentials) {
         return true; // Already deleted or never existed
       }
@@ -290,7 +301,7 @@ export class XService {
     
     try {
       // Get user credentials
-      const credentials = await this.storage.getXCredentials(userId);
+      const credentials = await this.storage.getXCredentialsByUserId(userId);
       
       if (!credentials) {
         console.error(`X Sync: User ${userId} is not connected to X.com`);
@@ -337,7 +348,7 @@ export class XService {
       console.log(`X Sync: Found ${existingXBookmarks.size} existing X.com bookmarks`);
       
       // Get latest credentials after possible refresh
-      const updatedCredentials = await this.storage.getXCredentials(userId);
+      const updatedCredentials = await this.storage.getXCredentialsByUserId(userId);
       if (!updatedCredentials) {
         throw new Error("User credentials not found");
       }
