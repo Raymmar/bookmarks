@@ -33,6 +33,7 @@ import {
   useCollections, 
   useCollectionMutations 
 } from "@/hooks/use-collection-queries";
+import { useBookmarkDetails } from "@/hooks/use-bookmark-details";
 
 // Use the imported Tag type
 
@@ -175,6 +176,18 @@ function Lightbox({ images, initialIndex, onClose }: LightboxProps) {
 }
 
 export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: BookmarkDetailPanelProps) {
+  // Use our consolidated API endpoint hook if we have a bookmark ID
+  const {
+    bookmark: detailBookmark,
+    notes: detailNotes,
+    tags: detailTags,
+    collections: detailCollections,
+    processingStatus: detailProcessingStatus,
+    isLoading: isLoadingDetails
+  } = useBookmarkDetails(initialBookmark?.id || null);
+  
+  // Combine data from both sources (initial passed bookmark and detail API)
+  // This ensures backwards compatibility while also using the efficient endpoint
   const [bookmark, setBookmark] = useState<Bookmark | undefined>(initialBookmark);
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -202,8 +215,8 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
-  // Collection related hooks and state
-  const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
+  // Collection related hooks and state 
+  // These are kept for compatibility with existing component
   const { data: allCollections = [] } = useCollections();
   const { addBookmarkToCollection, removeBookmarkFromCollection } = useCollectionMutations();
   
