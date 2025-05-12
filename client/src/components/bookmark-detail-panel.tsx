@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X, Plus, RefreshCw, Brain, AlertCircle, Loader2, FolderIcon, Twitter, Heart, MessagesSquare, Repeat, Quote, Share2, ExternalLink, LockIcon, ZoomIn, ZoomOut, Trash2 } from "lucide-react";
 import { Bookmark, Highlight, Note, Tag as TagType } from "@shared/types";
+import TweetEmbed from "./tweet-embed";
 import { formatDate } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -1159,179 +1160,24 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           </a>
         </div>
         
-        {/* Twitter Card for X.com bookmarks */}
-        {bookmark.source === 'x' && (
-          <div className="mb-4 mt-4 bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-            {/* Tweet author info */}
-            {bookmark.author_username && (
-              <div className="flex items-start mb-3">
-                {/* We've removed the Twitter bird icon placeholder avatar as requested */}
-                <div>
-                  <div className="font-bold">{bookmark.author_name || 'Twitter User'}</div>
-                  <div className="text-gray-500 text-sm">@{bookmark.author_username}</div>
-                </div>
-                <div className="ml-auto">
-                  <a 
-                    href={bookmark.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-600"
-                    title="Open original post"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </div>
+        {/* Tweet Embed for X.com bookmarks */}
+        {bookmark && bookmark.source === 'x' && (
+          <div className="mb-4 mt-4">
+            <TweetEmbed 
+              tweetUrl={bookmark.url} 
+              className="rounded-xl overflow-hidden"
+            />
+            
+            {/* Fallback for when embedding fails or for debugging (disabled by default) */}
+            {false && (
+              <div className="border rounded-xl p-4 mt-2 text-sm text-gray-500">
+                Tweet ID: {bookmark.external_id || 'N/A'}<br />
+                Author: {bookmark.author_name || 'Unknown'} (@{bookmark.author_username || 'unknown'})<br />
+                Stats: {bookmark.like_count || 0} likes, {bookmark.repost_count || 0} reposts
               </div>
             )}
             
-            {/* Tweet content */}
-            <div className="mb-4 text-gray-800 break-words">
-              {bookmark.description}
-            </div>
-            
-            {/* Media content (from any source) */}
-            {bookmark.media_urls && bookmark.media_urls.length > 0 && (
-              <div className="mb-4 grid grid-cols-1 gap-2">
-                {/* Handle Twitter/X media URLs */}
-                {bookmark.media_urls
-                  .filter(url => url.includes('pbs.twimg.com'))
-                  .map((url, index) => (
-                    <div 
-                      key={`twitter-${index}`} 
-                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
-                      onClick={() => {
-                        // Get all eligible images for the lightbox
-                        const imageUrls = [...bookmark.media_urls || []].filter(u => {
-                          // Only include image URLs
-                          if (u.startsWith('/') || u.includes('media/tweets/')) return false;
-                          const isValidUrl = u.startsWith('http') || u.startsWith('https');
-                          const hasImageExtension = 
-                            u.endsWith('.jpg') || 
-                            u.endsWith('.jpeg') || 
-                            u.endsWith('.png') || 
-                            u.endsWith('.gif') || 
-                            u.endsWith('.webp') ||
-                            u.includes('pbs.twimg.com'); // Twitter images don't always have extensions
-                          return isValidUrl && hasImageExtension;
-                        });
-                        
-                        // Format images for the lightbox
-                        const images = imageUrls.map(imgUrl => ({
-                          url: imgUrl,
-                          alt: `Media from ${bookmark.title}`
-                        }));
-                        
-                        // Find index of this image in the array
-                        const currentIndex = imageUrls.findIndex(imgUrl => imgUrl === url);
-                        
-                        // Open lightbox with all images
-                        setLightbox({
-                          isOpen: true,
-                          images,
-                          initialIndex: currentIndex >= 0 ? currentIndex : 0
-                        });
-                      }}
-                    >
-                      <img 
-                        src={url} 
-                        alt={`Media from ${bookmark.title}`}
-                        className="w-full h-auto object-contain max-h-96"
-                        loading="lazy"
-                        onError={(e) => {
-                          // If image fails to load, show fallback message
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
-                            parent.innerHTML = 'Media unavailable';
-                          }
-                        }}
-                      />
-                    </div>
-                  ))}
-                
-                {/* Handle other media URLs - only render actual URLs, not local paths */}
-                {bookmark.media_urls
-                  .filter(url => {
-                    // Skip Twitter/X media URLs (already handled above)
-                    if (url.includes('pbs.twimg.com')) return false;
-                    
-                    // Skip local file paths (these are the problematic ones that lead to broken links)
-                    if (url.startsWith('/') || url.includes('media/tweets/')) return false;
-                    
-                    // Only include valid image URLs that include http/https protocol
-                    const isValidUrl = url.startsWith('http') || url.startsWith('https');
-                    
-                    // Only include common image extensions
-                    const hasImageExtension = 
-                      url.endsWith('.jpg') || 
-                      url.endsWith('.jpeg') || 
-                      url.endsWith('.png') || 
-                      url.endsWith('.gif') || 
-                      url.endsWith('.webp');
-                      
-                    return isValidUrl && hasImageExtension;
-                  })
-                  .map((url, index) => (
-                    <div 
-                      key={`other-${index}`} 
-                      className="block overflow-hidden rounded-lg border border-gray-200 hover:border-primary cursor-pointer"
-                      onClick={() => {
-                        // Get all eligible images for the lightbox
-                        const imageUrls = [...bookmark.media_urls || []].filter(u => {
-                          // Only include image URLs 
-                          if (u.startsWith('/') || u.includes('media/tweets/')) return false;
-                          const isValidUrl = u.startsWith('http') || u.startsWith('https');
-                          const hasImageExtension = 
-                            u.endsWith('.jpg') || 
-                            u.endsWith('.jpeg') || 
-                            u.endsWith('.png') || 
-                            u.endsWith('.gif') || 
-                            u.endsWith('.webp') ||
-                            u.includes('pbs.twimg.com'); // Twitter images don't always have extensions
-                          return isValidUrl && hasImageExtension;
-                        });
-                        
-                        // Format images for the lightbox
-                        const images = imageUrls.map(imgUrl => ({
-                          url: imgUrl,
-                          alt: `Media from ${bookmark.title}`
-                        }));
-                        
-                        // Find index of this image in the array
-                        const currentIndex = imageUrls.findIndex(imgUrl => imgUrl === url);
-                        
-                        // Open lightbox with all images
-                        setLightbox({
-                          isOpen: true,
-                          images,
-                          initialIndex: currentIndex >= 0 ? currentIndex : 0
-                        });
-                      }}
-                    >
-                      <img 
-                        src={url} 
-                        alt={`Media from ${bookmark.title}`}
-                        className="w-full h-auto object-contain max-h-96"
-                        loading="lazy"
-                        onError={(e) => {
-                          // If image fails to load, show fallback message
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
-                            parent.innerHTML = 'Media unavailable';
-                          }
-                        }}
-                      />
-                    </div>
-                  ))}
-              </div>
-            )}
-            
-            {/* Lightbox for enlarged images */}
+            {/* Lightbox for enlarged images when clicked */}
             {lightbox.isOpen && (
               <Lightbox 
                 images={lightbox.images}
@@ -1339,37 +1185,6 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 onClose={() => setLightbox({ isOpen: false, images: [], initialIndex: 0 })} 
               />
             )}
-            
-            {/* Tweet stats - more compact design to prevent overflow */}
-            <div className="border-t border-gray-100 pt-3 text-xs">
-              {/* Engagement stats in a more compact format */}
-              <div className="flex flex-wrap justify-items-stretch gap-4 text-gray-500">
-                {bookmark.like_count !== undefined && (
-                  <span className="inline-flex items-center whitespace-nowrap">
-                    <Heart className="h-3 w-3 mr-2" />
-                    {bookmark.like_count}
-                  </span>
-                )}
-                {bookmark.repost_count !== undefined && (
-                  <span className="inline-flex items-center whitespace-nowrap">
-                    <Repeat className="h-3 w-3 mr-1" />
-                    {bookmark.repost_count}
-                  </span>
-                )}
-                {bookmark.reply_count !== undefined && (
-                  <span className="inline-flex items-center whitespace-nowrap">
-                    <MessagesSquare className="h-3 w-3 mr-1" />
-                    {bookmark.reply_count}
-                  </span>
-                )}
-                {bookmark.quote_count !== undefined && (
-                  <span className="inline-flex items-center whitespace-nowrap">
-                    <Quote className="h-3 w-3 mr-1" />
-                    {bookmark.quote_count}
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
         )}
         
