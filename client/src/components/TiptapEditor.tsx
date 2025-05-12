@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import Heading from '@tiptap/extension-heading';
+import { Markdown } from 'tiptap-markdown';
+import MarkdownIt from 'markdown-it';
 import { cn } from '@/lib/utils';
 
 interface TiptapEditorProps {
@@ -22,11 +24,24 @@ const TiptapEditor = ({
   editable = true,
 }: TiptapEditorProps) => {
   const [isMounted, setIsMounted] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Convert markdown to HTML for initial content
+  const markdownToHtml = useCallback((markdown: string) => {
+    const md = new MarkdownIt({
+      html: true,
+      breaks: true,
+      linkify: true,
+    });
+    return md.render(markdown);
+  }, []);
 
   // Initialize the editor with the given content
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        heading: false, // Disable built-in heading to avoid duplication
+      }),
       Placeholder.configure({
         placeholder,
       }),
@@ -39,11 +54,25 @@ const TiptapEditor = ({
       Heading.configure({
         levels: [1, 2, 3],
       }),
+      Markdown.configure({
+        html: true,
+        tightLists: true,
+        tightListClass: 'tight',
+        bulletListMarker: '-',
+        linkify: true,
+        breaks: true,
+        transformPastedText: true,
+        transformCopiedText: false,
+      }),
     ],
-    content: content, // Initialize with markdown content
+    content: markdownToHtml(content),
     editable,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      if (isInitialized) {
+        // Get content as markdown
+        const markdown = editor.storage.markdown.getMarkdown();
+        onChange(markdown);
+      }
     },
   });
 
@@ -54,13 +83,18 @@ const TiptapEditor = ({
   // Update editor content when the content prop changes
   useEffect(() => {
     if (editor && isMounted) {
-      // Only update if the content has changed
-      const currentContent = editor.getHTML();
-      if (content !== currentContent) {
-        editor.commands.setContent(content);
+      if (!isInitialized) {
+        setIsInitialized(true);
+      } else {
+        // Only update if the content has changed and it's not from our own onChange
+        const currentMarkdown = editor.storage.markdown.getMarkdown();
+        if (content !== currentMarkdown) {
+          // Set content as HTML converted from markdown
+          editor.commands.setContent(markdownToHtml(content));
+        }
       }
     }
-  }, [editor, content, isMounted]);
+  }, [editor, content, isMounted, isInitialized, markdownToHtml]);
 
   // Update editor editable state when the editable prop changes
   useEffect(() => {
