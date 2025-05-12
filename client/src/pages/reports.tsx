@@ -316,7 +316,7 @@ const Reports = () => {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6 px-2">
-        <h1 className="text-3xl font-bold">Bookmarks Digest</h1>
+        <h1 className="text-3xl font-bold">Reports</h1>
         <div className="flex items-center space-x-3">
           <Select
             value={preferences.reportType}
