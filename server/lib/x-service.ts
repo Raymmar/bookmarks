@@ -28,6 +28,9 @@ import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 
+// Track active syncs by user ID to prevent duplicates
+const activeSyncs = new Set<string>();
+
 /**
  * X API configuration
  * These values should be obtained from the X Developer Portal
@@ -1036,6 +1039,14 @@ export class XService {
    * Only syncs main bookmarks, not folder bookmarks (those are synced separately via the folder-specific sync)
    */
   async syncBookmarks(userId: string): Promise<{ added: number, updated: number, errors: number }> {
+    // Check if a sync is already in progress for this user
+    if (activeSyncs.has(userId)) {
+      console.log(`X Sync: Skipping sync for user ${userId} because another sync is already in progress`);
+      return { added: 0, updated: 0, errors: 0 };
+    }
+    
+    // Add user to active syncs set
+    activeSyncs.add(userId);
     console.log(`X Sync: Starting bookmark sync for user ${userId}`);
     
     // Track statistics
