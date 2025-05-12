@@ -223,8 +223,16 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     setIsDeleting(true);
     
     try {
-      await apiRequest("DELETE", `/api/bookmarks/${bookmark.id}`, undefined);
+      // Ensure we have a valid bookmark ID
+      const bookmarkId = bookmark.id;
+      if (!bookmarkId) {
+        throw new Error("Bookmark ID is missing");
+      }
       
+      // Make the DELETE request
+      await apiRequest("DELETE", `/api/bookmarks/${bookmarkId}`);
+      
+      // Show success toast
       toast({
         title: "Bookmark deleted",
         description: "Your bookmark was successfully deleted",
@@ -234,17 +242,23 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
       
-      // Close the detail panel
-      onClose();
+      // Make sure to close the dialog first, then the panel
+      setIsDeleteConfirmOpen(false);
+      
+      // Close the detail panel after a small delay to ensure smooth transition
+      setTimeout(() => {
+        onClose();
+      }, 100);
     } catch (error) {
+      console.error("Error deleting bookmark:", error);
       toast({
         title: "Error deleting bookmark",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
+      setIsDeleteConfirmOpen(false);
     } finally {
       setIsDeleting(false);
-      setIsDeleteConfirmOpen(false);
     }
   };
   
