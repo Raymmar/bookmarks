@@ -786,13 +786,24 @@ export class XService {
                     const videoId = match[1];
                     
                     // Construct potential video URLs - we don't know the exact format, but we can try
-                    // common patterns used by Twitter
-                    // These are example formats, Twitter's actual URLs may vary
+                    // common patterns used by Twitter for different resolutions
+                    // Based on observed Twitter video URL patterns
                     const potentialVideoUrls = [
+                      // Amplify videos (various resolutions)
+                      `https://video.twimg.com/amplify_video/${videoId}/vid/1280x720/video.mp4`,
                       `https://video.twimg.com/amplify_video/${videoId}/vid/720x720/video.mp4`,
-                      `https://video.twimg.com/amplify_video/${videoId}/vid/480x480/video.mp4`,
+                      `https://video.twimg.com/amplify_video/${videoId}/vid/720x406/video.mp4`,
+                      `https://video.twimg.com/amplify_video/${videoId}/vid/480x480/video.mp4`, 
+                      `https://video.twimg.com/amplify_video/${videoId}/vid/480x270/video.mp4`,
+                      `https://video.twimg.com/amplify_video/${videoId}/vid/320x320/video.mp4`,
+                      
+                      // Extended tweet videos (various resolutions)
+                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/1280x720/video.mp4`,
                       `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/720x720/video.mp4`,
-                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/480x480/video.mp4`
+                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/720x406/video.mp4`,
+                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/480x480/video.mp4`,
+                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/480x270/video.mp4`,
+                      `https://video.twimg.com/ext_tw_video/${videoId}/pu/vid/320x320/video.mp4`
                     ];
                     
                     // Add the constructed URLs with a marker indicating they're guesses

@@ -1197,12 +1197,17 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                   .map((url, index) => {
                     // Determine media type based on URL patterns
                     const isTwitterImage = url.includes('pbs.twimg.com');
-                    const isTwitterVideo = url.includes('video.twimg.com') || 
-                                          (url.includes('.mp4') && 
-                                           (url.includes('amplify_video') || url.includes('tweet_video')));
+                    
+                    // Only consider actual video file URLs, not tweet URLs that contain videos
+                    const isTwitterVideo = 
+                      (url.includes('video.twimg.com') && url.endsWith('.mp4')) || 
+                      (url.includes('.mp4') && 
+                       (url.includes('amplify_video') || url.includes('tweet_video')));
                     
                     // Skip URLs that aren't Twitter media (we'll handle them separately below)
-                    if (!isTwitterImage && !isTwitterVideo) return null;
+                    // Also skip tweet URLs that point to videos but aren't direct video files
+                    if ((!isTwitterImage && !isTwitterVideo) || 
+                        (url.includes('/status/') && url.includes('/video/'))) return null;
                     
                     return (
                       <div 
@@ -1262,26 +1267,56 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                         )}
                         
                         {isTwitterVideo && (
-                          // Render video player for videos and animated GIFs
-                          <video 
-                            src={url}
-                            controls
-                            autoPlay={false}
-                            loop={url.includes('tweet_video')} // Loop for animated GIFs
-                            muted={url.includes('tweet_video')} // Mute GIFs by default
-                            className="w-full h-auto max-h-96"
-                            poster={bookmark.media_urls?.find(u => u && u.includes('pbs.twimg.com'))} // Use image as poster if available
-                            onError={(e) => {
-                              // If video fails to load, show fallback message
-                              const target = e.target as HTMLVideoElement;
-                              target.style.display = 'none';
-                              const parent = target.parentElement;
-                              if (parent) {
-                                parent.classList.add('bg-gray-50', 'p-3', 'text-sm', 'text-gray-500');
-                                parent.innerHTML = 'Video unavailable';
-                              }
-                            }}
-                          />
+                          <div className="relative">
+                            {/* Render video player for videos and animated GIFs */}
+                            <video 
+                              src={url}
+                              controls
+                              preload="metadata" // Only preload metadata to save bandwidth and prevent flickering
+                              autoPlay={false}
+                              loop={url.includes('tweet_video')} // Loop for animated GIFs
+                              muted={url.includes('tweet_video')} // Mute GIFs by default
+                              className="w-full h-auto max-h-96"
+                              poster={bookmark.media_urls?.find(u => u && u.includes('pbs.twimg.com'))} // Use image as poster if available
+                              onError={(e) => {
+                                // If video fails to load, hide it but don't show error immediately
+                                // This prevents multiple "Video unavailable" messages for the same video
+                                const target = e.target as HTMLVideoElement;
+                                target.style.display = 'none';
+                                
+                                // Find parent container
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  // Safer way to show error message without manipulating DOM directly
+                                  setTimeout(() => {
+                                    try {
+                                      // Check if parent still exists in the DOM
+                                      if (parent && parent.isConnected) {
+                                        // Create error message element
+                                        const errorDiv = document.createElement('div');
+                                        errorDiv.className = 'bg-gray-50 p-3 text-sm text-gray-500';
+                                        errorDiv.textContent = 'Video unavailable';
+                                        
+                                        // Clear parent and append error message
+                                        while (parent.firstChild) {
+                                          parent.removeChild(parent.firstChild);
+                                        }
+                                        parent.classList.add('bg-gray-50', 'p-3');
+                                        parent.appendChild(errorDiv);
+                                      }
+                                    } catch (err) {
+                                      console.error('Error handling video failure:', err);
+                                    }
+                                  }, 100);
+                                }
+                              }}
+                            />
+                            
+                            {/* Video badge indicator */}
+                            <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                              {url.includes('tweet_video') ? 'GIF' : 'VIDEO'}
+                            </div>
+                          </div>
                         )}
                       </div>
                     );
