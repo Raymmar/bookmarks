@@ -85,16 +85,23 @@ export default function Feed() {
   
   // We'll filter the bookmarks after checking for deleted ones below
   
-  // Fetch the selected bookmark's details
-  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkType>({
-    queryKey: ['/api/bookmarks', selectedBookmarkId],
+  // Fetch the selected bookmark's details using the consolidated endpoint
+  const { data: detailsData, isLoading: isLoadingBookmark } = useQuery({
+    queryKey: ['/api/bookmarks/details', selectedBookmarkId],
     queryFn: async () => {
       if (!selectedBookmarkId) return null;
-      const data = await fetch(`/api/bookmarks/${selectedBookmarkId}`).then(res => res.json());
-      return data;
+      const response = await fetch(`/api/bookmarks/${selectedBookmarkId}/details`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch bookmark details');
+      }
+      return response.json();
     },
     enabled: !!selectedBookmarkId,
+    staleTime: 60 * 1000, // Cache is fresh for 1 minute
   });
+  
+  // Extract the bookmark from the detailed data
+  const selectedBookmark = detailsData?.bookmark;
   
   // Save sort preference in local storage
   const handleSortChange = (value: string) => {
