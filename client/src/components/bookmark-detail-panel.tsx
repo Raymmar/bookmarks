@@ -1162,35 +1162,19 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         
         {/* Tweet Embed for X.com bookmarks */}
         {bookmark && bookmark.source === 'x' && (
-          <>
-            <TweetEmbed 
-              tweetUrl={bookmark.url} 
-              className="rounded-xl overflow-hidden"
-            />
-            
-            {/* Error handling: if tweet embedding fails */}
-            <noscript>
-              <div className="border rounded-xl p-4 mt-2 text-sm text-gray-500">
-                <a 
-                  href={bookmark.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-blue-600 hover:underline block"
-                >
-                  View original tweet on X.com
-                </a>
-              </div>
-            </noscript>
-            
-            {/* Lightbox for enlarged images when clicked */}
-            {lightbox.isOpen && (
-              <Lightbox 
-                images={lightbox.images}
-                initialIndex={lightbox.initialIndex}
-                onClose={() => setLightbox({ isOpen: false, images: [], initialIndex: 0 })} 
-              />
-            )}
-          </>
+          <TweetEmbed 
+            tweetUrl={bookmark.url} 
+            className="my-4 rounded-xl overflow-hidden"
+          />
+        )}
+        
+        {/* Lightbox for enlarged images when clicked */}
+        {lightbox.isOpen && (
+          <Lightbox 
+            images={lightbox.images}
+            initialIndex={lightbox.initialIndex}
+            onClose={() => setLightbox({ isOpen: false, images: [], initialIndex: 0 })} 
+          />
         )}
         
         {/* AI Insights Section */}

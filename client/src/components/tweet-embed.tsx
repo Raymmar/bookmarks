@@ -41,13 +41,16 @@ export const TweetEmbed = ({ tweetUrl, className }: TweetEmbedProps) => {
   if (!tweetId) {
     // If we couldn't extract a tweet ID, show an error message
     return (
-      <div className={cn("bg-red-50 p-4 rounded-md text-red-600", className)}>
-        Invalid tweet URL: {tweetUrl}
+      <div className={className}>
+        <div className="bg-red-50 p-4 rounded-md text-red-600">
+          Invalid tweet URL: {tweetUrl}
+        </div>
       </div>
     );
   }
 
   return (
+    // We'll handle styling via CSS by targeting the data-tweet-id attribute
     <div className={className}>
       <Tweet 
         id={tweetId}
