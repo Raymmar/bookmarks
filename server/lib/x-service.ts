@@ -94,12 +94,17 @@ interface XTweet {
  */
 interface XMedia {
   media_key: string;
-  type: 'photo' | 'video' | 'animated_gif' | 'video';
+  type: 'photo' | 'video' | 'animated_gif';
   url?: string;
   preview_image_url?: string;
   width?: number;
   height?: number;
   alt_text?: string;
+  variants?: Array<{
+    bit_rate?: number;
+    content_type: string;
+    url: string;
+  }>;
 }
 
 /**
@@ -718,13 +723,39 @@ export class XService {
       // Process all media items
       tweet.attachments.media_keys.forEach((mediaKey) => {
         const mediaItem = mediaMap[mediaKey];
-        if (mediaItem && (mediaItem.url || mediaItem.preview_image_url)) {
-          // Use the direct URL if available, otherwise use preview image
-          const mediaUrl = mediaItem.url || mediaItem.preview_image_url;
-          if (mediaUrl) {
-            // Add the original URL to mediaUrls
-            mediaUrls.push(mediaUrl);
-            console.log(`X Sync: Added media URL ${mediaUrl} for tweet ${tweet.id}`);
+        
+        if (mediaItem) {
+          // Handle media based on its type
+          if (mediaItem.type === 'photo' && (mediaItem.url || mediaItem.preview_image_url)) {
+            // For photos, use the direct URL if available, otherwise use preview image
+            const mediaUrl = mediaItem.url || mediaItem.preview_image_url;
+            if (mediaUrl) {
+              mediaUrls.push(mediaUrl);
+              console.log(`X Sync: Added photo media URL ${mediaUrl} for tweet ${tweet.id}`);
+            }
+          } 
+          else if ((mediaItem.type === 'video' || mediaItem.type === 'animated_gif') && mediaItem.variants?.length) {
+            // For videos and animated GIFs, get the direct video URL from variants
+            // Find the highest quality video URL (highest bit rate)
+            const videoVariants = mediaItem.variants
+              .filter(variant => variant.content_type === 'video/mp4')
+              .sort((a, b) => (b.bit_rate || 0) - (a.bit_rate || 0));
+            
+            if (videoVariants.length > 0) {
+              const videoUrl = videoVariants[0].url;
+              mediaUrls.push(videoUrl);
+              console.log(`X Sync: Added ${mediaItem.type} URL ${videoUrl} for tweet ${tweet.id}`);
+              
+              // Also add the preview image if available for fallback
+              if (mediaItem.preview_image_url) {
+                mediaUrls.push(mediaItem.preview_image_url);
+                console.log(`X Sync: Added preview image URL ${mediaItem.preview_image_url} for ${mediaItem.type}`);
+              }
+            } else if (mediaItem.preview_image_url) {
+              // If no video variants found, at least use the preview image
+              mediaUrls.push(mediaItem.preview_image_url);
+              console.log(`X Sync: Added preview image URL ${mediaItem.preview_image_url} as fallback for ${mediaItem.type}`);
+            }
           }
         }
       });
