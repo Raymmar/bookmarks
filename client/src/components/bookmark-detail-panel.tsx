@@ -1162,7 +1162,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         
         {/* Tweet Embed for X.com bookmarks */}
         {bookmark && bookmark.source === 'x' && (
-          <div className="mb-4 mt-4">
+          <div>
             <TweetEmbed 
               tweetUrl={bookmark.url} 
               className="rounded-xl overflow-hidden"

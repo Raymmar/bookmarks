@@ -14,11 +14,12 @@
 
 /* Twitter/X Embed Styling */
 .tweet-embed-container {
-  @apply overflow-hidden rounded-xl border border-gray-200 shadow-sm transition-shadow hover:shadow-md;
+  @apply overflow-hidden rounded-xl border border-gray-200 shadow-sm transition-shadow hover:shadow-md my-4;
 }
 
 .tweet-embed-container iframe {
   @apply w-full !important;
+  margin: 0 !important;
 }
 
 /* Custom styles for the Pinterest-style masonry grid */
