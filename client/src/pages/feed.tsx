@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Search, Filter, Bookmark, X, Loader2 } from "lucide-react";
 import { usePaginatedBookmarks } from "@/hooks/use-paginated-bookmarks";
+import { useFuzzySearch } from "@/hooks/use-fuzzy-search";
 import { Bookmark as BookmarkType } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,6 +38,7 @@ export default function Feed() {
   // State for search
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+  const [useServerSearch, setUseServerSearch] = useState<boolean>(true);
   
   // Ref for infinite scroll
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -44,6 +46,10 @@ export default function Feed() {
   // Debounce search input to prevent too many requests
   useEffect(() => {
     const timerId = setTimeout(() => {
+      // If the search query contains multiple words or special characters,
+      // use client-side fuzzy search for better results
+      const isComplexSearch = /\s+|[^a-zA-Z0-9]/.test(searchQuery) || searchQuery.length > 15;
+      setUseServerSearch(!isComplexSearch);
       setDebouncedSearchQuery(searchQuery);
     }, 300);
     
@@ -52,14 +58,30 @@ export default function Feed() {
   
   // Fetch paginated bookmarks with server-side search and infinite scroll
   const {
-    bookmarks,
+    bookmarks: fetchedBookmarks,
     isLoading,
     hasNextPage,
     loadMoreBookmarks,
     isFetchingNextPage,
     totalPages,
     refetch
-  } = usePaginatedBookmarks(50, sortOrder as 'newest' | 'oldest' | 'recently_updated', debouncedSearchQuery);
+  } = usePaginatedBookmarks(
+    50, 
+    sortOrder as 'newest' | 'oldest' | 'recently_updated', 
+    // Only use server search for simple queries, otherwise fetch all and filter client-side
+    useServerSearch ? debouncedSearchQuery : ''
+  );
+  
+  // Apply fuzzy search on the client side when we have complex queries
+  const fuzzySearchResults = useFuzzySearch(
+    fetchedBookmarks,
+    !useServerSearch ? debouncedSearchQuery : ''
+  );
+  
+  // Use either fuzzy search results or regular fetched bookmarks
+  const bookmarks = !useServerSearch && debouncedSearchQuery 
+    ? fuzzySearchResults 
+    : fetchedBookmarks;
   
   // We'll filter the bookmarks after checking for deleted ones below
   
@@ -180,10 +202,10 @@ export default function Feed() {
             {/* Header with integrated search */}
             <div className="flex justify-between items-center p-3 border-b">
               <div className="relative flex-1 mr-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${!useServerSearch && searchQuery ? 'text-primary' : 'text-muted-foreground'}`} />
                 <Input 
-                  className="pl-9" 
-                  placeholder="Search bookmarks..." 
+                  className={`pl-9 ${!useServerSearch && searchQuery ? 'border-primary' : ''}`}
+                  placeholder={`${!useServerSearch && searchQuery ? 'Fuzzy search active...' : 'Search bookmarks...'}`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -196,6 +218,11 @@ export default function Feed() {
                   >
                     <X className="h-4 w-4" />
                   </Button>
+                )}
+                {!useServerSearch && searchQuery && (
+                  <div className="absolute -bottom-6 left-0 text-xs text-primary">
+                    Fuzzy search: {fuzzySearchResults.length} results
+                  </div>
                 )}
               </div>
               <div className="flex space-x-2 flex-shrink-0">

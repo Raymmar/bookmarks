@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import Fuse from 'fuse.js';
+import type { IFuseOptions } from 'fuse.js';
 import { Bookmark } from '@shared/types';
 
 // Define the fields to search on and their weights
-const defaultOptions = {
+const defaultOptions: IFuseOptions<Bookmark> = {
   includeScore: true,
   // Keys to search with weighted importance
   keys: [
@@ -21,12 +22,8 @@ const defaultOptions = {
   ],
   // A lower threshold results in more matches
   threshold: 0.4,
-  // Allow matching any word in the query, not just the whole phrase
-  useExtendedSearch: true,
   // Support searching across word boundaries
   ignoreLocation: true,
-  // Fuzzy matching
-  fuzzySearch: true,
   // Allow fuzzy matches up to 2 characters off
   distance: 2
 };
@@ -34,10 +31,10 @@ const defaultOptions = {
 export function useFuzzySearch<T extends Bookmark>(
   items: T[],
   searchQuery: string,
-  options: Fuse.IFuseOptions<T> = defaultOptions
+  options: IFuseOptions<T> = defaultOptions as IFuseOptions<T>
 ) {
   // Create a memoized Fuse instance
-  const fuse = useMemo(() => new Fuse(items, options), [items, options]);
+  const fuse = useMemo(() => new Fuse<T>(items, options), [items, options]);
   
   // Track the filtered results
   const [results, setResults] = useState<T[]>(items);
