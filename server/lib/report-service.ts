@@ -21,6 +21,14 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Default system prompt for title generation
+const DEFAULT_TITLE_SYSTEM_PROMPT = `You are a concise headline writer who creates accurate, descriptive titles.
+Given a report about bookmarks, create a brief, engaging title that captures the essence of the content.
+The title should be 8-12 words maximum and reflect the main themes or insights found in the report.
+Focus on being specific and informative rather than generic.
+DO NOT include phrases like "Daily Insights" or date ranges in your title.
+Return ONLY the title with no additional text, quotes, or explanations.`;
+
 // Default system prompt for report generation
 const DEFAULT_SYSTEM_PROMPT = `You are a casual yet professional research assistant with a direct and straightforward tone.
 
@@ -60,6 +68,7 @@ Remember you're writing for a casual reader who wants useful information present
 export interface GenerateReportOptions {
   userId: string;
   customSystemPrompt?: string;
+  customTitleSystemPrompt?: string;
   timePeriodStart?: Date;
   timePeriodEnd?: Date;
   maxBookmarks?: number;
@@ -71,6 +80,54 @@ export interface GenerateReportOptions {
  */
 export class ReportService {
   constructor() {}
+  
+  /**
+   * Generate a title for a report based on its content
+   * @param content The report content
+   * @param customTitleSystemPrompt Optional custom system prompt for title generation
+   * @returns A title string
+   */
+  async generateReportTitle(
+    content: string,
+    customTitleSystemPrompt?: string
+  ): Promise<string> {
+    try {
+      // Use default or custom system prompt
+      const systemPrompt = customTitleSystemPrompt || DEFAULT_TITLE_SYSTEM_PROMPT;
+      
+      // Create a shortened version of the content for the title generation
+      // to avoid token limits - 4000 characters should be enough context
+      const shortenedContent = content.length > 4000 
+        ? content.substring(0, 4000) + "..." 
+        : content;
+      
+      // Use OpenAI to generate a title
+      const response = await openai.chat.completions.create({
+        model: MODEL,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: `Generate a concise title for this report content: \n\n${shortenedContent}`,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 50, // Titles are short
+      });
+      
+      // Extract the title from the response
+      const title = response.choices[0].message.content?.trim() || 
+                   "Bookmark Insights Report"; // Fallback title
+      
+      return title;
+    } catch (error) {
+      console.error("Error generating report title:", error);
+      return "Bookmark Insights Report"; // Fallback title on error
+    }
+  }
 
   /**
    * Generate a report for the user's recent bookmarks
@@ -79,6 +136,7 @@ export class ReportService {
     const {
       userId,
       customSystemPrompt,
+      customTitleSystemPrompt,
       maxBookmarks = 100,
       reportType = "weekly",
     } = options;
@@ -95,10 +153,11 @@ export class ReportService {
       timePeriodStart = options.timePeriodStart || subWeeks(timePeriodEnd, 1);
     }
 
-    // Format date range for the report title
+    // Format date range for the initial report title (will be replaced later)
     const formattedStartDate = format(timePeriodStart, "MMM d, yyyy");
     const formattedEndDate = format(timePeriodEnd, "MMM d, yyyy");
-    const reportTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
+    // This is a temporary title that will be updated after content generation
+    const initialTitle = `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${formattedStartDate} - ${formattedEndDate}`;
 
     // Used to store the report for reference in the catch block
     let reportObj: Report;
@@ -107,7 +166,7 @@ export class ReportService {
       // Create the report first with "generating" status
       const report = await storage.createReport({
         user_id: userId,
-        title: reportTitle,
+        title: initialTitle,
         content: "Generating report...",
         time_period_start: timePeriodStart,
         time_period_end: timePeriodEnd,
@@ -213,9 +272,17 @@ export class ReportService {
       const content =
         response.choices[0].message.content ||
         "Failed to generate report content";
+        
+      console.log("Report content generated, now generating title...");
+        
+      // Generate a title for the report based on the content
+      const generatedTitle = await this.generateReportTitle(content, customTitleSystemPrompt);
+      
+      console.log(`Generated title: "${generatedTitle}"`);
 
-      // Update the report with the generated content
+      // Update the report with the generated content and title
       const updatedReport = await storage.updateReport(report.id, {
+        title: generatedTitle,
         content,
         status: "completed",
       });
