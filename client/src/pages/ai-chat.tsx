@@ -628,7 +628,6 @@ export default function AiChat() {
             <h3 className="font-semibold text-gray-800 mb-3">Search Context</h3>
             
             <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Tags</h4>
               <TagSelector 
                 selectedTags={selectedTags}
                 onTagsChange={setSelectedTags}
