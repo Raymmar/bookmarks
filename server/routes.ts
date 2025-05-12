@@ -48,6 +48,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse collection_id if provided
       const collectionId = req.query.collection_id ? (req.query.collection_id as string) : undefined;
       
+      // Parse prefetchDetails flag to determine if full bookmark details should be included
+      const prefetchDetails = req.query.prefetchDetails === 'true';
+      
       console.log(`Search query received: "${searchQuery}"`); // Debug log
       
       let bookmarks;
@@ -123,9 +126,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Bookmark not found" });
       }
       
-      res.json(bookmark);
+      // Check if full details are requested
+      const includeDetails = req.query.includeDetails === 'true';
+      
+      if (includeDetails) {
+        // Fetch all related data in parallel for better performance
+        const [tags, notes, highlights, screenshots, insights, collections, processingStatus] = await Promise.all([
+          storage.getTagsByBookmarkId(req.params.id),
+          storage.getNotesByBookmarkId(req.params.id),
+          storage.getHighlightsByBookmarkId(req.params.id),
+          storage.getScreenshotsByBookmarkId(req.params.id),
+          storage.getInsightByBookmarkId(req.params.id),
+          storage.getCollectionsByBookmarkId(req.params.id),
+          storage.getBookmark(req.params.id).then(b => b?.ai_processing_status || 'pending')
+        ]);
+        
+        // Return the bookmark with all its related data
+        res.json({
+          ...bookmark,
+          details: {
+            tags,
+            notes,
+            highlights,
+            screenshots,
+            insights,
+            collections,
+            processing_status: processingStatus
+          }
+        });
+      } else {
+        // Just return the basic bookmark data
+        res.json(bookmark);
+      }
     } catch (error) {
+      console.error("Error retrieving bookmark:", error);
       res.status(500).json({ error: "Failed to retrieve bookmark" });
+    }
+  });
+  
+  // New consolidated endpoint for fetching complete bookmark details
+  app.get("/api/bookmarks/:id/details", async (req, res) => {
+    try {
+      const bookmarkId = req.params.id;
+      
+      // Get the basic bookmark data
+      const bookmark = await storage.getBookmark(bookmarkId);
+      
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      // Fetch all related data in parallel for better performance
+      const [tags, notes, highlights, screenshots, insights, collections, processingStatus] = await Promise.all([
+        storage.getTagsByBookmarkId(bookmarkId),
+        storage.getNotesByBookmarkId(bookmarkId),
+        storage.getHighlightsByBookmarkId(bookmarkId),
+        storage.getScreenshotsByBookmarkId(bookmarkId),
+        storage.getInsightByBookmarkId(bookmarkId),
+        storage.getCollectionsByBookmarkId(bookmarkId),
+        storage.getBookmark(bookmarkId).then(b => b?.ai_processing_status || 'pending')
+      ]);
+      
+      // Return the bookmark with all its related data
+      res.json({
+        bookmark,
+        tags,
+        notes, 
+        highlights,
+        screenshots,
+        insights,
+        collections,
+        processing_status: processingStatus
+      });
+    } catch (error) {
+      console.error("Error retrieving bookmark details:", error);
+      res.status(500).json({ error: "Failed to retrieve bookmark details" });
     }
   });
 
