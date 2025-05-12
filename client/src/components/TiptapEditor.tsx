@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -7,8 +7,6 @@ import Heading from '@tiptap/extension-heading';
 import { Markdown } from 'tiptap-markdown';
 import MarkdownIt from 'markdown-it';
 import { cn } from '@/lib/utils';
-import TiptapMenuBar from './TiptapMenuBar';
-import { debounce } from '@/lib/utils';
 
 interface TiptapEditorProps {
   content: string;
@@ -27,16 +25,6 @@ const TiptapEditor = ({
 }: TiptapEditorProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  
-  // Reference to store the debounced onChange function
-  const debouncedOnChangeRef = useRef<any>(null);
-  
-  // Create the debounced function once and store it in the ref
-  useEffect(() => {
-    debouncedOnChangeRef.current = debounce((markdown: string) => {
-      onChange(markdown);
-    }, 3000); // Increased to 3 seconds to reduce API calls
-  }, [onChange]);
   
   // Convert markdown to HTML for initial content
   const markdownToHtml = useCallback((markdown: string) => {
@@ -80,24 +68,16 @@ const TiptapEditor = ({
     content: markdownToHtml(content),
     editable,
     onUpdate: ({ editor }) => {
-      if (isInitialized && debouncedOnChangeRef.current) {
+      if (isInitialized) {
         // Get content as markdown
         const markdown = editor.storage.markdown.getMarkdown();
-        // Use the debounced function
-        debouncedOnChangeRef.current(markdown);
+        onChange(markdown);
       }
     },
   });
 
   useEffect(() => {
     setIsMounted(true);
-    
-    // Cleanup on unmount
-    return () => {
-      if (debouncedOnChangeRef.current) {
-        debouncedOnChangeRef.current.cancel();
-      }
-    };
   }, []);
 
   // Update editor content when the content prop changes
@@ -106,15 +86,11 @@ const TiptapEditor = ({
       if (!isInitialized) {
         setIsInitialized(true);
       } else {
-        try {
-          // Only update if the content has changed and it's not from our own onChange
-          const currentMarkdown = editor.storage.markdown.getMarkdown();
-          if (content !== currentMarkdown) {
-            // Set content as HTML converted from markdown
-            editor.commands.setContent(markdownToHtml(content));
-          }
-        } catch (error) {
-          console.error('Error updating editor content:', error);
+        // Only update if the content has changed and it's not from our own onChange
+        const currentMarkdown = editor.storage.markdown.getMarkdown();
+        if (content !== currentMarkdown) {
+          // Set content as HTML converted from markdown
+          editor.commands.setContent(markdownToHtml(content));
         }
       }
     }
@@ -129,11 +105,10 @@ const TiptapEditor = ({
 
   // Add custom styles for the editor
   return (
-    <div className={cn('prose prose-slate dark:prose-invert max-w-none border rounded-md p-4', className)}>
-      {editor && <TiptapMenuBar editor={editor} />}
+    <div className={cn('prose prose-slate dark:prose-invert max-w-none', className)}>
       <EditorContent 
         editor={editor} 
-        className="min-h-[300px] focus-within:outline-none"
+        className="min-h-[300px] focus-within:outline-none border-0"
       />
     </div>
   );
