@@ -73,6 +73,57 @@ function BookmarkListItem({ bookmark, isSelected, onClick }: BookmarkListItemPro
       return 'Unknown domain';
     }
   };
+  
+  // Setup prefetching on hover
+  const [isPrefetching, setIsPrefetching] = useState(false);
+  const hoverDelayRef = useRef<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
+  
+  // Handle mouse enter/hover
+  const handleMouseEnter = useCallback(() => {
+    // Set a delay before prefetching to avoid unnecessary API calls for quick cursor movements
+    hoverDelayRef.current = setTimeout(() => {
+      // Only prefetch if we're not already doing so
+      if (!isPrefetching) {
+        setIsPrefetching(true);
+        
+        // Start prefetching the bookmark details - this is the main consolidated endpoint
+        queryClient.prefetchQuery({
+          queryKey: [`/api/bookmarks/${bookmark.id}/details`],
+          staleTime: 60000, // 1 minute stale time for prefetched data
+        });
+        
+        // Also prefetch the basic bookmark data as a fallback
+        queryClient.prefetchQuery({
+          queryKey: [`/api/bookmarks/${bookmark.id}`],
+          staleTime: 60000,
+        });
+        
+        console.log(`Prefetching details for bookmark ${bookmark.id} (list view)`);
+      }
+    }, 300); // 300ms delay - only prefetch if the user hovers for at least this long
+  }, [bookmark.id, isPrefetching, queryClient]);
+  
+  // Handle mouse leave
+  const handleMouseLeave = useCallback(() => {
+    // Clear the timeout if the user moves away before the delay completes
+    if (hoverDelayRef.current) {
+      clearTimeout(hoverDelayRef.current);
+      hoverDelayRef.current = null;
+    }
+    
+    // Reset prefetching state
+    setIsPrefetching(false);
+  }, []);
+  
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverDelayRef.current) {
+        clearTimeout(hoverDelayRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div 
@@ -80,6 +131,8 @@ function BookmarkListItem({ bookmark, isSelected, onClick }: BookmarkListItemPro
         isSelected ? "ring-2 ring-primary" : ""
       }`}
       onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <h3 className="font-medium text-base mb-2 line-clamp-2">{bookmark.title}</h3>
       

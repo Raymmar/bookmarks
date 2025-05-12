@@ -119,10 +119,16 @@ function BookmarkCard({ bookmark, isSelected, onClick }: BookmarkCardProps) {
       if (!isPrefetching) {
         setIsPrefetching(true);
         
-        // Start prefetching the bookmark details
+        // Start prefetching the bookmark details - this is the main consolidated endpoint
         queryClient.prefetchQuery({
           queryKey: [`/api/bookmarks/${bookmark.id}/details`],
           staleTime: 60000, // 1 minute stale time for prefetched data
+        });
+        
+        // Also prefetch the basic bookmark data as a fallback
+        queryClient.prefetchQuery({
+          queryKey: [`/api/bookmarks/${bookmark.id}`],
+          staleTime: 60000,
         });
         
         console.log(`Prefetching details for bookmark ${bookmark.id}`);
