@@ -48,9 +48,9 @@ export const TweetEmbed = ({ tweetUrl, className }: TweetEmbedProps) => {
   }
 
   return (
-    <div className={cn("tweet-embed-container", className)}>
+    <div className={className}>
       <Tweet 
-        id={tweetId} 
+        id={tweetId}
         fallback={
           <div className="flex flex-col space-y-3 animate-pulse p-4">
             <div className="flex items-center space-x-3">

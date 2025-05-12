@@ -1162,7 +1162,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         
         {/* Tweet Embed for X.com bookmarks */}
         {bookmark && bookmark.source === 'x' && (
-          <div>
+          <>
             <TweetEmbed 
               tweetUrl={bookmark.url} 
               className="rounded-xl overflow-hidden"
@@ -1190,7 +1190,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
                 onClose={() => setLightbox({ isOpen: false, images: [], initialIndex: 0 })} 
               />
             )}
-          </div>
+          </>
         )}
         
         {/* AI Insights Section */}

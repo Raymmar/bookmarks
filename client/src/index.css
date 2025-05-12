@@ -13,13 +13,15 @@
 }
 
 /* Twitter/X Embed Styling */
-.tweet-embed-container {
-  @apply overflow-hidden rounded-xl border border-gray-200 shadow-sm transition-shadow hover:shadow-md my-4;
+[data-tweet-id] {
+  @apply mb-4 !important;
 }
 
-.tweet-embed-container iframe {
+[data-tweet-id] iframe {
   @apply w-full !important;
   margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
 }
 
 /* Custom styles for the Pinterest-style masonry grid */
