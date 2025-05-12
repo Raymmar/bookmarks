@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
-import { BookmarkDetailSkeleton } from "@/components/bookmark-detail-skeleton";
 import { BookmarkGrid } from "@/components/responsive-bookmark-grid";
 import { BookmarkListView } from "@/components/bookmark-list-view";
 import { ViewModeSwitcher } from "@/components/view-mode-switcher";
@@ -86,32 +85,15 @@ export default function Feed() {
   
   // We'll filter the bookmarks after checking for deleted ones below
   
-  // Define a helper type for Bookmark data that includes potential nullish values
-  type BookmarkData = { 
-    id: string;
-    title: string;
-    url: string;
-    [key: string]: any; 
-  } | null | undefined;
-  
-  // Use optimized fetch strategy for better progressive loading
-  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkData>({
+  // Fetch the selected bookmark's details
+  const { data: selectedBookmark, isLoading: isLoadingBookmark } = useQuery<BookmarkType>({
     queryKey: ['/api/bookmarks', selectedBookmarkId],
     queryFn: async () => {
       if (!selectedBookmarkId) return null;
-      
-      // Find the bookmark in our existing data if possible for immediate display
-      const existingBookmark = bookmarks.find(b => b.id === selectedBookmarkId);
-      
-      // Fetch the full data in the background
       const data = await fetch(`/api/bookmarks/${selectedBookmarkId}`).then(res => res.json());
-      
-      // Return combined data (this ensures we show what we have while waiting for the rest)
       return data;
     },
     enabled: !!selectedBookmarkId,
-    // Faster initial load, with background refresh for better UX
-    staleTime: 30000, // 30 seconds
   });
   
   // Save sort preference in local storage
@@ -315,19 +297,26 @@ export default function Feed() {
         <ResizablePanel defaultSize={30} minSize={30} className="min-w-[420px] h-full">
           {selectedBookmarkId ? (
             isLoadingBookmark ? (
-              // Progressive loading with skeleton UI that shows partial data immediately
-              // This creates a better perceived performance since users see content immediately
-              <BookmarkDetailSkeleton 
-                onClose={handleCloseDetail}
-                // @ts-ignore: This safely handles the case when selectedBookmark is null or undefined
-                title={selectedBookmark?.title || ''}
-                // @ts-ignore: This safely handles the case when selectedBookmark is null or undefined
-                url={selectedBookmark?.url || ''}
-              />
+              // Loading state for bookmark details
+              <div className="flex flex-col h-full">
+                <div className="h-16 p-4 border-b border-gray-200 flex items-center sticky top-0 bg-white z-10">
+                  <div className="flex w-full items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-800">Detail View</h2>
+                    <Button variant="ghost" size="icon" onClick={handleCloseDetail}>
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading bookmark details...</p>
+                  </div>
+                </div>
+              </div>
             ) : (
-              // Full bookmark details panel once data is loaded
+              // Bookmark details panel
               <BookmarkDetailPanel
-                // @ts-ignore: Type casting to satisfy the component props
                 bookmark={selectedBookmark}
                 onClose={handleCloseDetail}
               />
