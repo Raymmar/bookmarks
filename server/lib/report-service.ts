@@ -214,9 +214,15 @@ export class ReportService {
         response.choices[0].message.content ||
         "Failed to generate report content";
 
-      // Update the report with the generated content
+      console.log("Report generation: Content generated successfully. Generating descriptive title...");
+
+      // Generate a descriptive title based on the report content
+      const descriptiveTitle = await this.generateDescriptiveTitle(content, reportType, formattedStartDate, formattedEndDate);
+
+      // Update the report with the generated content and title
       const updatedReport = await storage.updateReport(report.id, {
         content,
+        title: descriptiveTitle, // Use the AI-generated title
         status: "completed",
       });
 
@@ -275,6 +281,90 @@ export class ReportService {
    */
   async updateReport(reportId: string, updates: { title?: string; content?: string }): Promise<Report | undefined> {
     return await storage.updateReport(reportId, updates);
+  }
+  
+  /**
+   * Generate a descriptive title for a report based on its content
+   * @param content The content of the report
+   * @param reportType The type of report (daily or weekly)
+   * @param startDate Formatted start date (as fallback)
+   * @param endDate Formatted end date (as fallback)
+   * @returns A descriptive title for the report
+   */
+  private async generateDescriptiveTitle(
+    content: string, 
+    reportType: string,
+    startDate: string,
+    endDate: string
+  ): Promise<string> {
+    // If there's no content, return the default title
+    if (!content || content === "Generating report..." || content === "No bookmarks found for this time period.") {
+      return `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${startDate} - ${endDate}`;
+    }
+    
+    try {
+      console.log("Generating descriptive title from report content");
+      
+      // Create a system prompt for title generation
+      const systemPrompt = `You are a professional title generator for content digests.
+Your task is to create a concise, descriptive title for a content digest report.
+The title should capture the main themes and insights from the report content in 8-12 words maximum.
+DO NOT include the date range in the title.
+DO NOT use generic phrases like "Weekly Digest" or "Content Roundup".
+Instead, focus on the specific topics, themes, or takeaways in the report.
+The title should be engaging but professional, using sentence case capitalization.`;
+
+      // Take the first 2000 characters of the content as a sample
+      const contentSample = content.substring(0, 2000);
+      
+      // Create a user prompt
+      const userPrompt = `Generate a concise, descriptive title (8-12 words max) for this report content:
+      
+${contentSample}
+
+[...content continues...]
+
+IMPORTANT: Return ONLY the title text. No quotes, explanations, or additional text.`;
+      
+      // Send to OpenAI for title generation
+      const response = await openai.chat.completions.create({
+        model: MODEL,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: userPrompt,
+          },
+        ],
+        temperature: 0.7, // Slightly higher temperature for creative titles
+        max_tokens: 30,   // Short response needed
+      });
+      
+      // Get the generated title
+      let title = response.choices[0].message.content?.trim() || "";
+      
+      // Remove any quotes that might be in the response
+      title = title.replace(/^["']|["']$/g, "");
+      
+      // Clean up any extra spaces
+      title = title.replace(/\s+/g, " ").trim();
+      
+      console.log(`Generated title: "${title}"`);
+      
+      // If the AI didn't generate a valid title, fall back to the default
+      if (!title) {
+        return `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${startDate} - ${endDate}`;
+      }
+      
+      return title;
+    } catch (error) {
+      console.error("Error generating descriptive title:", error);
+      // Fall back to the default title format
+      return `${reportType === "daily" ? "Daily" : "Weekly"} Insights: ${startDate} - ${endDate}`;
+    }
   }
 }
 
