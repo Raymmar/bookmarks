@@ -8,8 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { 
   Select,
@@ -200,13 +199,14 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
   });
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
   // Collection related hooks and state
   const { data: bookmarkCollections = [] } = useBookmarkCollections(bookmark?.id || "");
   const { data: allCollections = [] } = useCollections();
   const { addBookmarkToCollection, removeBookmarkFromCollection } = useCollectionMutations();
   
-  // Handle bookmark deletion
+  // Handle bookmark deletion with better optimistic updates
   const handleDeleteBookmark = async () => {
     if (!bookmark) return;
     
@@ -226,36 +226,49 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       // Store the bookmark ID before we do anything
       const bookmarkId = bookmark.id;
       
-      // Close dialog and panel optimistically first for better UX
+      // Close delete confirmation dialog immediately
       setIsDeleteConfirmOpen(false);
       
-      // Notify the app of deletion through custom event for optimistic updates
-      const customEvent = new CustomEvent('bookmarkDeleted', {
-        detail: { bookmarkId }
-      });
-      window.dispatchEvent(customEvent);
+      // Immediately close the detail panel for better UX
+      onClose();
       
-      // Show success toast immediately
+      // Instant success message
       toast({
         title: "Bookmark deleted",
         description: "Your bookmark was successfully deleted",
       });
       
-      // Close the detail panel
-      onClose();
+      // Notify all components to update their UI immediately
+      // This is a true optimistic update that will be visible right away
+      const customEvent = new CustomEvent('bookmarkDeleted', {
+        detail: { bookmarkId }
+      });
+      window.dispatchEvent(customEvent);
       
-      // Make the DELETE request in the background - no need to await
-      apiRequest("DELETE", `/api/bookmarks/${bookmarkId}`)
-        .then(() => {
-          // After successful deletion, invalidate queries to refresh lists
-          queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
-        })
-        .catch(error => {
-          console.warn("Background error deleting bookmark:", error);
-          // Even if there's an error, we don't show it to the user since we've already
-          // optimistically updated the UI and they've moved on
-        });
+      // Fire the API request in the background
+      setTimeout(() => {
+        apiRequest("DELETE", `/api/bookmarks/${bookmarkId}`)
+          .then(() => {
+            // Success - silently invalidate queries to ensure data consistency
+            queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
+            
+            // Also invalidate any collection-specific queries
+            queryClient.invalidateQueries({ 
+              predicate: (query) => {
+                const queryKey = query.queryKey;
+                return Array.isArray(queryKey) && 
+                       queryKey[0] === '/api/bookmarks' && 
+                       queryKey.length > 1;
+              }
+            });
+          })
+          .catch(error => {
+            console.warn("Background error deleting bookmark:", error);
+            // Even if there's an error, we don't show it to the user since we've already
+            // optimistically updated the UI and they've moved on
+          });
+      }, 10); // Small delay to ensure UI updates finish first
     } catch (error) {
       // This catch block should rarely execute, but we keep it as a safety net
       console.error("Unexpected error in delete flow:", error);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
 import { BookmarkGrid } from "@/components/responsive-bookmark-grid";
 import { BookmarkListView } from "@/components/bookmark-list-view";
@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 export default function Feed() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // State for the selected bookmark
   const [selectedBookmarkId, setSelectedBookmarkId] = useState<string | null>(null);
@@ -135,10 +136,17 @@ export default function Feed() {
           setSelectedBookmarkId(null);
         }
         
-        // Refresh the bookmark list after a short delay
+        // Immediately update our local bookmarks array to remove the deleted bookmark
+        // This is a true optimistic update that will be visible right away
+        const updatedBookmarks = bookmarks.filter(b => b.id !== deletedId);
+        
+        // Update the React Query cache optimistically
+        queryClient.setQueryData(["/api/bookmarks"], updatedBookmarks);
+        
+        // Also refresh in the background to ensure we're in sync
         setTimeout(() => {
           refetch();
-        }, 300);
+        }, 500);
       }
     };
     
@@ -149,7 +157,7 @@ export default function Feed() {
     return () => {
       window.removeEventListener('bookmarkDeleted', handleBookmarkDeleted);
     };
-  }, [selectedBookmarkId, refetch]);
+  }, [selectedBookmarkId, refetch, bookmarks, queryClient]);
 
   return (
     <div className="h-full w-full bg-gray-50">

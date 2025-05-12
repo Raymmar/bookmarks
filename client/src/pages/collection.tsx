@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { BookmarkDetailPanel } from "@/components/bookmark-detail-panel";
 import { BookmarkGrid } from "@/components/responsive-bookmark-grid";
@@ -20,6 +20,7 @@ import { createUrlSlug } from "@/lib/utils";
 export default function CollectionPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Get the collection slug from the URL
   const [, params] = useRoute<{ name: string }>("/collection/:name");
@@ -143,7 +144,7 @@ export default function CollectionPage() {
     };
   }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreBookmarks]);
   
-  // Listen for bookmark deletion events
+  // Listen for bookmark deletion events with true optimistic UI updates
   useEffect(() => {
     const handleBookmarkDeleted = (e: Event) => {
       // Cast to CustomEvent with the expected detail type
@@ -158,10 +159,23 @@ export default function CollectionPage() {
           setSelectedBookmarkId(null);
         }
         
-        // Refresh the bookmark list after a short delay
+        // Immediately update our local bookmarks array to remove the deleted bookmark
+        // This is a true optimistic update that will be visible right away
+        const updatedBookmarks = bookmarks.filter(b => b.id !== deletedId);
+        
+        // Update the React Query cache optimistically - use the correct query key for collections
+        const queryKey = ['/api/bookmarks', { collectionId: collection?.id }];
+        queryClient.setQueryData(queryKey, (oldData: any) => {
+          if (Array.isArray(oldData)) {
+            return oldData.filter(b => b.id !== deletedId);
+          }
+          return oldData;
+        });
+        
+        // Also refresh in the background to ensure we're in sync
         setTimeout(() => {
           refetch();
-        }, 300);
+        }, 500);
       }
     };
     
@@ -172,7 +186,7 @@ export default function CollectionPage() {
     return () => {
       window.removeEventListener('bookmarkDeleted', handleBookmarkDeleted);
     };
-  }, [selectedBookmarkId, refetch]);
+  }, [selectedBookmarkId, refetch, bookmarks, collection, queryClient]);
 
   // Show a message if collection not found
   if (!collectionsLoading && !collection) {
