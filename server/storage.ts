@@ -2055,24 +2055,37 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Activities
-  async getActivities(userId?: string, limit?: number): Promise<Activity[]> {
-    if (userId) {
-      // If a user is authenticated, return all their activities
-      return await db
-        .select()
-        .from(activities)
-        .where(eq(activities.user_id, userId))
-        .orderBy(desc(activities.timestamp));
-    }
-    
-    // For non-authenticated users, optionally limit the number of activities returned
+  async getActivities(userId?: string, options?: { limit?: number; offset?: number }): Promise<Activity[]> {
+    // Start building the query
     let query = db.select().from(activities).orderBy(desc(activities.timestamp));
     
-    if (limit) {
-      query = query.limit(limit);
+    // Add user filter if userId is provided
+    if (userId) {
+      query = query.where(eq(activities.user_id, userId));
+    }
+    
+    // Add pagination
+    if (options?.offset !== undefined) {
+      query = query.offset(options.offset);
+    }
+    
+    if (options?.limit !== undefined) {
+      query = query.limit(options.limit);
     }
     
     return await query;
+  }
+  
+  // Get total count of activities (for pagination)
+  async getActivitiesCount(userId?: string): Promise<number> {
+    let query = db.select({ count: sql<number>`count(*)` }).from(activities);
+    
+    if (userId) {
+      query = query.where(eq(activities.user_id, userId));
+    }
+    
+    const result = await query;
+    return result[0]?.count || 0;
   }
   
   async createActivity(activity: InsertActivity): Promise<Activity> {
