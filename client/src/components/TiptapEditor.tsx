@@ -117,6 +117,14 @@ const TiptapEditor = ({
         debouncedOnChange(markdown);
       }
     },
+    onBlur: ({ editor }) => {
+      if (isInitialized) {
+        // Get content as markdown
+        const markdown = editor.storage.markdown.getMarkdown();
+        // Save immediately on blur (not debounced)
+        onChange(markdown);
+      }
+    },
   });
 
   useEffect(() => {

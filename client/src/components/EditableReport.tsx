@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import TiptapEditor from './TiptapEditor';
 import { Calendar, Save } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
@@ -29,29 +29,8 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // Update local state when report changes from props
-  useEffect(() => {
-    setTitle(report.title);
-    setContent(report.content);
-  }, [report.id, report.title, report.content]);
-  
-  // Auto-resize textarea for title
-  useEffect(() => {
-    const resizeTextarea = () => {
-      const textarea = titleInputRef.current;
-      if (textarea) {
-        // Reset height to auto to get the correct scrollHeight
-        textarea.style.height = 'auto';
-        // Set the height to match the content
-        textarea.style.height = `${textarea.scrollHeight}px`;
-      }
-    };
-    
-    // Resize when component mounts and when title changes
-    resizeTextarea();
-  }, [title]);
-
-  const saveReport = async (updates: { title?: string; content?: string }) => {
+  // Use useCallback to memoize the saveReport function to prevent unnecessary re-renders
+  const saveReport = useCallback(async (updates: { title?: string; content?: string }) => {
     if (!updates.title && !updates.content) return;
 
     setIsSaving(true);
@@ -84,7 +63,48 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [report.id, queryClient, lastSavedAt, toast]);
+
+  // Update local state when report changes from props
+  useEffect(() => {
+    setTitle(report.title);
+    setContent(report.content);
+  }, [report.id, report.title, report.content]);
+  
+  // Add a beforeunload event handler to save any changes before leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Save any pending changes before the page unloads
+      if (title !== report.title) {
+        saveReport({ title });
+      }
+      if (content !== report.content) {
+        saveReport({ content });
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [title, content, report.title, report.content, report.id, saveReport]);
+  
+  // Auto-resize textarea for title
+  useEffect(() => {
+    const resizeTextarea = () => {
+      const textarea = titleInputRef.current;
+      if (textarea) {
+        // Reset height to auto to get the correct scrollHeight
+        textarea.style.height = 'auto';
+        // Set the height to match the content
+        textarea.style.height = `${textarea.scrollHeight}px`;
+      }
+    };
+    
+    // Resize when component mounts and when title changes
+    resizeTextarea();
+  }, [title]);
 
   // Format the last saved time for display
   const getLastSavedText = () => {
@@ -128,6 +148,11 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       titleInputRef.current?.blur();
     }
   };
+  
+  const handleTitleBlur = () => {
+    // Save title immediately when the title field loses focus
+    saveReport({ title });
+  };
 
   return (
     <div className="p-6">
@@ -137,6 +162,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
         value={title}
         onChange={handleTitleChange}
         onKeyDown={handleTitleKeyDown}
+        onBlur={handleTitleBlur}
         placeholder="Enter report title..."
         rows={1}
         style={{ 
