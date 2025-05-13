@@ -171,20 +171,22 @@ export default function Activity() {
                 </div>
               )}
               
-              {/* Intersection observer target positioned at the bottom */}
+              {/* Intersection observer target - always rendered regardless of hasNextPage */}
               <div 
                 ref={loaderRef} 
-                className="w-full py-4"
+                className="w-full py-4 mt-2 border-t border-gray-100"
                 data-testid="infinite-loader"
+                id="activity-scroll-loader"
               >
-                {hasNextPage && (
-                  <div className="h-8 bg-gray-50 rounded"></div>
-                )}
-                {isFetchingNextPage && (
+                {isFetchingNextPage ? (
                   <div className="flex justify-center py-2">
-                    <div className="animate-bounce">Loading more...</div>
+                    <div className="animate-pulse text-sm text-gray-500">Loading more activities...</div>
                   </div>
-                )}
+                ) : hasNextPage ? (
+                  <div className="text-center text-sm text-gray-400">Scroll for more</div>
+                ) : activities.length > 0 ? (
+                  <div className="text-center text-sm text-gray-400">No more activities to load</div>
+                ) : null}
               </div>
             </div>
           </div>

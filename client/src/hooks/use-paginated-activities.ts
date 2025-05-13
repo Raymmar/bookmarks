@@ -84,14 +84,21 @@ export function usePaginatedActivities(pageSize: number = 50) {
   
   // Calculate if there are more pages
   const totalPages = Math.ceil(totalItems / pageSize);
-  const hasNextPage = hasMore;
+  
+  // Determine if there are more items to load
+  // This explicitly checks if the current loaded count is less than the total items
+  // and provides a more reliable check than just relying on hasMore from the query
+  const hasNextPage = activities.length < totalItems;
   
   // Function to load more activities
   const loadMoreActivities = useCallback(() => {
-    if (hasMore && !isFetchingNextPage) {
+    if (hasNextPage && !isFetchingNextPage) {
+      console.log(`Loading more activities... (currently have ${activities.length} of ${totalItems})`);
       fetchNextPage();
+    } else {
+      console.log(`Not loading more: hasNextPage=${hasNextPage}, isFetchingNextPage=${isFetchingNextPage}`);
     }
-  }, [hasMore, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, activities.length, totalItems, isFetchingNextPage, fetchNextPage]);
 
   return {
     activities,
