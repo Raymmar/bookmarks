@@ -307,23 +307,38 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         
         console.log(`Custom event received to show bookmark: ${bookmarkId}`);
         
-        // Fetch the updated bookmark
-        const { apiRequest } = await import('@/lib/queryClient');
-        const updatedBookmark = await apiRequest("GET", `/api/bookmarks/${bookmarkId}`);
+        // Use the optimized endpoint to fetch all bookmark data in one request
+        const startTime = performance.now();
+        const response = await fetch(`/api/bookmarks/${bookmarkId}/complete`);
         
-        if (updatedBookmark) {
-          // Update the bookmark state with the latest data
-          setBookmark(updatedBookmark);
+        if (response.ok) {
+          const data = await response.json();
           
-          // Fetch the tags for this bookmark
-          const fetchedTags = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/tags`);
-          setTags(fetchedTags || []);
-          
-          // Fetch and update notes if available
-          const notes = await apiRequest("GET", `/api/bookmarks/${bookmarkId}/notes`);
-          if (notes && notes.length > 0) {
-            setOptimisticNotes(notes);
+          // Update all states with the fetched data
+          if (data.bookmark) {
+            setBookmark(data.bookmark);
           }
+          
+          if (data.tags) {
+            setTags(data.tags);
+          }
+          
+          if (data.bookmark.notes && data.bookmark.notes.length > 0) {
+            setOptimisticNotes(data.bookmark.notes);
+          }
+          
+          // Update AI processing status
+          if (data.processingStatus) {
+            if (data.processingStatus.aiProcessingComplete) {
+              setAiProcessingStatus('completed');
+            } else {
+              setAiProcessingStatus('pending');
+            }
+          }
+          
+          // Performance logging
+          const endTime = performance.now();
+          console.log(`Bookmark detail data loaded in ${endTime - startTime}ms`);
           
           toast({
             title: "Bookmark updated",
@@ -345,93 +360,105 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     };
   }, [toast]);
   
-  // Fetch tags for this bookmark
-  useEffect(() => {
-    if (bookmark) {
-      const fetchTags = async () => {
-        try {
-          const response = await fetch(`/api/bookmarks/${bookmark.id}/tags`);
-          if (response.ok) {
-            const bookmarkTags = await response.json();
-            setTags(bookmarkTags);
-          }
-        } catch (error) {
-          console.error("Error fetching tags for bookmark:", error);
-        }
-      };
+  // Use the new optimized endpoint to fetch all bookmark data in one request
+  const fetchCompleteBookmarkData = async (bookmarkId: string) => {
+    if (!bookmarkId) return;
+    
+    try {
+      console.log(`Fetching complete data for bookmark: ${bookmarkId}`);
+      const startTime = performance.now();
       
-      fetchTags();
-    }
-  }, [bookmark?.id]);
-  
-  // Fetch notes whenever the bookmark ID changes
-  useEffect(() => {
-    if (bookmark) {
-      const fetchNotes = async () => {
-        try {
-          const notes = await apiRequest("GET", `/api/bookmarks/${bookmark.id}/notes`);
-          if (notes && notes.length > 0) {
-            setOptimisticNotes(notes);
-          } else if (bookmark.notes) {
-            // Fallback to notes from the bookmark object if API call returns empty
-            setOptimisticNotes(bookmark.notes);
-          } else {
-            setOptimisticNotes([]);
-          }
-        } catch (error) {
-          console.error("Error fetching notes for bookmark:", error);
-          // Fallback to notes from the bookmark object if API call fails
-          if (bookmark.notes) {
-            setOptimisticNotes(bookmark.notes);
-          } else {
-            setOptimisticNotes([]);
-          }
-        }
-      };
-      
-      fetchNotes();
-    } else {
-      setOptimisticNotes([]);
-    }
-  }, [bookmark?.id]);
-  
-  // Check AI processing status
-  useEffect(() => {
-    if (bookmark) {
-      // Set initial status based on bookmark data
-      if (bookmark.ai_processing_status) {
-        setAiProcessingStatus(bookmark.ai_processing_status as any);
-      } else {
-        // Check if we have insights or system-generated tags
-        const hasInsights = bookmark.insights && Object.keys(bookmark.insights).length > 0;
-        const hasSystemTags = tags.some(tag => tag.type === 'system');
+      const response = await fetch(`/api/bookmarks/${bookmarkId}/complete`);
+      if (response.ok) {
+        const data = await response.json();
         
-        if (hasInsights || hasSystemTags) {
-          setAiProcessingStatus('completed');
-        } else {
-          setAiProcessingStatus('pending');
+        // Update all states with the fetched data
+        if (data.bookmark) {
+          setBookmark(data.bookmark);
         }
-      }
-      
-      // Fetch the current processing status
-      const checkProcessingStatus = async () => {
-        try {
-          const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
-          if (response.ok) {
-            const statusData = await response.json();
-            
-            if (statusData.aiProcessingComplete) {
-              setAiProcessingStatus('completed');
+        
+        if (data.tags) {
+          setTags(data.tags);
+        }
+        
+        if (data.bookmark?.notes && data.bookmark.notes.length > 0) {
+          setOptimisticNotes(data.bookmark.notes);
+        } else if (bookmark?.notes) {
+          // Fallback to notes from the bookmark object if API call returns empty
+          setOptimisticNotes(bookmark.notes);
+        } else {
+          setOptimisticNotes([]);
+        }
+        
+        // Update AI processing status
+        if (data.processingStatus) {
+          if (data.processingStatus.aiProcessingComplete) {
+            setAiProcessingStatus('completed');
+          } else {
+            setAiProcessingStatus('pending');
+          }
+        }
+        
+        // Performance logging
+        const endTime = performance.now();
+        console.log(`Complete bookmark data fetched in ${endTime - startTime}ms`);
+      } else {
+        // If new endpoint fails, fall back to using the separate API calls
+        console.log(`Falling back to separate API calls for bookmark ${bookmarkId}`);
+        
+        // Fetch bookmark data separately
+        const bookmarkResponse = await fetch(`/api/bookmarks/${bookmarkId}`);
+        if (bookmarkResponse.ok) {
+          const bookmarkData = await bookmarkResponse.json();
+          setBookmark(bookmarkData);
+          
+          // Fetch tags separately
+          const tagsResponse = await fetch(`/api/bookmarks/${bookmarkId}/tags`);
+          if (tagsResponse.ok) {
+            const tagsData = await tagsResponse.json();
+            setTags(tagsData);
+          }
+          
+          // Fetch notes separately
+          const notesResponse = await fetch(`/api/bookmarks/${bookmarkId}/notes`);
+          if (notesResponse.ok) {
+            const notesData = await notesResponse.json();
+            if (notesData && notesData.length > 0) {
+              setOptimisticNotes(notesData);
+            } else if (bookmarkData.notes) {
+              setOptimisticNotes(bookmarkData.notes);
+            } else {
+              setOptimisticNotes([]);
             }
           }
-        } catch (error) {
-          console.error("Error checking AI processing status:", error);
+          
+          // Fetch processing status separately
+          const statusResponse = await fetch(`/api/bookmarks/${bookmarkId}/processing-status`);
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            if (statusData.aiProcessingComplete) {
+              setAiProcessingStatus('completed');
+            } else {
+              setAiProcessingStatus('pending');
+            }
+          }
         }
-      };
-      
-      checkProcessingStatus();
+      }
+    } catch (error) {
+      console.error("Error fetching bookmark data:", error);
+      // If any errors occur, fall back to original methods
+      if (bookmark?.id === bookmarkId) {
+        console.log("Using existing bookmark data as fallback");
+      }
     }
-  }, [bookmark, tags]);
+  };
+  
+  // Fetch complete bookmark data when ID changes
+  useEffect(() => {
+    if (bookmark?.id) {
+      fetchCompleteBookmarkData(bookmark.id);
+    }
+  }, [bookmark?.id]);
   
   // Trigger AI processing for the bookmark
   const handleTriggerAiProcessing = async () => {
@@ -553,7 +580,7 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
         }
       };
       
-      // Poll for status updates
+      // Poll for status updates - use the complete endpoint to get all data at once
       pollingInterval = setInterval(async () => {
         try {
           if (!bookmark) {
@@ -562,13 +589,13 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
           }
           
           console.log("Checking AI processing status...");
-          const response = await fetch(`/api/bookmarks/${bookmark.id}/processing-status`);
+          const response = await fetch(`/api/bookmarks/${bookmark.id}/complete`);
           
           if (response.ok) {
-            const statusData = await response.json();
-            console.log("Processing status response:", statusData);
+            const data = await response.json();
+            console.log("Processing status from complete endpoint:", data.processingStatus);
             
-            if (statusData.aiProcessingComplete) {
+            if (data.processingStatus && data.processingStatus.aiProcessingComplete) {
               // If processing is complete, update the UI
               updateUIWithResults();
             }

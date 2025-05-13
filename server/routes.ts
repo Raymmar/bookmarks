@@ -128,6 +128,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to retrieve bookmark" });
     }
   });
+  
+  // New comprehensive bookmark data endpoint that returns all bookmark data in a single request
+  app.get("/api/bookmarks/:id/complete", async (req, res) => {
+    try {
+      console.time(`complete-bookmark-${req.params.id}`);
+      const bookmarkId = req.params.id;
+      
+      // Get the base bookmark data
+      console.time(`complete-bookmark-${req.params.id}-base`);
+      const bookmark = await storage.getBookmark(bookmarkId);
+      console.timeEnd(`complete-bookmark-${req.params.id}-base`);
+      
+      if (!bookmark) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      
+      // Get additional data in parallel
+      console.time(`complete-bookmark-${req.params.id}-parallel`);
+      try {
+        const [collections, tags, processingStatus] = await Promise.all([
+          (async () => {
+            console.time(`complete-bookmark-${req.params.id}-collections`);
+            const result = await storage.getCollectionsByBookmarkId(bookmarkId);
+            console.timeEnd(`complete-bookmark-${req.params.id}-collections`);
+            return result;
+          })(),
+          (async () => {
+            console.time(`complete-bookmark-${req.params.id}-tags`);
+            const result = await storage.getTagsByBookmarkId(bookmarkId);
+            console.timeEnd(`complete-bookmark-${req.params.id}-tags`);
+            return result;
+          })(),
+          (async () => {
+            console.time(`complete-bookmark-${req.params.id}-processing`);
+            // Check if insights exist for this bookmark
+            const insight = await storage.getInsightByBookmarkId(bookmarkId);
+            // For now, we need a temporary tags array since we're in an async function
+            const tempTags = await storage.getTagsByBookmarkId(bookmarkId);
+            const systemTags = tempTags.filter(tag => tag.type === 'system');
+            const processingComplete = insight !== undefined || systemTags.length > 0;
+            
+            const result = {
+              bookmarkId,
+              aiProcessingComplete: processingComplete,
+              hasInsights: insight !== undefined,
+              insightCount: insight ? 1 : 0,
+              systemTagCount: systemTags.length
+            };
+            console.timeEnd(`complete-bookmark-${req.params.id}-processing`);
+            return result;
+          })()
+        ]);
+        console.timeEnd(`complete-bookmark-${req.params.id}-parallel`);
+        
+        // Return the combined data
+        const response = {
+          bookmark,
+          collections,
+          tags,
+          processingStatus
+        };
+        
+        console.timeEnd(`complete-bookmark-${req.params.id}`);
+        res.json(response);
+      } catch (parallelError) {
+        console.error("Error in parallel bookmark data fetching:", parallelError);
+        
+        // Fall back to sequential fetching if there was an error in the parallel approach
+        console.log("Falling back to sequential fetching for bookmark data");
+        
+        const collections = await storage.getCollectionsByBookmarkId(bookmarkId);
+        const tags = await storage.getTagsByBookmarkId(bookmarkId);
+        const insight = await storage.getInsightByBookmarkId(bookmarkId);
+        const systemTags = tags.filter(tag => tag.type === 'system');
+        const processingComplete = insight !== undefined || systemTags.length > 0;
+        
+        const processingStatus = {
+          bookmarkId,
+          aiProcessingComplete: processingComplete,
+          hasInsights: insight !== undefined,
+          insightCount: insight ? 1 : 0,
+          systemTagCount: systemTags.length
+        };
+        
+        // Return the combined data
+        const response = {
+          bookmark,
+          collections,
+          tags,
+          processingStatus
+        };
+        
+        console.timeEnd(`complete-bookmark-${req.params.id}`);
+        res.json(response);
+      }
+    } catch (error) {
+      console.error("Error retrieving complete bookmark data:", error);
+      res.status(500).json({ error: "Failed to retrieve complete bookmark data", details: String(error) });
+    }
+  });
 
   app.post("/api/bookmarks", async (req, res) => {
     try {

@@ -1931,11 +1931,13 @@ export class DatabaseStorage implements IStorage {
     
     if (!bookmark) return undefined;
     
-    // Fetch related data
-    const bookmarkNotes = await this.getNotesByBookmarkId(id);
-    const bookmarkHighlights = await this.getHighlightsByBookmarkId(id);
-    const bookmarkScreenshots = await this.getScreenshotsByBookmarkId(id);
-    const bookmarkInsight = await this.getInsightByBookmarkId(id);
+    // Fetch related data in parallel to improve performance
+    const [bookmarkNotes, bookmarkHighlights, bookmarkScreenshots, bookmarkInsight] = await Promise.all([
+      this.getNotesByBookmarkId(id),
+      this.getHighlightsByBookmarkId(id),
+      this.getScreenshotsByBookmarkId(id),
+      this.getInsightByBookmarkId(id)
+    ]);
     
     // TypeScript complains about direct assignment of these properties,
     // but they will be added to the returned object via the shared/types.ts interface
