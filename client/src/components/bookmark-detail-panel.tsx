@@ -368,88 +368,121 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       console.log(`Fetching complete data for bookmark: ${bookmarkId}`);
       const startTime = performance.now();
       
-      const response = await fetch(`/api/bookmarks/${bookmarkId}/complete`);
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Update all states with the fetched data
-        if (data.bookmark) {
-          setBookmark(data.bookmark);
-        }
-        
-        if (data.tags) {
-          setTags(data.tags);
-        }
-        
-        if (data.bookmark?.notes && data.bookmark.notes.length > 0) {
-          setOptimisticNotes(data.bookmark.notes);
-        } else if (bookmark?.notes) {
-          // Fallback to notes from the bookmark object if API call returns empty
-          setOptimisticNotes(bookmark.notes);
-        } else {
-          setOptimisticNotes([]);
-        }
-        
-        // Update AI processing status
-        if (data.processingStatus) {
-          if (data.processingStatus.aiProcessingComplete) {
-            setAiProcessingStatus('completed');
+      // Try the optimized endpoint first
+      try {
+        const response = await fetch(`/api/bookmarks/${bookmarkId}/complete`);
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Update all states with the fetched data
+          if (data.bookmark) {
+            setBookmark(data.bookmark);
+          }
+          
+          if (data.tags) {
+            setTags(data.tags);
+          }
+          
+          if (data.bookmark?.notes && data.bookmark.notes.length > 0) {
+            setOptimisticNotes(data.bookmark.notes);
+          } else if (bookmark?.notes) {
+            // Fallback to notes from the bookmark object if API call returns empty
+            setOptimisticNotes(bookmark.notes);
           } else {
-            setAiProcessingStatus('pending');
-          }
-        }
-        
-        // Performance logging
-        const endTime = performance.now();
-        console.log(`Complete bookmark data fetched in ${endTime - startTime}ms`);
-      } else {
-        // If new endpoint fails, fall back to using the separate API calls
-        console.log(`Falling back to separate API calls for bookmark ${bookmarkId}`);
-        
-        // Fetch bookmark data separately
-        const bookmarkResponse = await fetch(`/api/bookmarks/${bookmarkId}`);
-        if (bookmarkResponse.ok) {
-          const bookmarkData = await bookmarkResponse.json();
-          setBookmark(bookmarkData);
-          
-          // Fetch tags separately
-          const tagsResponse = await fetch(`/api/bookmarks/${bookmarkId}/tags`);
-          if (tagsResponse.ok) {
-            const tagsData = await tagsResponse.json();
-            setTags(tagsData);
+            setOptimisticNotes([]);
           }
           
-          // Fetch notes separately
-          const notesResponse = await fetch(`/api/bookmarks/${bookmarkId}/notes`);
-          if (notesResponse.ok) {
-            const notesData = await notesResponse.json();
-            if (notesData && notesData.length > 0) {
-              setOptimisticNotes(notesData);
-            } else if (bookmarkData.notes) {
-              setOptimisticNotes(bookmarkData.notes);
-            } else {
-              setOptimisticNotes([]);
-            }
-          }
-          
-          // Fetch processing status separately
-          const statusResponse = await fetch(`/api/bookmarks/${bookmarkId}/processing-status`);
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            if (statusData.aiProcessingComplete) {
+          // Update AI processing status
+          if (data.processingStatus) {
+            if (data.processingStatus.aiProcessingComplete) {
               setAiProcessingStatus('completed');
             } else {
               setAiProcessingStatus('pending');
             }
           }
+          
+          // Performance logging
+          const endTime = performance.now();
+          console.log(`Complete bookmark data fetched in ${endTime - startTime}ms`);
+          return; // Exit early if the optimized endpoint worked
         }
+      } catch (optimizedError) {
+        console.warn("Optimized endpoint failed, falling back to individual requests:", optimizedError);
+      }
+      
+      // If we reach here, the optimized endpoint failed, so we fall back to individual calls
+      console.log(`Falling back to separate API calls for bookmark ${bookmarkId}`);
+      
+      // Declare a variable to track if any of the API calls succeeded
+      let anyRequestSucceeded = false;
+      
+      // Fetch bookmark data separately
+      try {
+        const bookmarkResponse = await fetch(`/api/bookmarks/${bookmarkId}`);
+        if (bookmarkResponse.ok) {
+          const bookmarkData = await bookmarkResponse.json();
+          setBookmark(bookmarkData);
+          anyRequestSucceeded = true;
+          
+          // Fetch notes if we have the bookmark data
+          try {
+            const notesResponse = await fetch(`/api/bookmarks/${bookmarkId}/notes`);
+            if (notesResponse.ok) {
+              const notesData = await notesResponse.json();
+              if (notesData && notesData.length > 0) {
+                setOptimisticNotes(notesData);
+              } else if (bookmarkData.notes) {
+                setOptimisticNotes(bookmarkData.notes);
+              } else {
+                setOptimisticNotes([]);
+              }
+            }
+          } catch (notesError) {
+            console.warn("Error fetching notes:", notesError);
+          }
+        }
+      } catch (bookmarkError) {
+        console.warn("Error fetching bookmark:", bookmarkError);
+      }
+      
+      // Fetch tags separately - do this regardless of bookmark fetch success
+      try {
+        const tagsResponse = await fetch(`/api/bookmarks/${bookmarkId}/tags`);
+        if (tagsResponse.ok) {
+          const tagsData = await tagsResponse.json();
+          setTags(tagsData);
+          anyRequestSucceeded = true;
+        }
+      } catch (tagsError) {
+        console.warn("Error fetching tags:", tagsError);
+      }
+      
+      // Fetch processing status separately - do this regardless of other fetch success
+      try {
+        const statusResponse = await fetch(`/api/bookmarks/${bookmarkId}/processing-status`);
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          if (statusData.aiProcessingComplete) {
+            setAiProcessingStatus('completed');
+          } else {
+            setAiProcessingStatus('pending');
+          }
+          anyRequestSucceeded = true;
+        }
+      } catch (statusError) {
+        console.warn("Error fetching processing status:", statusError);
+      }
+      
+      // Performance logging for fallback method
+      const endTime = performance.now();
+      console.log(`Fallback bookmark data fetched in ${endTime - startTime}ms (success: ${anyRequestSucceeded})`);
+      
+      // If none of the requests succeeded, use existing data as absolute fallback
+      if (!anyRequestSucceeded && bookmark?.id === bookmarkId) {
+        console.log("Using existing bookmark data as absolute fallback");
       }
     } catch (error) {
-      console.error("Error fetching bookmark data:", error);
-      // If any errors occur, fall back to original methods
-      if (bookmark?.id === bookmarkId) {
-        console.log("Using existing bookmark data as fallback");
-      }
+      console.error("Error in overall bookmark data fetching process:", error);
     }
   };
   
