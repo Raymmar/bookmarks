@@ -161,16 +161,6 @@ export default function Activity() {
             
             {/* Footer area with loading status and intersection observer target */}
             <div className="min-h-[60px] w-full">
-              {/* Loading indicator that appears after content */}
-              {isFetchingNextPage && (
-                <div className="flex justify-center items-center py-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Loading more activities...</span>
-                  </div>
-                </div>
-              )}
-              
               {/* Intersection observer target - always rendered regardless of hasNextPage */}
               <div 
                 ref={loaderRef} 
@@ -179,8 +169,11 @@ export default function Activity() {
                 id="activity-scroll-loader"
               >
                 {isFetchingNextPage ? (
-                  <div className="flex justify-center py-2">
-                    <div className="animate-pulse text-sm text-gray-500">Loading more activities...</div>
+                  <div className="flex justify-center items-center py-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loading more activities...</span>
+                    </div>
                   </div>
                 ) : hasNextPage ? (
                   <div className="text-center text-sm text-gray-400">Scroll for more</div>
