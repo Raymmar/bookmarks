@@ -1,0 +1,73 @@
+Search query received: "undefined"
+2025-05-13 02:12:28.33
+957f435d
+User
+6:12:28 AM [express] GET /api/bookmarks 200 in 20859ms :: [{"id":"7ec0799e-ffc8-47fe-baec-a22f9411ad…
+2025-05-13 02:12:34.98
+957f435d
+User
+6:12:34 AM [express] GET /api/bookmarks 304 in 25538ms :: [{"id":"0a92c4fc-61cc-4cc5-a714-48f2c6aa7f…
+2025-05-13 02:12:36.28
+957f435d
+User
+Search query received: "undefined"
+2025-05-13 02:12:34.75
+957f435d
+User
+6:12:34 AM [express] GET /api/bookmarks 304 in 25327ms :: [{"id":"7ec0799e-ffc8-47fe-baec-a22f9411ad…
+2025-05-13 02:12:34.98
+957f435d
+User
+6:12:34 AM [express] GET /api/bookmarks 304 in 25538ms :: [{"id":"0a92c4fc-61cc-4cc5-a714-48f2c6aa7f…
+2025-05-13 02:12:52.92
+957f435d
+User
+6:12:52 AM [express] GET /api/bookmarks/365b9963-1667-4dfb-b703-54306eeaa517 200 in 20218ms :: {"id"…
+2025-05-13 02:12:54.21
+957f435d
+User
+6:12:54 AM [express] GET /api/user 401 in 89ms :: {"message":"Not authenticated"}
+2025-05-13 02:12:54.48
+957f435d
+User
+Search query received: "undefined"
+2025-05-13 02:12:59.12
+957f435d
+User
+6:12:59 AM [express] GET /api/bookmarks/9866316e-e277-4d0e-addc-953c5dfd91e5 304 in 19969ms :: {"id"…
+2025-05-13 02:13:04.09
+957f435d
+User
+6:13:04 AM [express] GET /api/collections 304 in 9981ms :: [{"id":"08d800fe-7300-4ac8-bd25-fd3a92711…
+2025-05-13 02:13:04.86
+957f435d
+User
+6:13:04 AM [express] GET /api/bookmarks 200 in 41336ms :: [{"id":"7ec0799e-ffc8-47fe-baec-a22f9411ad…
+2025-05-13 02:13:05.83
+957f435d
+User
+6:13:05 AM [express] GET /api/bookmarks/b29c5c91-d3d7-490b-8328-c39736ed1fe3 200 in 20044ms :: {"id"…
+2025-05-13 02:13:10.21
+957f435d
+User
+6:13:10 AM [express] GET /api/bookmarks 200 in 46684ms :: [{"id":"7ec0799e-ffc8-47fe-baec-a22f9411ad…
+2025-05-13 02:13:10.43
+957f435d
+User
+6:13:10 AM [express] GET /api/bookmarks/7ec0799e-ffc8-47fe-baec-a22f9411adc4 304 in 20307ms :: {"id"…
+2025-05-13 02:13:11.33
+957f435d
+User
+6:13:11 AM [express] GET /api/bookmarks 304 in 35095ms :: [{"id":"6b4bd296-c255-4260-b5f8-21eb9c09d5…
+2025-05-13 02:13:11.78
+957f435d
+User
+6:13:11 AM [express] GET /api/bookmarks 304 in 17650ms :: [{"id":"7ec0799e-ffc8-47fe-baec-a22f9411ad…
+2025-05-13 02:13:11.92
+957f435d
+User
+Search query received: "undefined"
+2025-05-13 02:13:13.00
+957f435d
+User
+6:13:13 AM [express] GET /api/bookmarks 304 in 1127ms :: [{"id":"0a92c4fc-61cc-4cc5-a714-48f2c6aa7fa…
