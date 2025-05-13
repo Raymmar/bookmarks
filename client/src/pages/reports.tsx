@@ -209,9 +209,8 @@ const Reports = () => {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center p-8">
           <FileText className="w-20 h-20 text-gray-300 mb-4" />
-          <h3 className="text-xl font-medium mb-2">No Report Selected</h3>
-          <p className="text-gray-500 mb-6">Select a report from the list or generate a new one.</p>
-          
+          <h3 className="text-xl font-medium mb-2">Turn your doom scrolling into deep insights</h3>
+          <p className="text-gray-500 mb-6">Select a report or generate a new one below.</p>
           <div className="flex flex-col space-y-4 items-center">
             <div className="w-64">
               <Select
