@@ -312,7 +312,7 @@ const Reports = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-6 min-h-screen flex flex-col">
       <div className="flex justify-between items-center mb-6 px-2">
         <h1 className="text-3xl font-bold">Reports</h1>
         <div className="flex items-center space-x-3">
@@ -354,10 +354,10 @@ const Reports = () => {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-2 flex-1">
         {/* Reports list panel */}
-        <Card className="lg:col-span-1">
-          <div className="max-h-[60vh] overflow-y-auto">
+        <Card className="lg:col-span-1 h-full">
+          <div className="h-full overflow-y-auto">
             {isLoadingReports ? (
               renderReportSkeletons()
             ) : reports && reports.length > 0 ? (
@@ -371,8 +371,8 @@ const Reports = () => {
         </Card>
 
         {/* Report content panel */}
-        <Card className="lg:col-span-2">
-          <div className="min-h-[60vh] max-h-[80vh] overflow-y-auto">
+        <Card className="lg:col-span-2 h-full">
+          <div className="h-full overflow-y-auto">
             {isLoadingSelectedReport ? (
               <div className="p-6 space-y-4">
                 <Skeleton className="h-8 w-3/4" />
