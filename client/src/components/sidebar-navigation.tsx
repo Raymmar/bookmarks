@@ -5,21 +5,16 @@ import {
   Bookmark, 
   Waypoints, 
   Activity, 
-  Bot, 
-  Circle, 
+  Bot,  
   Settings, 
   User, 
   LogOut,
   Plus,
   Folder,
-  FolderOpen,
-  Check,
   MoreHorizontal,
   Edit,
   Trash2,
   Cable,
-  Twitter,
-  ChevronDown,
   FileText,
   ListFilter
 } from "lucide-react";
@@ -40,7 +35,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Accordion,
   AccordionContent,
@@ -322,7 +316,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
       <div className="overflow-y-auto flex-grow scrollbar-thin">
         <div className="p-4">
           <div className="mb-6">
-            <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Dashboard</h2>
+            <h2 className="text-xs uppercase font-semibold text-gray-500 mb-2">Menu</h2>
             <ul>
               <li className="mb-1">
                 <Link href="/">
@@ -332,13 +326,30 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                       ? "bg-secondary/20 text-primary border border-primary/20" 
                       : "text-gray-700 hover:bg-gray-100"
                   )}>
-                    <ListFilter className={cn("h-5 w-5 mr-2", 
+                    <Bookmark className={cn("h-5 w-5 mr-2", 
                       location === "/" || location === "/feed" ? "text-primary" : ""
                     )} />
-                    Feed
+                    Bookmarks
                   </div>
                 </Link>
               </li>
+              {user && (
+                <li className="mb-1">
+                  <Link href="/reports">
+                    <div className={cn(
+                      "flex items-center px-2 py-2 text-sm rounded-lg",
+                      location === "/reports" 
+                        ? "bg-secondary/20 text-primary border border-primary/20" 
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}>
+                      <FileText className={cn("h-5 w-5 mr-2", 
+                        location === "/reports" ? "text-primary" : ""
+                      )} />
+                      Reports
+                    </div>
+                  </Link>
+                </li>
+              )}
               <li className="mb-1">
                 <Link href="/graph">
                   <div className={cn(
@@ -384,23 +395,6 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   </div>
                 </Link>
               </li>
-              {user && (
-                <li className="mb-1">
-                  <Link href="/reports">
-                    <div className={cn(
-                      "flex items-center px-2 py-2 text-sm rounded-lg",
-                      location === "/reports" 
-                        ? "bg-secondary/20 text-primary border border-primary/20" 
-                        : "text-gray-700 hover:bg-gray-100"
-                    )}>
-                      <FileText className={cn("h-5 w-5 mr-2", 
-                        location === "/reports" ? "text-primary" : ""
-                      )} />
-                      Reports
-                    </div>
-                  </Link>
-                </li>
-              )}
               {user && (
                 <>
                   <li className="mb-1">

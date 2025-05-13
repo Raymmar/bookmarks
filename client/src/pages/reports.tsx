@@ -354,10 +354,10 @@ const Reports = () => {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 px-2">
         {/* Reports list panel */}
         <Card className="lg:col-span-1">
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[80vh] overflow-y-auto">
             {isLoadingReports ? (
               renderReportSkeletons()
             ) : reports && reports.length > 0 ? (
@@ -372,7 +372,7 @@ const Reports = () => {
 
         {/* Report content panel */}
         <Card className="lg:col-span-2">
-          <div className="min-h-[60vh] max-h-[80vh] overflow-y-auto">
+          <div className="min-h-[80vh] max-h-[80vh] overflow-y-auto">
             {isLoadingSelectedReport ? (
               <div className="p-6 space-y-4">
                 <Skeleton className="h-8 w-3/4" />
