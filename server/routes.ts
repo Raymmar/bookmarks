@@ -474,18 +474,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Activities API endpoints
   app.get("/api/activities", async (req, res) => {
     try {
+      // Parse pagination parameters
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50; // Default to 50
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+      
       // If user is authenticated, filter activities by user_id
-      if (req.isAuthenticated()) {
-        const userId = req.user.id;
-        const activities = await storage.getActivities(userId);
-        console.log(`Retrieved ${activities.length} activities for user: ${userId}`);
-        res.json(activities);
-      } else {
-        // For non-authenticated users, limit to the last 50 activities
-        const activities = await storage.getActivities(undefined, 50);
-        console.log(`Retrieved ${activities.length} public activities (limited to 50)`);
-        res.json(activities);
-      }
+      const userId = req.isAuthenticated() ? req.user.id : undefined;
+      
+      // Get total count for pagination
+      const totalCount = await storage.getActivitiesCount(userId);
+      
+      // Get activities with pagination
+      const activities = await storage.getActivities(userId, { limit, offset });
+      
+      // Set total count header for client pagination
+      res.setHeader('X-Total-Count', totalCount.toString());
+      
+      console.log(`Retrieved ${activities.length} activities (offset: ${offset}, limit: ${limit}) ${userId ? `for user: ${userId}` : '(public)'}`);
+      res.json(activities);
     } catch (error) {
       console.error("Error retrieving activities:", error);
       res.status(500).json({ error: "Failed to retrieve activities" });

@@ -89,7 +89,8 @@ export interface IStorage {
   updateInsight(id: string, insight: Partial<InsertInsight>): Promise<Insight | undefined>;
   
   // Activities
-  getActivities(): Promise<Activity[]>;
+  getActivities(userId?: string, options?: { limit?: number; offset?: number }): Promise<Activity[]>;
+  getActivitiesCount(userId?: string): Promise<number>;
   createActivity(activity: InsertActivity): Promise<Activity>;
   
   // Tags

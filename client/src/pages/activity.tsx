@@ -1,19 +1,53 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
 import { ActivityFeed } from "@/components/activity-feed";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SearchX } from "lucide-react";
+import { Loader2, SearchX } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { usePaginatedActivities } from "@/hooks/use-paginated-activities";
 
 export default function Activity() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activityType, setActivityType] = useState("all");
   const [dateRange, setDateRange] = useState("all");
+  
+  // Reference for infinite scroll
+  const loaderRef = useRef<HTMLDivElement>(null);
 
-  const { data: activities = [], isLoading } = useQuery({
-    queryKey: ["/api/activities"],
-  });
+  // Use our custom hook for paginated activities
+  const { 
+    activities,
+    isLoading,
+    hasNextPage,
+    loadMoreActivities,
+    isFetchingNextPage
+  } = usePaginatedActivities(50);
+
+  // Setup intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isLoading && !isFetchingNextPage) {
+          loadMoreActivities();
+        }
+      },
+      { 
+        threshold: 0.1,
+        rootMargin: '200px 0px' // Start loading more content before user fully reaches the bottom
+      }
+    );
+    
+    const currentLoaderRef = loaderRef.current;
+    if (currentLoaderRef) {
+      observer.observe(currentLoaderRef);
+    }
+    
+    return () => {
+      if (currentLoaderRef) {
+        observer.unobserve(currentLoaderRef);
+      }
+    };
+  }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreActivities]);
 
   const filteredActivities = activities.filter(activity => {
     // Filter by search query
@@ -35,7 +69,6 @@ export default function Activity() {
     // Filter by date range
     if (dateRange !== "all") {
       const activityDate = new Date(activity.timestamp);
-      const now = new Date();
       
       if (dateRange === "today") {
         const today = new Date();
@@ -103,7 +136,7 @@ export default function Activity() {
       {/* Content */}
       <div className="flex-1 p-4 pb-20 bg-gray-50 overflow-y-auto">
         
-        {isLoading ? (
+        {isLoading && activities.length === 0 ? (
           <div className="p-8 text-center">
             <div className="h-8 w-8 border-4 border-t-primary rounded-full animate-spin mx-auto"></div>
             <p className="mt-2 text-gray-600">Loading activities...</p>
@@ -119,7 +152,31 @@ export default function Activity() {
             </p>
           </div>
         ) : (
-          <ActivityFeed activities={filteredActivities} />
+          <div className="space-y-6">
+            <ActivityFeed activities={filteredActivities} />
+            
+            {/* Footer area with loading status and intersection observer target */}
+            <div className="min-h-[60px] w-full">
+              {/* Loading indicator that appears after content */}
+              {isFetchingNextPage && (
+                <div className="flex justify-center items-center py-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading more activities...</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Intersection observer target positioned at the bottom */}
+              {hasNextPage && (
+                <div 
+                  ref={loaderRef} 
+                  className="w-full"
+                  style={{ height: '5px' }} // Small height element at the bottom of the list
+                />
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
