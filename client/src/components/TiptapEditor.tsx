@@ -70,11 +70,11 @@ const TiptapEditor = ({
     return md.render(markdown);
   }, []);
 
-  // Create a debounced onChange handler
+  // Create a debounced onChange handler with a more responsive delay
   const debouncedOnChange = useMemo(
     () => debounce((markdown: string) => {
       onChange(markdown);
-    }, 2000), // 2 seconds delay
+    }, 3000), // 3 seconds delay - increased to reduce frequency of cursor position resets
     [onChange]
   );
 
@@ -132,8 +132,20 @@ const TiptapEditor = ({
         // Only update if the content has changed and it's not from our own onChange
         const currentMarkdown = editor.storage.markdown.getMarkdown();
         if (content !== currentMarkdown) {
+          // Save current selection state
+          const { from, to } = editor.state.selection;
+          
           // Set content as HTML converted from markdown
           editor.commands.setContent(markdownToHtml(content));
+          
+          // After updating content, restore the selection position
+          window.requestAnimationFrame(() => {
+            // Make sure editor is still available
+            if (editor.isDestroyed) return;
+            
+            // Try to restore cursor position to where it was before
+            editor.commands.setTextSelection({ from, to });
+          });
         }
       }
     }

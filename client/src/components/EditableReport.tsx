@@ -102,14 +102,14 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     return `Saved ${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
   };
 
-  // Debounced save functions with 2-second timeout
+  // Debounced save functions with 3-second timeout
   const debouncedSaveContent = debounce((newContent: string) => {
     saveReport({ content: newContent });
-  }, 2000); // 2 seconds
+  }, 3000); // 3 seconds - increased to reduce frequency of saves
 
   const debouncedSaveTitle = debounce((newTitle: string) => {
     saveReport({ title: newTitle });
-  }, 2000); // 2 seconds
+  }, 3000); // 3 seconds - increased to match content debounce time
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
