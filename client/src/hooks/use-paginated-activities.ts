@@ -30,7 +30,7 @@ export function usePaginatedActivities(pageSize: number = 50) {
     error,
     refetch
   } = useInfiniteQuery({
-    queryKey: ['/api/activities/infinite', pageSize, user?.id],
+    queryKey: ['/api/activities', pageSize, user?.id],
     queryFn: async ({ pageParam = 1 }) => {
       const queryParams = buildQueryParams(pageParam);
       const response = await fetch(`/api/activities?${queryParams.toString()}`);
@@ -47,9 +47,16 @@ export function usePaginatedActivities(pageSize: number = 50) {
       }
       
       const activities = await response.json();
+      console.log(`Loaded page ${pageParam} with ${activities.length} activities. Total: ${totalCount}`);
+      
+      // Determine if there's another page
+      const currentOffset = (pageParam - 1) * pageSize;
+      const totalCountNum = totalCount ? parseInt(totalCount, 10) : 0;
+      const hasMore = totalCountNum > 0 && (currentOffset + activities.length) < totalCountNum;
+      
       return { 
         activities, 
-        nextPage: activities.length === pageSize ? pageParam + 1 : undefined 
+        nextPage: hasMore ? pageParam + 1 : undefined 
       };
     },
     initialPageParam: 1,

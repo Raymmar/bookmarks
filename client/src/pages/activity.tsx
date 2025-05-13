@@ -27,19 +27,23 @@ export default function Activity() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isLoading && !isFetchingNextPage) {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          console.log("Intersection triggered, loading more activities...");
           loadMoreActivities();
         }
       },
       { 
         threshold: 0.1,
-        rootMargin: '200px 0px' // Start loading more content before user fully reaches the bottom
+        rootMargin: '100px 0px' // Start loading more content before user fully reaches the bottom
       }
     );
     
     const currentLoaderRef = loaderRef.current;
     if (currentLoaderRef) {
       observer.observe(currentLoaderRef);
+      console.log("Observing loader element for intersection");
+    } else {
+      console.log("Loader ref not available");
     }
     
     return () => {
@@ -47,7 +51,7 @@ export default function Activity() {
         observer.unobserve(currentLoaderRef);
       }
     };
-  }, [hasNextPage, isLoading, isFetchingNextPage, loadMoreActivities]);
+  }, [hasNextPage, isFetchingNextPage, loadMoreActivities]);
 
   const filteredActivities = activities.filter(activity => {
     // Filter by search query
@@ -168,13 +172,20 @@ export default function Activity() {
               )}
               
               {/* Intersection observer target positioned at the bottom */}
-              {hasNextPage && (
-                <div 
-                  ref={loaderRef} 
-                  className="w-full"
-                  style={{ height: '5px' }} // Small height element at the bottom of the list
-                />
-              )}
+              <div 
+                ref={loaderRef} 
+                className="w-full py-4"
+                data-testid="infinite-loader"
+              >
+                {hasNextPage && (
+                  <div className="h-8 bg-gray-50 rounded"></div>
+                )}
+                {isFetchingNextPage && (
+                  <div className="flex justify-center py-2">
+                    <div className="animate-bounce">Loading more...</div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
