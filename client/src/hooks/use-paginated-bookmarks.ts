@@ -6,7 +6,7 @@ import { useAuth } from './use-auth';
 type SortOption = 'newest' | 'oldest' | 'recently_updated' | 'created_newest';
 
 export function usePaginatedBookmarks(
-  pageSize: number = 50, 
+  pageSize: number = 25, 
   sortOrder: SortOption = 'newest', 
   searchQuery: string = '',
   collectionId: string | null = null

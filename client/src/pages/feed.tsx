@@ -66,7 +66,7 @@ export default function Feed() {
     totalPages,
     refetch
   } = usePaginatedBookmarks(
-    50, 
+    25, 
     sortOrder as 'newest' | 'oldest' | 'recently_updated', 
     // Only use server search for simple queries, otherwise fetch all and filter client-side
     useServerSearch ? debouncedSearchQuery : ''
@@ -126,7 +126,7 @@ export default function Feed() {
       },
       { 
         threshold: 0.1,
-        rootMargin: '200px 0px' // Start loading more content before user fully reaches the bottom
+        rootMargin: '400px 0px' // Start loading more content much earlier before user reaches the bottom
       }
     );
     
