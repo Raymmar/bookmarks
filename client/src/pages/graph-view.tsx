@@ -160,9 +160,11 @@ export default function GraphView() {
     selectedCollectionIds.length > 1 ? multiCollectionBookmarks : 
     selectedCollectionId ? singleCollectionBookmarks : [];
 
-  // Fetch tags
+  // Fetch tags with improved caching strategy
   const { data: tags = [], isLoading: isLoadingTags } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
+    staleTime: 5 * 60 * 1000, // 5 minutes before considering data stale
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   // Fetch bookmark-tag associations for both the selected collection and all bookmarks

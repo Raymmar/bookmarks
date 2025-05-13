@@ -277,10 +277,11 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     }
   };
   
-  // Fetch all available tags for selection
+  // Fetch all available tags for selection with improved caching strategy
   const { data: availableTags = [] } = useQuery<TagType[]>({
     queryKey: ["/api/tags"],
-    staleTime: 10000, // 10 seconds before considering data stale
+    staleTime: 5 * 60 * 1000, // 5 minutes before considering data stale
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
   
   // Set all tags when the query data changes

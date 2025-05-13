@@ -22,17 +22,14 @@ interface TagSelectorProps {
 export function TagSelector({ selectedTags, onTagsChange, className }: TagSelectorProps) {
   const [newTagText, setNewTagText] = useState("");
   
-  // Fetch all tags from the server, always getting the latest data
+  // Fetch all tags from the server - uses global defaults set in queryClient.ts
+  // which includes good caching behavior for tags
   const { 
     data: tags = [],
     refetch: refetchTags
   } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    staleTime: 0, // Always consider data stale
-    gcTime: 0, // Don't keep data in cache (gcTime replaces cacheTime in v5)
-    refetchOnMount: true, // Always refetch when component mounts
-    refetchOnWindowFocus: true, // Refresh when window gets focus
+    queryFn: getQueryFn({ on401: "returnNull" })
   });
   
   // Use useMemo instead of useEffect to prevent infinite loop

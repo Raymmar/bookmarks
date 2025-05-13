@@ -41,6 +41,9 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Configure default query behavior for specific endpoints
+const TAGS_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -54,4 +57,12 @@ export const queryClient = new QueryClient({
       retry: false,
     },
   },
+});
+
+// Add a default behavior for all tag queries to use consistent caching
+queryClient.setQueryDefaults(['/api/tags'], {
+  staleTime: TAGS_CACHE_TIME,
+  gcTime: 2 * TAGS_CACHE_TIME,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false
 });
