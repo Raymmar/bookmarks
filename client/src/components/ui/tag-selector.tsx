@@ -32,7 +32,11 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
     queryFn: getQueryFn({ on401: "returnNull" })
   });
   
-  // No need to fetch all collections - tags can be used across multiple collections
+  // Fetch all collections - needed for application functionality
+  const { data: collections = [] } = useQuery({
+    queryKey: ["/api/collections"],
+    queryFn: getQueryFn({ on401: "returnNull" })
+  });
   
   // Filter out any items that don't match the expected Tag structure
   // This ensures we only show proper tags and not collections or other items
