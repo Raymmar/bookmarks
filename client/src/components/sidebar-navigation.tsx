@@ -230,14 +230,14 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
   // Render collection item for both public and private collections
   const renderCollectionItem = (collection: any) => (
     <li key={collection.id}>
-      <div className="flex items-center">
+      <div className="relative pr-8">
         <Link 
           href={`/collection/${createUrlSlug(collection.name)}`}
-          className="flex-1"
+          className="block w-full"
         >
           <div 
             className={cn(
-              "flex flex-1 items-center px-2 py-1.5 text-sm rounded-md cursor-pointer",
+              "flex items-center pr-6 px-2 py-1.5 text-sm rounded-md cursor-pointer",
               selectedCollections.includes(collection.id) && location !== `/collection/${createUrlSlug(collection.name)}`
                 ? "bg-primary/10 text-primary" 
                 : "text-gray-700 hover:bg-gray-100",
@@ -247,8 +247,8 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             )}
             title="View collection"
           >
-            <Folder className={cn("h-3.5 w-3.5 mr-2")} />
-            <span className={cn("truncate flex-1 max-w-[160px]", 
+            <Folder className={cn("h-3.5 w-3.5 mr-2 flex-shrink-0")} />
+            <span className={cn("truncate", 
               (selectedCollections.includes(collection.id) || 
                location === `/collection/${createUrlSlug(collection.name)}`) && "font-medium"
             )}>
@@ -258,10 +258,10 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
         </Link>
         
         {user && (
-          <div className="flex items-center">
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 z-10">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6 p-0 ml-1">
+                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
                   <MoreHorizontal className="h-3 w-3 text-gray-500" />
                   <span className="sr-only">More options</span>
                 </Button>
@@ -518,14 +518,14 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   ) : (
                     publicCollections.map(collection => (
                       <li key={collection.id}>
-                        <div className="flex items-center">
+                        <div className="relative pr-8">
                           <Link 
                             href={`/collection/${createUrlSlug(collection.name)}`}
-                            className="flex-1"
+                            className="block w-full"
                           >
                             <div 
                               className={cn(
-                                "flex flex-1 items-center px-2 py-1.5 text-sm rounded-md cursor-pointer",
+                                "flex items-center pr-6 px-2 py-1.5 text-sm rounded-md cursor-pointer",
                                 selectedCollections.includes(collection.id) 
                                   ? "bg-primary/10 text-primary" 
                                   : "text-gray-700 hover:bg-gray-50",
@@ -535,8 +535,8 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                               )}
                               title="View collection"
                             >
-                              <Folder className="h-3.5 w-3.5 mr-2 opacity-70" />
-                              <span className={cn("truncate flex-1 max-w-[160px]", 
+                              <Folder className="h-3.5 w-3.5 mr-2 opacity-70 flex-shrink-0" />
+                              <span className={cn("truncate", 
                                 (selectedCollections.includes(collection.id) || 
                                  location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
                               )}>
@@ -565,7 +565,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                     <Avatar className="h-8 w-8 mr-2">
                       <AvatarFallback>{getUserInitials()}</AvatarFallback>
                     </Avatar>
-                    <div className="text-sm font-medium truncate max-w-[140px]">
+                    <div className="text-sm font-medium truncate" style={{ maxWidth: "140px" }}>
                       {user.username}
                     </div>
                   </Button>
