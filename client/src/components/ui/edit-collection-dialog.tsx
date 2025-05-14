@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useCollectionMutations } from "@/hooks/use-collection-queries";
+import { TagSelector } from "@/components/ui/tag-selector";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 
 
 interface EditCollectionDialogProps {
@@ -17,8 +20,16 @@ interface EditCollectionDialogProps {
     name: string;
     description: string | null;
     is_public: boolean;
+    auto_add_tagged?: boolean;
   } | null;
   onCollectionUpdated?: () => void;
+}
+
+interface Tag {
+  id: string;
+  name: string;
+  type: "user" | "system";
+  count: number;
 }
 
 export function EditCollectionDialog({ 
@@ -30,9 +41,30 @@ export function EditCollectionDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
+  const [autoAddTagged, setAutoAddTagged] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { updateCollection } = useCollectionMutations();
+  
+  // Fetch tags for this collection
+  const { 
+    data: collectionTags = [],
+    refetch: refetchCollectionTags
+  } = useQuery<Tag[]>({
+    queryKey: ["/api/collections", collection?.id, "tags"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!collection?.id && open,
+  });
+  
+  // When tags are loaded, update the selected tags state
+  useEffect(() => {
+    if (collectionTags.length > 0) {
+      setSelectedTags(collectionTags.map(tag => tag.name));
+    } else {
+      setSelectedTags([]);
+    }
+  }, [collectionTags]);
 
   // Reset form when the collection changes or dialog opens
   useEffect(() => {
@@ -40,8 +72,64 @@ export function EditCollectionDialog({
       setName(collection.name);
       setDescription(collection.description || "");
       setIsPublic(collection.is_public);
+      setAutoAddTagged(collection.auto_add_tagged ?? false);
+      // Tags will be loaded via the query
     }
   }, [collection, open]);
+
+  // Helper function to sync collection tags
+  const syncCollectionTags = async () => {
+    if (!collection) return;
+    
+    try {
+      // Get the IDs of the selected tags
+      const tagsResponse = await apiRequest('GET', '/api/tags');
+      const allTags = tagsResponse;
+      
+      // Map of tag names to tag IDs
+      const tagMap = new Map(allTags.map((tag: Tag) => [tag.name.toLowerCase(), tag.id]));
+      
+      // Get the existing tags for this collection
+      const existingTags = collectionTags.map(tag => tag.name.toLowerCase());
+      
+      // Create any new tags that don't exist yet
+      for (const tagName of selectedTags) {
+        const normalizedTagName = tagName.toLowerCase().trim();
+        
+        // Skip if this tag is already in the collection
+        if (existingTags.includes(normalizedTagName)) continue;
+        
+        // Check if the tag already exists in our database
+        let tagId = tagMap.get(normalizedTagName);
+        
+        if (!tagId) {
+          // Create the tag if it doesn't exist
+          const newTag = await apiRequest('POST', '/api/tags', { name: tagName });
+          tagId = newTag.id;
+        }
+        
+        // Add the tag to the collection
+        await apiRequest('POST', `/api/collections/${collection.id}/tags/${tagId}`);
+      }
+      
+      // Remove tags that were unselected
+      for (const tag of collectionTags) {
+        const normalizedTagName = tag.name.toLowerCase().trim();
+        
+        // If this tag is no longer in the selected tags, remove it
+        if (!selectedTags.some(t => t.toLowerCase().trim() === normalizedTagName)) {
+          await apiRequest('DELETE', `/api/collections/${collection.id}/tags/${tag.id}`);
+        }
+      }
+      
+      // Refresh the collection tags
+      refetchCollectionTags();
+      
+    } catch (error) {
+      console.error("Error syncing collection tags:", error);
+      throw error;
+    }
+  };
 
   const handleSubmit = async () => {
     if (!collection) return;
@@ -58,12 +146,22 @@ export function EditCollectionDialog({
     setIsSubmitting(true);
 
     try {
+      // Update the collection basic details
       await updateCollection.mutateAsync({
         id: collection.id,
         name,
         description,
-        is_public: isPublic
+        is_public: isPublic,
+        auto_add_tagged: autoAddTagged
       });
+      
+      // Update the collection tags
+      await syncCollectionTags();
+      
+      // Process tagged bookmarks if auto-add is enabled
+      if (autoAddTagged) {
+        await apiRequest('POST', `/api/collections/${collection.id}/process-tagged`);
+      }
       
       toast({
         title: "Collection updated",
@@ -119,6 +217,31 @@ export function EditCollectionDialog({
               onChange={(e) => setDescription(e.target.value)}
               className="mt-1"
             />
+          </div>
+          
+          <div>
+            <Label className="mb-1 block">Tags</Label>
+            <TagSelector 
+              selectedTags={selectedTags}
+              onTagsChange={setSelectedTags}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Add tags to organize your collection</p>
+          </div>
+          
+          <div className="flex items-center space-x-2 pt-2">
+            <Switch 
+              id="auto-add-tagged" 
+              checked={autoAddTagged} 
+              onCheckedChange={setAutoAddTagged}
+            />
+            <div>
+              <Label htmlFor="auto-add-tagged" className="text-sm">
+                Auto-add bookmarks with matching tags
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Automatically add bookmarks to this collection when they match the tags above
+              </p>
+            </div>
           </div>
           
           <div className="flex items-center space-x-2 pt-2">
