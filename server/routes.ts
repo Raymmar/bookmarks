@@ -991,35 +991,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/bookmarks/:bookmarkId/tags/:tagId", async (req, res) => {
     try {
+      const bookmarkId = req.params.bookmarkId;
+      const tagId = req.params.tagId;
+      
       // Check if bookmark exists
-      const bookmark = await storage.getBookmark(req.params.bookmarkId);
+      const bookmark = await storage.getBookmark(bookmarkId);
       if (!bookmark) {
         return res.status(404).json({ error: "Bookmark not found" });
       }
       
       // Check if tag exists
-      const tag = await storage.getTag(req.params.tagId);
+      const tag = await storage.getTag(tagId);
       if (!tag) {
         return res.status(404).json({ error: "Tag not found" });
       }
       
-      const bookmarkTag = await storage.addTagToBookmark(req.params.bookmarkId, req.params.tagId);
+      // Add tag to bookmark
+      const bookmarkTag = await storage.addTagToBookmark(bookmarkId, tagId);
+      
+      // Update collections based on the newly added tag
+      // This will add the bookmark to any collections that have this tag configured for auto-organization
+      try {
+        console.log(`Checking if bookmark ${bookmarkId} should be added to any collections after adding tag ${tagId}`);
+        await bookmarkService.updateBookmarkCollectionsBasedOnTags(bookmarkId);
+      } catch (collectionError) {
+        console.error("Error updating collections after tag addition:", collectionError);
+        // Continue with the response even if collection update fails
+      }
+      
       res.status(201).json(bookmarkTag);
     } catch (error) {
+      console.error("Error adding tag to bookmark:", error);
       res.status(500).json({ error: "Failed to add tag to bookmark" });
     }
   });
   
   app.delete("/api/bookmarks/:bookmarkId/tags/:tagId", async (req, res) => {
     try {
-      const result = await storage.removeTagFromBookmark(req.params.bookmarkId, req.params.tagId);
+      const bookmarkId = req.params.bookmarkId;
+      const tagId = req.params.tagId;
+      
+      const result = await storage.removeTagFromBookmark(bookmarkId, tagId);
       
       if (!result) {
         return res.status(404).json({ error: "Tag not found on this bookmark" });
       }
       
+      // Update collections based on the tag removal
+      // This will only remove the bookmark from collections where no other matching tags remain
+      try {
+        console.log(`Checking if bookmark ${bookmarkId} should be removed from any collections after tag ${tagId} removal`);
+        await bookmarkService.updateCollectionsAfterTagRemoval(bookmarkId, tagId);
+      } catch (collectionError) {
+        console.error("Error updating collections after tag removal:", collectionError);
+        // Continue with the response even if collection update fails
+      }
+      
       res.status(204).send();
     } catch (error) {
+      console.error("Error removing tag from bookmark:", error);
       res.status(500).json({ error: "Failed to remove tag from bookmark" });
     }
   });

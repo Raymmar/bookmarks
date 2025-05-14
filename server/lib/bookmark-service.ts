@@ -641,6 +641,63 @@ ${summaryPrompt?.value || ""}
       console.error(`Error updating collections for bookmark ${bookmarkId} based on tags:`, error);
     }
   }
+  
+  /**
+   * Updates collections after a tag is removed from a bookmark
+   * Only removes the bookmark from collections if no other matching tags remain
+   */
+  async updateCollectionsAfterTagRemoval(bookmarkId: string, removedTagId: string) {
+    try {
+      // Get the bookmark to get the user ID
+      const bookmark = await this.storage.getBookmark(bookmarkId);
+      if (!bookmark || !bookmark.user_id) {
+        console.log(`Cannot update collections for bookmark ${bookmarkId}: bookmark not found or has no user ID`);
+        return;
+      }
+
+      // Get remaining tags for this bookmark
+      const remainingTags = await this.storage.getTagsByBookmarkId(bookmarkId);
+      const remainingTagIds = new Set(remainingTags.map(tag => tag.id));
+      
+      // Get all collections this bookmark is currently in
+      const bookmarkCollections = await this.storage.getCollectionsByBookmarkId(bookmarkId);
+      
+      // Check each collection to see if the bookmark should still be included
+      let totalRemoved = 0;
+      
+      for (const collection of bookmarkCollections) {
+        // Only process collections that belong to the bookmark's owner and have auto-add enabled
+        if (collection.user_id !== bookmark.user_id || !collection.auto_add_tagged) {
+          continue;
+        }
+        
+        // Get all tags for this collection
+        const collectionTags = await this.storage.getTagsByCollectionId(collection.id);
+        
+        // Check if ANY collection tag matches ANY remaining bookmark tag
+        // This is the key logic: we only remove the bookmark if NO matching tags remain
+        const hasMatchingTag = collectionTags.some(collectionTag => 
+          remainingTagIds.has(collectionTag.id)
+        );
+        
+        // If no matching tags remain, remove the bookmark from the collection
+        if (!hasMatchingTag) {
+          await this.storage.removeBookmarkFromCollection(collection.id, bookmarkId);
+          totalRemoved++;
+          
+          console.log(`Removed bookmark ${bookmarkId} from collection ${collection.id} because no matching tags remain after removing tag ${removedTagId}`);
+        } else {
+          // Log which tags are keeping this bookmark in the collection
+          const matchingTags = collectionTags.filter(tag => remainingTagIds.has(tag.id));
+          console.log(`Kept bookmark ${bookmarkId} in collection ${collection.id} because it still has matching tags: ${matchingTags.map(t => t.name).join(', ')}`);
+        }
+      }
+      
+      console.log(`Removed bookmark ${bookmarkId} from ${totalRemoved} collections after tag ${removedTagId} was removed`);
+    } catch (error) {
+      console.error(`Error updating collections after tag removal for bookmark ${bookmarkId}:`, error);
+    }
+  }
 
   /**
    * Creates a new bookmark with comprehensive processing
@@ -1115,6 +1172,9 @@ ${summaryPrompt?.value || ""}
       const currentTagNames = currentTags.map((tag) => tag.name.toLowerCase());
 
       console.log(`Adding new tags to existing bookmark ${bookmarkId}`);
+      
+      // Track if any new tags were added
+      let tagsAdded = false;
 
       // Add new normalized tags (only adding new ones, not replacing)
       for (const tagName of normalizedTags) {
@@ -1145,6 +1205,19 @@ ${summaryPrompt?.value || ""}
         console.log(
           `Added new tag "${tagName}" to existing bookmark ${bookmarkId}`,
         );
+        
+        tagsAdded = true;
+      }
+      
+      // Update collections based on the newly added tags, but only if we actually added any tags
+      if (tagsAdded) {
+        try {
+          console.log(`Checking if bookmark ${bookmarkId} should be added to any collections after tag updates`);
+          await this.updateBookmarkCollectionsBasedOnTags(bookmarkId);
+        } catch (collectionError) {
+          console.error("Error updating collections after tag update:", collectionError);
+          // Continue with the update even if collection update fails
+        }
       }
     }
 
