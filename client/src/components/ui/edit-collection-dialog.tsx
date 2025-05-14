@@ -82,9 +82,14 @@ export function EditCollectionDialog({
       setDescription(collection.description || "");
       setIsPublic(collection.is_public);
       
+      // Reset selected tags to clear any previous state
+      setSelectedTags([]);
+      
       // Force refetch of collection tags when modal opens
       if (collection.id) {
         console.log("Explicitly refetching tags for collection", collection.id);
+        // Invalidate query cache before refetching
+        queryClient.invalidateQueries({ queryKey: ["/api/collections", collection.id, "tags"] });
         refetchCollectionTags();
       }
     }
@@ -147,10 +152,11 @@ export function EditCollectionDialog({
           tagId = newTag.id;
         }
         
-        // Add the tag to the collection using our mutation hook
+        // Add the tag to the collection using our mutation hook with optimistic updates
         await addTagToCollection.mutateAsync({ 
           collectionId: collection.id, 
-          tagId: tagId 
+          tagId: tagId,
+          tagName: tagName // Include tag name for optimistic updates
         });
       }
       

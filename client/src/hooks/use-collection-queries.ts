@@ -129,12 +129,49 @@ export function useCollectionMutations() {
   
   // Add a tag to a collection
   const addTagToCollection = useMutation({
-    mutationFn: async (variables: { collectionId: string; tagId: string }) => {
+    mutationFn: async (variables: { collectionId: string; tagId: string; tagName?: string }) => {
       const { collectionId, tagId } = variables;
       return await apiRequest('POST', `/api/collections/${collectionId}/tags/${tagId}`);
     },
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/collections', variables.collectionId, 'tags'] });
+      
+      // Snapshot the previous value
+      const previousTags = queryClient.getQueryData(['/api/collections', variables.collectionId, 'tags']);
+      
+      // Optimistically update the tags list - add the new tag if we have tag data
+      if (variables.tagName) {
+        queryClient.setQueryData(['/api/collections', variables.collectionId, 'tags'], 
+          (old: any[] = []) => {
+            // Check if this tag ID is already in the list
+            const tagExists = old.some(tag => tag.id === variables.tagId);
+            if (tagExists) return old;
+            
+            // Add the new tag to the list
+            return [...old, {
+              id: variables.tagId,
+              name: variables.tagName,
+              type: "system", // Default to system type
+              count: 0 // Default count 
+            }];
+          }
+        );
+      }
+      
+      return { previousTags };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, revert back to the previous value
+      if (context?.previousTags) {
+        queryClient.setQueryData(
+          ['/api/collections', variables.collectionId, 'tags'], 
+          context.previousTags
+        );
+      }
+    },
     onSuccess: (_, variables) => {
-      // Invalidate collection tags and collections
+      // Invalidate collection tags and collections to refetch with actual data
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId, 'tags'] });
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
     }
@@ -146,8 +183,33 @@ export function useCollectionMutations() {
       const { collectionId, tagId } = variables;
       return await apiRequest('DELETE', `/api/collections/${collectionId}/tags/${tagId}`);
     },
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/collections', variables.collectionId, 'tags'] });
+      
+      // Snapshot the previous value
+      const previousTags = queryClient.getQueryData(['/api/collections', variables.collectionId, 'tags']);
+      
+      // Optimistically update the tags list - remove the tag
+      queryClient.setQueryData(['/api/collections', variables.collectionId, 'tags'], 
+        (old: any[] = []) => {
+          return old.filter(tag => tag.id !== variables.tagId);
+        }
+      );
+      
+      return { previousTags };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, revert back to the previous value
+      if (context?.previousTags) {
+        queryClient.setQueryData(
+          ['/api/collections', variables.collectionId, 'tags'], 
+          context.previousTags
+        );
+      }
+    },
     onSuccess: (_, variables) => {
-      // Invalidate collection tags and collections
+      // Invalidate collection tags and collections to refetch with actual data
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId, 'tags'] });
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
     }
