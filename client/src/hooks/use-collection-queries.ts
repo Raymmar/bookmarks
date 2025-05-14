@@ -232,9 +232,18 @@ export function useCollectionMutations() {
     mutationFn: async (id: string) => {
       return await apiRequest('DELETE', `/api/collections/${id}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       // Invalidate collections query to refetch
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+      // Also invalidate any collection-specific queries
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', id] });
+      // Invalidate collection tags query to ensure tag associations are properly cleaned up
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', id, 'tags'] });
+      // Invalidate graph data associated with this collection
+      queryClient.invalidateQueries({ queryKey: ['/api/collections/graph', id] });
+    },
+    onError: (error) => {
+      console.error("Error deleting collection:", error);
     }
   });
 
