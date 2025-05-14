@@ -110,9 +110,21 @@ export function EditCollectionDialog({
         'type' in tag
       );
       
-      if (validTags.length > 0) {
-        console.log("Setting selected tags from valid collection tags:", validTags);
-        setSelectedTags(validTags.map(tag => tag.name));
+      // Only set selected tags when open is true and if we haven't set them yet or if the tags have changed
+      if (open && validTags.length > 0) {
+        // Get current tag names (for comparison)
+        const currentTagNames = selectedTags.map(t => t.toLowerCase());
+        const newTagNames = validTags.map(tag => tag.name.toLowerCase());
+        
+        // Check if the arrays are different in content (regardless of order)
+        const tagsDifferent = 
+          currentTagNames.length !== newTagNames.length || 
+          !currentTagNames.every(tag => newTagNames.includes(tag));
+        
+        if (tagsDifferent) {
+          console.log("Setting selected tags from valid collection tags:", validTags);
+          setSelectedTags(validTags.map(tag => tag.name));
+        }
       } else if (collectionTags.length > 0 && validTags.length === 0) {
         console.warn("Received collection tags but none were valid:", collectionTags);
       }
@@ -120,7 +132,9 @@ export function EditCollectionDialog({
       // Save valid tags for reference
       setValidCollectionTags(validTags);
     }
-  }, [collectionTags]);
+    // We only want to update when collectionTags actually changes, not when selectedTags changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionTags, open]);
 
   // Helper function to sync collection tags
   const syncCollectionTags = async () => {
