@@ -41,6 +41,7 @@ export function EditCollectionDialog({
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [validCollectionTags, setValidCollectionTags] = useState<Tag[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { 
@@ -115,6 +116,9 @@ export function EditCollectionDialog({
       } else if (collectionTags.length > 0 && validTags.length === 0) {
         console.warn("Received collection tags but none were valid:", collectionTags);
       }
+      
+      // Save valid tags for reference
+      setValidCollectionTags(validTags);
     }
   }, [collectionTags]);
 
