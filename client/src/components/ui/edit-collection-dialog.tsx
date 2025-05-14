@@ -45,7 +45,12 @@ export function EditCollectionDialog({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { updateCollection } = useCollectionMutations();
+  const { 
+    updateCollection, 
+    addTagToCollection, 
+    removeTagFromCollection, 
+    processTaggedBookmarks 
+  } = useCollectionMutations();
   
   // Fetch tags for this collection
   const { 
@@ -107,8 +112,11 @@ export function EditCollectionDialog({
           tagId = newTag.id;
         }
         
-        // Add the tag to the collection
-        await apiRequest('POST', `/api/collections/${collection.id}/tags/${tagId}`);
+        // Add the tag to the collection using our mutation hook
+        await addTagToCollection.mutateAsync({ 
+          collectionId: collection.id, 
+          tagId: tagId 
+        });
       }
       
       // Remove tags that were unselected
@@ -117,7 +125,10 @@ export function EditCollectionDialog({
         
         // If this tag is no longer in the selected tags, remove it
         if (!selectedTags.some(t => t.toLowerCase().trim() === normalizedTagName)) {
-          await apiRequest('DELETE', `/api/collections/${collection.id}/tags/${tag.id}`);
+          await removeTagFromCollection.mutateAsync({ 
+            collectionId: collection.id, 
+            tagId: tag.id 
+          });
         }
       }
       
@@ -159,7 +170,7 @@ export function EditCollectionDialog({
       
       // Process tagged bookmarks if auto-add is enabled
       if (autoAddTagged) {
-        await apiRequest('POST', `/api/collections/${collection.id}/process-tagged`);
+        await processTaggedBookmarks.mutateAsync(collection.id);
       }
       
       toast({
