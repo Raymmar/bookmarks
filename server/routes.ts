@@ -1580,9 +1580,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // For private collections, check authentication
-      if (!collection.is_public && (!req.isAuthenticated() || collection.user_id !== (req.user as Express.User)?.id)) {
+      // If the user is authenticated and it's their collection, or the collection is public, allow access
+      const isAuthenticated = req.isAuthenticated();
+      const isOwner = isAuthenticated && collection.user_id === (req.user as Express.User)?.id;
+      
+      if (!collection.is_public && !isOwner) {
         return res.status(403).json({ error: "You don't have access to this collection" });
       }
+      
+      console.log(`Access granted to collection tags - public: ${collection.is_public}, authenticated: ${isAuthenticated}, owner: ${isOwner}`);
       
       const tags = await storage.getTagsByCollectionId(collectionId);
       res.json(tags);
