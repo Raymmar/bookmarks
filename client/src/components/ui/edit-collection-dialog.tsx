@@ -73,10 +73,30 @@ export function EditCollectionDialog({
       setIsPublic(collection.is_public);
       setAutoAddTagged(collection.auto_add_tagged ?? false);
       
+      // Initially reset the selectedTags when opening the dialog
+      setSelectedTags([]);
+      
       // Only set the tags when collectionTags have loaded
       // This avoids an unnecessary state update when they come in later
       if (collectionTags.length > 0) {
-        setSelectedTags(collectionTags.map(tag => tag.name));
+        console.log("Got collection tags:", collectionTags);
+        
+        // Ensure we only use tags that have a valid tag structure
+        const validTags = collectionTags.filter(tag => 
+          tag && 
+          typeof tag === 'object' &&
+          'id' in tag && 
+          'name' in tag && 
+          'type' in tag &&
+          (tag.type === 'user' || tag.type === 'system') &&
+          'count' in tag
+        );
+        
+        console.log("Valid tags after filtering:", validTags);
+        
+        if (validTags.length > 0) {
+          setSelectedTags(validTags.map(tag => tag.name));
+        }
       }
     }
   }, [collection, open, collectionTags.length]);

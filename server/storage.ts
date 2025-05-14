@@ -1715,6 +1715,9 @@ export class DatabaseStorage implements IStorage {
   // Collection Tags methods
   async getTagsByCollectionId(collectionId: string): Promise<Tag[]> {
     try {
+      // Verify we're getting the correct collection ID
+      console.log(`Getting tags for collection ID: ${collectionId}`);
+      
       const joinResult = await db
         .select({
           tag: tags
@@ -1723,7 +1726,10 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(tags, eq(collectionTags.tag_id, tags.id))
         .where(eq(collectionTags.collection_id, collectionId));
       
-      return joinResult.map(result => result.tag);
+      const result = joinResult.map(result => result.tag);
+      console.log(`Found ${result.length} tags for collection ${collectionId}`);
+      
+      return result;
     } catch (error) {
       console.error(`Database error retrieving tags for collection ${collectionId}:`, error);
       throw error;
