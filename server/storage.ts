@@ -2305,43 +2305,24 @@ export class DatabaseStorage implements IStorage {
   
   // Tags
   async getTags(userId?: string): Promise<Tag[]> {
-    // For the main tag filtering in the UI, we want to return tags that are
-    // associated with bookmarks visible to the user
-    if (userId) {
-      // Use direct SQL join to get tags associated with user's bookmarks
-      // This is more efficient than the previous implementation
-      const userTags = await db
-        .select({
-          tag: tags
-        })
+    try {
+      // Modified approach: Always return ALL tags to ensure users can find existing tags
+      // This helps with the tag search functionality
+      
+      // For user-specific views, we could add extra filtering later if needed,
+      // but for now returning all tags is the best approach
+      
+      // Get all tags directly - no joins
+      const allTags = await db
+        .select()
         .from(tags)
-        .innerJoin(bookmarkTags, eq(bookmarkTags.tag_id, tags.id))
-        .innerJoin(bookmarks, eq(bookmarkTags.bookmark_id, bookmarks.id))
-        .where(eq(bookmarks.user_id, userId))
-        .groupBy(tags.id); // Group by tag ID to eliminate duplicates
-      
-      // If no results, return empty array
-      if (userTags.length === 0) {
-        return [];
-      }
-      
-      // Extract tag objects from the join result
-      return userTags.map(result => result.tag);
+        .orderBy(desc(tags.count)); // Order by popularity (most used first)
+        
+      return allTags;
+    } catch (error) {
+      console.error("Error retrieving tags:", error);
+      return [];
     }
-    
-    // If no userId provided (user not logged in), return distinct tags for all bookmarks
-    // This ensures non-authenticated users still see relevant tags for filtering
-    // Using SQL GROUP BY to ensure we only get unique tags
-    const allTags = await db
-      .select({
-        tag: tags
-      })
-      .from(tags)
-      .innerJoin(bookmarkTags, eq(bookmarkTags.tag_id, tags.id))
-      .groupBy(tags.id); // Group by tag ID to eliminate duplicates
-    
-    // Extract tag objects from the join result
-    return allTags.map(result => result.tag);
   }
   
   async getTag(id: string): Promise<Tag | undefined> {
