@@ -20,7 +20,6 @@ interface EditCollectionDialogProps {
     name: string;
     description: string | null;
     is_public: boolean;
-    auto_add_tagged?: boolean;
   } | null;
   onCollectionUpdated?: () => void;
 }
@@ -41,7 +40,6 @@ export function EditCollectionDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
-  const [autoAddTagged, setAutoAddTagged] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -83,11 +81,6 @@ export function EditCollectionDialog({
       setName(collection.name);
       setDescription(collection.description || "");
       setIsPublic(collection.is_public);
-      
-      // Set auto-add tagged to true by default if not explicitly set
-      const autoAddValue = collection.auto_add_tagged !== undefined ? 
-        collection.auto_add_tagged : true;
-      setAutoAddTagged(autoAddValue);
       
       // Force refetch of collection tags when modal opens
       if (collection.id) {
@@ -208,15 +201,14 @@ export function EditCollectionDialog({
     setIsSubmitting(true);
 
     try {
-      console.log("Saving collection with auto_add_tagged:", autoAddTagged);
-      
       // Update the collection basic details
       const updatedCollection = await updateCollection.mutateAsync({
         id: collection.id,
         name,
         description,
         is_public: isPublic,
-        auto_add_tagged: autoAddTagged
+        // Always set auto_add_tagged to true
+        auto_add_tagged: true
       });
       
       console.log("Collection updated successfully:", updatedCollection);
@@ -305,23 +297,15 @@ export function EditCollectionDialog({
             <p className="text-xs text-muted-foreground mt-1">Add tags to organize your collection</p>
           </div>
           
-          <div className="flex items-center space-x-2 pt-2">
-            <Switch 
-              id="auto-add-tagged" 
-              checked={autoAddTagged} 
-              onCheckedChange={(checked) => {
-                console.log("Auto-add tagged toggled to:", checked);
-                setAutoAddTagged(checked);
-              }}
-            />
-            <div>
-              <Label htmlFor="auto-add-tagged" className="text-sm">
-                Auto-add bookmarks with matching tags
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Automatically add bookmarks to this collection when they match the tags above
-              </p>
-            </div>
+          <div className="mt-2 p-2 bg-muted/20 rounded-md">
+            <p className="text-sm text-muted-foreground flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              Bookmarks with matching tags will be automatically added to this collection
+            </p>
           </div>
           
           <div className="flex items-center space-x-2 pt-2">
