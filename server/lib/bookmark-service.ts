@@ -564,12 +564,81 @@ ${summaryPrompt?.value || ""}
         }
       }
 
+      // Check if bookmark should be added to any collections based on its tags
+      await this.updateBookmarkCollectionsBasedOnTags(bookmarkId);
+
       console.log(`Completed AI processing for bookmark ${bookmarkId}`);
     } catch (error) {
       console.error(
         `Error in AI processing for bookmark ${bookmarkId}:`,
         error,
       );
+    }
+  }
+
+  /**
+   * Checks if a bookmark should be added to any collections based on its tags
+   * This is called after AI processing adds tags to a bookmark
+   */
+  async updateBookmarkCollectionsBasedOnTags(bookmarkId: string) {
+    try {
+      // Get the bookmark to get the user ID
+      const bookmark = await this.storage.getBookmark(bookmarkId);
+      if (!bookmark || !bookmark.user_id) {
+        console.log(`Cannot update collections for bookmark ${bookmarkId}: bookmark not found or has no user ID`);
+        return;
+      }
+
+      // Get all tags for this bookmark
+      const bookmarkTags = await this.storage.getTagsByBookmarkId(bookmarkId);
+      if (bookmarkTags.length === 0) {
+        console.log(`No tags found for bookmark ${bookmarkId}, skipping collection assignment`);
+        return;
+      }
+
+      // Get all collections for this user that have auto_add_tagged enabled
+      const userCollections = await this.storage.getCollections(bookmark.user_id);
+      const autoAddCollections = userCollections.filter(collection => collection.auto_add_tagged);
+      
+      if (autoAddCollections.length === 0) {
+        console.log(`No collections with auto_add_tagged found for user ${bookmark.user_id}, skipping collection assignment`);
+        return;
+      }
+
+      console.log(`Checking ${autoAddCollections.length} collections for possible tag matches for bookmark ${bookmarkId}`);
+
+      // For each collection, check if any of its tags match the bookmark's tags
+      let totalAdded = 0;
+      
+      for (const collection of autoAddCollections) {
+        // Get all tags for this collection
+        const collectionTags = await this.storage.getTagsByCollectionId(collection.id);
+        
+        // Check if any collection tags match any bookmark tags
+        const matchingTags = collectionTags.filter(collectionTag => 
+          bookmarkTags.some(bookmarkTag => bookmarkTag.id === collectionTag.id)
+        );
+        
+        if (matchingTags.length > 0) {
+          // Check if bookmark is already in collection
+          const bookmarksInCollection = await this.storage.getBookmarksByCollectionId(collection.id);
+          const isAlreadyInCollection = bookmarksInCollection.some(b => b.id === bookmarkId);
+          
+          if (!isAlreadyInCollection) {
+            // Add bookmark to collection
+            await this.storage.addBookmarkToCollection(collection.id, bookmarkId);
+            totalAdded++;
+            
+            console.log(`Added bookmark ${bookmarkId} to collection ${collection.id} based on matching tags: ${matchingTags.map(t => t.name).join(', ')}`);
+          } else {
+            console.log(`Bookmark ${bookmarkId} is already in collection ${collection.id}`);
+          }
+        }
+      }
+      
+      console.log(`Added bookmark ${bookmarkId} to ${totalAdded} collections based on tag matching`);
+    } catch (error) {
+      console.error(`Error updating collections for bookmark ${bookmarkId} based on tags:`, error);
     }
   }
 
