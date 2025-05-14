@@ -688,20 +688,31 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                   }
                 
                   // Perform the actual deletion
-                  await deleteCollection.mutateAsync(selectedCollectionToEdit.id, {
-                    onError: (error) => {
-                      console.error('Error deleting collection:', error);
-                      // Only show error if the deletion actually fails
-                      toast({
-                        title: "Error occurred",
-                        description: "There was an issue with syncing the deletion. Please refresh the page.",
-                        variant: "destructive",
-                      });
-                    }
-                  });
-                  
-                  // Refresh collections data
-                  queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+                  try {
+                    await deleteCollection.mutateAsync(selectedCollectionToEdit.id);
+                    
+                    // Refresh collections data
+                    queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+                    
+                    // Clear any cached references to this collection 
+                    // to prevent stale data issues
+                    queryClient.removeQueries({ 
+                      queryKey: ['/api/collections', selectedCollectionToEdit.id] 
+                    });
+                    queryClient.removeQueries({ 
+                      queryKey: ['/api/collections', selectedCollectionToEdit.id, 'tags'] 
+                    });
+                    queryClient.removeQueries({ 
+                      queryKey: ['/api/collections/graph', selectedCollectionToEdit.id] 
+                    });
+                  } catch (error) {
+                    console.error('Error deleting collection:', error);
+                    toast({
+                      title: "Error occurred",
+                      description: "There was an issue with deleting the collection. Please try again.",
+                      variant: "destructive",
+                    });
+                  }
                 } catch (error) {
                   // This is a fallback and likely won't be reached due to the onError handler above
                   console.error('Error deleting collection:', error);

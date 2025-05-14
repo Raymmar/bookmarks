@@ -233,17 +233,20 @@ export function useCollectionMutations() {
       return await apiRequest('DELETE', `/api/collections/${id}`);
     },
     onSuccess: (_, id) => {
-      // Invalidate collections query to refetch
+      // Invalidate collections query to refetch the collections list
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
-      // Also invalidate any collection-specific queries
-      queryClient.invalidateQueries({ queryKey: ['/api/collections', id] });
-      // Invalidate collection tags query to ensure tag associations are properly cleaned up
-      queryClient.invalidateQueries({ queryKey: ['/api/collections', id, 'tags'] });
-      // Invalidate graph data associated with this collection
-      queryClient.invalidateQueries({ queryKey: ['/api/collections/graph', id] });
+      
+      // Remove the deleted collection data entirely from cache
+      queryClient.removeQueries({ queryKey: ['/api/collections', id] });
+      queryClient.removeQueries({ queryKey: ['/api/collections', id, 'tags'] });
+      queryClient.removeQueries({ queryKey: ['/api/collections/graph', id] });
+      
+      // Also invalidate any multi-collection graph views that might include this collection
+      queryClient.invalidateQueries({ queryKey: ['/api/collections/graph'] });
     },
     onError: (error) => {
       console.error("Error deleting collection:", error);
+      throw error; // Re-throw to allow component-level error handling
     }
   });
 
