@@ -57,25 +57,24 @@ export function EditCollectionDialog({
     enabled: !!collection?.id && open,
   });
   
-  // When tags are loaded, update the selected tags state
+  // Initialize form or reset when dialog opens/collection changes
+  // Use a single useEffect for initializing both regular fields and tags
+  // with a proper reset when the collection or modal state changes
   useEffect(() => {
-    if (collectionTags.length > 0) {
-      setSelectedTags(collectionTags.map(tag => tag.name));
-    } else {
-      setSelectedTags([]);
-    }
-  }, [collectionTags]);
-
-  // Reset form when the collection changes or dialog opens
-  useEffect(() => {
-    if (collection) {
+    if (collection && open) {
+      // Initialize form fields from collection data
       setName(collection.name);
       setDescription(collection.description || "");
       setIsPublic(collection.is_public);
       setAutoAddTagged(collection.auto_add_tagged ?? false);
-      // Tags will be loaded via the query
+      
+      // Only set the tags when collectionTags have loaded
+      // This avoids an unnecessary state update when they come in later
+      if (collectionTags.length > 0) {
+        setSelectedTags(collectionTags.map(tag => tag.name));
+      }
     }
-  }, [collection, open]);
+  }, [collection, open, collectionTags.length]);
 
   // Helper function to sync collection tags
   const syncCollectionTags = async () => {

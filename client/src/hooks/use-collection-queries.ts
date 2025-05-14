@@ -78,6 +78,18 @@ export function useBookmarkCollections(bookmarkId: string): UseQueryResult<Colle
   });
 }
 
+// Hook for fetching tags associated with a collection
+export function useCollectionTags(collectionId: string) {
+  return useQuery({
+    queryKey: ['/api/collections', collectionId, 'tags'],
+    queryFn: async () => {
+      if (!collectionId) return [];
+      return await apiRequest('GET', `/api/collections/${collectionId}/tags`);
+    },
+    enabled: !!collectionId // Only run query if collectionId is provided
+  });
+}
+
 // Hook for collection mutations (create, update, delete)
 export function useCollectionMutations() {
   // Create a new collection
@@ -86,6 +98,7 @@ export function useCollectionMutations() {
       name: string; 
       description?: string; 
       is_public?: boolean;
+      auto_add_tagged?: boolean;
     }) => {
       return await apiRequest('POST', '/api/collections', variables);
     },
@@ -102,6 +115,7 @@ export function useCollectionMutations() {
       name?: string; 
       description?: string; 
       is_public?: boolean;
+      auto_add_tagged?: boolean;
     }) => {
       const { id, ...data } = variables;
       return await apiRequest('PUT', `/api/collections/${id}`, data);
@@ -110,6 +124,56 @@ export function useCollectionMutations() {
       // Invalidate specific collection and collections list
       queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+    }
+  });
+  
+  // Add a tag to a collection
+  const addTagToCollection = useMutation({
+    mutationFn: async (variables: { collectionId: string; tagId: string }) => {
+      const { collectionId, tagId } = variables;
+      return await apiRequest('POST', `/api/collections/${collectionId}/tags/${tagId}`);
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate collection tags and collections
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId, 'tags'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
+    }
+  });
+  
+  // Remove a tag from a collection
+  const removeTagFromCollection = useMutation({
+    mutationFn: async (variables: { collectionId: string; tagId: string }) => {
+      const { collectionId, tagId } = variables;
+      return await apiRequest('DELETE', `/api/collections/${collectionId}/tags/${tagId}`);
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate collection tags and collections
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId, 'tags'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
+    }
+  });
+  
+  // Toggle auto-add tagged for a collection
+  const toggleAutoAddTagged = useMutation({
+    mutationFn: async (variables: { collectionId: string; enabled: boolean }) => {
+      const { collectionId, enabled } = variables;
+      return await apiRequest('PATCH', `/api/collections/${collectionId}/auto-add-tagged`, { enabled });
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate collection and all collections
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+    }
+  });
+  
+  // Manually process tagged bookmarks for a collection
+  const processTaggedBookmarks = useMutation({
+    mutationFn: async (collectionId: string) => {
+      return await apiRequest('POST', `/api/collections/${collectionId}/process-tagged`);
+    },
+    onSuccess: (_, collectionId) => {
+      // Invalidate collection bookmarks
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', collectionId, 'bookmarks'] });
     }
   });
 
@@ -176,6 +240,10 @@ export function useCollectionMutations() {
     updateCollection,
     deleteCollection,
     addBookmarkToCollection,
-    removeBookmarkFromCollection
+    removeBookmarkFromCollection,
+    addTagToCollection,
+    removeTagFromCollection,
+    toggleAutoAddTagged,
+    processTaggedBookmarks
   };
 }
