@@ -221,15 +221,13 @@ export function EditCollectionDialog({
         console.error('Error syncing collection tags:', tagError);
       }
       
-      // Process tagged bookmarks if auto-add is enabled
-      if (autoAddTagged) {
-        try {
-          console.log("Processing tagged bookmarks for collection", collection.id);
-          await processTaggedBookmarks.mutateAsync(collection.id);
-        } catch (processError) {
-          // Log the error but continue
-          console.error('Error processing tagged bookmarks:', processError);
-        }
+      // Always process tagged bookmarks - auto-add is always enabled
+      try {
+        console.log("Processing tagged bookmarks for collection", collection.id);
+        await processTaggedBookmarks.mutateAsync(collection.id);
+      } catch (processError) {
+        // Log the error but continue
+        console.error('Error processing tagged bookmarks:', processError);
       }
       
       toast({
@@ -297,15 +295,19 @@ export function EditCollectionDialog({
             <p className="text-xs text-muted-foreground mt-1">Add tags to organize your collection</p>
           </div>
           
-          <div className="mt-2 p-2 bg-muted/20 rounded-md">
-            <p className="text-sm text-muted-foreground flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          <div className="mt-2 p-3 bg-muted/30 rounded-md border border-muted">
+            <div className="flex items-start">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-primary flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
-              Bookmarks with matching tags will be automatically added to this collection
-            </p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Auto-organization is enabled</p>
+                <p className="text-xs text-muted-foreground">
+                  Bookmarks with matching tags will be automatically added to this collection.
+                  When you add or remove tags, the system will update your collection immediately.
+                </p>
+              </div>
+            </div>
           </div>
           
           <div className="flex items-center space-x-2 pt-2">

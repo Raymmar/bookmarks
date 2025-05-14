@@ -1406,7 +1406,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         description: description || "",
         user_id: userId,
-        is_public: is_public === true || is_public === "true"
+        is_public: is_public === true || is_public === "true",
+        auto_add_tagged: true // Always enable auto organization
       });
 
       res.status(201).json(collection);
@@ -1440,11 +1441,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { name, description, is_public } = req.body;
       
+      // Auto-add tagged is always set to true to ensure automatic organization
       const updatedCollection = await storage.updateCollection(collectionId, {
         name,
         description,
-        is_public
+        is_public,
+        auto_add_tagged: true
       });
+      
+      // Process tagged bookmarks in the background after any collection update
+      setTimeout(() => {
+        storage.processTaggedBookmarksForCollection(collectionId)
+          .then(count => {
+            if (count > 0) {
+              console.log(`Updated ${count} bookmarks in collection ${collectionId} after collection update`);
+            }
+          })
+          .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
+      }, 0);
       
       res.json(updatedCollection);
     } catch (error) {
@@ -1705,7 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Toggle auto-add tagged feature for a collection
+  // Process tagged bookmarks for a collection (auto-add is always enabled)
   app.patch("/api/collections/:collectionId/auto-add-tagged", async (req, res) => {
     try {
       // User must be authenticated to update collection settings
@@ -1715,11 +1729,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = (req.user as Express.User).id;
       const { collectionId } = req.params;
-      const { enabled } = req.body;
-      
-      if (typeof enabled !== 'boolean') {
-        return res.status(400).json({ error: "Enabled parameter must be a boolean" });
-      }
       
       // Verify the collection exists and user owns it
       const collection = await storage.getCollection(collectionId);
@@ -1732,20 +1741,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "You can only update your own collections" });
       }
       
-      // Update the auto_add_tagged setting
+      // Always ensure auto_add_tagged is true (simplified UX)
       const updatedCollection = await storage.updateCollection(collectionId, {
-        auto_add_tagged: enabled
+        auto_add_tagged: true
       });
       
-      // If enabled, immediately process any tagged bookmarks
-      if (enabled) {
-        // Process in the background
-        setTimeout(() => {
-          storage.processTaggedBookmarksForCollection(collectionId)
-            .then(count => console.log(`Added ${count} bookmarks to collection ${collectionId} based on tags`))
-            .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
-        }, 0);
-      }
+      // Process tagged bookmarks in the background
+      setTimeout(() => {
+        storage.processTaggedBookmarksForCollection(collectionId)
+          .then(count => console.log(`Added ${count} bookmarks to collection ${collectionId} based on tags`))
+          .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
+      }, 0);
       
       res.json(updatedCollection);
     } catch (error) {

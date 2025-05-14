@@ -153,26 +153,14 @@ export function useCollectionMutations() {
     }
   });
   
-  // Toggle auto-add tagged for a collection
-  const toggleAutoAddTagged = useMutation({
-    mutationFn: async (variables: { collectionId: string; enabled: boolean }) => {
-      const { collectionId, enabled } = variables;
-      return await apiRequest('PATCH', `/api/collections/${collectionId}/auto-add-tagged`, { enabled });
-    },
-    onSuccess: (_, variables) => {
-      // Invalidate collection and all collections
-      queryClient.invalidateQueries({ queryKey: ['/api/collections', variables.collectionId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
-    }
-  });
-  
-  // Manually process tagged bookmarks for a collection
+  // Process tagged bookmarks for a collection (auto-add is always enabled)
   const processTaggedBookmarks = useMutation({
     mutationFn: async (collectionId: string) => {
-      return await apiRequest('POST', `/api/collections/${collectionId}/process-tagged`);
+      return await apiRequest('PATCH', `/api/collections/${collectionId}/auto-add-tagged`, {});
     },
     onSuccess: (_, collectionId) => {
-      // Invalidate collection bookmarks
+      // Invalidate collection and bookmarks
+      queryClient.invalidateQueries({ queryKey: ['/api/collections', collectionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/collections', collectionId, 'bookmarks'] });
     }
   });
@@ -243,7 +231,6 @@ export function useCollectionMutations() {
     removeBookmarkFromCollection,
     addTagToCollection,
     removeTagFromCollection,
-    toggleAutoAddTagged,
     processTaggedBookmarks
   };
 }
