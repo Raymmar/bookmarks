@@ -1816,32 +1816,23 @@ export class DatabaseStorage implements IStorage {
       const existingBookmarks = await this.getBookmarksByCollectionId(collectionId);
       const existingBookmarkIds = new Set(existingBookmarks.map(b => b.id));
       
-      if (collectionTags.length === 0) {
-        // If there are no tags in the collection, we should remove all auto-added bookmarks
-        let removedCount = 0;
-        for (const bookmark of existingBookmarks) {
-          await this.removeBookmarkFromCollection(collectionId, bookmark.id);
-          removedCount++;
-        }
-        console.log(`Removed ${removedCount} bookmarks from collection ${collectionId} as there are no tags`);
-        return removedCount;
-      }
-      
       const tagIds = collectionTags.map(tag => tag.id);
       
       // Find all bookmarks that have any of these tags
       // This query gets all bookmarks that have at least one of the collection's tags
+      // If there are no tags, this will return an empty array
       const joinResult = await db
         .selectDistinct({
           bookmark_id: bookmarkTags.bookmark_id
         })
         .from(bookmarkTags)
-        .where(inArray(bookmarkTags.tag_id, tagIds));
+        .where(tagIds.length > 0 ? inArray(bookmarkTags.tag_id, tagIds) : sql`1=0`); // If no tags, use a condition that returns no results
       
       // Create a set of bookmark IDs that should be in the collection
+      // These are bookmarks that have at least one of the collection's tags
       const shouldBeInCollectionIds = new Set(joinResult.map(r => r.bookmark_id));
       
-      // Add bookmarks that are not already in the collection
+      // Add bookmarks that are not already in the collection but have matching tags
       let addedCount = 0;
       for (const { bookmark_id } of joinResult) {
         if (!existingBookmarkIds.has(bookmark_id)) {
@@ -1852,12 +1843,19 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Remove bookmarks that no longer match any collection tag
+      // This only removes bookmarks that don't match any current tag
+      // It preserves bookmarks manually added to the collection
       let removedCount = 0;
       for (const bookmark of existingBookmarks) {
-        if (!shouldBeInCollectionIds.has(bookmark.id)) {
-          await this.removeBookmarkFromCollection(collectionId, bookmark.id);
-          removedCount++;
-          processedCount++;
+        // Only remove if the bookmark doesn't match any current tag
+        // If there are no tags, we don't remove any bookmarks
+        if (tagIds.length > 0 && !shouldBeInCollectionIds.has(bookmark.id)) {
+          const isRemoved = await this.removeBookmarkFromCollection(collectionId, bookmark.id);
+          if (isRemoved) {
+            removedCount++;
+            processedCount++;
+            console.log(`Removed bookmark ${bookmark.id} from collection ${collectionId}: ${isRemoved}`);
+          }
         }
       }
       
