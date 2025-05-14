@@ -34,23 +34,15 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
   
   // Use useMemo instead of useEffect to prevent infinite loop
   const filteredTags = useMemo(() => {
-    if (!tags || tags.length === 0) return [];
+    if (!tags || tags.length === 0 || newTagText.trim() === "") return [];
     
-    if (newTagText.trim() === "") {
-      // Show top 10 most used tags that aren't already selected
-      return tags
-        .filter(tag => !selectedTags.includes(tag.name))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-    } else {
-      // Filter tags by name
-      return tags
-        .filter(tag => 
-          tag.name.toLowerCase().includes(newTagText.toLowerCase()) && 
-          !selectedTags.includes(tag.name)
-        )
-        .slice(0, 10);
-    }
+    // Only show tags that match the input text
+    return tags
+      .filter(tag => 
+        tag.name.toLowerCase().includes(newTagText.toLowerCase()) && 
+        !selectedTags.includes(tag.name)
+      )
+      .slice(0, 10);
   }, [newTagText, tags, selectedTags]);
   
   const handleNewTagSubmit = async () => {
