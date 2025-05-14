@@ -73,16 +73,29 @@ export function EditCollectionDialog({
       setIsPublic(collection.is_public);
       setAutoAddTagged(collection.auto_add_tagged ?? false);
       
-      // Initially reset the selectedTags when opening the dialog
+      // Always reset selectedTags when opening the dialog to prevent stale data
       setSelectedTags([]);
+    }
+  }, [collection, open]);
+  
+  // Separate useEffect to handle tag loading
+  // This ensures we don't have a race condition with the form reset
+  useEffect(() => {
+    if (collectionTags && Array.isArray(collectionTags) && collectionTags.length > 0) {
+      // Only update if we have valid tag objects with the proper structure
+      const validTags = collectionTags.filter(tag => 
+        tag && 
+        typeof tag === 'object' &&
+        'id' in tag && 
+        'name' in tag && 
+        'type' in tag
+      );
       
-      // Only set the tags when collectionTags have loaded
-      // This avoids an unnecessary state update when they come in later
-      if (collectionTags && Array.isArray(collectionTags) && collectionTags.length > 0) {
-        console.log("Got collection tags:", collectionTags);
+      if (validTags.length > 0) {
+        setSelectedTags(validTags.map(tag => tag.name));
       }
     }
-  }, [collection, open, collectionTags.length]);
+  }, [collectionTags]);
 
   // Helper function to sync collection tags
   const syncCollectionTags = async () => {
@@ -96,8 +109,11 @@ export function EditCollectionDialog({
       // Map of tag names to tag IDs
       const tagMap = new Map(allTags.map((tag: Tag) => [tag.name.toLowerCase(), tag.id]));
       
-      // Get the existing tags for this collection
-      const existingTags = collectionTags.map(tag => tag.name.toLowerCase());
+      // Get the existing tags for this collection, filtering out invalid objects
+      const validCollectionTags = collectionTags.filter(tag => 
+        tag && typeof tag === 'object' && 'name' in tag && typeof tag.name === 'string'
+      );
+      const existingTags = validCollectionTags.map(tag => tag.name.toLowerCase());
       
       // Create any new tags that don't exist yet
       for (const tagName of selectedTags) {
@@ -122,8 +138,8 @@ export function EditCollectionDialog({
         });
       }
       
-      // Remove tags that were unselected
-      for (const tag of collectionTags) {
+      // Remove tags that were unselected, only processing valid tag objects
+      for (const tag of validCollectionTags) {
         const normalizedTagName = tag.name.toLowerCase().trim();
         
         // If this tag is no longer in the selected tags, remove it
