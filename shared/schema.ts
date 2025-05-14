@@ -92,7 +92,7 @@ export const collections = pgTable("collections", {
   description: text("description"),
   user_id: uuid("user_id").references(() => users.id).notNull(),
   is_public: boolean("is_public").default(false).notNull(),
-  auto_add_tagged: boolean("auto_add_tagged").default(false).notNull(), // Flag to enable automatic tag-based bookmark addition
+  auto_add_tagged: boolean("auto_add_tagged").default(true).notNull(), // Auto-adding bookmarks with matching tags (always enabled)
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });

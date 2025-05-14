@@ -1645,15 +1645,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add tag to collection
       const collectionTag = await storage.addTagToCollection(collectionId, tagId);
       
-      // If auto-add is enabled, process tagged bookmarks
-      if (collection.auto_add_tagged) {
-        // Process in the background
-        setTimeout(() => {
-          storage.processTaggedBookmarksForCollection(collectionId)
-            .then(count => console.log(`Added ${count} bookmarks to collection ${collectionId} based on tag ${tagId}`))
-            .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
-        }, 0);
-      }
+      // Always process tagged bookmarks in the background
+      setTimeout(() => {
+        storage.processTaggedBookmarksForCollection(collectionId)
+          .then(count => console.log(`Added ${count} bookmarks to collection ${collectionId} based on tag ${tagId}`))
+          .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
+      }, 0);
       
       res.status(201).json(collectionTag);
     } catch (error) {
