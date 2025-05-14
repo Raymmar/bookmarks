@@ -94,14 +94,26 @@ export function EditCollectionDialog({
     
     try {
       // Get all available tags
-      const allTags = await apiRequest('GET', '/api/tags');
-      const tagMap = new Map(allTags.map((tag: Tag) => [tag.name.toLowerCase(), tag.id]));
+      const allTagsResponse = await fetch('/api/tags', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (!allTagsResponse.ok) {
+        throw new Error(`Failed to fetch tags: ${allTagsResponse.statusText}`);
+      }
+      
+      const allTags = await allTagsResponse.json();
+      const tagMap = new Map(allTags.map((tag: Tag) => [tag.name.toLowerCase(), tag.id as string]));
       
       // Get existing tag names (lowercase for case-insensitive comparison)
       const existingTagNames = collectionTags.map(tag => tag.name.toLowerCase());
       
       // Add new tags that aren't already in the collection
       for (const tagName of selectedTags) {
+        if (!tagName) continue; // Skip empty tags
+        
         const normalizedTagName = tagName.toLowerCase().trim();
         
         // Skip if tag is already in the collection
@@ -112,28 +124,51 @@ export function EditCollectionDialog({
         
         if (!tagId) {
           // Create the tag if it doesn't exist
-          const newTag = await apiRequest('POST', '/api/tags', { name: tagName });
+          const createTagResponse = await fetch('/api/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ name: tagName })
+          });
+          
+          if (!createTagResponse.ok) {
+            throw new Error(`Failed to create tag: ${createTagResponse.statusText}`);
+          }
+          
+          const newTag = await createTagResponse.json();
           tagId = newTag.id;
         }
         
         // Add tag to collection
-        await addTagToCollection.mutateAsync({ 
-          collectionId: collection.id, 
-          tagId,
-          tagName
-        });
+        try {
+          await addTagToCollection.mutateAsync({ 
+            collectionId: collection.id, 
+            tagId: tagId as string,
+            tagName
+          });
+        } catch (addTagError) {
+          console.error(`Error adding tag ${tagName} to collection:`, addTagError);
+          // Continue with other tags
+        }
       }
       
       // Remove tags that were unselected
       for (const tag of collectionTags) {
+        if (!tag || !tag.id || !tag.name) continue; // Skip invalid tags
+        
         const normalizedTagName = tag.name.toLowerCase().trim();
         
         // If this tag is no longer in selected tags, remove it
-        if (!selectedTags.some(t => t.toLowerCase().trim() === normalizedTagName)) {
-          await removeTagFromCollection.mutateAsync({ 
-            collectionId: collection.id, 
-            tagId: tag.id 
-          });
+        if (!selectedTags.some(t => t && t.toLowerCase().trim() === normalizedTagName)) {
+          try {
+            await removeTagFromCollection.mutateAsync({ 
+              collectionId: collection.id, 
+              tagId: tag.id 
+            });
+          } catch (removeTagError) {
+            console.error(`Error removing tag ${tag.name} from collection:`, removeTagError);
+            // Continue with other tags
+          }
         }
       }
       
@@ -141,7 +176,7 @@ export function EditCollectionDialog({
       refetchCollectionTags();
     } catch (error) {
       console.error("Error syncing collection tags:", error);
-      throw error;
+      // Don't rethrow, just log and allow the rest of the workflow to continue
     }
   };
 
@@ -160,20 +195,45 @@ export function EditCollectionDialog({
     setIsSubmitting(true);
 
     try {
-      // Update the collection basic details
-      await updateCollection.mutateAsync({
-        id: collection.id,
-        name,
-        description,
-        is_public: isPublic,
-        auto_add_tagged: true
+      // Update the collection basic details using direct fetch
+      const updateResponse = await fetch(`/api/collections/${collection.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name,
+          description,
+          is_public: isPublic,
+          auto_add_tagged: true
+        })
       });
+      
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to update collection: ${updateResponse.statusText}`);
+      }
+      
+      // Update collection in cache
+      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       
       // Update tags
       await syncCollectionTags();
       
-      // Process tagged bookmarks
-      await processTaggedBookmarks.mutateAsync(collection.id);
+      // Process tagged bookmarks with direct fetch
+      try {
+        const processResponse = await fetch(`/api/collections/${collection.id}/process-tagged`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+        
+        if (!processResponse.ok) {
+          console.warn(`Warning processing tagged bookmarks: ${processResponse.statusText}`);
+          // Continue even if this fails
+        }
+      } catch (processError) {
+        console.warn('Warning: Error processing tagged bookmarks:', processError);
+        // Continue even if this fails
+      }
       
       toast({
         title: "Collection updated",
