@@ -54,50 +54,69 @@ export function EditCollectionDialog({
     processTaggedBookmarks 
   } = useCollectionMutations();
   
-  // Reset the form when the dialog opens with a collection
+  // Reset the form and reset query cache when the dialog opens with a collection
   useEffect(() => {
     if (collection && open) {
+      console.log(`Dialog opened for collection ${collection.id}`);
+      
       // Reset all form values
       setName(collection.name);
       setDescription(collection.description || "");
       setIsPublic(collection.is_public);
       
-      // Always clear tags when opening dialog
+      // Always clear tags when opening dialog to avoid showing old data
       setSelectedTags([]);
       
-      // Reset initialization flag
+      // Reset initialization flag so we can update tags when data loads
       initialized.current = false;
+      
+      // Force refetch tag data for the current collection
+      queryClient.resetQueries({ 
+        queryKey: ["/api/collections", collection.id, "tags"],
+        exact: true
+      });
     }
-  }, [collection, open]);
+  }, [collection, open, queryClient]);
   
   // Fetch tags for this collection when dialog is open
   const { 
     data: collectionTags = [],
     refetch: refetchCollectionTags,
+    isLoading: isLoadingCollectionTags,
   } = useQuery<Tag[]>({
     queryKey: ["/api/collections", collection?.id, "tags"],
     queryFn: async () => {
       if (!collection?.id) return [];
+      console.log(`Fetching tags for collection ${collection.id}`);
       const tags = await apiRequest('GET', `/api/collections/${collection.id}/tags`);
+      console.log(`Retrieved ${tags.length} tags for collection ${collection.id}`, tags);
       return tags;
     },
     enabled: !!collection?.id && open,
+    // Force refetch when dialog opens with a different collection
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    staleTime: 0
   });
   
-  // Update selected tags when collection tags change, but only once
+  // Update selected tags when collection tags are loaded
   useEffect(() => {
-    if (open && collection && !initialized.current) {
+    if (open && collection && !isLoadingCollectionTags) {
+      console.log(`Tags loaded for collection ${collection.id}, found ${collectionTags.length} tags`);
+      
       if (collectionTags.length > 0) {
         // Only set tags if this collection actually has tags
         const tagNames = collectionTags.map(tag => tag.name);
+        console.log(`Setting ${tagNames.length} tag names:`, tagNames);
         setSelectedTags(tagNames);
       } else {
         // Ensure tags are empty if no collection tags
+        console.log(`No tags found for collection ${collection.id}, clearing selected tags`);
         setSelectedTags([]);
       }
       initialized.current = true;
     }
-  }, [collectionTags, collection, open]);
+  }, [collectionTags, collection, open, isLoadingCollectionTags]);
   
   // Helper function to sync the collection's tags with selected tags
   const syncCollectionTags = async () => {
