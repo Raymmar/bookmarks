@@ -1690,6 +1690,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      // After removing a tag, process the collection's tagged bookmarks in the background
+      // This will ensure any bookmarks that were only associated with this tag are removed from the collection
+      setTimeout(() => {
+        storage.processTaggedBookmarksForCollection(collectionId)
+          .then(count => console.log(`Updated bookmarks in collection ${collectionId} after removing tag ${tagId}`))
+          .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
+      }, 0);
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error removing tag from collection:", error);
