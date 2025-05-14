@@ -7,6 +7,7 @@ import {
   activities, Activity, InsertActivity,
   tags, Tag, InsertTag,
   bookmarkTags, BookmarkTag, InsertBookmarkTag,
+  collectionTags, CollectionTag, InsertCollectionTag,
   chatSessions, ChatSession, InsertChatSession,
   chatMessages, ChatMessage, InsertChatMessage,
   settings, Setting, InsertSetting,

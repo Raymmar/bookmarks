@@ -92,6 +92,7 @@ export const collections = pgTable("collections", {
   description: text("description"),
   user_id: uuid("user_id").references(() => users.id).notNull(),
   is_public: boolean("is_public").default(false).notNull(),
+  auto_add_tagged: boolean("auto_add_tagged").default(false).notNull(), // Flag to enable automatic tag-based bookmark addition
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -173,6 +174,18 @@ export const bookmarkTags = pgTable("bookmark_tags", {
   tag_id: uuid("tag_id").references(() => tags.id, { onDelete: "cascade" }).notNull(),
 });
 
+// Collection-Tags join table for auto-organization
+export const collectionTags = pgTable("collection_tags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  collection_id: uuid("collection_id").references(() => collections.id, { onDelete: "cascade" }).notNull(),
+  tag_id: uuid("tag_id").references(() => tags.id, { onDelete: "cascade" }).notNull(),
+}, (table) => {
+  return {
+    // Add a unique constraint to prevent duplicate tag entries in a collection
+    uniqueTagInCollection: unique().on(table.collection_id, table.tag_id),
+  };
+});
+
 // Settings table for user-configurable settings
 export const settings = pgTable("settings", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -230,6 +243,7 @@ export const collectionsRelations = relations(collections, ({ one, many }) => ({
     references: [users.id],
   }),
   collectionBookmarks: many(collectionBookmarks),
+  collectionTags: many(collectionTags),
 }));
 
 export const collectionBookmarksRelations = relations(collectionBookmarks, ({ one }) => ({
@@ -240,6 +254,36 @@ export const collectionBookmarksRelations = relations(collectionBookmarks, ({ on
   bookmark: one(bookmarks, {
     fields: [collectionBookmarks.bookmark_id],
     references: [bookmarks.id],
+  }),
+}));
+
+// Define relation between tags and collection tags
+export const tagsRelations = relations(tags, ({ many }) => ({
+  bookmarkTags: many(bookmarkTags),
+  collectionTags: many(collectionTags),
+}));
+
+// Define relations for bookmark tags
+export const bookmarkTagsRelations = relations(bookmarkTags, ({ one }) => ({
+  bookmark: one(bookmarks, {
+    fields: [bookmarkTags.bookmark_id],
+    references: [bookmarks.id],
+  }),
+  tag: one(tags, {
+    fields: [bookmarkTags.tag_id],
+    references: [tags.id],
+  }),
+}));
+
+// Define relations for collection tags
+export const collectionTagsRelations = relations(collectionTags, ({ one }) => ({
+  collection: one(collections, {
+    fields: [collectionTags.collection_id],
+    references: [collections.id],
+  }),
+  tag: one(tags, {
+    fields: [collectionTags.tag_id],
+    references: [tags.id],
   }),
 }));
 
@@ -296,6 +340,10 @@ export const insertBookmarkTagSchema = createInsertSchema(bookmarkTags).omit({
   id: true,
 });
 
+export const insertCollectionTagSchema = createInsertSchema(collectionTags).omit({
+  id: true,
+});
+
 // Chat Schemas
 export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
   id: true,
@@ -347,6 +395,9 @@ export type Tag = typeof tags.$inferSelect;
 
 export type InsertBookmarkTag = z.infer<typeof insertBookmarkTagSchema>;
 export type BookmarkTag = typeof bookmarkTags.$inferSelect;
+
+export type InsertCollectionTag = z.infer<typeof insertCollectionTagSchema>;
+export type CollectionTag = typeof collectionTags.$inferSelect;
 
 export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
 export type ChatSession = typeof chatSessions.$inferSelect;
