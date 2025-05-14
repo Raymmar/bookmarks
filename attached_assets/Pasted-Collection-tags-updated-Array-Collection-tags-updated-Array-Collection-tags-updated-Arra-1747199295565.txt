@@ -1,0 +1,50 @@
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Warning: Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn&#x27;t have a dependency array, or one of the dependencies changes on every render.
+    at EditCollectionDialog (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/src/components/ui/edit-collection-dialog.tsx:31:3)
+    at nav
+    at SidebarNavigation (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/src/components/sidebar-navigation.tsx:70:37)
+    at div
+    at div
+    at MainLayout (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/src/layouts/main-layout.tsx:22:38)
+    at Provider (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-U27FYV5Z.js?v=607ef6a1:38:15)
+    at TooltipProvider (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=607ef6a1:62:5)
+    at AuthProvider (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/src/hooks/use-auth.tsx:26:32)
+    at QueryClientProvider (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=607ef6a1:2805:3)
+    at App
+    at V (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/next-themes.js?v=607ef6a1:44:25)
+    at J (https://157f39c6-6ae3-4a0c-8da9-261964e6a280-00-694nh0tm5kbv.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/next-themes.js?v=607ef6a1:42:18)
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array []
+Collection tags updated: 
+Array 

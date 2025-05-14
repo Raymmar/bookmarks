@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCollectionMutations } from "@/hooks/use-collection-queries";
 import { TagSelector } from "@/components/ui/tag-selector";
 import { useQuery } from "@tanstack/react-query";
-import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface EditCollectionDialogProps {
   open: boolean;
@@ -37,13 +36,17 @@ export function EditCollectionDialog({
   collection,
   onCollectionUpdated 
 }: EditCollectionDialogProps) {
+  // State for form values
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [validCollectionTags, setValidCollectionTags] = useState<Tag[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  
+  // Ref to track initialization
+  const initialized = useRef(false);
+  
   const { 
     updateCollection, 
     addTagToCollection, 
@@ -51,117 +54,60 @@ export function EditCollectionDialog({
     processTaggedBookmarks 
   } = useCollectionMutations();
   
-  // Fetch tags for this collection
+  // Reset the form when the dialog opens with a collection
+  useEffect(() => {
+    if (collection && open) {
+      setName(collection.name);
+      setDescription(collection.description || "");
+      setIsPublic(collection.is_public);
+      initialized.current = false;
+    }
+  }, [collection, open]);
+  
+  // Fetch tags for this collection when dialog is open
   const { 
     data: collectionTags = [],
     refetch: refetchCollectionTags,
-    isLoading: isLoadingTags,
-    isError: isTagsError,
-    error: tagsError
   } = useQuery<Tag[]>({
     queryKey: ["/api/collections", collection?.id, "tags"],
     queryFn: async () => {
       if (!collection?.id) return [];
-      try {
-        console.log(`Fetching tags for collection ${collection.id}`);
-        const tags = await apiRequest('GET', `/api/collections/${collection.id}/tags`);
-        console.log('Retrieved tags:', tags);
-        return tags;
-      } catch (error) {
-        console.error('Error fetching collection tags:', error);
-        throw error;
-      }
+      const tags = await apiRequest('GET', `/api/collections/${collection.id}/tags`);
+      return tags;
     },
     enabled: !!collection?.id && open,
   });
   
-  // Initialize form when dialog opens/collection changes
+  // Update selected tags when collection tags change, but only once
   useEffect(() => {
-    if (collection && open) {
-      // Initialize form fields from collection data
-      setName(collection.name);
-      setDescription(collection.description || "");
-      setIsPublic(collection.is_public);
-      
-      // Reset selected tags to clear any previous state
-      setSelectedTags([]);
-      
-      // Force refetch of collection tags when modal opens
-      if (collection.id) {
-        console.log("Explicitly refetching tags for collection", collection.id);
-        // Invalidate query cache before refetching
-        queryClient.invalidateQueries({ queryKey: ["/api/collections", collection.id, "tags"] });
-        refetchCollectionTags();
-      }
+    if (open && collection && collectionTags.length > 0 && !initialized.current) {
+      // Extract tag names
+      const tagNames = collectionTags.map(tag => tag.name);
+      setSelectedTags(tagNames);
+      initialized.current = true;
     }
-  }, [collection, open, refetchCollectionTags]);
+  }, [collectionTags, collection, open]);
   
-  // Handle loading collection tags
-  useEffect(() => {
-    console.log("Collection tags updated:", collectionTags);
-    
-    if (collectionTags && Array.isArray(collectionTags)) {
-      // Only update if we have valid tag objects with the proper structure
-      const validTags = collectionTags.filter(tag => 
-        tag && 
-        typeof tag === 'object' &&
-        'id' in tag && 
-        'name' in tag && 
-        'type' in tag
-      );
-      
-      // Only set selected tags when open is true and if we haven't set them yet or if the tags have changed
-      if (open && validTags.length > 0) {
-        // Get current tag names (for comparison)
-        const currentTagNames = selectedTags.map(t => t.toLowerCase());
-        const newTagNames = validTags.map(tag => tag.name.toLowerCase());
-        
-        // Check if the arrays are different in content (regardless of order)
-        const tagsDifferent = 
-          currentTagNames.length !== newTagNames.length || 
-          !currentTagNames.every(tag => newTagNames.includes(tag));
-        
-        if (tagsDifferent) {
-          console.log("Setting selected tags from valid collection tags:", validTags);
-          setSelectedTags(validTags.map(tag => tag.name));
-        }
-      } else if (collectionTags.length > 0 && validTags.length === 0) {
-        console.warn("Received collection tags but none were valid:", collectionTags);
-      }
-      
-      // Save valid tags for reference
-      setValidCollectionTags(validTags);
-    }
-    // We only want to update when collectionTags actually changes, not when selectedTags changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionTags, open]);
-
-  // Helper function to sync collection tags
+  // Helper function to sync the collection's tags with selected tags
   const syncCollectionTags = async () => {
     if (!collection) return;
     
     try {
-      // Get the IDs of the selected tags
-      const tagsResponse = await apiRequest('GET', '/api/tags');
-      const allTags = tagsResponse;
-      
-      // Map of tag names to tag IDs
+      // Get all available tags
+      const allTags = await apiRequest('GET', '/api/tags');
       const tagMap = new Map(allTags.map((tag: Tag) => [tag.name.toLowerCase(), tag.id]));
       
-      // Get the existing tags for this collection, filtering out invalid objects
-      const validCollectionTags = collectionTags.filter(tag => 
-        tag && typeof tag === 'object' && 'name' in tag && typeof tag.name === 'string'
-      );
-      const existingTags = validCollectionTags.map(tag => tag.name.toLowerCase());
+      // Get existing tag names (lowercase for case-insensitive comparison)
+      const existingTagNames = collectionTags.map(tag => tag.name.toLowerCase());
       
-      // Create any new tags that don't exist yet
+      // Add new tags that aren't already in the collection
       for (const tagName of selectedTags) {
         const normalizedTagName = tagName.toLowerCase().trim();
         
-        // Skip if this tag is already in the collection
-        if (existingTags.includes(normalizedTagName)) continue;
+        // Skip if tag is already in the collection
+        if (existingTagNames.includes(normalizedTagName)) continue;
         
-        // Check if the tag already exists in our database
+        // Find tag ID or create new tag if needed
         let tagId = tagMap.get(normalizedTagName);
         
         if (!tagId) {
@@ -170,40 +116,29 @@ export function EditCollectionDialog({
           tagId = newTag.id;
         }
         
-        // Add the tag to the collection using our mutation hook with optimistic updates
+        // Add tag to collection
         await addTagToCollection.mutateAsync({ 
           collectionId: collection.id, 
-          tagId: tagId,
-          tagName: tagName || "" // Include tag name for optimistic updates (use empty string as fallback)
+          tagId,
+          tagName
         });
       }
       
-      // Remove tags that were unselected, only processing valid tag objects
-      for (const tag of validCollectionTags) {
-        if (!tag || typeof tag !== 'object' || !tag.id || !tag.name) {
-          console.log("Skipping invalid tag object:", tag);
-          continue;
-        }
-        
+      // Remove tags that were unselected
+      for (const tag of collectionTags) {
         const normalizedTagName = tag.name.toLowerCase().trim();
         
-        // If this tag is no longer in the selected tags, remove it
+        // If this tag is no longer in selected tags, remove it
         if (!selectedTags.some(t => t.toLowerCase().trim() === normalizedTagName)) {
-          try {
-            await removeTagFromCollection.mutateAsync({ 
-              collectionId: collection.id, 
-              tagId: tag.id 
-            });
-          } catch (error) {
-            console.error(`Error removing tag ${tag.id} from collection ${collection.id}:`, error);
-            // Continue processing other tags even if one fails
-          }
+          await removeTagFromCollection.mutateAsync({ 
+            collectionId: collection.id, 
+            tagId: tag.id 
+          });
         }
       }
       
-      // Refresh the collection tags
+      // Refresh collection tags
       refetchCollectionTags();
-      
     } catch (error) {
       console.error("Error syncing collection tags:", error);
       throw error;
@@ -226,33 +161,19 @@ export function EditCollectionDialog({
 
     try {
       // Update the collection basic details
-      const updatedCollection = await updateCollection.mutateAsync({
+      await updateCollection.mutateAsync({
         id: collection.id,
         name,
         description,
         is_public: isPublic,
-        // Always set auto_add_tagged to true
         auto_add_tagged: true
       });
       
-      console.log("Collection updated successfully:", updatedCollection);
+      // Update tags
+      await syncCollectionTags();
       
-      try {
-        // Try to update the collection tags
-        await syncCollectionTags();
-      } catch (tagError) {
-        // Log the error but continue with the update process
-        console.error('Error syncing collection tags:', tagError);
-      }
-      
-      // Always process tagged bookmarks - auto-add is always enabled
-      try {
-        console.log("Processing tagged bookmarks for collection", collection.id);
-        await processTaggedBookmarks.mutateAsync(collection.id);
-      } catch (processError) {
-        // Log the error but continue
-        console.error('Error processing tagged bookmarks:', processError);
-      }
+      // Process tagged bookmarks
+      await processTaggedBookmarks.mutateAsync(collection.id);
       
       toast({
         title: "Collection updated",
@@ -275,8 +196,6 @@ export function EditCollectionDialog({
       setIsSubmitting(false);
     }
   };
-
-
 
   if (!collection) return null;
 
