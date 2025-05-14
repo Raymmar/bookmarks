@@ -156,7 +156,7 @@ export function EditCollectionDialog({
         await addTagToCollection.mutateAsync({ 
           collectionId: collection.id, 
           tagId: tagId,
-          tagName: tagName // Include tag name for optimistic updates
+          tagName: tagName || "" // Include tag name for optimistic updates (use empty string as fallback)
         });
       }
       
