@@ -142,14 +142,15 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
         />
       </div>
       
-      {/* Tag suggestions */}
-      {(newTagText.trim() !== "" || filteredTags.length > 0) && (
+      {/* Tag suggestions - only shown when user is typing */}
+      {newTagText.trim() !== "" && (
         <div className="mt-2">
           <div className="text-xs text-gray-500 mb-1">
-            {newTagText.trim() !== "" ? "Add new or select existing tag:" : "Suggested tags:"}
+            Add new or select existing tag:
           </div>
           <div className="flex flex-wrap gap-1">
-            {newTagText.trim() !== "" && !tags.some(t => t.name.toLowerCase() === newTagText.trim().toLowerCase()) && (
+            {/* Show option to create new tag if it doesn't already exist */}
+            {!tags.some(t => t.name.toLowerCase() === newTagText.trim().toLowerCase()) && (
               <Badge 
                 key="new-tag" 
                 variant="outline" 
@@ -161,6 +162,7 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
               </Badge>
             )}
             
+            {/* Show matching existing tags */}
             {filteredTags.map(tag => (
               <Badge 
                 key={tag.id} 
