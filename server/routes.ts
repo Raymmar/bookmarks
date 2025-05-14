@@ -1565,6 +1565,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Collection Tags API endpoints
+  
+  // Get tags for a collection
+  app.get("/api/collections/:collectionId/tags", async (req, res) => {
+    try {
+      const { collectionId } = req.params;
+      
+      // Check if collection exists
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      // For private collections, check authentication
+      if (!collection.is_public && (!req.isAuthenticated() || collection.user_id !== (req.user as Express.User)?.id)) {
+        return res.status(403).json({ error: "You don't have access to this collection" });
+      }
+      
+      const tags = await storage.getTagsByCollectionId(collectionId);
+      res.json(tags);
+    } catch (error) {
+      console.error("Error retrieving collection tags:", error);
+      res.status(500).json({ error: "Failed to retrieve collection tags" });
+    }
+  });
+  
+  // Add tag to collection
+  app.post("/api/collections/:collectionId/tags/:tagId", async (req, res) => {
+    try {
+      // User must be authenticated to add tags to collections
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const { collectionId, tagId } = req.params;
+      
+      // Verify the collection exists and user owns it
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only add tags to your own collections" });
+      }
+      
+      // Verify the tag exists
+      const tag = await storage.getTag(tagId);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      // Add tag to collection
+      const collectionTag = await storage.addTagToCollection(collectionId, tagId);
+      
+      // If auto-add is enabled, process tagged bookmarks
+      if (collection.auto_add_tagged) {
+        // Process in the background
+        setTimeout(() => {
+          storage.processTaggedBookmarksForCollection(collectionId)
+            .then(count => console.log(`Added ${count} bookmarks to collection ${collectionId} based on tag ${tagId}`))
+            .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
+        }, 0);
+      }
+      
+      res.status(201).json(collectionTag);
+    } catch (error) {
+      console.error("Error adding tag to collection:", error);
+      res.status(500).json({ error: "Failed to add tag to collection" });
+    }
+  });
+  
+  // Remove tag from collection
+  app.delete("/api/collections/:collectionId/tags/:tagId", async (req, res) => {
+    try {
+      // User must be authenticated to remove tags from collections
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const { collectionId, tagId } = req.params;
+      
+      // Verify the collection exists and user owns it
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only remove tags from your own collections" });
+      }
+      
+      // Remove tag from collection
+      const success = await storage.removeTagFromCollection(collectionId, tagId);
+      
+      if (!success) {
+        // If tag wasn't associated with this collection, still return success (idempotent)
+        res.status(204).send();
+        return;
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing tag from collection:", error);
+      res.status(500).json({ error: "Failed to remove tag from collection" });
+    }
+  });
+  
+  // Toggle auto-add tagged feature for a collection
+  app.patch("/api/collections/:collectionId/auto-add-tagged", async (req, res) => {
+    try {
+      // User must be authenticated to update collection settings
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const { collectionId } = req.params;
+      const { enabled } = req.body;
+      
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "Enabled parameter must be a boolean" });
+      }
+      
+      // Verify the collection exists and user owns it
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only update your own collections" });
+      }
+      
+      // Update the auto_add_tagged setting
+      const updatedCollection = await storage.updateCollection(collectionId, {
+        auto_add_tagged: enabled
+      });
+      
+      // If enabled, immediately process any tagged bookmarks
+      if (enabled) {
+        // Process in the background
+        setTimeout(() => {
+          storage.processTaggedBookmarksForCollection(collectionId)
+            .then(count => console.log(`Added ${count} bookmarks to collection ${collectionId} based on tags`))
+            .catch(err => console.error(`Error processing tagged bookmarks: ${err}`));
+        }, 0);
+      }
+      
+      res.json(updatedCollection);
+    } catch (error) {
+      console.error("Error updating collection auto-add setting:", error);
+      res.status(500).json({ error: "Failed to update collection auto-add setting" });
+    }
+  });
+  
+  // Manually trigger processing of tagged bookmarks for a collection
+  app.post("/api/collections/:collectionId/process-tagged", async (req, res) => {
+    try {
+      // User must be authenticated to trigger processing
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userId = (req.user as Express.User).id;
+      const { collectionId } = req.params;
+      
+      // Verify the collection exists and user owns it
+      const collection = await storage.getCollection(collectionId);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      if (collection.user_id !== userId) {
+        return res.status(403).json({ error: "You can only process your own collections" });
+      }
+      
+      // Process tagged bookmarks and return the count
+      const addedCount = await storage.processTaggedBookmarksForCollection(collectionId);
+      
+      res.json({ 
+        success: true, 
+        message: `Processed tags for collection ${collection.name}`,
+        bookmarks_added: addedCount
+      });
+    } catch (error) {
+      console.error("Error processing collection tagged bookmarks:", error);
+      res.status(500).json({ error: "Failed to process collection tagged bookmarks" });
+    }
+  });
+  
   // Settings API endpoints
   app.get("/api/settings", async (req, res) => {
     try {

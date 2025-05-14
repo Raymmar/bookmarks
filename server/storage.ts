@@ -1711,6 +1711,132 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+
+  // Collection Tags methods
+  async getTagsByCollectionId(collectionId: string): Promise<Tag[]> {
+    try {
+      const joinResult = await db
+        .select({
+          tag: tags
+        })
+        .from(collectionTags)
+        .innerJoin(tags, eq(collectionTags.tag_id, tags.id))
+        .where(eq(collectionTags.collection_id, collectionId));
+      
+      return joinResult.map(result => result.tag);
+    } catch (error) {
+      console.error(`Database error retrieving tags for collection ${collectionId}:`, error);
+      throw error;
+    }
+  }
+
+  async getCollectionsByTagId(tagId: string): Promise<Collection[]> {
+    try {
+      const joinResult = await db
+        .select({
+          collection: collections
+        })
+        .from(collectionTags)
+        .innerJoin(collections, eq(collectionTags.collection_id, collections.id))
+        .where(eq(collectionTags.tag_id, tagId));
+      
+      return joinResult.map(result => result.collection);
+    } catch (error) {
+      console.error(`Database error retrieving collections for tag ${tagId}:`, error);
+      throw error;
+    }
+  }
+
+  async addTagToCollection(collectionId: string, tagId: string): Promise<CollectionTag> {
+    try {
+      // First check if the relation already exists
+      const existingRelation = await db
+        .select()
+        .from(collectionTags)
+        .where(eq(collectionTags.collection_id, collectionId))
+        .where(eq(collectionTags.tag_id, tagId));
+      
+      if (existingRelation.length > 0) {
+        return existingRelation[0];
+      }
+      
+      // Create new relation
+      const [newCollectionTag] = await db
+        .insert(collectionTags)
+        .values({ collection_id: collectionId, tag_id: tagId })
+        .returning();
+      
+      // Process any existing bookmarks with this tag for auto-adding
+      await this.processTaggedBookmarksForCollection(collectionId);
+      
+      return newCollectionTag;
+    } catch (error) {
+      console.error(`Database error adding tag ${tagId} to collection ${collectionId}:`, error);
+      throw error;
+    }
+  }
+
+  async removeTagFromCollection(collectionId: string, tagId: string): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(collectionTags)
+        .where(eq(collectionTags.collection_id, collectionId))
+        .where(eq(collectionTags.tag_id, tagId))
+        .returning({ id: collectionTags.id });
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Database error removing tag ${tagId} from collection ${collectionId}:`, error);
+      throw error;
+    }
+  }
+
+  async processTaggedBookmarksForCollection(collectionId: string): Promise<number> {
+    try {
+      // First, check if auto-adding is enabled for this collection
+      const collection = await this.getCollection(collectionId);
+      
+      if (!collection || !collection.auto_add_tagged) {
+        return 0;
+      }
+      
+      // Get all tags for this collection
+      const collectionTags = await this.getTagsByCollectionId(collectionId);
+      if (collectionTags.length === 0) {
+        return 0;
+      }
+      
+      const tagIds = collectionTags.map(tag => tag.id);
+      
+      // Find all bookmarks that have any of these tags
+      // This query gets all bookmarks that have at least one of the collection's tags
+      const joinResult = await db
+        .selectDistinct({
+          bookmark_id: bookmarkTags.bookmark_id
+        })
+        .from(bookmarkTags)
+        .where(inArray(bookmarkTags.tag_id, tagIds));
+      
+      // Get existing bookmarks in the collection
+      const existingBookmarks = await this.getBookmarksByCollectionId(collectionId);
+      const existingBookmarkIds = new Set(existingBookmarks.map(b => b.id));
+      
+      // Add bookmarks that are not already in the collection
+      let addedCount = 0;
+      for (const { bookmark_id } of joinResult) {
+        if (!existingBookmarkIds.has(bookmark_id)) {
+          await this.addBookmarkToCollection(collectionId, bookmark_id);
+          addedCount++;
+        }
+      }
+      
+      console.log(`Added ${addedCount} bookmarks to collection ${collectionId} based on tags`);
+      return addedCount;
+    } catch (error) {
+      console.error(`Database error processing tagged bookmarks for collection ${collectionId}:`, error);
+      throw error;
+    }
+  }
   
   // Bookmarks
   async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
