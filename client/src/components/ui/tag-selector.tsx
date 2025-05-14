@@ -25,12 +25,24 @@ export function TagSelector({ selectedTags, onTagsChange, className }: TagSelect
   // Fetch all tags from the server - uses global defaults set in queryClient.ts
   // which includes good caching behavior for tags
   const { 
-    data: tags = [],
+    data: allTagsData = [],
     refetch: refetchTags
   } = useQuery<Tag[]>({
     queryKey: ["/api/tags"],
     queryFn: getQueryFn({ on401: "returnNull" })
   });
+  
+  // Filter out any items that don't match the expected Tag structure
+  // This ensures we only show proper tags and not collections or other items
+  const tags = allTagsData.filter(tag => 
+    tag && 
+    typeof tag === 'object' && 
+    'id' in tag && 
+    'name' in tag && 
+    'type' in tag && 
+    (tag.type === 'user' || tag.type === 'system') &&
+    'count' in tag
+  );
   
   // Use useMemo instead of useEffect to prevent infinite loop
   const filteredTags = useMemo(() => {
