@@ -1840,6 +1840,9 @@ export class DatabaseStorage implements IStorage {
         return 0;
       }
       
+      // Store the user ID of the collection owner to ensure we only process their bookmarks
+      const collectionUserId = collection.user_id;
+      
       // Get all tags for this collection
       const collectionTags = await this.getTagsByCollectionId(collectionId);
       
@@ -1852,7 +1855,7 @@ export class DatabaseStorage implements IStorage {
       
       const tagIds = collectionTags.map(tag => tag.id);
       
-      // Find all bookmarks that have any of these tags
+      // Find all bookmarks that have any of these tags AND belong to the collection owner
       // This query gets all bookmarks that have at least one of the collection's tags
       // If there are no tags, this will return an empty array
       const joinResult = await db
@@ -1860,10 +1863,16 @@ export class DatabaseStorage implements IStorage {
           bookmark_id: bookmarkTags.bookmark_id
         })
         .from(bookmarkTags)
-        .where(tagIds.length > 0 ? inArray(bookmarkTags.tag_id, tagIds) : sql`1=0`); // If no tags, use a condition that returns no results
+        .innerJoin(bookmarks, eq(bookmarkTags.bookmark_id, bookmarks.id))
+        .where(
+          and(
+            tagIds.length > 0 ? inArray(bookmarkTags.tag_id, tagIds) : sql`1=0`, // If no tags, use a condition that returns no results
+            eq(bookmarks.user_id, collectionUserId) // Only include bookmarks from the collection owner
+          )
+        );
       
       // Create a set of bookmark IDs that should be in the collection
-      // These are bookmarks that have at least one of the collection's tags
+      // These are bookmarks that have at least one of the collection's tags AND belong to the same user
       const shouldBeInCollectionIds = new Set(joinResult.map(r => r.bookmark_id));
       
       // Add bookmarks that are not already in the collection but have matching tags
