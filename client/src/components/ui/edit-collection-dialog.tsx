@@ -76,26 +76,32 @@ export function EditCollectionDialog({
     enabled: !!collection?.id && open,
   });
   
-  // Initialize form or reset when dialog opens/collection changes
-  // Use a single useEffect for initializing both regular fields and tags
-  // with a proper reset when the collection or modal state changes
+  // Initialize form when dialog opens/collection changes
   useEffect(() => {
     if (collection && open) {
       // Initialize form fields from collection data
       setName(collection.name);
       setDescription(collection.description || "");
       setIsPublic(collection.is_public);
-      setAutoAddTagged(collection.auto_add_tagged ?? false);
       
-      // Always reset selectedTags when opening the dialog to prevent stale data
-      setSelectedTags([]);
+      // Set auto-add tagged to true by default if not explicitly set
+      const autoAddValue = collection.auto_add_tagged !== undefined ? 
+        collection.auto_add_tagged : true;
+      setAutoAddTagged(autoAddValue);
+      
+      // Force refetch of collection tags when modal opens
+      if (collection.id) {
+        console.log("Explicitly refetching tags for collection", collection.id);
+        refetchCollectionTags();
+      }
     }
-  }, [collection, open]);
+  }, [collection, open, refetchCollectionTags]);
   
-  // Separate useEffect to handle tag loading
-  // This ensures we don't have a race condition with the form reset
+  // Handle loading collection tags
   useEffect(() => {
-    if (collectionTags && Array.isArray(collectionTags) && collectionTags.length > 0) {
+    console.log("Collection tags updated:", collectionTags);
+    
+    if (collectionTags && Array.isArray(collectionTags)) {
       // Only update if we have valid tag objects with the proper structure
       const validTags = collectionTags.filter(tag => 
         tag && 
@@ -106,7 +112,10 @@ export function EditCollectionDialog({
       );
       
       if (validTags.length > 0) {
+        console.log("Setting selected tags from valid collection tags:", validTags);
         setSelectedTags(validTags.map(tag => tag.name));
+      } else if (collectionTags.length > 0 && validTags.length === 0) {
+        console.warn("Received collection tags but none were valid:", collectionTags);
       }
     }
   }, [collectionTags]);
@@ -199,14 +208,18 @@ export function EditCollectionDialog({
     setIsSubmitting(true);
 
     try {
+      console.log("Saving collection with auto_add_tagged:", autoAddTagged);
+      
       // Update the collection basic details
-      await updateCollection.mutateAsync({
+      const updatedCollection = await updateCollection.mutateAsync({
         id: collection.id,
         name,
         description,
         is_public: isPublic,
         auto_add_tagged: autoAddTagged
       });
+      
+      console.log("Collection updated successfully:", updatedCollection);
       
       try {
         // Try to update the collection tags
@@ -219,6 +232,7 @@ export function EditCollectionDialog({
       // Process tagged bookmarks if auto-add is enabled
       if (autoAddTagged) {
         try {
+          console.log("Processing tagged bookmarks for collection", collection.id);
           await processTaggedBookmarks.mutateAsync(collection.id);
         } catch (processError) {
           // Log the error but continue
@@ -295,7 +309,10 @@ export function EditCollectionDialog({
             <Switch 
               id="auto-add-tagged" 
               checked={autoAddTagged} 
-              onCheckedChange={setAutoAddTagged}
+              onCheckedChange={(checked) => {
+                console.log("Auto-add tagged toggled to:", checked);
+                setAutoAddTagged(checked);
+              }}
             />
             <div>
               <Label htmlFor="auto-add-tagged" className="text-sm">
