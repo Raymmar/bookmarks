@@ -57,9 +57,15 @@ export function EditCollectionDialog({
   // Reset the form when the dialog opens with a collection
   useEffect(() => {
     if (collection && open) {
+      // Reset all form values
       setName(collection.name);
       setDescription(collection.description || "");
       setIsPublic(collection.is_public);
+      
+      // Always clear tags when opening dialog
+      setSelectedTags([]);
+      
+      // Reset initialization flag
       initialized.current = false;
     }
   }, [collection, open]);
@@ -80,10 +86,15 @@ export function EditCollectionDialog({
   
   // Update selected tags when collection tags change, but only once
   useEffect(() => {
-    if (open && collection && collectionTags.length > 0 && !initialized.current) {
-      // Extract tag names
-      const tagNames = collectionTags.map(tag => tag.name);
-      setSelectedTags(tagNames);
+    if (open && collection && !initialized.current) {
+      if (collectionTags.length > 0) {
+        // Only set tags if this collection actually has tags
+        const tagNames = collectionTags.map(tag => tag.name);
+        setSelectedTags(tagNames);
+      } else {
+        // Ensure tags are empty if no collection tags
+        setSelectedTags([]);
+      }
       initialized.current = true;
     }
   }, [collectionTags, collection, open]);
@@ -93,6 +104,8 @@ export function EditCollectionDialog({
     if (!collection) return;
     
     try {
+      console.log(`Syncing tags for collection ${collection.id}. Selected tags:`, selectedTags);
+      
       // Get all available tags
       const allTagsResponse = await fetch('/api/tags', {
         method: 'GET',
@@ -105,10 +118,13 @@ export function EditCollectionDialog({
       }
       
       const allTags = await allTagsResponse.json();
+      console.log(`Retrieved ${allTags.length} total tags from server`);
+      
       const tagMap = new Map(allTags.map((tag: Tag) => [tag.name.toLowerCase(), tag.id as string]));
       
       // Get existing tag names (lowercase for case-insensitive comparison)
       const existingTagNames = collectionTags.map(tag => tag.name.toLowerCase());
+      console.log(`Collection currently has ${existingTagNames.length} tags:`, existingTagNames);
       
       // Add new tags that aren't already in the collection
       for (const tagName of selectedTags) {
@@ -117,35 +133,58 @@ export function EditCollectionDialog({
         const normalizedTagName = tagName.toLowerCase().trim();
         
         // Skip if tag is already in the collection
-        if (existingTagNames.includes(normalizedTagName)) continue;
+        if (existingTagNames.includes(normalizedTagName)) {
+          console.log(`Tag '${tagName}' already exists in collection, skipping`);
+          continue;
+        }
+        
+        console.log(`Adding tag '${tagName}' to collection ${collection.id}`);
         
         // Find tag ID or create new tag if needed
         let tagId = tagMap.get(normalizedTagName);
         
         if (!tagId) {
+          console.log(`Tag '${tagName}' doesn't exist in system, creating new tag`);
           // Create the tag if it doesn't exist
-          const createTagResponse = await fetch('/api/tags', {
+          try {
+            const createTagResponse = await fetch('/api/tags', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ name: tagName })
+            });
+            
+            if (!createTagResponse.ok) {
+              throw new Error(`Failed to create tag: ${createTagResponse.statusText}`);
+            }
+            
+            const newTag = await createTagResponse.json();
+            tagId = newTag.id;
+            console.log(`Created new tag '${tagName}' with ID ${tagId}`);
+          } catch (createTagError) {
+            console.error(`Error creating tag '${tagName}':`, createTagError);
+            continue; // Skip this tag and move to the next one
+          }
+        }
+        
+        // Add tag to collection using direct fetch for better error handling
+        try {
+          console.log(`Adding tag ID ${tagId} to collection ${collection.id}`);
+          const addTagResponse = await fetch(`/api/collections/${collection.id}/tags`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ name: tagName })
+            body: JSON.stringify({ 
+              tagId: tagId as string,
+              tagName 
+            })
           });
           
-          if (!createTagResponse.ok) {
-            throw new Error(`Failed to create tag: ${createTagResponse.statusText}`);
+          if (!addTagResponse.ok) {
+            throw new Error(`Failed to add tag: ${addTagResponse.statusText}`);
           }
           
-          const newTag = await createTagResponse.json();
-          tagId = newTag.id;
-        }
-        
-        // Add tag to collection
-        try {
-          await addTagToCollection.mutateAsync({ 
-            collectionId: collection.id, 
-            tagId: tagId as string,
-            tagName
-          });
+          console.log(`Successfully added tag '${tagName}' to collection`);
         } catch (addTagError) {
           console.error(`Error adding tag ${tagName} to collection:`, addTagError);
           // Continue with other tags
@@ -153,18 +192,27 @@ export function EditCollectionDialog({
       }
       
       // Remove tags that were unselected
+      console.log(`Checking for tags to remove from ${collectionTags.length} existing tags`);
       for (const tag of collectionTags) {
         if (!tag || !tag.id || !tag.name) continue; // Skip invalid tags
         
         const normalizedTagName = tag.name.toLowerCase().trim();
         
         // If this tag is no longer in selected tags, remove it
-        if (!selectedTags.some(t => t && t.toLowerCase().trim() === normalizedTagName)) {
+        const shouldRemove = !selectedTags.some(t => t && t.toLowerCase().trim() === normalizedTagName);
+        if (shouldRemove) {
+          console.log(`Tag '${tag.name}' will be removed as it's no longer selected`);
           try {
-            await removeTagFromCollection.mutateAsync({ 
-              collectionId: collection.id, 
-              tagId: tag.id 
+            const response = await fetch(`/api/collections/${collection.id}/tags/${tag.id}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include'
             });
+            
+            if (!response.ok) {
+              throw new Error(`Server error: ${response.status} ${response.statusText}`);
+            }
+            console.log(`Successfully removed tag '${tag.name}' from collection`);
           } catch (removeTagError) {
             console.error(`Error removing tag ${tag.name} from collection:`, removeTagError);
             // Continue with other tags
