@@ -1843,18 +1843,30 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Remove bookmarks that no longer match any collection tag
-      // This only removes bookmarks that don't match any current tag
-      // It preserves bookmarks manually added to the collection
+      // This removes bookmarks that don't match any current tag or when all tags are removed
       let removedCount = 0;
-      for (const bookmark of existingBookmarks) {
-        // Only remove if the bookmark doesn't match any current tag
-        // If there are no tags, we don't remove any bookmarks
-        if (tagIds.length > 0 && !shouldBeInCollectionIds.has(bookmark.id)) {
+      
+      if (tagIds.length === 0) {
+        // When all tags are removed, remove all auto-added bookmarks
+        console.log(`Removing all auto-added bookmarks from collection ${collectionId} since there are no tags`);
+        for (const bookmark of existingBookmarks) {
           const isRemoved = await this.removeBookmarkFromCollection(collectionId, bookmark.id);
           if (isRemoved) {
             removedCount++;
             processedCount++;
-            console.log(`Removed bookmark ${bookmark.id} from collection ${collectionId}: ${isRemoved}`);
+            console.log(`Removed bookmark ${bookmark.id} from collection ${collectionId} (all tags removed): ${isRemoved}`);
+          }
+        }
+      } else {
+        // Otherwise, only remove bookmarks that don't match any current tag
+        for (const bookmark of existingBookmarks) {
+          if (!shouldBeInCollectionIds.has(bookmark.id)) {
+            const isRemoved = await this.removeBookmarkFromCollection(collectionId, bookmark.id);
+            if (isRemoved) {
+              removedCount++;
+              processedCount++;
+              console.log(`Removed bookmark ${bookmark.id} from collection ${collectionId}: ${isRemoved}`);
+            }
           }
         }
       }
