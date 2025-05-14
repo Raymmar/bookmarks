@@ -69,6 +69,13 @@ export interface IStorage {
   addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark>;
   removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean>;
   
+  // Collection Tags
+  getTagsByCollectionId(collectionId: string): Promise<Tag[]>;
+  getCollectionsByTagId(tagId: string): Promise<Collection[]>;
+  addTagToCollection(collectionId: string, tagId: string): Promise<CollectionTag>;
+  removeTagFromCollection(collectionId: string, tagId: string): Promise<boolean>;
+  processTaggedBookmarksForCollection(collectionId: string): Promise<number>;
+  
   // Notes
   getNotesByBookmarkId(bookmarkId: string): Promise<Note[]>;
   createNote(note: InsertNote): Promise<Note>;
