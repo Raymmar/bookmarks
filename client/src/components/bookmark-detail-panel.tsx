@@ -797,6 +797,9 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
       // Optimistically update the UI
       setTags(prev => [...prev, tagToAdd]);
       
+      // Clear the input field immediately for better UX
+      setNewTagText("");
+      
       // Make the API request
       await apiRequest("POST", `/api/bookmarks/${bookmark.id}/tags/${tagId}`, {});
       
@@ -851,9 +854,15 @@ export function BookmarkDetailPanel({ bookmark: initialBookmark, onClose }: Book
     setIsSubmittingTag(true);
     
     try {
+      // Store the tag name before clearing the input
+      const tagName = newTagText.trim();
+      
+      // Clear the input field immediately for better UX
+      setNewTagText("");
+      
       // Create the new tag
       const newTag = await apiRequest<TagType>("POST", "/api/tags", {
-        name: newTagText.trim(),
+        name: tagName,
         type: "user"
       });
       
