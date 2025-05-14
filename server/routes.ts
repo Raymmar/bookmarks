@@ -1571,26 +1571,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/collections/:collectionId/tags", async (req, res) => {
     try {
       const { collectionId } = req.params;
+      console.log(`Fetching tags for collection: ${collectionId}`);
       
       // Check if collection exists
       const collection = await storage.getCollection(collectionId);
       
       if (!collection) {
+        console.log(`Collection not found: ${collectionId}`);
         return res.status(404).json({ error: "Collection not found" });
       }
       
-      // For private collections, check authentication
-      // If the user is authenticated and it's their collection, or the collection is public, allow access
       const isAuthenticated = req.isAuthenticated();
-      const isOwner = isAuthenticated && collection.user_id === (req.user as Express.User)?.id;
+      const authenticatedUserId = isAuthenticated ? (req.user as Express.User)?.id : null;
+      const isOwner = isAuthenticated && authenticatedUserId === collection.user_id;
       
-      if (!collection.is_public && !isOwner) {
+      console.log(`Auth check for collection ${collectionId}:
+        - Collection owner: ${collection.user_id}
+        - Logged in user: ${authenticatedUserId || 'not logged in'}
+        - Is owner: ${isOwner}
+        - Is public: ${collection.is_public}
+      `);
+      
+      // Allow access for any of these cases:
+      // 1. The collection is public
+      // 2. The user is authenticated and is the owner of the collection
+      const hasAccess = collection.is_public || isOwner;
+      
+      if (!hasAccess) {
+        console.log(`Access denied to collection tags - public: ${collection.is_public}, authenticated: ${isAuthenticated}, owner: ${isOwner}`);
         return res.status(403).json({ error: "You don't have access to this collection" });
       }
       
       console.log(`Access granted to collection tags - public: ${collection.is_public}, authenticated: ${isAuthenticated}, owner: ${isOwner}`);
       
       const tags = await storage.getTagsByCollectionId(collectionId);
+      console.log(`Retrieved ${tags.length} tags for collection ${collectionId}`);
+      
       res.json(tags);
     } catch (error) {
       console.error("Error retrieving collection tags:", error);

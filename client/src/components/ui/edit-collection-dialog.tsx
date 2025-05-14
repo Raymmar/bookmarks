@@ -55,10 +55,24 @@ export function EditCollectionDialog({
   // Fetch tags for this collection
   const { 
     data: collectionTags = [],
-    refetch: refetchCollectionTags
+    refetch: refetchCollectionTags,
+    isLoading: isLoadingTags,
+    isError: isTagsError,
+    error: tagsError
   } = useQuery<Tag[]>({
     queryKey: ["/api/collections", collection?.id, "tags"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async () => {
+      if (!collection?.id) return [];
+      try {
+        console.log(`Fetching tags for collection ${collection.id}`);
+        const tags = await apiRequest('GET', `/api/collections/${collection.id}/tags`);
+        console.log('Retrieved tags:', tags);
+        return tags;
+      } catch (error) {
+        console.error('Error fetching collection tags:', error);
+        throw error;
+      }
+    },
     enabled: !!collection?.id && open,
   });
   
