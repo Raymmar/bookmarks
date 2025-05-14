@@ -1808,8 +1808,23 @@ export class DatabaseStorage implements IStorage {
       
       // Get all tags for this collection
       const collectionTags = await this.getTagsByCollectionId(collectionId);
+      
+      // Set to track all processed bookmarks (added or removed)
+      let processedCount = 0;
+      
+      // Get existing bookmarks in the collection
+      const existingBookmarks = await this.getBookmarksByCollectionId(collectionId);
+      const existingBookmarkIds = new Set(existingBookmarks.map(b => b.id));
+      
       if (collectionTags.length === 0) {
-        return 0;
+        // If there are no tags in the collection, we should remove all auto-added bookmarks
+        let removedCount = 0;
+        for (const bookmark of existingBookmarks) {
+          await this.removeBookmarkFromCollection(collectionId, bookmark.id);
+          removedCount++;
+        }
+        console.log(`Removed ${removedCount} bookmarks from collection ${collectionId} as there are no tags`);
+        return removedCount;
       }
       
       const tagIds = collectionTags.map(tag => tag.id);
@@ -1823,9 +1838,8 @@ export class DatabaseStorage implements IStorage {
         .from(bookmarkTags)
         .where(inArray(bookmarkTags.tag_id, tagIds));
       
-      // Get existing bookmarks in the collection
-      const existingBookmarks = await this.getBookmarksByCollectionId(collectionId);
-      const existingBookmarkIds = new Set(existingBookmarks.map(b => b.id));
+      // Create a set of bookmark IDs that should be in the collection
+      const shouldBeInCollectionIds = new Set(joinResult.map(r => r.bookmark_id));
       
       // Add bookmarks that are not already in the collection
       let addedCount = 0;
@@ -1833,11 +1847,22 @@ export class DatabaseStorage implements IStorage {
         if (!existingBookmarkIds.has(bookmark_id)) {
           await this.addBookmarkToCollection(collectionId, bookmark_id);
           addedCount++;
+          processedCount++;
         }
       }
       
-      console.log(`Added ${addedCount} bookmarks to collection ${collectionId} based on tags`);
-      return addedCount;
+      // Remove bookmarks that no longer match any collection tag
+      let removedCount = 0;
+      for (const bookmark of existingBookmarks) {
+        if (!shouldBeInCollectionIds.has(bookmark.id)) {
+          await this.removeBookmarkFromCollection(collectionId, bookmark.id);
+          removedCount++;
+          processedCount++;
+        }
+      }
+      
+      console.log(`Added ${addedCount} and removed ${removedCount} bookmarks from collection ${collectionId} based on tags`);
+      return processedCount;
     } catch (error) {
       console.error(`Database error processing tagged bookmarks for collection ${collectionId}:`, error);
       throw error;
