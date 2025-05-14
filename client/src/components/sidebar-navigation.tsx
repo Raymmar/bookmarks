@@ -248,7 +248,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
             title="View collection"
           >
             <Folder className={cn("h-3.5 w-3.5 mr-2")} />
-            <span className={cn("truncate flex-1", 
+            <span className={cn("truncate flex-1 max-w-[160px]", 
               (selectedCollections.includes(collection.id) || 
                location === `/collection/${createUrlSlug(collection.name)}`) && "font-medium"
             )}>
@@ -536,7 +536,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                               title="View collection"
                             >
                               <Folder className="h-3.5 w-3.5 mr-2 opacity-70" />
-                              <span className={cn("truncate flex-1", 
+                              <span className={cn("truncate flex-1 max-w-[160px]", 
                                 (selectedCollections.includes(collection.id) || 
                                  location === `/collection/${encodeURIComponent(collection.name)}`) && "font-medium"
                               )}>
@@ -565,7 +565,7 @@ export function SidebarNavigation({ className }: SidebarNavigationProps) {
                     <Avatar className="h-8 w-8 mr-2">
                       <AvatarFallback>{getUserInitials()}</AvatarFallback>
                     </Avatar>
-                    <div className="text-sm font-medium truncate">
+                    <div className="text-sm font-medium truncate max-w-[140px]">
                       {user.username}
                     </div>
                   </Button>
