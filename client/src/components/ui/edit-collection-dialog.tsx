@@ -96,7 +96,8 @@ export function EditCollectionDialog({
     // Force refetch when dialog opens with a different collection
     refetchOnMount: true,
     refetchOnWindowFocus: false,
-    staleTime: 0
+    staleTime: 0,
+    refetchInterval: 2000 // Add polling to ensure we get updated tag data
   });
   
   // Update selected tags when collection tags are loaded
@@ -189,14 +190,10 @@ export function EditCollectionDialog({
         // Add tag to collection using direct fetch for better error handling
         try {
           console.log(`Adding tag ID ${tagId} to collection ${collection.id}`);
-          const addTagResponse = await fetch(`/api/collections/${collection.id}/tags`, {
+          const addTagResponse = await fetch(`/api/collections/${collection.id}/tags/${tagId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ 
-              tagId: tagId as string,
-              tagName 
-            })
+            credentials: 'include'
           });
           
           if (!addTagResponse.ok) {

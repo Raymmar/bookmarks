@@ -1755,6 +1755,9 @@ export class DatabaseStorage implements IStorage {
 
   async addTagToCollection(collectionId: string, tagId: string): Promise<CollectionTag> {
     try {
+      // Log the tag being added
+      console.log(`Adding tag ID ${tagId} to collection ${collectionId} (storage method)`);
+      
       // First check if the relation already exists
       const existingRelation = await db
         .select()
@@ -1763,14 +1766,18 @@ export class DatabaseStorage implements IStorage {
         .where(eq(collectionTags.tag_id, tagId));
       
       if (existingRelation.length > 0) {
+        console.log(`Tag ID ${tagId} is already in collection ${collectionId}, skipping`);
         return existingRelation[0];
       }
       
       // Create new relation
+      console.log(`Inserting new tag relation: collection=${collectionId}, tag=${tagId}`);
       const [newCollectionTag] = await db
         .insert(collectionTags)
         .values({ collection_id: collectionId, tag_id: tagId })
         .returning();
+      
+      console.log(`Successfully added tag ID ${tagId} to collection ${collectionId}`);
       
       // Process any existing bookmarks with this tag for auto-adding
       await this.processTaggedBookmarksForCollection(collectionId);
