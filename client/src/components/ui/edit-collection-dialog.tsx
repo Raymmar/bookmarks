@@ -140,14 +140,24 @@ export function EditCollectionDialog({
       
       // Remove tags that were unselected, only processing valid tag objects
       for (const tag of validCollectionTags) {
+        if (!tag || typeof tag !== 'object' || !tag.id || !tag.name) {
+          console.log("Skipping invalid tag object:", tag);
+          continue;
+        }
+        
         const normalizedTagName = tag.name.toLowerCase().trim();
         
         // If this tag is no longer in the selected tags, remove it
         if (!selectedTags.some(t => t.toLowerCase().trim() === normalizedTagName)) {
-          await removeTagFromCollection.mutateAsync({ 
-            collectionId: collection.id, 
-            tagId: tag.id 
-          });
+          try {
+            await removeTagFromCollection.mutateAsync({ 
+              collectionId: collection.id, 
+              tagId: tag.id 
+            });
+          } catch (error) {
+            console.error(`Error removing tag ${tag.id} from collection ${collection.id}:`, error);
+            // Continue processing other tags even if one fails
+          }
         }
       }
       
@@ -184,12 +194,22 @@ export function EditCollectionDialog({
         auto_add_tagged: autoAddTagged
       });
       
-      // Update the collection tags
-      await syncCollectionTags();
+      try {
+        // Try to update the collection tags
+        await syncCollectionTags();
+      } catch (tagError) {
+        // Log the error but continue with the update process
+        console.error('Error syncing collection tags:', tagError);
+      }
       
       // Process tagged bookmarks if auto-add is enabled
       if (autoAddTagged) {
-        await processTaggedBookmarks.mutateAsync(collection.id);
+        try {
+          await processTaggedBookmarks.mutateAsync(collection.id);
+        } catch (processError) {
+          // Log the error but continue
+          console.error('Error processing tagged bookmarks:', processError);
+        }
       }
       
       toast({
