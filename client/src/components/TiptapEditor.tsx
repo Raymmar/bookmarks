@@ -279,7 +279,7 @@ const TiptapEditor = ({
       
       <EditorContent 
         editor={editor} 
-        className="min-h-[300px] focus-within:outline-none border-0 p-4" 
+        className="min-h-[300px] focus-within:outline-none border-0" 
       />
     </div>
   );

@@ -295,13 +295,13 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       
       {/* Scrollable content area with the "page" editor */}
       <div className="flex-1 overflow-y-auto px-3 py-3 bg-gray-50 dark:bg-gray-900/20">
-        <div className="max-w-3xl mx-auto bg-white dark:bg-background rounded-md shadow-sm">
+        <div className="max-w-3xl mx-auto bg-white dark:bg-background rounded-md shadow-sm border-0">
           <TiptapEditor 
             content={content} 
             onChange={handleContentChange}
             onFocus={handleContentFocus}
             onBlur={handleContentBlur}
-            className="prose dark:prose-invert max-w-none editor-subtle-focus"
+            className="prose dark:prose-invert max-w-none editor-subtle-focus border-0"
             placeholder="Start typing your report..."
           />
         </div>
