@@ -174,7 +174,7 @@ const Reports = () => {
     return (
       <div 
         key={report.id}
-        className={`p-4 border-b cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
+        className={`p-4 border-b cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-50 ${
           isSelected ? 'bg-gray-100 dark:bg-gray-800' : ''
         }`}
         onClick={() => setSelectedReportId(report.id)}
