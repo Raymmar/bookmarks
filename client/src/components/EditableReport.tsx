@@ -223,8 +223,14 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
     if (!ignorePropsUpdatesRef.current) {
       setTitle(report.title);
       setContent(report.content);
+      
+      // Important: Always update the lastSaved refs when a new report is loaded
+      // This prevents saving on report changes but allows saving of actual user edits
       lastSavedTitleRef.current = report.title;
       lastSavedContentRef.current = report.content;
+      
+      // Reset the last saved timestamp when switching reports
+      setLastSavedAt(null);
     }
   }, [report.id, report.title, report.content]);
   
@@ -315,12 +321,13 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
         clearTimeout(saveTimeoutRef.current);
       }
       
-      // Only save when changes have been made by the user, not on auto-loading
-      const userMadeChanges = 
-        (title !== report.title && title !== lastSavedTitleRef.current) ||
-        (content !== report.content && content !== lastSavedContentRef.current);
+      // Check if user made changes by comparing with the last saved values
+      // This ensures we save user edits but avoid unnecessary saves on page refresh
+      const hasUnsavedChanges = 
+        title !== lastSavedTitleRef.current || 
+        content !== lastSavedContentRef.current;
       
-      if (userMadeChanges) {
+      if (hasUnsavedChanges) {
         // Prepare changes object with all unsaved changes at once
         const changes: { title?: string; content?: string } = {};
         
@@ -349,13 +356,13 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
         clearTimeout(saveTimeoutRef.current);
       }
       
-      // Only save when changes have been made by the user, not on auto-loading
-      // This prevents auto-saving when just navigating between reports
-      const userMadeChanges = 
-        (title !== report.title && title !== lastSavedTitleRef.current) ||
-        (content !== report.content && content !== lastSavedContentRef.current);
+          // Check if user made changes by comparing with the last saved values
+      // This ensures we save user edits but avoid unnecessary saves on report switching
+      const hasUnsavedChanges = 
+        title !== lastSavedTitleRef.current || 
+        content !== lastSavedContentRef.current;
       
-      if (userMadeChanges) {
+      if (hasUnsavedChanges) {
         const changes: { title?: string; content?: string } = {};
         
         if (title !== lastSavedTitleRef.current) {
