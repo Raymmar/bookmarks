@@ -295,7 +295,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
         onChange={handleContentChange}
         onFocus={handleContentFocus}
         onBlur={handleContentBlur}
-        className="prose dark:prose-invert max-w-none"
+        className="prose dark:prose-invert max-w-none editor-subtle-focus rounded-md border border-border"
         placeholder="Start typing your report..."
       />
     </div>

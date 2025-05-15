@@ -88,4 +88,27 @@
   .masonry-grid-column > div:nth-child(3n + 1) { animation-delay: 0.0s; }
   .masonry-grid-column > div:nth-child(3n + 2) { animation-delay: 0.05s; }
   .masonry-grid-column > div:nth-child(3n + 3) { animation-delay: 0.1s; }
+  
+  /* Custom report editor styling */
+  .editor-subtle-focus {
+    @apply overflow-hidden transition-all duration-200;
+  }
+  
+  .editor-subtle-focus:focus-within {
+    @apply ring-1 ring-border ring-opacity-50 shadow-sm;
+  }
+  
+  /* Ensure proper spacing inside the editor */
+  .editor-subtle-focus .ProseMirror {
+    @apply px-4 py-3 min-h-[300px] focus:outline-none;
+  }
+  
+  /* Fix cursor position near the edge */
+  .editor-subtle-focus .ProseMirror > *:first-child {
+    @apply mt-0;
+  }
+  
+  .editor-subtle-focus .ProseMirror > *:last-child {
+    @apply mb-0;
+  }
 }
