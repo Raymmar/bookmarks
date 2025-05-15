@@ -1,9 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import TiptapEditor from './TiptapEditor';
-import { Calendar, Save } from 'lucide-react';
+import { Calendar, Save, Share, MoreHorizontal, Trash2, ExternalLink } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 interface EditableReportProps {
   report: {
@@ -27,6 +35,57 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  
+  // Handle publishing the report
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    try {
+      // First save any pending changes
+      const changes: { title?: string; content?: string } = {};
+      if (title !== lastSavedTitleRef.current) changes.title = title;
+      if (content !== lastSavedContentRef.current) changes.content = content;
+      
+      if (Object.keys(changes).length > 0) {
+        await saveReport(changes);
+      }
+      
+      // Then publish the report (stub for now)
+      toast({
+        title: "Report published",
+        description: "Your report is now available for viewing.",
+      });
+    } catch (error) {
+      console.error('Error publishing report:', error);
+      toast({
+        title: "Publishing failed",
+        description: "There was a problem publishing your report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+  
+  // Handle deleting the report
+  const handleDelete = async () => {
+    if (window.confirm("Are you sure you want to delete this report? This action cannot be undone.")) {
+      try {
+        // Delete the report (stub for now)
+        toast({
+          title: "Report deleted",
+          description: "Your report has been deleted.",
+        });
+      } catch (error) {
+        console.error('Error deleting report:', error);
+        toast({
+          title: "Deletion failed",
+          description: "There was a problem deleting your report. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
   
   // Refs for tracking state
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
@@ -289,6 +348,50 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
                 {getLastSavedText()}
               </span>
             ) : null}
+            
+            <div className="flex items-center gap-1 ml-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex items-center gap-1.5 h-8 text-xs"
+                onClick={handlePublish}
+                disabled={isPublishing || isSaving}
+              >
+                {isPublishing ? (
+                  <>
+                    <Share className="h-3.5 w-3.5 animate-pulse" />
+                    <span>Publishing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Share className="h-3.5 w-3.5" />
+                    <span>Publish</span>
+                  </>
+                )}
+              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    <span>View public link</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive"
+                    onClick={handleDelete}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    <span>Delete report</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>
