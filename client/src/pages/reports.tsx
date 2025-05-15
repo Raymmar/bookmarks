@@ -370,23 +370,21 @@ const Reports = () => {
         </Card>
 
         {/* Report content panel */}
-        <Card className="lg:col-span-2">
-          <div className="min-h-[80vh] max-h-[80vh] overflow-y-auto">
-            {isLoadingSelectedReport ? (
-              <div className="p-6 space-y-4">
-                <Skeleton className="h-8 w-3/4" />
-                <Skeleton className="h-4 w-1/3 mb-6" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-4/5" />
-              </div>
-            ) : (
-              renderReportContent()
-            )}
-          </div>
-        </Card>
+        <div className="lg:col-span-2 border border-border rounded-lg overflow-hidden flex flex-col bg-background h-[calc(100vh-12rem)]">
+          {isLoadingSelectedReport ? (
+            <div className="p-6 space-y-4">
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-4 w-1/3 mb-6" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-4/5" />
+            </div>
+          ) : (
+            renderReportContent()
+          )}
+        </div>
       </div>
     </div>
   );

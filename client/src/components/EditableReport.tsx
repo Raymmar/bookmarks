@@ -252,52 +252,60 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   }, [title, content, saveReport]);
   
   return (
-    <div className="p-6">
-      <textarea
-        ref={titleInputRef}
-        className="text-2xl font-bold mb-2 w-full bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/20 rounded px-2 py-1 -ml-2 resize-none overflow-hidden leading-tight"
-        value={title}
-        onChange={handleTitleChange}
-        onFocus={handleTitleFocus}
-        onBlur={handleTitleBlur}
-        onKeyDown={handleTitleKeyDown}
-        placeholder="Enter report title..."
-        rows={1}
-        style={{ 
-          minHeight: "2.5rem", 
-          height: "auto",
-          lineHeight: "1.2", 
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word" 
-        }}
-      />
-      <div className="text-sm text-gray-500 mb-6 flex items-center gap-2 justify-between">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4" /> 
-          {dateRange}
-        </div>
-        <div className="flex items-center gap-2">
-          {isSaving ? (
-            <span className="text-xs italic flex items-center">
-              <Save className="w-3 h-3 mr-1 animate-pulse" />
-              Saving...
-            </span>
-          ) : lastSavedAt ? (
-            <span className="text-xs italic">
-              {getLastSavedText()}
-            </span>
-          ) : null}
+    <div className="flex flex-col h-full">
+      {/* Sticky header section */}
+      <div className="sticky top-0 z-10 bg-background px-6 py-4 border-b border-border">
+        <textarea
+          ref={titleInputRef}
+          className="text-2xl font-bold mb-2 w-full bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/20 rounded px-2 py-1 -ml-2 resize-none overflow-hidden leading-tight"
+          value={title}
+          onChange={handleTitleChange}
+          onFocus={handleTitleFocus}
+          onBlur={handleTitleBlur}
+          onKeyDown={handleTitleKeyDown}
+          placeholder="Enter report title..."
+          rows={1}
+          style={{ 
+            minHeight: "2.5rem", 
+            height: "auto",
+            lineHeight: "1.2", 
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word" 
+          }}
+        />
+        <div className="text-sm text-gray-500 flex items-center gap-2 justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" /> 
+            {dateRange}
+          </div>
+          <div className="flex items-center gap-2">
+            {isSaving ? (
+              <span className="text-xs italic flex items-center">
+                <Save className="w-3 h-3 mr-1 animate-pulse" />
+                Saving...
+              </span>
+            ) : lastSavedAt ? (
+              <span className="text-xs italic">
+                {getLastSavedText()}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
       
-      <TiptapEditor 
-        content={content} 
-        onChange={handleContentChange}
-        onFocus={handleContentFocus}
-        onBlur={handleContentBlur}
-        className="prose dark:prose-invert max-w-none editor-subtle-focus rounded-md border border-border"
-        placeholder="Start typing your report..."
-      />
+      {/* Scrollable content area with the "page" editor */}
+      <div className="flex-1 overflow-y-auto px-6 py-6 bg-gray-50 dark:bg-gray-900/20">
+        <div className="max-w-3xl mx-auto bg-white dark:bg-background rounded-md shadow-sm">
+          <TiptapEditor 
+            content={content} 
+            onChange={handleContentChange}
+            onFocus={handleContentFocus}
+            onBlur={handleContentBlur}
+            className="prose dark:prose-invert max-w-none editor-subtle-focus"
+            placeholder="Start typing your report..."
+          />
+        </div>
+      </div>
     </div>
   );
 };
