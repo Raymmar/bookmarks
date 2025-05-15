@@ -458,12 +458,12 @@ ${summaryPrompt?.value || ""}
       }
 
       // 2. Add the AI-generated tags
-      // Just use the tags from the insights (which are already the activity feed tags)
-      // No need to combine with separate aiTags or do additional processing
+      // Combine tags from insights and tag generation
       const tagsToUse = insights?.tags || aiTags || [];
       
-      // Keep the tags array consistent with what's shown in the activity feed
-      const allTagsArray = tagsToUse;
+      // Process tags to ensure they're single-word and lowercase
+      const { processAITags } = await import("./tag-normalizer");
+      const allTagsArray = processAITags(tagsToUse);
 
       if (allTagsArray.length > 0) {
         console.log(
@@ -770,9 +770,9 @@ ${summaryPrompt?.value || ""}
             tag.name.toLowerCase(),
           );
 
-          // Apply only basic tag formatting to new user tags
-          const { deduplicateTags } = await import("./tag-normalizer");
-          const formattedTags = deduplicateTags(options.tags);
+          // Process tags to ensure they're single-word and lowercase
+          const { processAITags } = await import("./tag-normalizer");
+          const formattedTags = processAITags(options.tags);
 
           console.log(
             `Adding new tags to existing bookmark ${urlResult.existingBookmarkId}`,

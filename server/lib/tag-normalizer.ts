@@ -25,6 +25,11 @@ export function normalizeTag(tag: string): string {
   // Trim whitespace
   normalizedTag = normalizedTag.trim();
   
+  // If the tag contains spaces, only take the first word (to ensure single-word tags)
+  if (normalizedTag.includes(' ')) {
+    normalizedTag = normalizedTag.split(' ')[0];
+  }
+  
   return normalizedTag;
 }
 
@@ -36,8 +41,26 @@ export function normalizeTag(tag: string): string {
 export function deduplicateTags(tags: string[]): string[] {
   if (!tags || !Array.isArray(tags)) return [];
   
-  // First normalize all tags (just lowercase and special char removal)
-  const normalizedTags = tags.map(tag => normalizeTag(tag)).filter(Boolean);
+  // Handle multi-word tags by splitting them into individual words
+  const expandedTags: string[] = [];
+  
+  for (const tag of tags) {
+    if (!tag || typeof tag !== 'string') continue;
+    
+    // If tag has spaces, split it into multiple single-word tags
+    if (tag.includes(' ')) {
+      const words = tag.split(' ')
+        .map(word => word.trim())
+        .filter(word => word.length > 0);
+      
+      expandedTags.push(...words);
+    } else {
+      expandedTags.push(tag);
+    }
+  }
+  
+  // Normalize each tag (lowercase, special char removal, etc.)
+  const normalizedTags = expandedTags.map(tag => normalizeTag(tag)).filter(Boolean);
   
   // Remove exact duplicates using Array.filter for uniqueness
   const uniqueTags = normalizedTags.filter((tag, index, self) => 
@@ -71,7 +94,8 @@ export function processAITags(rawTags: string[]): string[] {
     return true;
   });
   
-  // Normalize and deduplicate 
+  // Process multi-word tags by splitting them and normalize all tags
+  // This ensures we get single-word, lowercase tags with special chars removed
   let result = deduplicateTags(filteredTags);
   
   // Limit to max number of tags if needed
@@ -79,7 +103,7 @@ export function processAITags(rawTags: string[]): string[] {
     result = result.slice(0, MAX_TAGS_PER_BOOKMARK);
   }
   
-  console.log("After basic formatting:", result);
+  console.log("After single-word formatting:", result);
   
   return result;
 }
