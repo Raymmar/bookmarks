@@ -92,16 +92,33 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     }
   }, [report.id, queryClient, lastSavedAt, toast, isEditing, report.title, report.content]);
   
+  // Prevent immediate content updates after edit
+  const ignorePropsUpdatesRef = useRef(false);
+  
+  // Update the ignoring state in a separate effect
+  useEffect(() => {
+    if (isEditing) {
+      ignorePropsUpdatesRef.current = true;
+    } else {
+      // When editing stops, continue ignoring for a brief period to prevent flicker
+      const timeout = setTimeout(() => {
+        ignorePropsUpdatesRef.current = false;
+      }, 1500); // Longer than the TiptapEditor's ignoreExternalUpdates timeout
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isEditing]);
+  
   // Update local state when report changes from props
   useEffect(() => {
-    // Only update if we're not actively editing
-    if (!isEditing) {
+    // Only update if we're not ignoring updates
+    if (!ignorePropsUpdatesRef.current) {
       setTitle(report.title);
       setContent(report.content);
       lastSavedTitleRef.current = report.title;
       lastSavedContentRef.current = report.content;
     }
-  }, [report.id, report.title, report.content, isEditing]);
+  }, [report.id, report.title, report.content]);
   
   // Auto-resize textarea for title
   useEffect(() => {

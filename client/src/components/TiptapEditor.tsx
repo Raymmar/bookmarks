@@ -144,13 +144,43 @@ const TiptapEditor = ({
     setIsMounted(true);
   }, []);
 
+  // Track when we should ignore external content updates
+  const [ignoreExternalUpdates, setIgnoreExternalUpdates] = useState(false);
+  
+  // Update the ignoreExternalUpdates flag when focus/blur happens
+  useEffect(() => {
+    if (!editor) return;
+    
+    const handleFocus = () => {
+      setIgnoreExternalUpdates(true);
+    };
+    
+    const handleBlur = () => {
+      // We'll keep ignoring external updates for a short time after blur
+      // to prevent flicker when the API response comes back
+      setTimeout(() => {
+        setIgnoreExternalUpdates(false);
+      }, 1000); // Ignore for 1 second after blur
+    };
+    
+    editor.on('focus', handleFocus);
+    editor.on('blur', handleBlur);
+    
+    return () => {
+      editor.off('focus', handleFocus);
+      editor.off('blur', handleBlur);
+    };
+  }, [editor]);
+  
   // Update editor content when the content prop changes
   useEffect(() => {
     if (editor && isMounted) {
       if (!isInitialized) {
         setIsInitialized(true);
-      } else {
-        // Only update if the content has changed and it's not from our own onChange
+      } else if (!ignoreExternalUpdates) {
+        // Only update if: 
+        // 1. We're not ignoring external updates
+        // 2. The content has changed and it's not from our own onChange
         const currentMarkdown = editor.storage.markdown.getMarkdown();
         if (content !== currentMarkdown) {
           // Save current selection state
@@ -170,7 +200,7 @@ const TiptapEditor = ({
         }
       }
     }
-  }, [editor, content, isMounted, isInitialized, markdownToHtml]);
+  }, [editor, content, isMounted, isInitialized, markdownToHtml, ignoreExternalUpdates]);
 
   // Update editor editable state when the editable prop changes
   useEffect(() => {
