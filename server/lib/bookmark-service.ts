@@ -457,27 +457,32 @@ ${summaryPrompt?.value || ""}
         }
       }
 
-      // 2. Add all AI-generated tags
-      // Use Array.from instead of Set for better compatibility
-      const allTagsArray = [
-        ...(aiTags || []), // Tags from tag generation
-        ...(insights?.tags || []), // Tags from insights
-      ].filter(
-        (value, index, self) =>
-          // Remove duplicates
-          self.indexOf(value) === index,
-      );
+      // 2. Add all AI-generated tags - use the same tags that are added to the activity feed
+      // Apply only basic formatting - lowercase and remove duplicates
+      const { normalizeTag, deduplicateTags } = await import("./tag-normalizer");
+      
+      // Combine tags from both sources, prioritizing the insights tags when available
+      let tagsToUse = insights?.tags || [];
+      
+      // If no insights tags but we have AI tags, use those
+      if (!tagsToUse.length && aiTags && aiTags.length) {
+        tagsToUse = aiTags;
+      }
+      
+      // Basic clean up - only apply lightweight formatting (lowercase, deduplication)
+      // This preserves the original tags that show in the activity feed
+      const allTagsArray = deduplicateTags(tagsToUse);
 
       if (allTagsArray.length > 0) {
         console.log(
           `Adding ${allTagsArray.length} AI-generated tags to bookmark ${bookmarkId}`,
         );
 
+        const existingTags = await this.storage.getTagsByBookmarkId(bookmarkId);
+        
         for (const tagName of allTagsArray) {
           try {
             // Check if this tag is already associated with the bookmark
-            const existingTags =
-              await this.storage.getTagsByBookmarkId(bookmarkId);
             const tagExists = existingTags.some(
               (t) => t.name.toLowerCase() === tagName.toLowerCase(),
             );
@@ -773,14 +778,14 @@ ${summaryPrompt?.value || ""}
             tag.name.toLowerCase(),
           );
 
-          // Apply tag normalization to new user tags
-          const { processAITags } = await import("./tag-normalizer");
-          const normalizedTags = processAITags(options.tags);
+          // Apply only basic tag formatting to new user tags
+          const { deduplicateTags } = await import("./tag-normalizer");
+          const formattedTags = deduplicateTags(options.tags);
 
           console.log(
             `Adding new tags to existing bookmark ${urlResult.existingBookmarkId}`,
           );
-          for (const tagName of normalizedTags) {
+          for (const tagName of formattedTags) {
             // Skip if tag already exists on this bookmark
             if (existingTagNames.includes(tagName.toLowerCase())) {
               console.log(

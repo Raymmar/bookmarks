@@ -316,8 +316,9 @@ Format your response as valid JSON with these exact keys:
         .map((tag: string) => tag.trim())
         .filter((tag: string) => tag.length > 0);
         
-      // Then apply enhanced tag normalization with deduplication
-      const tags = processAITags(cleanedTags);
+      // Do simple tag normalization - deduplication and lowercase only
+      const { deduplicateTags } = await import("./tag-normalizer");
+      const tags = deduplicateTags(cleanedTags);
       
       // Extract related links with fallbacks
       let relatedLinks = [];
@@ -526,12 +527,13 @@ Additional User Instructions: ${userSystemPrompt}`;
       .map((tag: string) => tag.trim())
       .filter(tag => tag.length > 0);
     
-    // Then apply our enhanced normalization and deduplication
-    const normalizedTags = processAITags(cleanedTags);
+    // Do simple tag normalization - deduplication and lowercase only
+    const { deduplicateTags } = await import("./tag-normalizer");
+    const simplifiedTags = deduplicateTags(cleanedTags);
     
     console.log("Raw tags:", cleanedTags);
-    console.log("Normalized tags:", normalizedTags);
-    return normalizedTags;
+    console.log("Simplified tags:", simplifiedTags);
+    return simplifiedTags;
   } catch (error) {
     console.error("Error generating tags:", error);
     return [];
