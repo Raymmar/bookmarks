@@ -294,7 +294,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       </div>
       
       {/* Scrollable content area with the "page" editor */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 bg-gray-50 dark:bg-gray-900/20">
+      <div className="flex-1 overflow-y-auto px-3 py-3 bg-gray-50 dark:bg-gray-900/20">
         <div className="max-w-3xl mx-auto bg-white dark:bg-background rounded-md shadow-sm">
           <TiptapEditor 
             content={content} 
