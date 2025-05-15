@@ -316,9 +316,14 @@ Format your response as valid JSON with these exact keys:
         .map((tag: string) => tag.trim())
         .filter((tag: string) => tag.length > 0);
         
-      // Do simple tag normalization - deduplication and lowercase only
-      const { deduplicateTags } = await import("./tag-normalizer");
-      const tags = deduplicateTags(cleanedTags);
+      // Normalize tags to be single-word and lowercase
+      const { normalizeTag } = await import("./tag-normalizer");
+      // Map each tag through the normalizer to ensure lowercase and single-word format
+      const tags = cleanedTags
+        .map(tag => normalizeTag(tag))
+        .filter(tag => tag.length > 0)
+        // Remove duplicates
+        .filter((tag, index, self) => self.indexOf(tag) === index);
       
       // Extract related links with fallbacks
       let relatedLinks = [];
@@ -521,19 +526,20 @@ Additional User Instructions: ${userSystemPrompt}`;
       }
     }
     
-    // First basic cleaning
-    let cleanedTags = tags
+    // Clean and normalize tags to be single-word and lowercase
+    const { normalizeTag } = await import("./tag-normalizer");
+    
+    // Apply consistent tag normalization
+    const normalizedTags = tags
       .filter(tag => tag && typeof tag === 'string')
-      .map((tag: string) => tag.trim())
-      .filter(tag => tag.length > 0);
+      .map((tag: string) => normalizeTag(tag)) // Converts to lowercase and removes special chars
+      .filter(tag => tag.length > 0)
+      // Remove duplicates
+      .filter((tag, index, self) => self.indexOf(tag) === index);
     
-    // Do simple tag normalization - deduplication and lowercase only
-    const { deduplicateTags } = await import("./tag-normalizer");
-    const simplifiedTags = deduplicateTags(cleanedTags);
-    
-    console.log("Raw tags:", cleanedTags);
-    console.log("Simplified tags:", simplifiedTags);
-    return simplifiedTags;
+    console.log("Raw tags:", tags);
+    console.log("Normalized tags:", normalizedTags);
+    return normalizedTags;
   } catch (error) {
     console.error("Error generating tags:", error);
     return [];

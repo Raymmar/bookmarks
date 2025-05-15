@@ -457,21 +457,13 @@ ${summaryPrompt?.value || ""}
         }
       }
 
-      // 2. Add all AI-generated tags - use the same tags that are added to the activity feed
-      // Apply only basic formatting - lowercase and remove duplicates
-      const { normalizeTag, deduplicateTags } = await import("./tag-normalizer");
+      // 2. Add the AI-generated tags
+      // Just use the tags from the insights (which are already the activity feed tags)
+      // No need to combine with separate aiTags or do additional processing
+      const tagsToUse = insights?.tags || aiTags || [];
       
-      // Combine tags from both sources, prioritizing the insights tags when available
-      let tagsToUse = insights?.tags || [];
-      
-      // If no insights tags but we have AI tags, use those
-      if (!tagsToUse.length && aiTags && aiTags.length) {
-        tagsToUse = aiTags;
-      }
-      
-      // Basic clean up - only apply lightweight formatting (lowercase, deduplication)
-      // This preserves the original tags that show in the activity feed
-      const allTagsArray = deduplicateTags(tagsToUse);
+      // Keep the tags array consistent with what's shown in the activity feed
+      const allTagsArray = tagsToUse;
 
       if (allTagsArray.length > 0) {
         console.log(
