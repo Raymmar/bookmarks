@@ -3,7 +3,6 @@ import TiptapEditor from './TiptapEditor';
 import { Calendar, Save } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { debounce } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface EditableReportProps {
@@ -26,26 +25,45 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const [title, setTitle] = useState(report.title);
   const [content, setContent] = useState(report.content);
   const [isSaving, setIsSaving] = useState(false);
-  const titleInputRef = useRef<HTMLTextAreaElement>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-
-  // Use useCallback to memoize the saveReport function to prevent unnecessary re-renders
+  
+  // Refs for tracking state
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
+  const lastSavedTitleRef = useRef(report.title);
+  const lastSavedContentRef = useRef(report.content);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Save report function
   const saveReport = useCallback(async (updates: { title?: string; content?: string }) => {
     if (!updates.title && !updates.content) return;
-
+    
+    // Don't save while user is actively editing
+    if (isEditing) return;
+    
+    // Don't save if nothing has changed
+    if (
+      (updates.title && updates.title === lastSavedTitleRef.current) && 
+      (updates.content && updates.content === lastSavedContentRef.current)
+    ) return;
+    
     setIsSaving(true);
+    
     try {
       // Send the update to the API
       await apiRequest('PUT', `/api/reports/${report.id}`, updates);
       
+      // Update refs to track what we've saved
+      if (updates.title) lastSavedTitleRef.current = updates.title;
+      if (updates.content) lastSavedContentRef.current = updates.content;
+      
       // Set the last saved timestamp
       setLastSavedAt(new Date());
       
-      // Invalidate the report queries to ensure we get fresh data
+      // Invalidate the query cache
       queryClient.invalidateQueries({ queryKey: ['/api/reports'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/reports/${report.id}`] });
       
-      // Only show the success toast the first time in a session
+      // Only show toast on first save
       if (!lastSavedAt) {
         toast({
           title: 'Report saved',
@@ -63,36 +81,54 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     } finally {
       setIsSaving(false);
     }
-  }, [report.id, queryClient, lastSavedAt, toast]);
-
-  // Track the initial values to compare for changes
-  const initialTitle = useRef(report.title);
-  const initialContent = useRef(report.content);
+  }, [report.id, queryClient, lastSavedAt, toast, isEditing]);
   
   // Update local state when report changes from props
   useEffect(() => {
-    setTitle(report.title);
-    setContent(report.content);
-    initialTitle.current = report.title;
-    initialContent.current = report.content;
-  }, [report.id, report.title, report.content]);
+    // Only update if we're not actively editing
+    if (!isEditing) {
+      setTitle(report.title);
+      setContent(report.content);
+      lastSavedTitleRef.current = report.title;
+      lastSavedContentRef.current = report.content;
+    }
+  }, [report.id, report.title, report.content, isEditing]);
+  
+  // Schedule a save for later
+  const scheduleSave = useCallback(() => {
+    // Clear any existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Schedule a new save for 2 seconds after editing stops
+    saveTimeoutRef.current = setTimeout(() => {
+      // Only save if not currently editing and content has changed
+      if (!isEditing) {
+        if (title !== lastSavedTitleRef.current) {
+          saveReport({ title });
+        }
+        if (content !== lastSavedContentRef.current) {
+          saveReport({ content });
+        }
+      }
+      saveTimeoutRef.current = null;
+    }, 2000);
+  }, [title, content, saveReport, isEditing]);
   
   // Auto-resize textarea for title
   useEffect(() => {
     const resizeTextarea = () => {
       const textarea = titleInputRef.current;
       if (textarea) {
-        // Reset height to auto to get the correct scrollHeight
         textarea.style.height = 'auto';
-        // Set the height to match the content
         textarea.style.height = `${textarea.scrollHeight}px`;
       }
     };
     
-    // Resize when component mounts and when title changes
     resizeTextarea();
   }, [title]);
-
+  
   // Format the last saved time for display
   const getLastSavedText = () => {
     if (!lastSavedAt) return '';
@@ -108,24 +144,28 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     const diffMin = Math.round(diffSec / 60);
     return `Saved ${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
   };
-
-  // Content is still handled with a debounce
-  const saveContentDebounced = debounce((newContent: string) => {
-    saveReport({ content: newContent });
-  }, 5000); // 5 seconds for content to reduce saves while typing
-
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    saveContentDebounced(newContent);
-  };
-
-  // Simple change handler for title - only updates state, no saving
+  
+  // Handle title changes
   const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newTitle = e.target.value;
-    setTitle(newTitle);
+    setTitle(e.target.value);
   };
-
-  // Handle Enter key to blur the title input
+  
+  // Handle title focus
+  const handleTitleFocus = () => {
+    setIsEditing(true);
+  };
+  
+  // Handle title blur
+  const handleTitleBlur = () => {
+    setIsEditing(false);
+    
+    // Only save if content has changed
+    if (title !== lastSavedTitleRef.current) {
+      scheduleSave();
+    }
+  };
+  
+  // Handle title keydown
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -133,38 +173,39 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     }
   };
   
-  // Save title only when user is done editing (on blur)
-  const handleTitleBlur = () => {
-    // Only save if title has changed
-    if (title !== initialTitle.current) {
-      saveReport({ title });
-      initialTitle.current = title;
-    }
+  // Handle content changes
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
   };
   
-  // Handle onBlur for the TiptapEditor
+  // Handle content focus
+  const handleContentFocus = () => {
+    setIsEditing(true);
+  };
+  
+  // Handle content blur
   const handleContentBlur = () => {
-    // Cancel any pending debounced saves
-    saveContentDebounced.cancel();
+    setIsEditing(false);
     
-    // Save content immediately on blur if it has changed
-    if (content !== initialContent.current) {
-      saveReport({ content });
-      initialContent.current = content;
+    // Only save if content has changed
+    if (content !== lastSavedContentRef.current) {
+      scheduleSave();
     }
   };
   
-  // Add a beforeunload event handler to save any changes before leaving the page
+  // Save before unloading the page
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Cancel any pending debounced content saves
-      saveContentDebounced.cancel();
+      // Cancel any pending save
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
       
-      // Save any pending changes before the page unloads
-      if (title !== initialTitle.current) {
+      // Immediately save any unsaved changes
+      if (title !== lastSavedTitleRef.current) {
         saveReport({ title });
       }
-      if (content !== initialContent.current) {
+      if (content !== lastSavedContentRef.current) {
         saveReport({ content });
       }
     };
@@ -173,9 +214,14 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // Clear any pending save timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
     };
-  }, [title, content, saveReport, saveContentDebounced]);
-
+  }, [title, content, saveReport]);
+  
   return (
     <div className="p-6">
       <textarea
@@ -183,8 +229,9 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
         className="text-2xl font-bold mb-2 w-full bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/20 rounded px-2 py-1 -ml-2 resize-none overflow-hidden leading-tight"
         value={title}
         onChange={handleTitleChange}
-        onKeyDown={handleTitleKeyDown}
+        onFocus={handleTitleFocus}
         onBlur={handleTitleBlur}
+        onKeyDown={handleTitleKeyDown}
         placeholder="Enter report title..."
         rows={1}
         style={{ 
@@ -217,6 +264,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       <TiptapEditor 
         content={content} 
         onChange={handleContentChange}
+        onFocus={handleContentFocus}
         onBlur={handleContentBlur}
         className="prose dark:prose-invert max-w-none"
         placeholder="Start typing your report..."

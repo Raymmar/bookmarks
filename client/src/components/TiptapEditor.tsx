@@ -21,6 +21,7 @@ interface TiptapEditorProps {
   content: string;
   onChange: (content: string) => void;
   onBlur?: () => void;
+  onFocus?: () => void;
   className?: string;
   placeholder?: string;
   editable?: boolean;
@@ -55,6 +56,7 @@ const TiptapEditor = ({
   content,
   onChange,
   onBlur,
+  onFocus,
   className,
   placeholder = 'Start typing...',
   editable = true,
@@ -117,6 +119,11 @@ const TiptapEditor = ({
         const markdown = editor.storage.markdown.getMarkdown();
         // Use debounced onChange
         debouncedOnChange(markdown);
+      }
+    },
+    onFocus: () => {
+      if (isInitialized && onFocus) {
+        onFocus();
       }
     },
     onBlur: ({ editor }) => {
