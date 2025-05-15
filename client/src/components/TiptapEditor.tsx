@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 interface TiptapEditorProps {
   content: string;
   onChange: (content: string) => void;
+  onBlur?: () => void;
   className?: string;
   placeholder?: string;
   editable?: boolean;
@@ -53,6 +54,7 @@ const MenuButton = ({
 const TiptapEditor = ({
   content,
   onChange,
+  onBlur,
   className,
   placeholder = 'Start typing...',
   editable = true,
@@ -123,6 +125,10 @@ const TiptapEditor = ({
         const markdown = editor.storage.markdown.getMarkdown();
         // Save immediately on blur (not debounced)
         onChange(markdown);
+        // Call custom onBlur handler if provided
+        if (onBlur) {
+          onBlur();
+        }
       }
     },
   });

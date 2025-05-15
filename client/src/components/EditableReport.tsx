@@ -65,17 +65,16 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     }
   }, [report.id, queryClient, lastSavedAt, toast]);
 
-  // Refs to store the original values for comparison
-  const originalTitleRef = useRef(report.title);
-  const originalContentRef = useRef(report.content);
-  const pendingSaveRef = useRef(false);
+  // Track the initial values to compare for changes
+  const initialTitle = useRef(report.title);
+  const initialContent = useRef(report.content);
   
-  // Update local state and refs when report changes from props
+  // Update local state when report changes from props
   useEffect(() => {
     setTitle(report.title);
     setContent(report.content);
-    originalTitleRef.current = report.title;
-    originalContentRef.current = report.content;
+    initialTitle.current = report.title;
+    initialContent.current = report.content;
   }, [report.id, report.title, report.content]);
   
   // Auto-resize textarea for title
@@ -109,78 +108,63 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     const diffMin = Math.round(diffSec / 60);
     return `Saved ${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
   };
-  
-  // Debounced save functions with 3-second timeout
-  const debouncedSaveContent = debounce((newContent: string) => {
-    // Only save if content has actually changed
-    if (newContent !== originalContentRef.current) {
-      saveReport({ content: newContent });
-      originalContentRef.current = newContent;
-    }
-  }, 3000); // 3 seconds - increased to reduce frequency of saves
 
-  const debouncedSaveTitle = debounce((newTitle: string) => {
-    // Only save if title has actually changed
-    if (newTitle !== originalTitleRef.current && !pendingSaveRef.current) {
-      pendingSaveRef.current = true;
-      saveReport({ title: newTitle })
-        .finally(() => {
-          pendingSaveRef.current = false;
-          originalTitleRef.current = newTitle;
-        });
-    }
-  }, 3000); // 3 seconds - increased to match content debounce time
+  // Content is still handled with a debounce
+  const saveContentDebounced = debounce((newContent: string) => {
+    saveReport({ content: newContent });
+  }, 5000); // 5 seconds for content to reduce saves while typing
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
-    debouncedSaveContent(newContent);
+    saveContentDebounced(newContent);
   };
 
+  // Simple change handler for title - only updates state, no saving
   const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
-    // Only trigger the debounced save if we're not already saving
-    if (!pendingSaveRef.current) {
-      debouncedSaveTitle(newTitle);
-    }
   };
 
+  // Handle Enter key to blur the title input
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      // Cancel pending debounced saves
-      debouncedSaveTitle.cancel();
       titleInputRef.current?.blur();
     }
   };
   
+  // Save title only when user is done editing (on blur)
   const handleTitleBlur = () => {
+    // Only save if title has changed
+    if (title !== initialTitle.current) {
+      saveReport({ title });
+      initialTitle.current = title;
+    }
+  };
+  
+  // Handle onBlur for the TiptapEditor
+  const handleContentBlur = () => {
     // Cancel any pending debounced saves
-    debouncedSaveTitle.cancel();
+    saveContentDebounced.cancel();
     
-    // Only save if the title has actually changed and we're not already in the process of saving
-    if (title !== originalTitleRef.current && !pendingSaveRef.current) {
-      pendingSaveRef.current = true;
-      saveReport({ title })
-        .finally(() => {
-          pendingSaveRef.current = false;
-          originalTitleRef.current = title;
-        });
+    // Save content immediately on blur if it has changed
+    if (content !== initialContent.current) {
+      saveReport({ content });
+      initialContent.current = content;
     }
   };
   
   // Add a beforeunload event handler to save any changes before leaving the page
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Cancel any pending debounced operations
-      debouncedSaveTitle.cancel();
-      debouncedSaveContent.cancel();
+      // Cancel any pending debounced content saves
+      saveContentDebounced.cancel();
       
       // Save any pending changes before the page unloads
-      if (title !== originalTitleRef.current && !pendingSaveRef.current) {
+      if (title !== initialTitle.current) {
         saveReport({ title });
       }
-      if (content !== originalContentRef.current) {
+      if (content !== initialContent.current) {
         saveReport({ content });
       }
     };
@@ -190,7 +174,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [title, content, saveReport, debouncedSaveTitle, debouncedSaveContent]);
+  }, [title, content, saveReport, saveContentDebounced]);
 
   return (
     <div className="p-6">
@@ -233,6 +217,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       <TiptapEditor 
         content={content} 
         onChange={handleContentChange}
+        onBlur={handleContentBlur}
         className="prose dark:prose-invert max-w-none"
         placeholder="Start typing your report..."
       />
