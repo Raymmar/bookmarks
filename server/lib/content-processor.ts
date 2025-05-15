@@ -154,7 +154,7 @@ Your job is to read the image, understand the idea being expressed, and then wri
 Your response MUST include:
 - A concise yet nuanced summary (250-500 words)
 - A sentiment score (0-10)
-- 3-5 tags that capture both explicit and implicit topics
+- 3-5 SINGLE WORD tags that capture both explicit and implicit topics
 
 User Instructions: ${userSystemPrompt}
 
