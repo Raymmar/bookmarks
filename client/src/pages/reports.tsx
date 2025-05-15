@@ -290,6 +290,7 @@ const Reports = () => {
         <EditableReport 
           report={selectedReport}
           dateRange={createdDate}
+          onDelete={() => setSelectedReportId(null)}
         />
       );
     }

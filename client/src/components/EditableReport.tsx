@@ -81,11 +81,6 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
     }
   };
   
-  // Open delete confirmation dialog
-  const openDeleteDialog = () => {
-    setShowDeleteDialog(true);
-  };
-  
   // Handle deleting the report
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -116,8 +111,10 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
         description: "Your report has been permanently deleted.",
       });
       
-      // Redirect back to reports list
-      navigate('/reports');
+      // Call onDelete callback if provided
+      if (onDelete) {
+        onDelete();
+      }
       
     } catch (error) {
       console.error('Error deleting report:', error);
@@ -436,7 +433,7 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     className="text-destructive focus:text-destructive"
-                    onClick={handleDelete}
+                    onClick={() => setShowDeleteDialog(true)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     <span>Delete report</span>
@@ -461,6 +458,31 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
           />
         </div>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Report
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{title}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Report'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
