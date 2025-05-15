@@ -177,11 +177,6 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
       
       // Only show toast on first save in a session
       if (!lastSavedAt) {
-        toast({
-          title: 'Report saved',
-          description: 'Your changes have been saved successfully.',
-          variant: 'default',
-        });
       }
     } catch (error) {
       console.error('Error saving report:', error);
