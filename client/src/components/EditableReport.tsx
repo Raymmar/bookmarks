@@ -65,19 +65,22 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     }
   }, [report.id, queryClient, lastSavedAt, toast]);
 
-  // Track the initial values to compare for changes
-  const initialTitle = useRef(report.title);
-  const initialContent = useRef(report.content);
-  const [isTyping, setIsTyping] = useState(false);
-  const lastKeyPressTimeRef = useRef<number>(0);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track the last saved content for comparison
+  const lastSavedTitle = useRef(report.title);
+  const lastSavedContent = useRef(report.content);
+  
+  // Auto-save timer reference
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Flag to track if content has changed since last save
+  const [contentChanged, setContentChanged] = useState(false);
   
   // Update local state when report changes from props
   useEffect(() => {
     setTitle(report.title);
     setContent(report.content);
-    initialTitle.current = report.title;
-    initialContent.current = report.content;
+    lastSavedTitle.current = report.title;
+    lastSavedContent.current = report.content;
   }, [report.id, report.title, report.content]);
   
   // Auto-resize textarea for title
@@ -96,14 +99,52 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     resizeTextarea();
   }, [title]);
 
-  // Clean up any timers when component unmounts
+  // Set up regular interval auto-save
   useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
+    // Function to check and save changes
+    const checkAndSaveChanges = () => {
+      let hasChanges = false;
+      const changes: {title?: string; content?: string} = {};
+      
+      if (title !== lastSavedTitle.current) {
+        changes.title = title;
+        hasChanges = true;
+      }
+      
+      if (content !== lastSavedContent.current) {
+        changes.content = content;
+        hasChanges = true;
+      }
+      
+      if (hasChanges) {
+        setIsSaving(true);
+        saveReport(changes)
+          .then(() => {
+            // Update the last saved values
+            if (changes.title) lastSavedTitle.current = title;
+            if (changes.content) lastSavedContent.current = content;
+            setContentChanged(false);
+          })
+          .finally(() => {
+            setIsSaving(false);
+          });
       }
     };
-  }, []);
+    
+    // Set up interval for auto-save - check every 5 seconds
+    autoSaveTimerRef.current = setInterval(() => {
+      if (contentChanged) {
+        checkAndSaveChanges();
+      }
+    }, 5000);
+    
+    // Clean up interval on unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+      }
+    };
+  }, [title, content, saveReport, contentChanged]);
 
   // Format the last saved time for display
   const getLastSavedText = () => {
@@ -121,53 +162,44 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     return `Saved ${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
   };
 
-  // Function to mark when user has stopped typing
-  const markUserStoppedTyping = useCallback(() => {
-    setIsTyping(false);
-    
-    // Only save if content has actually changed
-    if (content !== initialContent.current) {
-      saveReport({ content })
+  // Function to save immediately
+  const saveImmediately = () => {
+    if (title !== lastSavedTitle.current || content !== lastSavedContent.current) {
+      const changes: {title?: string; content?: string} = {};
+      
+      if (title !== lastSavedTitle.current) {
+        changes.title = title;
+      }
+      
+      if (content !== lastSavedContent.current) {
+        changes.content = content;
+      }
+      
+      setIsSaving(true);
+      saveReport(changes)
         .then(() => {
-          initialContent.current = content;
+          // Update the last saved values
+          if (changes.title) lastSavedTitle.current = title;
+          if (changes.content) lastSavedContent.current = content;
+          setContentChanged(false);
+        })
+        .finally(() => {
+          setIsSaving(false);
         });
     }
-  }, [content, initialContent, saveReport]);
-
-  // Special version of debounce specifically for typing detection
-  // This will only trigger after user stops typing for a significant amount of time
-  const saveContentAfterUserPause = useCallback(() => {
-    // Cancel any existing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    // Mark that we're currently typing
-    setIsTyping(true);
-    
-    // Record time of last keypress
-    lastKeyPressTimeRef.current = Date.now();
-    
-    // Wait 3 seconds of no activity before saving
-    typingTimeoutRef.current = setTimeout(() => {
-      // Check if it's been at least 3 seconds since the last keypress
-      const timeSinceLastKeyPress = Date.now() - lastKeyPressTimeRef.current;
-      if (timeSinceLastKeyPress >= 3000) {
-        markUserStoppedTyping();
-      }
-    }, 3000);
-  }, [markUserStoppedTyping]);
+  };
 
   // Handle content changes
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
-    saveContentAfterUserPause();
+    setContentChanged(true);
   };
 
-  // Simple change handler for title - only updates state, no saving
+  // Simple change handler for title - only updates state
   const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
+    setContentChanged(true);
   };
 
   // Handle Enter key to blur the title input
@@ -178,52 +210,22 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     }
   };
   
-  // Save title only when user is done editing (on blur)
+  // Save title immediately when the title field loses focus
   const handleTitleBlur = () => {
-    // Only save if title has changed
-    if (title !== initialTitle.current) {
-      saveReport({ title })
-        .then(() => {
-          initialTitle.current = title;
-        });
-    }
+    saveImmediately();
   };
   
-  // Handle onBlur for the TiptapEditor
+  // Save content immediately when the editor loses focus
   const handleContentBlur = () => {
-    // Cancel any pending typing detection
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = null;
-    }
-    
-    // If we were typing, mark that we stopped and save
-    if (isTyping) {
-      markUserStoppedTyping();
-    }
-    // Otherwise, just save if content changed
-    else if (content !== initialContent.current) {
-      saveReport({ content })
-        .then(() => {
-          initialContent.current = content;
-        });
-    }
+    saveImmediately();
   };
   
   // Add a beforeunload event handler to save any changes before leaving the page
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Cancel any pending typing detection timer
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      
-      // Save any pending changes before the page unloads
-      if (title !== initialTitle.current) {
-        saveReport({ title });
-      }
-      if (content !== initialContent.current) {
-        saveReport({ content });
+      // Save any pending changes immediately before the page unloads
+      if (contentChanged) {
+        saveImmediately();
       }
     };
     
@@ -232,7 +234,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [title, content, saveReport, initialTitle, initialContent]);
+  }, [contentChanged]);
 
   return (
     <div className="p-6">
