@@ -44,10 +44,12 @@ export class AIProcessorService {
    * This should be called after new bookmarks are added from external sources
    * 
    * @param userId Optional user ID to filter bookmarks by user
+   * @param processedBookmarkIds Optional array to collect processed bookmark IDs for further operations
+   * @returns The IDs of all processed bookmarks
    */
-  async processAfterSync(userId?: string) {
+  async processAfterSync(userId?: string): Promise<string[]> {
     console.log(`Processing bookmarks after sync${userId ? ` for user ${userId}` : ''}`);
-    await this.processPendingBookmarks(userId);
+    return await this.processPendingBookmarks(userId);
   }
   
   /**
@@ -55,13 +57,17 @@ export class AIProcessorService {
    * Continues processing in batches until all pending bookmarks are processed
    * 
    * @param userId Optional user ID to filter bookmarks by user
+   * @returns The IDs of all processed bookmarks
    */
-  async processPendingBookmarks(userId?: string) {
+  async processPendingBookmarks(userId?: string): Promise<string[]> {
     // Prevent multiple processing runs from executing simultaneously
     if (this.isProcessing) {
       console.log('AI processing already in progress, skipping this run');
-      return;
+      return [];
     }
+    
+    // Track processed bookmark IDs
+    const processedBookmarkIds: string[] = [];
     
     try {
       this.isProcessing = true;
@@ -107,6 +113,9 @@ export class AIProcessorService {
         const promises: Promise<void>[] = [];
         
         for (const bookmark of pendingBookmarks) {
+          // Add bookmark ID to the processed list
+          processedBookmarkIds.push(bookmark.id);
+          
           // Wait until we have a processing slot available
           while (this.processingCount >= MAX_CONCURRENCY) {
             await new Promise(resolve => setTimeout(resolve, 200));
@@ -140,8 +149,12 @@ export class AIProcessorService {
       }
       
       console.log(`AI processing complete. Total bookmarks processed: ${totalProcessed}`);
+      
+      // Return the list of processed bookmark IDs
+      return processedBookmarkIds;
     } catch (error) {
       console.error('Error in AI bookmark processing:', error);
+      return processedBookmarkIds;
     } finally {
       this.isProcessing = false;
     }
