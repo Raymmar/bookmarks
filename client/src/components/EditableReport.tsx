@@ -315,20 +315,27 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
         clearTimeout(saveTimeoutRef.current);
       }
       
-      // Prepare changes object with all unsaved changes at once
-      const changes: { title?: string; content?: string } = {};
+      // Only save when changes have been made by the user, not on auto-loading
+      const userMadeChanges = 
+        (title !== report.title && title !== lastSavedTitleRef.current) ||
+        (content !== report.content && content !== lastSavedContentRef.current);
       
-      if (title !== lastSavedTitleRef.current) {
-        changes.title = title;
-      }
-      
-      if (content !== lastSavedContentRef.current) {
-        changes.content = content;
-      }
-      
-      // Only save if there are actual changes
-      if (Object.keys(changes).length > 0) {
-        saveReport(changes);
+      if (userMadeChanges) {
+        // Prepare changes object with all unsaved changes at once
+        const changes: { title?: string; content?: string } = {};
+        
+        if (title !== lastSavedTitleRef.current) {
+          changes.title = title;
+        }
+        
+        if (content !== lastSavedContentRef.current) {
+          changes.content = content;
+        }
+        
+        // Only save if there are actual changes
+        if (Object.keys(changes).length > 0) {
+          saveReport(changes);
+        }
       }
     };
     
@@ -342,22 +349,29 @@ const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) =>
         clearTimeout(saveTimeoutRef.current);
       }
       
-      // Also save any pending changes when unmounting
-      const changes: { title?: string; content?: string } = {};
+      // Only save when changes have been made by the user, not on auto-loading
+      // This prevents auto-saving when just navigating between reports
+      const userMadeChanges = 
+        (title !== report.title && title !== lastSavedTitleRef.current) ||
+        (content !== report.content && content !== lastSavedContentRef.current);
       
-      if (title !== lastSavedTitleRef.current) {
-        changes.title = title;
-      }
-      
-      if (content !== lastSavedContentRef.current) {
-        changes.content = content;
-      }
-      
-      if (Object.keys(changes).length > 0) {
-        saveReport(changes);
+      if (userMadeChanges) {
+        const changes: { title?: string; content?: string } = {};
+        
+        if (title !== lastSavedTitleRef.current) {
+          changes.title = title;
+        }
+        
+        if (content !== lastSavedContentRef.current) {
+          changes.content = content;
+        }
+        
+        if (Object.keys(changes).length > 0) {
+          saveReport(changes);
+        }
       }
     };
-  }, [title, content, saveReport]);
+  }, [title, content, saveReport, report]);
   
   return (
     <div className="flex flex-col h-full">
