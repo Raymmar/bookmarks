@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import TiptapEditor from './TiptapEditor';
-import { Calendar, Save, Share, MoreHorizontal, Trash2, ExternalLink } from 'lucide-react';
+import { Calendar, Save, Share, MoreHorizontal, Trash2, ExternalLink, AlertTriangle } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 
 interface EditableReportProps {
@@ -25,9 +36,10 @@ interface EditableReportProps {
     status: 'generating' | 'completed' | 'failed';
   };
   dateRange: string; // This is now the created_at date formatted as a string
+  onDelete?: () => void; // Callback for after successful deletion
 }
 
-const EditableReport = ({ report, dateRange }: EditableReportProps) => {
+const EditableReport = ({ report, dateRange, onDelete }: EditableReportProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(report.title);
@@ -36,6 +48,8 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Handle publishing the report
   const handlePublish = async () => {
@@ -67,23 +81,61 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     }
   };
   
+  // Open delete confirmation dialog
+  const openDeleteDialog = () => {
+    setShowDeleteDialog(true);
+  };
+  
   // Handle deleting the report
   const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this report? This action cannot be undone.")) {
-      try {
-        // Delete the report (stub for now)
-        toast({
-          title: "Report deleted",
-          description: "Your report has been deleted.",
-        });
-      } catch (error) {
-        console.error('Error deleting report:', error);
-        toast({
-          title: "Deletion failed",
-          description: "There was a problem deleting your report. Please try again.",
-          variant: "destructive",
-        });
-      }
+    setIsDeleting(true);
+    
+    try {
+      // Optimistically update the cache
+      queryClient.setQueriesData(
+        { queryKey: ['/api/reports'] },
+        (old: any) => {
+          if (Array.isArray(old)) {
+            return old.filter(r => r.id !== report.id);
+          }
+          return old;
+        }
+      );
+      
+      // Perform the actual delete
+      await apiRequest('DELETE', `/api/reports/${report.id}`);
+      
+      // Invalidate queries but don't refetch immediately
+      queryClient.invalidateQueries({
+        queryKey: ['/api/reports'],
+        refetchType: 'none'
+      });
+      
+      toast({
+        title: "Report deleted",
+        description: "Your report has been permanently deleted.",
+      });
+      
+      // Redirect back to reports list
+      navigate('/reports');
+      
+    } catch (error) {
+      console.error('Error deleting report:', error);
+      
+      // Revert optimistic update
+      queryClient.invalidateQueries({
+        queryKey: ['/api/reports'],
+        refetchType: 'active'
+      });
+      
+      toast({
+        title: "Deletion failed",
+        description: "There was a problem deleting your report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
   
