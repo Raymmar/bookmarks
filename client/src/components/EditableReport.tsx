@@ -65,30 +65,18 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     }
   }, [report.id, queryClient, lastSavedAt, toast]);
 
-  // Update local state when report changes from props
+  // Refs to store the original values for comparison
+  const originalTitleRef = useRef(report.title);
+  const originalContentRef = useRef(report.content);
+  const pendingSaveRef = useRef(false);
+  
+  // Update local state and refs when report changes from props
   useEffect(() => {
     setTitle(report.title);
     setContent(report.content);
+    originalTitleRef.current = report.title;
+    originalContentRef.current = report.content;
   }, [report.id, report.title, report.content]);
-  
-  // Add a beforeunload event handler to save any changes before leaving the page
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Save any pending changes before the page unloads
-      if (title !== report.title) {
-        saveReport({ title });
-      }
-      if (content !== report.content) {
-        saveReport({ content });
-      }
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [title, content, report.title, report.content, report.id, saveReport]);
   
   // Auto-resize textarea for title
   useEffect(() => {
@@ -121,14 +109,26 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     const diffMin = Math.round(diffSec / 60);
     return `Saved ${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
   };
-
+  
   // Debounced save functions with 3-second timeout
   const debouncedSaveContent = debounce((newContent: string) => {
-    saveReport({ content: newContent });
+    // Only save if content has actually changed
+    if (newContent !== originalContentRef.current) {
+      saveReport({ content: newContent });
+      originalContentRef.current = newContent;
+    }
   }, 3000); // 3 seconds - increased to reduce frequency of saves
 
   const debouncedSaveTitle = debounce((newTitle: string) => {
-    saveReport({ title: newTitle });
+    // Only save if title has actually changed
+    if (newTitle !== originalTitleRef.current && !pendingSaveRef.current) {
+      pendingSaveRef.current = true;
+      saveReport({ title: newTitle })
+        .finally(() => {
+          pendingSaveRef.current = false;
+          originalTitleRef.current = newTitle;
+        });
+    }
   }, 3000); // 3 seconds - increased to match content debounce time
 
   const handleContentChange = (newContent: string) => {
@@ -139,20 +139,58 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
-    debouncedSaveTitle(newTitle);
+    // Only trigger the debounced save if we're not already saving
+    if (!pendingSaveRef.current) {
+      debouncedSaveTitle(newTitle);
+    }
   };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      // Cancel pending debounced saves
+      debouncedSaveTitle.cancel();
       titleInputRef.current?.blur();
     }
   };
   
   const handleTitleBlur = () => {
-    // Save title immediately when the title field loses focus
-    saveReport({ title });
+    // Cancel any pending debounced saves
+    debouncedSaveTitle.cancel();
+    
+    // Only save if the title has actually changed and we're not already in the process of saving
+    if (title !== originalTitleRef.current && !pendingSaveRef.current) {
+      pendingSaveRef.current = true;
+      saveReport({ title })
+        .finally(() => {
+          pendingSaveRef.current = false;
+          originalTitleRef.current = title;
+        });
+    }
   };
+  
+  // Add a beforeunload event handler to save any changes before leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Cancel any pending debounced operations
+      debouncedSaveTitle.cancel();
+      debouncedSaveContent.cancel();
+      
+      // Save any pending changes before the page unloads
+      if (title !== originalTitleRef.current && !pendingSaveRef.current) {
+        saveReport({ title });
+      }
+      if (content !== originalContentRef.current) {
+        saveReport({ content });
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [title, content, saveReport, debouncedSaveTitle, debouncedSaveContent]);
 
   return (
     <div className="p-6">

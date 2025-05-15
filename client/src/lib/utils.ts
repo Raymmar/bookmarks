@@ -97,14 +97,20 @@ export function createUrlSlug(text: string): string {
  * Debounce function that delays invoking the provided function
  * until after the specified wait time has elapsed since the last time
  * the debounced function was invoked.
+ * 
+ * Returns both the debounced function and a cancel method to clear pending executions.
  */
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
-): (...args: Parameters<T>) => void {
+): {
+  (...args: Parameters<T>): void;
+  cancel: () => void;
+} {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   
-  return function(...args: Parameters<T>) {
+  // Create the debounced function
+  const debounced = function(...args: Parameters<T>) {
     if (timeout) clearTimeout(timeout);
     
     timeout = setTimeout(() => {
@@ -112,4 +118,14 @@ export function debounce<T extends (...args: any[]) => any>(
       timeout = null;
     }, wait);
   };
+  
+  // Add a cancel method to the debounced function
+  debounced.cancel = function() {
+    if (timeout) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+  };
+  
+  return debounced;
 }
