@@ -197,66 +197,29 @@ export const COMMON_TAGS = [
 ];
 
 /**
- * Process, normalize, and limit AI-generated tags
- * Enforces single-word tags and limits quantity
+ * Process and normalize AI-generated tags
+ * Preserves multi-word tags but handles basic formatting and deduplication
  */
 export function processAITags(rawTags: string[]): string[] {
   if (!rawTags || !Array.isArray(rawTags)) return [];
   
   console.log("Tag normalization started with raw tags:", rawTags);
   
-  // Filter out obviously invalid tags
+  // Basic validation only - filter out obviously invalid tags
   let filteredTags = rawTags.filter(tag => {
     if (!tag || typeof tag !== 'string') return false;
-    if (tag.trim().length < 2) return false; // Too short to be meaningful
-    if (tag.trim().length > 50) return false; // Too long to be a reasonable tag
+    if (tag.trim().length === 0) return false; // Empty tags
     
     return true;
   });
   
-  // Split multi-word tags into separate single-word tags
-  const singleWordTags: string[] = [];
-  filteredTags.forEach(tag => {
-    const normalized = normalizeTag(tag);
-    // If it contains spaces, split it
-    if (normalized.includes(' ')) {
-      const words = normalized.split(' ');
-      // Only add words that are meaningful (longer than 2 chars)
-      words.forEach(word => {
-        if (word.length >= 3) {
-          singleWordTags.push(word);
-        }
-      });
-    } else {
-      singleWordTags.push(normalized);
-    }
-  });
-  
-  // Add the single-word tags to our filtered list
-  filteredTags = filteredTags.concat(singleWordTags);
-  
-  // Normalize all tags
+  // Normalize all tags (lowercase, trim, etc)
   filteredTags = filteredTags.map(tag => normalizeTag(tag));
   
-  // Remove tags with spaces (multi-word tags)
-  filteredTags = filteredTags.filter(tag => !tag.includes(' '));
+  console.log("After basic normalization:", filteredTags);
   
-  console.log("After splitting to single words:", filteredTags);
-  
-  // Prioritize common tags over obscure ones
-  const prioritizedTags = filteredTags.sort((a, b) => {
-    const aIsCommon = COMMON_TAGS.includes(a);
-    const bIsCommon = COMMON_TAGS.includes(b);
-    
-    if (aIsCommon && !bIsCommon) return -1;
-    if (!aIsCommon && bIsCommon) return 1;
-    
-    // For non-common tags, prefer shorter ones
-    return a.length - b.length;
-  });
-  
-  // Normalize and deduplicate
-  let result = deduplicateTags(prioritizedTags);
+  // Deduplicate tags
+  let result = deduplicateTags(filteredTags);
   
   // Limit to max number of tags
   if (result.length > MAX_TAGS_PER_BOOKMARK) {
