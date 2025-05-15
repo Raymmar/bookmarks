@@ -47,23 +47,27 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       (updates.content && updates.content === lastSavedContentRef.current)
     ) return;
     
+    // Already store optimistically in state before saving
+    if (updates.title) lastSavedTitleRef.current = updates.title;
+    if (updates.content) lastSavedContentRef.current = updates.content;
+    
     setIsSaving(true);
     
     try {
       // Send the update to the API
       await apiRequest('PUT', `/api/reports/${report.id}`, updates);
       
-      // Update refs to track what we've saved
-      if (updates.title) lastSavedTitleRef.current = updates.title;
-      if (updates.content) lastSavedContentRef.current = updates.content;
-      
       // Set the last saved timestamp
       setLastSavedAt(new Date());
       
-      // Invalidate the query cache
-      queryClient.invalidateQueries({ queryKey: ['/api/reports'] });
+      // Invalidate the query cache, but don't immediately refetch
+      // This prevents the UI from flickering with the old data
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/reports'],
+        refetchType: 'none'
+      });
       
-      // Only show toast on first save
+      // Only show toast on first save in a session
       if (!lastSavedAt) {
         toast({
           title: 'Report saved',
@@ -73,6 +77,11 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       }
     } catch (error) {
       console.error('Error saving report:', error);
+      
+      // Revert the optimistic update on error
+      if (updates.title) lastSavedTitleRef.current = report.title;
+      if (updates.content) lastSavedContentRef.current = report.content;
+      
       toast({
         title: 'Error saving report',
         description: 'There was a problem saving your changes. Please try again.',
@@ -81,7 +90,7 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     } finally {
       setIsSaving(false);
     }
-  }, [report.id, queryClient, lastSavedAt, toast, isEditing]);
+  }, [report.id, queryClient, lastSavedAt, toast, isEditing, report.title, report.content]);
   
   // Update local state when report changes from props
   useEffect(() => {
@@ -93,28 +102,6 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       lastSavedContentRef.current = report.content;
     }
   }, [report.id, report.title, report.content, isEditing]);
-  
-  // Schedule a save for later
-  const scheduleSave = useCallback(() => {
-    // Clear any existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    // Schedule a new save for 2 seconds after editing stops
-    saveTimeoutRef.current = setTimeout(() => {
-      // Only save if not currently editing and content has changed
-      if (!isEditing) {
-        if (title !== lastSavedTitleRef.current) {
-          saveReport({ title });
-        }
-        if (content !== lastSavedContentRef.current) {
-          saveReport({ content });
-        }
-      }
-      saveTimeoutRef.current = null;
-    }, 2000);
-  }, [title, content, saveReport, isEditing]);
   
   // Auto-resize textarea for title
   useEffect(() => {
@@ -159,9 +146,10 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
   const handleTitleBlur = () => {
     setIsEditing(false);
     
-    // Only save if content has changed
+    // Only save if title has changed
     if (title !== lastSavedTitleRef.current) {
-      scheduleSave();
+      // Save immediately instead of scheduling
+      saveReport({ title });
     }
   };
   
@@ -189,7 +177,8 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
     
     // Only save if content has changed
     if (content !== lastSavedContentRef.current) {
-      scheduleSave();
+      // Save immediately instead of scheduling
+      saveReport({ content });
     }
   };
   
@@ -201,12 +190,20 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
         clearTimeout(saveTimeoutRef.current);
       }
       
-      // Immediately save any unsaved changes
+      // Prepare changes object with all unsaved changes at once
+      const changes: { title?: string; content?: string } = {};
+      
       if (title !== lastSavedTitleRef.current) {
-        saveReport({ title });
+        changes.title = title;
       }
+      
       if (content !== lastSavedContentRef.current) {
-        saveReport({ content });
+        changes.content = content;
+      }
+      
+      // Only save if there are actual changes
+      if (Object.keys(changes).length > 0) {
+        saveReport(changes);
       }
     };
     
@@ -218,6 +215,21 @@ const EditableReport = ({ report, dateRange }: EditableReportProps) => {
       // Clear any pending save timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+      }
+      
+      // Also save any pending changes when unmounting
+      const changes: { title?: string; content?: string } = {};
+      
+      if (title !== lastSavedTitleRef.current) {
+        changes.title = title;
+      }
+      
+      if (content !== lastSavedContentRef.current) {
+        changes.content = content;
+      }
+      
+      if (Object.keys(changes).length > 0) {
+        saveReport(changes);
       }
     };
   }, [title, content, saveReport]);
