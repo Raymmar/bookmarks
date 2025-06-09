@@ -9,11 +9,10 @@
  * - Managing folder to collection mapping
  */
 
-import { storage } from '../storage';
-import { db } from '../db';
+import { Storage } from '../storage';
 import { eq, and } from 'drizzle-orm';
-import { aiProcessorService } from './ai-processor-service';
-import { bookmarkService } from './bookmark-service';
+import { AIProcessorService } from './ai-processor-service';
+import { BookmarkService } from './bookmark-service';
 import type { Bookmark } from '@shared/schema';
 import { 
   xCredentials, XCredentials, InsertXCredentials, 
@@ -25,9 +24,7 @@ import crypto from 'crypto';
 import { URLSearchParams } from 'url';
 import { Client, auth } from 'twitter-api-sdk';
 import fetch from 'node-fetch';
-import fs from 'fs';
-import path from 'path';
-import { promisify } from 'util';
+import { Db } from '../db';
 
 // Track active syncs by user ID to prevent duplicates
 const activeSyncs = new Set<string>();
@@ -131,7 +128,12 @@ export class XService {
   private authClient: auth.OAuth2User;
   private STATE = "state";
   
-  constructor() {
+  constructor(
+    private db: Db,
+    private storage: Storage,
+    private aiProcessorService: AIProcessorService,
+    private bookmarkService: BookmarkService,
+  ) {
     // Check API configuration
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
       console.error('XService: Missing OAuth credentials - X_CLIENT_ID or X_CLIENT_SECRET not set');
@@ -860,7 +862,7 @@ export class XService {
       try {
         // Check if we have recently synced folders in the database
         console.log(`X Folders: Checking database for stored folders`);
-        const storedFolders = await storage.getStoredXFolders(userId);
+        const storedFolders = await this.storage.getStoredXFolders(userId);
         
         if (storedFolders && storedFolders.length > 0) {
           // Convert database folders to the format expected by the API
@@ -986,7 +988,7 @@ export class XService {
       console.log(`X Folders: Storing ${folders.length} folders in database for user ${userId}`);
       
       // First, get existing mappings to preserve collection associations
-      const existingMappings = await storage.getXFoldersByUserId(userId);
+      const existingMappings = await this.storage.getXFoldersByUserId(userId);
       const existingMappingsMap = new Map<string, string | null>();
       
       // Create a map of folder ID to collection ID
@@ -1003,7 +1005,7 @@ export class XService {
           // Update existing folder
           console.log(`X Folders: Updating existing folder mapping for ${folder.name} (${folder.id})`);
           
-          await storage.updateXFolder(existingMapping.id, {
+          await this.storage.updateXFolder(existingMapping.id, {
             x_folder_name: folder.name,
             // Keep existing collection mapping
             collection_id: existingMapping.collection_id,
@@ -1024,7 +1026,7 @@ export class XService {
             last_sync_at: new Date()
           };
           
-          await storage.createXFolder(newMapping);
+          await this.storage.createXFolder(newMapping);
         }
       }
       
@@ -1103,7 +1105,7 @@ export class XService {
           try {
             // Try to refresh the token
             const refreshedCreds = await this.refreshAccessToken(credentials.refresh_token);
-            await storage.updateXCredentials(credentials.id, refreshedCreds);
+            await this.storage.updateXCredentials(credentials.id, refreshedCreds);
             console.log(`X Sync: Token refreshed successfully`);
           } catch (refreshError) {
             console.error(`X Sync: Failed to refresh token:`, refreshError);
@@ -1213,7 +1215,7 @@ export class XService {
             }
             
             // Update only the engagement metrics for the existing bookmark
-            await storage.updateBookmark(existingBookmark.id, updateData);
+            await this.storage.updateBookmark(existingBookmark.id, updateData);
             updated++;
           } else {
             // This is a new bookmark - create it with all data
@@ -1227,7 +1229,7 @@ export class XService {
             console.log(`X Sync: Using original media URLs for tweet ${tweet.id}`);
             
             // Create the new bookmark
-            const newBookmark = await storage.createBookmark(bookmarkData);
+            const newBookmark = await this.storage.createBookmark(bookmarkData);
             added++;
             
             // Skip folder processing during main bookmark sync
@@ -1258,7 +1260,7 @@ export class XService {
         // This improves the app by ensuring tags are processed before auto-organization
         try {
           // Process the bookmarks with AI and get the IDs of processed bookmarks
-          const processedBookmarkIds = await aiProcessorService.processAfterSync(userId);
+          const processedBookmarkIds = await this.aiProcessorService.processAfterSync(userId);
           
           if (processedBookmarkIds.length > 0) {
             console.log(`X Sync: AI processing complete for ${processedBookmarkIds.length} bookmarks, now running auto-organization`);
@@ -1267,7 +1269,7 @@ export class XService {
             for (const bookmarkId of processedBookmarkIds) {
               try {
                 // This ensures collection assignments happen AFTER tags are processed
-                await bookmarkService.updateBookmarkCollectionsBasedOnTags(bookmarkId);
+                await this.bookmarkService.updateBookmarkCollectionsBasedOnTags(bookmarkId);
               } catch (orgError) {
                 console.error(`X Sync: Error during auto-organization for bookmark ${bookmarkId}: ${orgError}`);
               }
@@ -1396,7 +1398,7 @@ export class XService {
   private async ensureFolderCollection(userId: string, folder: XFolderData): Promise<void> {
     try {
       // Check if there's already a mapping for this folder
-      const [existingMapping] = await db.select()
+      const [existingMapping] = await this.db.select()
         .from(xFolders)
         .where(
           and(
@@ -1407,7 +1409,7 @@ export class XService {
       
       if (existingMapping) {
         // Update the last sync time for this folder mapping
-        await storage.updateXFolderLastSync(existingMapping.id);
+        await this.storage.updateXFolderLastSync(existingMapping.id);
         console.log(`X Sync: Updated last sync time for folder "${folder.name}" (${folder.id})`);
       } else {
         // We found a folder that doesn't have a mapping yet
@@ -1415,7 +1417,7 @@ export class XService {
         console.log(`X Sync: Found unmapped folder "${folder.name}" (${folder.id})`);
         
         // Check if we already have a record of this folder
-        const [existingFolder] = await db.select()
+        const [existingFolder] = await this.db.select()
           .from(xFolders)
           .where(
             and(
@@ -1436,7 +1438,7 @@ export class XService {
             last_sync_at: new Date()
           };
           
-          await storage.createXFolder(newMapping);
+          await this.storage.createXFolder(newMapping);
           console.log(`X Sync: Created folder record without collection mapping for "${folder.name}" (${folder.id})`);
         }
       }
@@ -1457,7 +1459,7 @@ export class XService {
       is_public: false,
     };
     
-    const newCollection = await storage.createCollection(collection);
+    const newCollection = await this.storage.createCollection(collection);
     
     // Create folder mapping
     const folderMapping: InsertXFolder = {
@@ -1478,7 +1480,7 @@ export class XService {
     console.log(`X Mapping: Mapping folder "${folderData.name}" (${folderData.id}) to collection ${collectionId}`);
     
     // First, check if this folder already exists in our system
-    const [existingFolder] = await db.select()
+    const [existingFolder] = await this.db.select()
       .from(xFolders)
       .where(
         and(
@@ -1491,7 +1493,7 @@ export class XService {
       // Update the existing folder mapping to point to the new collection
       console.log(`X Mapping: Updating existing folder mapping from collection ${existingFolder.collection_id || 'none'} to ${collectionId}`);
       
-      const [updatedFolder] = await db.update(xFolders)
+      const [updatedFolder] = await this.db.update(xFolders)
         .set({
           x_folder_name: folderData.name, // Update name in case it changed
           collection_id: collectionId,
@@ -1529,7 +1531,7 @@ export class XService {
     }
     
     // Update last sync time
-    await db.update(xCredentials)
+    await this.db.update(xCredentials)
       .set({ 
         last_sync_at: new Date(),
         updated_at: new Date()
@@ -1541,7 +1543,7 @@ export class XService {
    * Find an existing bookmark by external_id
    */
   private async findExistingBookmark(userId: string, tweetId: string): Promise<Bookmark | undefined> {
-    const [bookmark] = await db.select()
+    const [bookmark] = await this.db.select()
       .from(bookmarks)
       .where(
         and(
@@ -1580,7 +1582,7 @@ export class XService {
     
     try {
       // First, validate that the folder exists for this user
-      const [folderData] = await db.select()
+      const [folderData] = await this.db.select()
         .from(xFolders)
         .where(
           and(
@@ -1744,7 +1746,7 @@ export class XService {
               }
               
               // Update only the engagement metrics for the existing bookmark
-              await storage.updateBookmark(existingBookmark.id, updateData);
+              await this.storage.updateBookmark(existingBookmark.id, updateData);
               updated++;
             }
             
@@ -1754,7 +1756,7 @@ export class XService {
                 console.log(`X Sync: Associating existing bookmark ${existingBookmark.id} with collection ${folderData.collection_id}`);
                 
                 // Add the bookmark to the mapped collection if it's not already there
-                await storage.addBookmarkToCollection(folderData.collection_id, existingBookmark.id);
+                await this.storage.addBookmarkToCollection(folderData.collection_id, existingBookmark.id);
                 associated++;
               } catch (collectionError) {
                 // This is likely because the bookmark is already in the collection, which is fine
@@ -1773,7 +1775,7 @@ export class XService {
               bookmarkData.user_id = userId;
               
               // Create the new bookmark
-              const newBookmark = await storage.createBookmark(bookmarkData);
+              const newBookmark = await this.storage.createBookmark(bookmarkData);
               added++;
               
               // If this folder has a collection mapping, associate the bookmark with it
@@ -1781,7 +1783,7 @@ export class XService {
                 console.log(`X Sync: Adding new bookmark ${newBookmark.id} to collection ${folderData.collection_id}`);
                 
                 // Add the bookmark to the mapped collection
-                await storage.addBookmarkToCollection(folderData.collection_id, newBookmark.id);
+                await this.storage.addBookmarkToCollection(folderData.collection_id, newBookmark.id);
                 associated++;
               }
             } catch (createError) {
@@ -1796,7 +1798,7 @@ export class XService {
       }
       
       // Update last sync time for the folder
-      await storage.updateXFolderLastSync(folderData.id);
+      await this.storage.updateXFolderLastSync(folderData.id);
       
       // Trigger AI processing for newly added bookmarks
       if (added > 0) {
@@ -1806,7 +1808,7 @@ export class XService {
         // This improves the app by ensuring tags are processed before auto-organization
         try {
           // Process the bookmarks with AI and get the IDs of processed bookmarks
-          const processedBookmarkIds = await aiProcessorService.processAfterSync(userId);
+          const processedBookmarkIds = await this.aiProcessorService.processAfterSync(userId);
           
           if (processedBookmarkIds.length > 0) {
             console.log(`X Sync: AI processing complete for ${processedBookmarkIds.length} bookmarks, now running auto-organization`);
@@ -1815,7 +1817,7 @@ export class XService {
             for (const bookmarkId of processedBookmarkIds) {
               try {
                 // This ensures collection assignments happen AFTER tags are processed
-                await bookmarkService.updateBookmarkCollectionsBasedOnTags(bookmarkId);
+                await this.bookmarkService.updateBookmarkCollectionsBasedOnTags(bookmarkId);
               } catch (orgError) {
                 console.error(`X Sync: Error during auto-organization for bookmark ${bookmarkId}: ${orgError}`);
               }
@@ -1846,7 +1848,7 @@ export class XService {
    * Create a new folder mapping
    */
   private async createFolderMapping(folderMapping: InsertXFolder): Promise<XFolder> {
-    const [folder] = await db.insert(xFolders)
+    const [folder] = await this.db.insert(xFolders)
       .values({
         ...folderMapping,
         last_sync_at: new Date()
@@ -1878,7 +1880,7 @@ export class XService {
       const updated = await this.refreshAccessToken(credentials.refresh_token);
       
       // Update in database
-      await db.update(xCredentials)
+      await this.db.update(xCredentials)
         .set(updated)
         .where(eq(xCredentials.id, credentials.id));
       
@@ -1892,7 +1894,7 @@ export class XService {
    * Get X.com credentials for a user
    */
   private async getUserCredentials(userId: string): Promise<XCredentials | undefined> {
-    const [credentials] = await db.select()
+    const [credentials] = await this.db.select()
       .from(xCredentials)
       .where(eq(xCredentials.user_id, userId));
     
@@ -2021,7 +2023,7 @@ export class XService {
   private async getExistingXBookmarks(userId: string): Promise<Map<string, Bookmark>> {
     console.log(`X Sync: Fetching existing X.com bookmarks for user ${userId}`);
     
-    const xBookmarks = await db.select()
+    const xBookmarks = await this.db.select()
       .from(bookmarks)
       .where(
         and(
@@ -2059,7 +2061,7 @@ export class XService {
       }
       
       // Delete all credentials for this user
-      await db.delete(xCredentials)
+      await this.db.delete(xCredentials)
         .where(eq(xCredentials.user_id, userId));
       
       console.log(`XService: Successfully deleted X credentials for user ${userId}`);
@@ -2091,6 +2093,3 @@ export class XService {
     return hash.toString('base64url');
   }
 }
-
-// Export a singleton instance
-export const xService = new XService();

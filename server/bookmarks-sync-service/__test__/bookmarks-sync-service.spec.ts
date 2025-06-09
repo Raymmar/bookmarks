@@ -1,18 +1,18 @@
 import { expect } from 'chai';
 import { eq, and } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/pglite';
 import { FakeXServer } from './fake-x-server';
-import { xService } from '../../lib/x-service';
 import { xCredentials, bookmarks, users } from '@shared/schema';
 import { v4 as uuidv4 } from 'uuid';
-import tmp from 'tmp';
 import { createDb } from './create-db';
-
-tmp.setGracefulCleanup();
+import { XService } from 'server/lib/x-service';
+import { DatabaseStorage } from 'server/storage';
+import { AIProcessorService } from 'server/lib/ai-processor-service';
+import { BookmarkService } from 'server/lib/bookmark-service';
 
 describe('X.com Bookmarks Sync', () => {
-  let testDb: ReturnType<typeof drizzle>;
+  let testDb: Awaited<ReturnType<typeof createDb>>;
   let fakeXServer: FakeXServer;
+  let xService: XService;
   const TEST_PORT = 3001;
   const TEST_USER_ID = uuidv4();
   const TEST_X_USERNAME = 'testuser';
@@ -20,6 +20,10 @@ describe('X.com Bookmarks Sync', () => {
 
   before(async () => {
     testDb = await createDb();
+    const storage = new DatabaseStorage(testDb);
+    const bookmarkService = new BookmarkService(storage);
+    const aiProcessorService = new AIProcessorService(testDb, bookmarkService);
+    xService = new XService(testDb, storage, aiProcessorService, bookmarkService);
 
     // Create a test user
     await testDb.insert(users).values({
@@ -63,40 +67,36 @@ describe('X.com Bookmarks Sync', () => {
   describe('syncBookmarks', () => {
     it('should sync bookmarks from X.com to database', async () => {
       // Set up test bookmarks in fake X server
-      // const testBookmarks = [
-      //   {
-      //     id: '1',
-      //     text: 'Test bookmark 1',
-      //     created_at: '2024-01-01T00:00:00Z',
-      //     author_id: '456',
-      //     author_name: 'Test Author',
-      //     author_username: 'testauthor',
-      //   },
-      //   {
-      //     id: '2',
-      //     text: 'Test bookmark 2',
-      //     created_at: '2024-01-02T00:00:00Z',
-      //     author_id: '789',
-      //     author_name: 'Another Author',
-      //     author_username: 'anotherauthor',
-      //   },
-      // ];
+      const testBookmarks = [
+        {
+          id: '1',
+          text: 'Test bookmark 1',
+          created_at: '2024-01-01T00:00:00Z',
+          author_id: '456',
+          author_name: 'Test Author',
+          author_username: 'testauthor',
+        },
+        {
+          id: '2',
+          text: 'Test bookmark 2',
+          created_at: '2024-01-02T00:00:00Z',
+          author_id: '789',
+          author_name: 'Another Author',
+          author_username: 'anotherauthor',
+        },
+      ];
 
-      // fakeXServer.setUserBookmarks(TEST_USER_ID, TEST_X_USERNAME, testBookmarks);
+      fakeXServer.setUserBookmarks(TEST_USER_ID, TEST_X_USERNAME, testBookmarks);
 
-      // // Perform sync
-      // const result = await xService.syncBookmarks(TEST_USER_ID);
+      // Perform sync
+      const result = await xService.syncBookmarks(TEST_USER_ID);
 
-      // // Verify results
-      // expect(result.added).to.equal(2);
-      // expect(result.updated).to.equal(0);
-      // expect(result.errors).to.equal(0);
+      // Verify results
+      expect(result.added).to.equal(2);
+      expect(result.updated).to.equal(0);
+      expect(result.errors).to.equal(0);
 
       // Verify bookmarks were saved to database
-      const usersResult = await testDb.select().from(users);
-      console.log(usersResult);
-
-      
       const savedBookmarks = await testDb
         .select()
         .from(bookmarks)

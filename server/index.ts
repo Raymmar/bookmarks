@@ -2,6 +2,12 @@ import express, { type Request, Response, type NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupSchedulers } from "./lib/scheduler";
+import { XService } from "./lib/x-service";
+import { createProdDbConnection } from "./db";
+import { AIProcessorService } from "./lib/ai-processor-service";
+import { DatabaseStorage } from "./storage";
+import { ReportService } from "./lib/report-service";
+import { BookmarkService } from "./lib/bookmark-service";
 
 const app = express();
 app.use(express.json());
@@ -39,7 +45,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  // Wire up the services and their dependencies
+  const db = createProdDbConnection();
+  const storage = new DatabaseStorage(db);
+  const bookmarkService = new BookmarkService(storage);
+  const aiProcessorService = new AIProcessorService(db, bookmarkService);
+  const reportService = new ReportService(storage);
+  const xService = new XService(db, storage, aiProcessorService, bookmarkService);
+
+  // Register all the routes
+  const server = await registerRoutes(app, bookmarkService, reportService, storage, xService);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -72,7 +87,7 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
 
       // Set up all scheduled tasks
-      setupSchedulers()
+      setupSchedulers(db, aiProcessorService, xService)
         .then(() => log("Background schedulers initialized successfully"))
         .catch((err: Error) =>
           log(`Error setting up schedulers: ${err.message}`),

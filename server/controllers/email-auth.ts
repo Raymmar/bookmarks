@@ -1,5 +1,5 @@
 import { Express, Request, Response, NextFunction } from "express";
-import { storage } from "../storage";
+import { Storage } from "../storage";
 import { emailService } from "../services/email";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -17,7 +17,7 @@ async function hashPassword(password: string) {
 const VERIFICATION_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const RESET_TOKEN_EXPIRY = 60 * 60 * 1000; // 1 hour in milliseconds
 
-export function setupEmailAuthRoutes(app: Express) {
+export function setupEmailAuthRoutes(app: Express, storage: Storage) {
   // Send email verification email
   app.post("/api/email/send-verification", async (req: Request, res: Response, next: NextFunction) => {
     try {

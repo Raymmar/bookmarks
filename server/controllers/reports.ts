@@ -5,8 +5,8 @@
  */
 
 import type { Express, Request, Response } from "express";
-import { reportService } from "../lib/report-service";
-import { storage } from "../storage";
+import { ReportService } from "../lib/report-service";
+import { Storage } from "../storage";
 import { z } from "zod";
 
 // Middleware to check if user is authenticated
@@ -17,7 +17,7 @@ const ensureAuthenticated = (req: Request, res: Response, next: Function) => {
   next();
 };
 
-export function setupReportRoutes(app: Express) {
+export function setupReportRoutes(app: Express, reportService: ReportService, storage: Storage) {
   // Generate a new weekly report
   app.post("/api/reports", ensureAuthenticated, async (req, res) => {
     try {

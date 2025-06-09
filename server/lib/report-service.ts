@@ -5,10 +5,10 @@
  * and their associated tags and insights.
  */
 
-import { storage } from "../storage";
-import { InsertReport, Report } from "@shared/schema";
+import { Storage } from "../storage";
+import { Report } from "@shared/schema";
 import OpenAI from "openai";
-import { addWeeks, subWeeks, startOfWeek, endOfWeek, format, subDays } from "date-fns";
+import { subWeeks, format, subDays } from "date-fns";
 
 // Define report status types
 type ReportStatus = "generating" | "completed" | "failed";
@@ -71,7 +71,7 @@ export interface GenerateReportOptions {
  * Report Service for generating weekly insights
  */
 export class ReportService {
-  constructor() {}
+  constructor(private readonly storage: Storage) {}
 
   /**
    * Generate a report for the user's recent bookmarks
@@ -103,7 +103,7 @@ export class ReportService {
 
     try {
       // Create the report first with "generating" status
-      const report = await storage.createReport({
+      const report = await this.storage.createReport({
         user_id: userId,
         title: reportTitle,
         content: "Generating report...",
@@ -112,10 +112,10 @@ export class ReportService {
       });
       
       // Update the status after creation
-      await storage.updateReportStatus(report.id, "generating");
+      await this.storage.updateReportStatus(report.id, "generating");
 
       // Fetch bookmarks with insights and tags
-      const bookmarksWithData = await storage.getBookmarksWithInsightsAndTags(
+      const bookmarksWithData = await this.storage.getBookmarksWithInsightsAndTags(
         userId,
         timePeriodStart,
         maxBookmarks,
@@ -123,12 +123,12 @@ export class ReportService {
 
       if (bookmarksWithData.length === 0) {
         // Update the content
-        await storage.updateReport(report.id, {
+        await this.storage.updateReport(report.id, {
           content: "No bookmarks found for this time period.",
         });
         
         // Update the status separately
-        await storage.updateReportStatus(report.id, "completed");
+        await this.storage.updateReportStatus(report.id, "completed");
         
         // Return the updated report data
         return {
@@ -140,7 +140,7 @@ export class ReportService {
 
       // Add the bookmarks to the report for tracking
       for (const { bookmark } of bookmarksWithData) {
-        await storage.addBookmarkToReport(report.id, bookmark.id);
+        await this.storage.addBookmarkToReport(report.id, bookmark.id);
       }
 
       // Prepare data for OpenAI
@@ -222,13 +222,13 @@ export class ReportService {
       const descriptiveTitle = await this.generateDescriptiveTitle(content, reportType, formattedStartDate, formattedEndDate);
 
       // Update the report content and title
-      const updatedReport = await storage.updateReport(report.id, {
+      const updatedReport = await this.storage.updateReport(report.id, {
         content,
         title: descriptiveTitle, // Use the AI-generated title
       });
       
       // Update status separately
-      await storage.updateReportStatus(report.id, "completed");
+      await this.storage.updateReportStatus(report.id, "completed");
 
       return updatedReport || report;
     } catch (error) {
@@ -236,7 +236,7 @@ export class ReportService {
 
       try {
         // Try to create an error report if one doesn't already exist
-        const errorReport = await storage.createReport({
+        const errorReport = await this.storage.createReport({
           user_id: userId,
           title: reportTitle,
           content: "Error generating report",
@@ -245,7 +245,7 @@ export class ReportService {
         });
         
         // Set status to failed
-        await storage.updateReportStatus(errorReport.id, "failed");
+        await this.storage.updateReportStatus(errorReport.id, "failed");
         
         return errorReport;
       } catch (nestedError) {
@@ -261,7 +261,7 @@ export class ReportService {
           time_period_start: timePeriodStart instanceof Date ? timePeriodStart.toISOString() : timePeriodStart,
           time_period_end: timePeriodEnd instanceof Date ? timePeriodEnd.toISOString() : timePeriodEnd,
           status: "failed" as ReportStatus,
-        } as Report;
+        } as unknown as Report;
       }
     }
   }
@@ -270,28 +270,28 @@ export class ReportService {
    * Get all reports for a user
    */
   async getReportsByUserId(userId: string): Promise<Report[]> {
-    return await storage.getReportsByUserId(userId);
+    return await this.storage.getReportsByUserId(userId);
   }
 
   /**
    * Get a specific report by ID
    */
   async getReport(reportId: string): Promise<Report | undefined> {
-    return await storage.getReport(reportId);
+    return await this.storage.getReport(reportId);
   }
 
   /**
    * Delete a report
    */
   async deleteReport(reportId: string): Promise<boolean> {
-    return await storage.deleteReport(reportId);
+    return await this.storage.deleteReport(reportId);
   }
 
   /**
    * Update a report's content and/or title
    */
   async updateReport(reportId: string, updates: { title?: string; content?: string }): Promise<Report | undefined> {
-    return await storage.updateReport(reportId, updates);
+    return await this.storage.updateReport(reportId, updates);
   }
   
   /**
@@ -377,5 +377,3 @@ IMPORTANT: Return ONLY the title text. No quotes, explanations, or additional te
   }
 }
 
-// Export a singleton instance
-export const reportService = new ReportService();

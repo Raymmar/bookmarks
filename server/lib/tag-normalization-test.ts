@@ -6,7 +6,7 @@
  * npx tsx server/lib/tag-normalization-test.ts
  */
 
-import { processAITags, normalizeTag, areSimilarTags, deduplicateTags } from './tag-normalizer';
+import { processAITags, normalizeTag, deduplicateTags } from './tag-normalizer';
 
 // Test tag normalization
 function testNormalization() {
@@ -41,35 +41,36 @@ function testNormalization() {
 }
 
 // Test similar tag detection
-function testSimilarTagDetection() {
-  console.log('--- Testing Similar Tag Detection ---');
+// TODO: No longer exists?
+// function testSimilarTagDetection() {
+//   console.log('--- Testing Similar Tag Detection ---');
   
-  const testCases = [
-    { tag1: 'javascript', tag2: 'javascript', expected: true },
-    { tag1: 'javascript', tag2: 'JavaScript', expected: true },
-    { tag1: 'react', tag2: 'React.js', expected: true },
-    { tag1: 'machine learning', tag2: 'machine-learning', expected: true },
-    { tag1: 'AI', tag2: 'artificial intelligence', expected: false },
-    { tag1: 'tech', tag2: 'tech community', expected: true },
-    { tag1: 'technology', tag2: 'tech', expected: true },
-    { tag1: 'web development', tag2: 'webdev', expected: true },
-  ];
+//   const testCases = [
+//     { tag1: 'javascript', tag2: 'javascript', expected: true },
+//     { tag1: 'javascript', tag2: 'JavaScript', expected: true },
+//     { tag1: 'react', tag2: 'React.js', expected: true },
+//     { tag1: 'machine learning', tag2: 'machine-learning', expected: true },
+//     { tag1: 'AI', tag2: 'artificial intelligence', expected: false },
+//     { tag1: 'tech', tag2: 'tech community', expected: true },
+//     { tag1: 'technology', tag2: 'tech', expected: true },
+//     { tag1: 'web development', tag2: 'webdev', expected: true },
+//   ];
   
-  let passed = 0;
-  let failed = 0;
+//   let passed = 0;
+//   let failed = 0;
   
-  testCases.forEach(test => {
-    const result = areSimilarTags(test.tag1, test.tag2);
-    const success = result === test.expected;
+//   testCases.forEach(test => {
+//     const result = areSimilarTags(test.tag1, test.tag2);
+//     const success = result === test.expected;
     
-    console.log(`${success ? '✓' : '✗'} areSimilarTags('${test.tag1}', '${test.tag2}') => ${result} ${success ? '' : `(expected ${test.expected})`}`);
+//     console.log(`${success ? '✓' : '✗'} areSimilarTags('${test.tag1}', '${test.tag2}') => ${result} ${success ? '' : `(expected ${test.expected})`}`);
     
-    if (success) passed++;
-    else failed++;
-  });
+//     if (success) passed++;
+//     else failed++;
+//   });
   
-  console.log(`\nResults: ${passed} passed, ${failed} failed\n`);
-}
+//   console.log(`\nResults: ${passed} passed, ${failed} failed\n`);
+// }
 
 // Test tag deduplication
 function testTagDeduplication() {
@@ -156,7 +157,7 @@ function testFullProcessing() {
 // Run the tests
 console.log('\n==== TAG NORMALIZATION TESTS ====\n');
 testNormalization();
-testSimilarTagDetection();
+// testSimilarTagDetection();
 testTagDeduplication();
 testFullProcessing();
 console.log('==== TESTS COMPLETE ====\n');

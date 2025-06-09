@@ -6,20 +6,25 @@
  * npx tsx server/lib/openai-insights-test.ts
  */
 
+import { createProdDbConnection } from '../db';
 import { generateInsights } from './content-processor';
 import { processAITags } from './tag-normalizer';
+import { DatabaseStorage } from '../storage';
 
 // Test URL
 const TEST_URL = "https://developer.mozilla.org/en-US/docs/Web/JavaScript";
 
 async function testOpenAIInsightsGeneration() {
   console.log('\n==== OPENAI INSIGHTS GENERATION TEST ====\n');
-  
+
+  const db = createProdDbConnection();
+  const storage = new DatabaseStorage(db);
+
   try {
     console.log(`Testing insights generation for URL: ${TEST_URL}`);
     
     // Generate insights directly from URL (empty content, pass URL)
-    const insights = await generateInsights(TEST_URL, "");
+    const insights = await generateInsights(storage, TEST_URL, "");
     
     console.log("\n=== GENERATED INSIGHTS ===\n");
     // Note: The insights object doesn't include a title field

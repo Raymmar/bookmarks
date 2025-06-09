@@ -19,13 +19,13 @@ import {
   xCredentials, XCredentials, InsertXCredentials,
   xFolders, XFolder, InsertXFolder
 } from "@shared/schema";
-import { db } from "./db";
+import { Db } from "./db";
 import { eq, desc, asc, sql, inArray, and, or, ilike } from "drizzle-orm";
 
 // Storage interface
-export interface IStorage {
+export interface Storage {
   // Database access
-  getDb(): typeof db;
+  getDb(): Db;
   
   // Users
   getUsers(): Promise<User[]>;
@@ -119,7 +119,7 @@ export interface IStorage {
   removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean>;
   
   // Chat Sessions
-  getChatSessions(): Promise<ChatSession[]>;
+  getChatSessions(userId?: string): Promise<ChatSession[]>;
   getChatSession(id: string): Promise<ChatSession | undefined>;
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   updateChatSession(id: string, session: Partial<InsertChatSession>): Promise<ChatSession | undefined>;
@@ -131,7 +131,7 @@ export interface IStorage {
   deleteChatMessagesBySessionId(sessionId: string): Promise<boolean>;
   
   // Settings
-  getSettings(): Promise<Setting[]>;
+  getSettings(userId?: string): Promise<Setting[]>;
   getSetting(key: string): Promise<Setting | undefined>;
   createSetting(setting: InsertSetting): Promise<Setting>;
   updateSetting(key: string, value: string): Promise<Setting | undefined>;
@@ -168,1039 +168,36 @@ export interface IStorage {
   findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined>;
 }
 
-// In-memory storage implementation as a fallback
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private bookmarks: Map<string, Bookmark>;
-  private notes: Map<string, Note>;
-  private screenshots: Map<string, Screenshot>;
-  private highlights: Map<string, Highlight>;
-  private insights: Map<string, Insight>;
-  private activities: Map<string, Activity>;
-  private collections: Map<string, Collection>;
-  private collectionBookmarks: Map<string, CollectionBookmark>;
-  private tags: Map<string, Tag>;
-  private bookmarkTags: Map<string, BookmarkTag>;
-  
-  // Chat persistence
-  private chatSessions: Map<string, ChatSession>;
-  private chatMessages: Map<string, ChatMessage>;
-  
-  // Settings
-  private settings: Map<string, Setting>;
-  
-  // Reports
-  private reports: Map<string, Report>;
-  private reportBookmarks: Map<string, ReportBookmark>;
-  
-  // X.com integration
-  private xCredentials: Map<string, XCredentials>;
-  private xFolders: Map<string, XFolder>;
-  
-  // Database access - this is just a stub for the in-memory implementation
-  getDb(): typeof db {
-    throw new Error("Cannot access database directly in MemStorage mode");
-  }
-  
-  constructor() {
-    this.users = new Map();
-    this.bookmarks = new Map();
-    this.notes = new Map();
-    this.screenshots = new Map();
-    this.highlights = new Map();
-    this.insights = new Map();
-    this.activities = new Map();
-    this.collections = new Map();
-    this.collectionBookmarks = new Map();
-    this.tags = new Map();
-    this.bookmarkTags = new Map();
-    this.chatSessions = new Map();
-    this.chatMessages = new Map();
-    this.settings = new Map();
-    this.reports = new Map();
-    this.reportBookmarks = new Map();
-    this.xCredentials = new Map();
-    this.xFolders = new Map();
-  }
-  
-  // User methods
-  async getUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
-  }
-  
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-  
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      user => user.username.toLowerCase() === username.toLowerCase()
-    );
-  }
-  
-  async createUser(user: InsertUser): Promise<User> {
-    const id = crypto.randomUUID();
-    const now = new Date();
-    
-    const newUser: User = {
-      ...user,
-      id,
-      created_at: now,
-      updated_at: now,
-    };
-    
-    this.users.set(id, newUser);
-    return newUser;
-  }
-  
-  async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    
-    const updatedUser = { 
-      ...user, 
-      ...userUpdate,
-      updated_at: new Date()
-    };
-    
-    this.users.set(id, updatedUser);
-    return updatedUser;
-  }
-  
-  async deleteUser(id: string): Promise<boolean> {
-    return this.users.delete(id);
-  }
-  
-  // Collection methods
-  async getCollections(userId?: string): Promise<Collection[]> {
-    if (userId) {
-      return Array.from(this.collections.values()).filter(
-        collection => collection.user_id === userId
-      );
-    }
-    return Array.from(this.collections.values());
-  }
-  
-  async getPublicCollections(): Promise<Collection[]> {
-    return Array.from(this.collections.values()).filter(
-      collection => collection.is_public
-    );
-  }
-  
-  async getCollection(id: string): Promise<Collection | undefined> {
-    return this.collections.get(id);
-  }
-  
-  async createCollection(collection: InsertCollection): Promise<Collection> {
-    const id = crypto.randomUUID();
-    const now = new Date();
-    
-    const newCollection: Collection = {
-      ...collection,
-      id,
-      created_at: now,
-      updated_at: now,
-    };
-    
-    this.collections.set(id, newCollection);
-    return newCollection;
-  }
-  
-  async updateCollection(id: string, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
-    const collection = this.collections.get(id);
-    if (!collection) return undefined;
-    
-    const updatedCollection = {
-      ...collection,
-      ...collectionUpdate,
-      updated_at: new Date(),
-    };
-    
-    this.collections.set(id, updatedCollection);
-    return updatedCollection;
-  }
-  
-  async deleteCollection(id: string): Promise<boolean> {
-    try {
-      // First, update any X.com folder mappings to remove the collection reference
-      for (const folder of this.xFolders.values()) {
-        if (folder.collection_id === id) {
-          folder.collection_id = null;
-          folder.updated_at = new Date();
-        }
-      }
-      
-      // Then remove bookmark-collection associations (but NOT the bookmarks themselves)
-      // This just deletes the relationship records in collectionBookmarks table
-      for (const cb of this.collectionBookmarks.values()) {
-        if (cb.collection_id === id) {
-          this.collectionBookmarks.delete(cb.id);
-        }
-      }
-      
-      // Finally delete the collection itself
-      return this.collections.delete(id);
-    } catch (error) {
-      console.error(`Error deleting collection ${id}:`, error);
-      throw error;
-    }
-  }
-  
-  // Collection Bookmarks methods
-  async getBookmarksByCollectionId(collectionId: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
-    const collectionBookmarksEntries = Array.from(this.collectionBookmarks.values())
-      .filter(cb => cb.collection_id === collectionId);
-    
-    const bookmarkIds = collectionBookmarksEntries.map(cb => cb.bookmark_id);
-    let bookmarks = bookmarkIds
-      .map(id => this.bookmarks.get(id))
-      .filter(Boolean) as Bookmark[];
-    
-    // Apply search filter if provided
-    if (options?.searchQuery) {
-      const query = options.searchQuery.toLowerCase();
-      bookmarks = bookmarks.filter(bookmark => 
-        bookmark.title.toLowerCase().includes(query) ||
-        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
-        bookmark.url.toLowerCase().includes(query) ||
-        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
-      );
-    }
-    
-    // Apply sorting
-    if (options?.sort) {
-      switch (options.sort) {
-        case 'newest':
-          bookmarks = bookmarks.sort((a, b) => 
-            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
-          break;
-        case 'oldest':
-          bookmarks = bookmarks.sort((a, b) => 
-            new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime());
-          break;
-        case 'recently_updated':
-          bookmarks = bookmarks.sort((a, b) => 
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-          break;
-        case 'created_newest':
-          bookmarks = bookmarks.sort((a, b) => {
-            const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
-            const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
-            return bCreatedAt - aCreatedAt;
-          });
-          break;
-        default:
-          // Default to newest first
-          bookmarks = bookmarks.sort((a, b) => 
-            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
-      }
-    } else {
-      // Default sort - newest first
-      bookmarks = bookmarks.sort((a, b) => 
-        new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
-    }
-    
-    // Apply pagination
-    if (options?.offset) {
-      bookmarks = bookmarks.slice(options.offset);
-    }
-    
-    if (options?.limit) {
-      bookmarks = bookmarks.slice(0, options.limit);
-    }
-    
-    return bookmarks;
-  }
-  
-  async getBookmarksByCollectionIdCount(collectionId: string, options?: { searchQuery?: string }): Promise<number> {
-    const collectionBookmarksEntries = Array.from(this.collectionBookmarks.values())
-      .filter(cb => cb.collection_id === collectionId);
-    
-    const bookmarkIds = collectionBookmarksEntries.map(cb => cb.bookmark_id);
-    let bookmarks = bookmarkIds
-      .map(id => this.bookmarks.get(id))
-      .filter(Boolean) as Bookmark[];
-    
-    // Apply search filter if provided
-    if (options?.searchQuery) {
-      const query = options.searchQuery.toLowerCase();
-      bookmarks = bookmarks.filter(bookmark => 
-        bookmark.title.toLowerCase().includes(query) ||
-        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
-        bookmark.url.toLowerCase().includes(query) ||
-        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
-      );
-    }
-    
-    return bookmarks.length;
-  }
-  
-  async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
-    const collectionBookmarksEntries = Array.from(this.collectionBookmarks.values())
-      .filter(cb => cb.bookmark_id === bookmarkId);
-    
-    const collectionIds = collectionBookmarksEntries.map(cb => cb.collection_id);
-    return collectionIds.map(id => this.collections.get(id)!).filter(Boolean);
-  }
-  
-  async addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark> {
-    const id = crypto.randomUUID();
-    
-    const newCollectionBookmark: CollectionBookmark = {
-      id,
-      collection_id: collectionId,
-      bookmark_id: bookmarkId,
-    };
-    
-    this.collectionBookmarks.set(id, newCollectionBookmark);
-    return newCollectionBookmark;
-  }
-  
-  async removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean> {
-    const collectionBookmark = Array.from(this.collectionBookmarks.values())
-      .find(cb => cb.collection_id === collectionId && cb.bookmark_id === bookmarkId);
-    
-    if (!collectionBookmark) return false;
-    
-    return this.collectionBookmarks.delete(collectionBookmark.id);
-  }
-
-  // Bookmarks
-  async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
-    // Filter by user ID if provided
-    let result = userId 
-      ? Array.from(this.bookmarks.values()).filter(bookmark => bookmark.user_id === userId)
-      : Array.from(this.bookmarks.values());
-    
-    // Apply search filter if provided
-    if (options?.searchQuery) {
-      const query = options.searchQuery.toLowerCase();
-      result = result.filter(bookmark => 
-        bookmark.title.toLowerCase().includes(query) ||
-        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
-        bookmark.url.toLowerCase().includes(query) ||
-        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
-      );
-    }
-    
-    // Apply sorting
-    if (options?.sort) {
-      switch (options.sort) {
-        case 'newest':
-          result = result.sort((a, b) => 
-            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
-          break;
-        case 'oldest':
-          result = result.sort((a, b) => 
-            new Date(a.date_saved).getTime() - new Date(b.date_saved).getTime());
-          break;
-        case 'recently_updated':
-          result = result.sort((a, b) => 
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-          break;
-        case 'created_newest':
-          result = result.sort((a, b) => {
-            const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date_saved).getTime();
-            const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date_saved).getTime();
-            return bCreatedAt - aCreatedAt;
-          });
-          break;
-        default:
-          // Default to newest first
-          result = result.sort((a, b) => 
-            new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
-      }
-    } else {
-      // Default sort - newest first
-      result = result.sort((a, b) => 
-        new Date(b.date_saved).getTime() - new Date(a.date_saved).getTime());
-    }
-    
-    // Apply pagination
-    if (options?.offset) {
-      result = result.slice(options.offset);
-    }
-    
-    if (options?.limit) {
-      result = result.slice(0, options.limit);
-    }
-    
-    return result;
-  }
-  
-  async getBookmarksCount(userId?: string, options?: { searchQuery?: string }): Promise<number> {
-    // Filter by user ID if provided
-    let result = userId 
-      ? Array.from(this.bookmarks.values()).filter(bookmark => bookmark.user_id === userId)
-      : Array.from(this.bookmarks.values());
-    
-    // Apply search filter if provided
-    if (options?.searchQuery) {
-      const query = options.searchQuery.toLowerCase();
-      result = result.filter(bookmark => 
-        bookmark.title.toLowerCase().includes(query) ||
-        (bookmark.description && bookmark.description.toLowerCase().includes(query)) ||
-        bookmark.url.toLowerCase().includes(query) ||
-        (bookmark.content_html && bookmark.content_html.toLowerCase().includes(query))
-      );
-    }
-    
-    return result.length;
-  }
-  
-  async getBookmark(id: string): Promise<Bookmark | undefined> {
-    const bookmark = this.bookmarks.get(id);
-    if (!bookmark) return undefined;
-    
-    // Fetch related data
-    const bookmarkNotes = await this.getNotesByBookmarkId(id);
-    const bookmarkHighlights = await this.getHighlightsByBookmarkId(id);
-    const bookmarkScreenshots = await this.getScreenshotsByBookmarkId(id);
-    const bookmarkInsight = await this.getInsightByBookmarkId(id);
-    
-    return {
-      ...bookmark,
-      notes: bookmarkNotes,
-      highlights: bookmarkHighlights,
-      screenshots: bookmarkScreenshots,
-      insights: bookmarkInsight,
-    };
-  }
-  
-  async createBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
-    const id = crypto.randomUUID();
-    // Convert string date to Date object if needed
-    const dateSaved = bookmark.date_saved ? 
-      (typeof bookmark.date_saved === 'string' ? new Date(bookmark.date_saved) : bookmark.date_saved) : 
-      new Date();
-    
-    const newBookmark: Bookmark = {
-      ...bookmark,
-      id,
-      date_saved: dateSaved,
-      vector_embedding: null, // Add this field to satisfy TypeScript
-    };
-    
-    this.bookmarks.set(id, newBookmark);
-    return newBookmark;
-  }
-  
-  async updateBookmark(id: string, bookmarkUpdate: Partial<InsertBookmark>): Promise<Bookmark | undefined> {
-    const bookmark = this.bookmarks.get(id);
-    if (!bookmark) return undefined;
-    
-    const updatedBookmark = { 
-      ...bookmark, 
-      ...bookmarkUpdate,
-      updated_at: new Date()
-    };
-    this.bookmarks.set(id, updatedBookmark);
-    return updatedBookmark;
-  }
-  
-  async deleteBookmark(id: string): Promise<boolean> {
-    return this.bookmarks.delete(id);
-  }
-  
-  // Notes
-  async getNotesByBookmarkId(bookmarkId: string): Promise<Note[]> {
-    return Array.from(this.notes.values()).filter(note => note.bookmark_id === bookmarkId);
-  }
-  
-  async createNote(note: InsertNote): Promise<Note> {
-    const id = crypto.randomUUID();
-    // Convert string date to Date object if needed
-    const timestamp = note.timestamp ? 
-      (typeof note.timestamp === 'string' ? new Date(note.timestamp) : note.timestamp) : 
-      new Date();
-      
-    const newNote: Note = {
-      ...note,
-      id,
-      timestamp: timestamp,
-    };
-    
-    this.notes.set(id, newNote);
-    return newNote;
-  }
-  
-  async deleteNote(id: string): Promise<boolean> {
-    return this.notes.delete(id);
-  }
-  
-  // Screenshots
-  async getScreenshotsByBookmarkId(bookmarkId: string): Promise<Screenshot[]> {
-    return Array.from(this.screenshots.values()).filter(
-      screenshot => screenshot.bookmark_id === bookmarkId
-    );
-  }
-  
-  async createScreenshot(screenshot: InsertScreenshot): Promise<Screenshot> {
-    const id = crypto.randomUUID();
-    // Convert string date to Date object if needed
-    const uploadedAt = screenshot.uploaded_at ? 
-      (typeof screenshot.uploaded_at === 'string' ? new Date(screenshot.uploaded_at) : screenshot.uploaded_at) : 
-      new Date();
-      
-    const newScreenshot: Screenshot = {
-      ...screenshot,
-      id,
-      uploaded_at: uploadedAt,
-    };
-    
-    this.screenshots.set(id, newScreenshot);
-    return newScreenshot;
-  }
-  
-  async deleteScreenshot(id: string): Promise<boolean> {
-    return this.screenshots.delete(id);
-  }
-  
-  // Highlights
-  async getHighlightsByBookmarkId(bookmarkId: string): Promise<Highlight[]> {
-    return Array.from(this.highlights.values()).filter(
-      highlight => highlight.bookmark_id === bookmarkId
-    );
-  }
-  
-  async createHighlight(highlight: InsertHighlight): Promise<Highlight> {
-    const id = crypto.randomUUID();
-    // Ensure position_selector is provided
-    const newHighlight: Highlight = {
-      ...highlight,
-      id,
-      position_selector: highlight.position_selector || null,
-    };
-    
-    this.highlights.set(id, newHighlight);
-    return newHighlight;
-  }
-  
-  async deleteHighlight(id: string): Promise<boolean> {
-    return this.highlights.delete(id);
-  }
-  
-  // Insights
-  async getInsightByBookmarkId(bookmarkId: string): Promise<Insight | undefined> {
-    return Array.from(this.insights.values()).find(
-      insight => insight.bookmark_id === bookmarkId
-    );
-  }
-  
-  async createInsight(insight: InsertInsight): Promise<Insight> {
-    const id = crypto.randomUUID();
-    const newInsight: Insight = {
-      ...insight,
-      id,
-      summary: insight.summary || null,
-      sentiment: insight.sentiment || null,
-      depth_level: insight.depth_level || 1,
-      related_links: insight.related_links || [],
-    };
-    
-    this.insights.set(id, newInsight);
-    return newInsight;
-  }
-  
-  async updateInsight(id: string, insightUpdate: Partial<InsertInsight>): Promise<Insight | undefined> {
-    const insight = this.insights.get(id);
-    if (!insight) return undefined;
-    
-    const updatedInsight = { ...insight, ...insightUpdate };
-    this.insights.set(id, updatedInsight);
-    return updatedInsight;
-  }
-  
-  // Activities
-  async getActivities(): Promise<Activity[]> {
-    return Array.from(this.activities.values())
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }
-  
-  async createActivity(activity: InsertActivity): Promise<Activity> {
-    const id = crypto.randomUUID();
-    const newActivity: Activity = {
-      ...activity,
-      id,
-      user_id: activity.user_id || null, // Make sure user_id is included
-      timestamp: activity.timestamp || new Date().toISOString(),
-      tags: activity.tags || [],
-    };
-    
-    this.activities.set(id, newActivity);
-    return newActivity;
-  }
-  
-  // Tags
-  async getTags(userId?: string): Promise<Tag[]> {
-    // For the main tag filtering in the UI, we want to return tags that are
-    // associated with bookmarks visible to the user
-    if (userId) {
-      // First get all user's bookmarks 
-      const userBookmarks = Array.from(this.bookmarks.values())
-        .filter(bookmark => bookmark.user_id === userId);
-      
-      if (userBookmarks.length === 0) {
-        // User has no bookmarks, return empty array of tags
-        return [];
-      }
-      
-      // Get bookmark IDs
-      const userBookmarkIds = userBookmarks.map(bookmark => bookmark.id);
-      
-      // Get all bookmark-tag relationships for these bookmarks
-      const bookmarkTagEntries = Array.from(this.bookmarkTags.values())
-        .filter(bt => userBookmarkIds.includes(bt.bookmark_id));
-      
-      if (bookmarkTagEntries.length === 0) {
-        // No tag relationships found for user's bookmarks
-        return [];
-      }
-      
-      // Get the unique tag IDs
-      const tagIds = [...new Set(bookmarkTagEntries.map(bt => bt.tag_id))];
-      
-      // Return only tags associated with user's bookmarks
-      return Array.from(this.tags.values())
-        .filter(tag => tagIds.includes(tag.id));
-    }
-    
-    // If no userId provided (user not logged in), still return tags associated with bookmarks
-    // Get all tag IDs from bookmark_tags relationships
-    const allBookmarkTagEntries = Array.from(this.bookmarkTags.values());
-    const allTagIds = [...new Set(allBookmarkTagEntries.map(bt => bt.tag_id))];
-    
-    // Return only tags that are associated with bookmarks
-    return Array.from(this.tags.values())
-      .filter(tag => allTagIds.includes(tag.id));
-  }
-  
-  async getTag(id: string): Promise<Tag | undefined> {
-    return this.tags.get(id);
-  }
-  
-  async getTagByName(name: string): Promise<Tag | undefined> {
-    if (!name) return undefined;
-    
-    // Use case-insensitive comparison
-    return Array.from(this.tags.values()).find(
-      tag => tag.name.toLowerCase() === name.toLowerCase()
-    );
-  }
-  
-  async createTag(tag: InsertTag): Promise<Tag> {
-    const id = crypto.randomUUID();
-    const created_at = new Date();
-    
-    // Ensure type is always a valid value
-    const type = tag.type && (tag.type === "user" || tag.type === "system") 
-                 ? tag.type 
-                 : "user";
-    
-    const newTag: Tag = {
-      id,
-      name: tag.name,
-      type, // Use our validated type
-      count: 0,
-      created_at,
-    };
-    
-    this.tags.set(id, newTag);
-    return newTag;
-  }
-  
-  async updateTag(id: string, tagUpdate: Partial<InsertTag>): Promise<Tag | undefined> {
-    const tag = this.tags.get(id);
-    if (!tag) return undefined;
-    
-    const updatedTag = { ...tag, ...tagUpdate };
-    this.tags.set(id, updatedTag);
-    return updatedTag;
-  }
-  
-  async incrementTagCount(id: string): Promise<Tag | undefined> {
-    const tag = this.tags.get(id);
-    if (!tag) return undefined;
-    
-    const updatedTag = { ...tag, count: tag.count + 1 };
-    this.tags.set(id, updatedTag);
-    return updatedTag;
-  }
-  
-  async decrementTagCount(id: string): Promise<Tag | undefined> {
-    const tag = this.tags.get(id);
-    if (!tag) return undefined;
-    
-    const updatedTag = { ...tag, count: Math.max(0, tag.count - 1) };
-    this.tags.set(id, updatedTag);
-    return updatedTag;
-  }
-  
-  async deleteTag(id: string): Promise<boolean> {
-    return this.tags.delete(id);
-  }
-  
-  // BookmarkTags
-  async getTagsByBookmarkId(bookmarkId: string): Promise<Tag[]> {
-    const bookmarkTagsEntries = Array.from(this.bookmarkTags.values())
-      .filter(bt => bt.bookmark_id === bookmarkId);
-    
-    const tagIds = bookmarkTagsEntries.map(bt => bt.tag_id);
-    return tagIds.map(id => this.tags.get(id)!).filter(Boolean);
-  }
-  
-  async getAllBookmarkTags(bookmarkIds?: string[]): Promise<{[bookmarkId: string]: Tag[]}> {
-    // Create a map to store tags for each bookmark
-    const bookmarkTagsMap: {[bookmarkId: string]: Tag[]} = {};
-    
-    // Get all bookmark-tag relationships, filtering by bookmark IDs if provided
-    const filteredBookmarkTags = Array.from(this.bookmarkTags.values()).filter(bt => {
-      if (bookmarkIds && bookmarkIds.length > 0) {
-        return bookmarkIds.includes(bt.bookmark_id);
-      }
-      return true;
-    });
-    
-    // Group tags by bookmark ID
-    for (const bt of filteredBookmarkTags) {
-      const tag = this.tags.get(bt.tag_id);
-      if (!tag) continue;
-      
-      if (!bookmarkTagsMap[bt.bookmark_id]) {
-        bookmarkTagsMap[bt.bookmark_id] = [];
-      }
-      
-      bookmarkTagsMap[bt.bookmark_id].push(tag);
-    }
-    
-    return bookmarkTagsMap;
-  }
-  
-  async getBookmarksByTagId(tagId: string): Promise<Bookmark[]> {
-    const bookmarkTagsEntries = Array.from(this.bookmarkTags.values())
-      .filter(bt => bt.tag_id === tagId);
-    
-    const bookmarkIds = bookmarkTagsEntries.map(bt => bt.bookmark_id);
-    return bookmarkIds.map(id => this.bookmarks.get(id)!).filter(Boolean);
-  }
-  
-  async addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag> {
-    const id = crypto.randomUUID();
-    
-    const newBookmarkTag: BookmarkTag = {
-      id,
-      bookmark_id: bookmarkId,
-      tag_id: tagId,
-    };
-    
-    this.bookmarkTags.set(id, newBookmarkTag);
-    
-    // Increment the tag count
-    await this.incrementTagCount(tagId);
-    
-    return newBookmarkTag;
-  }
-  
-  async removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean> {
-    const bookmarkTag = Array.from(this.bookmarkTags.values())
-      .find(bt => bt.bookmark_id === bookmarkId && bt.tag_id === tagId);
-    
-    if (!bookmarkTag) return false;
-    
-    const result = this.bookmarkTags.delete(bookmarkTag.id);
-    
-    if (result) {
-      // Decrement the tag count
-      await this.decrementTagCount(tagId);
-    }
-    
-    return result;
-  }
-  
-  // Chat Sessions
-  async getChatSessions(userId?: string): Promise<ChatSession[]> {
-    if (userId) {
-      return Array.from(this.chatSessions.values())
-        .filter(session => session.user_id === userId)
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-    }
-    return Array.from(this.chatSessions.values())
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  }
-
-  async getChatSession(id: string): Promise<ChatSession | undefined> {
-    return this.chatSessions.get(id);
-  }
-
-  async createChatSession(session: InsertChatSession): Promise<ChatSession> {
-    const id = crypto.randomUUID();
-    const now = new Date();
-    
-    const newSession: ChatSession = {
-      ...session,
-      id,
-      created_at: now,
-      updated_at: now,
-      filters: session.filters || null,
-      user_id: session.user_id || null,
-    };
-    
-    this.chatSessions.set(id, newSession);
-    return newSession;
-  }
-
-  async updateChatSession(id: string, sessionUpdate: Partial<InsertChatSession>): Promise<ChatSession | undefined> {
-    const session = this.chatSessions.get(id);
-    if (!session) return undefined;
-    
-    const updatedSession: ChatSession = {
-      ...session,
-      ...sessionUpdate,
-      updated_at: new Date(),
-    };
-    
-    this.chatSessions.set(id, updatedSession);
-    return updatedSession;
-  }
-
-  async deleteChatSession(id: string): Promise<boolean> {
-    // Delete all messages in the session first
-    await this.deleteChatMessagesBySessionId(id);
-    
-    // Then delete the session itself
-    return this.chatSessions.delete(id);
-  }
-  
-  // Chat Messages
-  async getChatMessagesBySessionId(sessionId: string): Promise<ChatMessage[]> {
-    return Array.from(this.chatMessages.values())
-      .filter(message => message.session_id === sessionId)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  }
-
-  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const id = crypto.randomUUID();
-    const now = new Date();
-    
-    const newMessage: ChatMessage = {
-      ...message,
-      id,
-      timestamp: now,
-    };
-    
-    this.chatMessages.set(id, newMessage);
-    
-    // Update the parent session's updated_at timestamp
-    await this.updateChatSession(message.session_id, {});
-    
-    return newMessage;
-  }
-
-  async deleteChatMessagesBySessionId(sessionId: string): Promise<boolean> {
-    const messagesToDelete = Array.from(this.chatMessages.values())
-      .filter(message => message.session_id === sessionId);
-    
-    if (messagesToDelete.length === 0) return false;
-    
-    let allDeleted = true;
-    for (const message of messagesToDelete) {
-      if (!this.chatMessages.delete(message.id)) {
-        allDeleted = false;
-      }
-    }
-    
-    return allDeleted;
-  }
-  
-  // Settings
-  async getSettings(userId?: string): Promise<Setting[]> {
-    if (userId) {
-      return Array.from(this.settings.values())
-        .filter(setting => setting.user_id === userId);
-    }
-    return Array.from(this.settings.values());
-  }
-  
-  async getSetting(key: string): Promise<Setting | undefined> {
-    // Find setting by key (case-sensitive match)
-    return Array.from(this.settings.values()).find(setting => setting.key === key);
-  }
-  
-  async createSetting(setting: InsertSetting): Promise<Setting> {
-    const id = crypto.randomUUID();
-    const now = new Date();
-    
-    // Create the new setting
-    const newSetting: Setting = {
-      id,
-      key: setting.key,
-      value: setting.value,
-      description: setting.description || null,
-      user_id: setting.user_id || null, // Make sure user_id is included
-      updated_at: now
-    };
-    
-    // Save by ID for consistency, but also get by key
-    this.settings.set(id, newSetting);
-    return newSetting;
-  }
-  
-  async updateSetting(key: string, value: string): Promise<Setting | undefined> {
-    // Find the setting by key
-    const setting = Array.from(this.settings.values()).find(setting => setting.key === key);
-    if (!setting) return undefined;
-    
-    // Update the setting
-    const updatedSetting: Setting = {
-      ...setting,
-      value,
-      updated_at: new Date()
-    };
-    
-    // Update in map
-    this.settings.set(setting.id, updatedSetting);
-    return updatedSetting;
-  }
-  
-  async deleteSetting(key: string): Promise<boolean> {
-    // Find the setting by key
-    const setting = Array.from(this.settings.values()).find(setting => setting.key === key);
-    if (!setting) return false;
-    
-    // Delete the setting
-    return this.settings.delete(setting.id);
-  }
-  
-  // X.com integration methods
-  async createXCredentials(credentials: InsertXCredentials): Promise<XCredentials> {
-    const id = crypto.randomUUID();
-    const now = new Date();
-    
-    const newCredentials: XCredentials = {
-      ...credentials,
-      id,
-      created_at: now,
-      updated_at: now,
-      last_sync_at: null
-    };
-    
-    this.xCredentials.set(id, newCredentials);
-    return newCredentials;
-  }
-  
-  async getXCredentialsByUserId(userId: string): Promise<XCredentials | undefined> {
-    return Array.from(this.xCredentials.values()).find(
-      credentials => credentials.user_id === userId
-    );
-  }
-  
-  async updateXCredentials(id: string, credentialsUpdate: Partial<XCredentials>): Promise<XCredentials | undefined> {
-    const credentials = this.xCredentials.get(id);
-    if (!credentials) return undefined;
-    
-    const updatedCredentials: XCredentials = {
-      ...credentials,
-      ...credentialsUpdate,
-      updated_at: new Date()
-    };
-    
-    this.xCredentials.set(id, updatedCredentials);
-    return updatedCredentials;
-  }
-  
-  async createXFolder(folder: InsertXFolder): Promise<XFolder> {
-    const id = crypto.randomUUID();
-    const now = new Date();
-    
-    const newFolder: XFolder = {
-      ...folder,
-      id,
-      created_at: now,
-      updated_at: now,
-      last_sync_at: now
-    };
-    
-    this.xFolders.set(id, newFolder);
-    return newFolder;
-  }
-  
-  async getXFoldersByUserId(userId: string): Promise<XFolder[]> {
-    return Array.from(this.xFolders.values()).filter(
-      folder => folder.user_id === userId
-    );
-  }
-  
-  async getStoredXFolders(userId: string): Promise<XFolder[]> {
-    // For memory storage, this is the same as getXFoldersByUserId
-    return this.getXFoldersByUserId(userId);
-  }
-  
-  async updateXFolder(id: string, folderUpdate: Partial<XFolder>): Promise<XFolder | undefined> {
-    const folder = this.xFolders.get(id);
-    if (!folder) return undefined;
-    
-    const updatedFolder: XFolder = {
-      ...folder,
-      ...folderUpdate,
-      updated_at: new Date()
-    };
-    
-    this.xFolders.set(id, updatedFolder);
-    return updatedFolder;
-  }
-  
-  async updateXFolderLastSync(id: string): Promise<XFolder | undefined> {
-    const folder = this.xFolders.get(id);
-    if (!folder) return undefined;
-    
-    const updatedFolder: XFolder = {
-      ...folder,
-      last_sync_at: new Date(),
-      updated_at: new Date()
-    };
-    
-    this.xFolders.set(id, updatedFolder);
-    return updatedFolder;
-  }
-  
-  async findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined> {
-    return Array.from(this.bookmarks.values()).find(
-      bookmark => 
-        bookmark.user_id === userId && 
-        bookmark.external_id === externalId &&
-        bookmark.source === source
-    );
-  }
-}
-
 // PostgreSQL database storage implementation
-export class DatabaseStorage implements IStorage {
+export class DatabaseStorage implements Storage {
+  constructor(private readonly db: Db) {}
+
   // Database access - provide raw access to the database for direct queries
-  getDb(): typeof db {
-    return db;
+  getDb(): Db {
+    return this.db;
   }
   // Users
   async getUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    return await this.db.select().from(users);
   }
   
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await this.db.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
   
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await this.db.select().from(users).where(eq(users.username, username));
     return user || undefined;
   }
   
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await this.db.select().from(users).where(eq(users.email, email));
     return user || undefined;
   }
   
   async createUser(user: InsertUser): Promise<User> {
-    const [newUser] = await db
+    const [newUser] = await this.db
       .insert(users)
       .values(user)
       .returning();
@@ -1208,7 +205,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async updateUser(id: string, userUpdate: Partial<InsertUser>): Promise<User | undefined> {
-    const [updatedUser] = await db
+    const [updatedUser] = await this.db
       .update(users)
       .set({ ...userUpdate, updated_at: new Date() })
       .where(eq(users.id, id))
@@ -1217,13 +214,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteUser(id: string): Promise<boolean> {
-    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    const result = await this.db.delete(users).where(eq(users.id, id)).returning();
     return result.length > 0;
   }
   
   // Email verification methods
   async getUserByVerificationToken(token: string): Promise<User | undefined> {
-    const [user] = await db
+    const [user] = await this.db
       .select()
       .from(users)
       .where(eq(users.verification_token, token));
@@ -1234,7 +231,7 @@ export class DatabaseStorage implements IStorage {
     // Calculate expiration date (current time + expiresIn in milliseconds)
     const expires = new Date(Date.now() + expiresIn);
     
-    const [updatedUser] = await db
+    const [updatedUser] = await this.db
       .update(users)
       .set({ 
         verification_token: token, 
@@ -1271,7 +268,7 @@ export class DatabaseStorage implements IStorage {
     
     // Verify the email by updating the user
     try {
-      const [updatedUser] = await db
+      const [updatedUser] = await this.db
         .update(users)
         .set({ 
           email_verified: true,
@@ -1292,7 +289,7 @@ export class DatabaseStorage implements IStorage {
   
   // Password reset methods
   async getUserByResetToken(token: string): Promise<User | undefined> {
-    const [user] = await db
+    const [user] = await this.db
       .select()
       .from(users)
       .where(eq(users.reset_token, token));
@@ -1303,7 +300,7 @@ export class DatabaseStorage implements IStorage {
     // Calculate expiration date (current time + expiresIn in milliseconds)
     const expires = new Date(Date.now() + expiresIn);
     
-    const [updatedUser] = await db
+    const [updatedUser] = await this.db
       .update(users)
       .set({ 
         reset_token: token, 
@@ -1327,7 +324,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Reset the password by updating the user
-    const [updatedUser] = await db
+    const [updatedUser] = await this.db
       .update(users)
       .set({ 
         password: newPassword,
@@ -1344,22 +341,22 @@ export class DatabaseStorage implements IStorage {
   // Collections
   async getCollections(userId?: string): Promise<Collection[]> {
     if (userId) {
-      return await db.select().from(collections).where(eq(collections.user_id, userId));
+      return await this.db.select().from(collections).where(eq(collections.user_id, userId));
     }
-    return await db.select().from(collections);
+    return await this.db.select().from(collections);
   }
   
   async getPublicCollections(): Promise<Collection[]> {
-    return await db.select().from(collections).where(eq(collections.is_public, true));
+    return await this.db.select().from(collections).where(eq(collections.is_public, true));
   }
   
   async getCollection(id: string): Promise<Collection | undefined> {
-    const [collection] = await db.select().from(collections).where(eq(collections.id, id));
+    const [collection] = await this.db.select().from(collections).where(eq(collections.id, id));
     return collection || undefined;
   }
   
   async createCollection(collection: InsertCollection): Promise<Collection> {
-    const [newCollection] = await db
+    const [newCollection] = await this.db
       .insert(collections)
       .values(collection)
       .returning();
@@ -1367,7 +364,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async updateCollection(id: string, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
-    const [updatedCollection] = await db
+    const [updatedCollection] = await this.db
       .update(collections)
       .set({ ...collectionUpdate, updated_at: new Date() })
       .where(eq(collections.id, id))
@@ -1378,7 +375,7 @@ export class DatabaseStorage implements IStorage {
   async deleteCollection(id: string): Promise<boolean> {
     try {
       // First, remove any X.com folder mappings to this collection
-      await db.update(xFolders)
+      await this.db.update(xFolders)
         .set({ 
           collection_id: null,
           updated_at: new Date()
@@ -1387,11 +384,11 @@ export class DatabaseStorage implements IStorage {
       
       // Then remove bookmark-collection associations (but NOT the bookmarks themselves)
       // This just deletes the relationship records in collectionBookmarks table
-      await db.delete(collectionBookmarks)
+      await this.db.delete(collectionBookmarks)
         .where(eq(collectionBookmarks.collection_id, id));
       
       // Finally delete the collection itself
-      const result = await db.delete(collections)
+      const result = await this.db.delete(collections)
         .where(eq(collections.id, id))
         .returning();
       
@@ -1406,13 +403,14 @@ export class DatabaseStorage implements IStorage {
   async getBookmarksByCollectionId(collectionId: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
     if (!options?.searchQuery) {
       // If no search query, use the standard query without complex joins
-      let query = db
+      let query = this.db
         .select({
           bookmark: bookmarks
         })
         .from(collectionBookmarks)
         .innerJoin(bookmarks, eq(collectionBookmarks.bookmark_id, bookmarks.id))
-        .where(eq(collectionBookmarks.collection_id, collectionId));
+        .where(eq(collectionBookmarks.collection_id, collectionId))
+        .$dynamic();
       
       // Apply sorting
       if (options?.sort) {
@@ -1457,7 +455,7 @@ export class DatabaseStorage implements IStorage {
       // Find bookmarks matching search criteria using UNION
       console.log(`Collection search using search term: ${searchTerm}`);
 
-      const matchingBookmarkIds = await db.execute(sql`
+      const matchingBookmarkIds = await this.db.execute(sql`
         SELECT DISTINCT b.id, b.title
         FROM ${bookmarks} b
         JOIN ${collectionBookmarks} cb ON b.id = cb.bookmark_id
@@ -1514,8 +512,9 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Now get the actual bookmarks with full details
-      let query = db.select().from(bookmarks)
-        .where(inArray(bookmarks.id, ids));
+      let query = this.db.select().from(bookmarks)
+        .where(inArray(bookmarks.id, ids as string[]))
+        .$dynamic();
       
       // Apply sorting
       if (options?.sort) {
@@ -1557,7 +556,7 @@ export class DatabaseStorage implements IStorage {
   async getBookmarksByCollectionIdCount(collectionId: string, options?: { searchQuery?: string }): Promise<number> {
     if (!options?.searchQuery) {
       // Standard count without enhanced search
-      let query = db
+      let query = this.db
         .select({
           count: sql<number>`count(*)`
         })
@@ -1574,7 +573,7 @@ export class DatabaseStorage implements IStorage {
       // Build a count query that counts unique bookmark IDs matching any of our search criteria
       console.log(`Collection count search using term: ${searchTerm}`);
       
-      const result = await db.execute(sql`
+      const result = await this.db.execute(sql`
         SELECT COUNT(*) FROM (
           SELECT DISTINCT b.id
           FROM ${bookmarks} b
@@ -1622,12 +621,12 @@ export class DatabaseStorage implements IStorage {
         ) AS bookmark_search
       `);
       
-      return parseInt(result.rows[0].count) || 0;
+      return parseInt(result.rows[0].count as string) || 0;
     }
   }
   
   async getCollectionsByBookmarkId(bookmarkId: string): Promise<Collection[]> {
-    const result = await db
+    const result = await this.db
       .select({
         collection: collections
       })
@@ -1641,7 +640,7 @@ export class DatabaseStorage implements IStorage {
   async addBookmarkToCollection(collectionId: string, bookmarkId: string): Promise<CollectionBookmark> {
     try {
       // First check if this bookmark is already in the collection
-      const existingRelation = await db
+      const existingRelation = await this.db
         .select()
         .from(collectionBookmarks)
         .where(
@@ -1659,7 +658,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Otherwise, create a new relationship
-      const [newCollectionBookmark] = await db
+      const [newCollectionBookmark] = await this.db
         .insert(collectionBookmarks)
         .values({
           collection_id: collectionId,
@@ -1677,7 +676,7 @@ export class DatabaseStorage implements IStorage {
         console.log(`Unique constraint prevented duplicate: bookmark ${bookmarkId} in collection ${collectionId}`);
         
         // Retrieve and return the existing record
-        const [existingRecord] = await db
+        const [existingRecord] = await this.db
           .select()
           .from(collectionBookmarks)
           .where(
@@ -1698,10 +697,12 @@ export class DatabaseStorage implements IStorage {
   async removeBookmarkFromCollection(collectionId: string, bookmarkId: string): Promise<boolean> {
     try {
       // Use separate eq conditions for simpler and more reliable querying
-      const result = await db
+      const result = await this.db
         .delete(collectionBookmarks)
-        .where(eq(collectionBookmarks.collection_id, collectionId))
-        .where(eq(collectionBookmarks.bookmark_id, bookmarkId))
+        .where(and(
+          eq(collectionBookmarks.collection_id, collectionId),
+          eq(collectionBookmarks.bookmark_id, bookmarkId)
+        ))
         .returning();
       
       console.log(`Removed bookmark ${bookmarkId} from collection ${collectionId}: ${result.length > 0}`);
@@ -1718,7 +719,7 @@ export class DatabaseStorage implements IStorage {
       // Verify we're getting the correct collection ID
       console.log(`Getting tags for collection ID: ${collectionId}`);
       
-      const joinResult = await db
+      const joinResult = await this.db
         .select({
           tag: tags
         })
@@ -1738,7 +739,7 @@ export class DatabaseStorage implements IStorage {
 
   async getCollectionsByTagId(tagId: string): Promise<Collection[]> {
     try {
-      const joinResult = await db
+      const joinResult = await this.db
         .select({
           collection: collections
         })
@@ -1759,11 +760,15 @@ export class DatabaseStorage implements IStorage {
       console.log(`Adding tag ID ${tagId} to collection ${collectionId} (storage method)`);
       
       // First check if the relation already exists
-      const existingRelation = await db
+      const existingRelation = await this.db
         .select()
         .from(collectionTags)
-        .where(eq(collectionTags.collection_id, collectionId))
-        .where(eq(collectionTags.tag_id, tagId));
+        .where(
+          and(
+            eq(collectionTags.collection_id, collectionId),
+            eq(collectionTags.tag_id, tagId)
+          )
+        );
       
       if (existingRelation.length > 0) {
         console.log(`Tag ID ${tagId} is already in collection ${collectionId}, skipping`);
@@ -1772,7 +777,7 @@ export class DatabaseStorage implements IStorage {
       
       // Create new relation
       console.log(`Inserting new tag relation: collection=${collectionId}, tag=${tagId}`);
-      const [newCollectionTag] = await db
+      const [newCollectionTag] = await this.db
         .insert(collectionTags)
         .values({ collection_id: collectionId, tag_id: tagId })
         .returning();
@@ -1795,17 +800,21 @@ export class DatabaseStorage implements IStorage {
       
       if (!collection || !collection.auto_add_tagged) {
         // Just remove the tag association if auto-adding is disabled
-        const result = await db
+        const result = await this.db
           .delete(collectionTags)
-          .where(eq(collectionTags.collection_id, collectionId))
-          .where(eq(collectionTags.tag_id, tagId))
+          .where(
+            and(
+              eq(collectionTags.collection_id, collectionId),
+              eq(collectionTags.tag_id, tagId)
+            )
+          )
           .returning({ id: collectionTags.id });
         
         return result.length > 0;
       }
 
       // Find bookmarks that have the specific removed tag
-      const bookmarksWithRemovedTag = await db
+      const bookmarksWithRemovedTag = await this.db
         .select({
           bookmark_id: bookmarkTags.bookmark_id
         })
@@ -1813,10 +822,14 @@ export class DatabaseStorage implements IStorage {
         .where(eq(bookmarkTags.tag_id, tagId));
       
       // Now remove the tag from the collection
-      const result = await db
+      const result = await this.db
         .delete(collectionTags)
-        .where(eq(collectionTags.collection_id, collectionId))
-        .where(eq(collectionTags.tag_id, tagId))
+        .where(
+          and(
+            eq(collectionTags.collection_id, collectionId),
+            eq(collectionTags.tag_id, tagId)
+          )
+        )
         .returning({ id: collectionTags.id });
       
       // Remove only bookmarks that were automatically added because of this specific tag
@@ -1865,7 +878,7 @@ export class DatabaseStorage implements IStorage {
       // Find all bookmarks that have any of these tags AND belong to the collection owner
       // This query gets all bookmarks that have at least one of the collection's tags
       // If there are no tags, this will return an empty array
-      const joinResult = await db
+      const joinResult = await this.db
         .selectDistinct({
           bookmark_id: bookmarkTags.bookmark_id
         })
@@ -1908,7 +921,7 @@ export class DatabaseStorage implements IStorage {
   async getBookmarks(userId?: string, options?: { limit?: number; offset?: number; sort?: string; searchQuery?: string }): Promise<Bookmark[]> {
     if (!options?.searchQuery) {
       // If no search query, use the standard query without joins
-      let query = db.select().from(bookmarks);
+      let query = this.db.select().from(bookmarks).$dynamic();
       
       // Apply user filter if provided
       if (userId) {
@@ -1959,7 +972,7 @@ export class DatabaseStorage implements IStorage {
       // using a UNION approach to deduplicate bookmarks
       const userIdFilter = userId ? sql`(b.user_id = ${userId})` : sql`(b.user_id IS NOT NULL OR b.user_id IS NULL)`;
       
-      const matchingBookmarkIds = await db.execute(sql`
+      const matchingBookmarkIds = await this.db.execute(sql`
         SELECT DISTINCT b.id
         FROM ${bookmarks} b
         WHERE
@@ -2014,8 +1027,9 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Now get the actual bookmarks with full details
-      let query = db.select().from(bookmarks)
-        .where(inArray(bookmarks.id, ids));
+      let query = this.db.select().from(bookmarks)
+        .where(inArray(bookmarks.id, ids as string[]))
+        .$dynamic();
       
       // Apply sorting
       if (options?.sort) {
@@ -2058,7 +1072,7 @@ export class DatabaseStorage implements IStorage {
   async getBookmarksCount(userId?: string, options?: { searchQuery?: string }): Promise<number> {
     if (!options?.searchQuery) {
       // Standard count without search
-      let query = db.select({ count: sql<number>`COUNT(*)` }).from(bookmarks);
+      let query = this.db.select({ count: sql<number>`COUNT(*)` }).from(bookmarks).$dynamic();
       
       // Apply user filter if provided
       if (userId) {
@@ -2074,7 +1088,7 @@ export class DatabaseStorage implements IStorage {
       // Build a count query that counts unique bookmark IDs matching any of our search criteria
       const userIdFilter = userId ? sql`(b.user_id = ${userId})` : sql`(b.user_id IS NOT NULL OR b.user_id IS NULL)`;
 
-      const result = await db.execute(sql`
+      const result = await this.db.execute(sql`
         SELECT COUNT(*) FROM (
           SELECT DISTINCT b.id
           FROM ${bookmarks} b
@@ -2122,12 +1136,12 @@ export class DatabaseStorage implements IStorage {
         ) AS bookmark_search
       `);
       
-      return parseInt(result.rows[0].count) || 0;
+      return parseInt(result.rows[0].count as string) || 0;
     }
   }
   
   async getBookmark(id: string): Promise<Bookmark | undefined> {
-    const [bookmark] = await db.select().from(bookmarks).where(eq(bookmarks.id, id));
+    const [bookmark] = await this.db.select().from(bookmarks).where(eq(bookmarks.id, id));
     
     if (!bookmark) return undefined;
     
@@ -2157,12 +1171,12 @@ export class DatabaseStorage implements IStorage {
       date_saved: new Date()
     };
     
-    const [newBookmark] = await db.insert(bookmarks).values(bookmarkData).returning();
+    const [newBookmark] = await this.db.insert(bookmarks).values(bookmarkData).returning();
     return newBookmark;
   }
   
   async updateBookmark(id: string, bookmarkUpdate: Partial<InsertBookmark>): Promise<Bookmark | undefined> {
-    const [updatedBookmark] = await db
+    const [updatedBookmark] = await this.db
       .update(bookmarks)
       .set({
         ...bookmarkUpdate,
@@ -2175,13 +1189,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteBookmark(id: string): Promise<boolean> {
-    const result = await db.delete(bookmarks).where(eq(bookmarks.id, id)).returning({ id: bookmarks.id });
+    const result = await this.db.delete(bookmarks).where(eq(bookmarks.id, id)).returning({ id: bookmarks.id });
     return result.length > 0;
   }
   
   // Notes
   async getNotesByBookmarkId(bookmarkId: string): Promise<Note[]> {
-    return await db.select().from(notes).where(eq(notes.bookmark_id, bookmarkId));
+    return await this.db.select().from(notes).where(eq(notes.bookmark_id, bookmarkId));
   }
   
   async createNote(note: InsertNote): Promise<Note> {
@@ -2191,18 +1205,18 @@ export class DatabaseStorage implements IStorage {
       timestamp: new Date()
     };
     
-    const [newNote] = await db.insert(notes).values(noteData).returning();
+    const [newNote] = await this.db.insert(notes).values(noteData).returning();
     return newNote;
   }
   
   async deleteNote(id: string): Promise<boolean> {
-    const result = await db.delete(notes).where(eq(notes.id, id)).returning({ id: notes.id });
+    const result = await this.db.delete(notes).where(eq(notes.id, id)).returning({ id: notes.id });
     return result.length > 0;
   }
   
   // Screenshots
   async getScreenshotsByBookmarkId(bookmarkId: string): Promise<Screenshot[]> {
-    return await db.select().from(screenshots).where(eq(screenshots.bookmark_id, bookmarkId));
+    return await this.db.select().from(screenshots).where(eq(screenshots.bookmark_id, bookmarkId));
   }
   
   async createScreenshot(screenshot: InsertScreenshot): Promise<Screenshot> {
@@ -2212,43 +1226,43 @@ export class DatabaseStorage implements IStorage {
       uploaded_at: new Date()
     };
     
-    const [newScreenshot] = await db.insert(screenshots).values(screenshotData).returning();
+    const [newScreenshot] = await this.db.insert(screenshots).values(screenshotData).returning();
     return newScreenshot;
   }
   
   async deleteScreenshot(id: string): Promise<boolean> {
-    const result = await db.delete(screenshots).where(eq(screenshots.id, id)).returning({ id: screenshots.id });
+    const result = await this.db.delete(screenshots).where(eq(screenshots.id, id)).returning({ id: screenshots.id });
     return result.length > 0;
   }
   
   // Highlights
   async getHighlightsByBookmarkId(bookmarkId: string): Promise<Highlight[]> {
-    return await db.select().from(highlights).where(eq(highlights.bookmark_id, bookmarkId));
+    return await this.db.select().from(highlights).where(eq(highlights.bookmark_id, bookmarkId));
   }
   
   async createHighlight(highlight: InsertHighlight): Promise<Highlight> {
-    const [newHighlight] = await db.insert(highlights).values(highlight).returning();
+    const [newHighlight] = await this.db.insert(highlights).values(highlight).returning();
     return newHighlight;
   }
   
   async deleteHighlight(id: string): Promise<boolean> {
-    const result = await db.delete(highlights).where(eq(highlights.id, id)).returning({ id: highlights.id });
+    const result = await this.db.delete(highlights).where(eq(highlights.id, id)).returning({ id: highlights.id });
     return result.length > 0;
   }
   
   // Insights
   async getInsightByBookmarkId(bookmarkId: string): Promise<Insight | undefined> {
-    const [insight] = await db.select().from(insights).where(eq(insights.bookmark_id, bookmarkId));
+    const [insight] = await this.db.select().from(insights).where(eq(insights.bookmark_id, bookmarkId));
     return insight;
   }
   
   async createInsight(insight: InsertInsight): Promise<Insight> {
-    const [newInsight] = await db.insert(insights).values(insight).returning();
+    const [newInsight] = await this.db.insert(insights).values(insight).returning();
     return newInsight;
   }
   
   async updateInsight(id: string, insightUpdate: Partial<InsertInsight>): Promise<Insight | undefined> {
-    const [updatedInsight] = await db
+    const [updatedInsight] = await this.db
       .update(insights)
       .set(insightUpdate)
       .where(eq(insights.id, id))
@@ -2260,7 +1274,7 @@ export class DatabaseStorage implements IStorage {
   // Activities
   async getActivities(userId?: string, options?: { limit?: number; offset?: number }): Promise<Activity[]> {
     // Start building the query
-    let query = db.select().from(activities).orderBy(desc(activities.timestamp));
+    let query = this.db.select().from(activities).orderBy(desc(activities.timestamp)).$dynamic();
     
     // Add user filter if userId is provided
     if (userId) {
@@ -2281,7 +1295,7 @@ export class DatabaseStorage implements IStorage {
   
   // Get total count of activities (for pagination)
   async getActivitiesCount(userId?: string): Promise<number> {
-    let query = db.select({ count: sql<number>`count(*)` }).from(activities);
+    let query = this.db.select({ count: sql<number>`count(*)` }).from(activities).$dynamic();
     
     if (userId) {
       query = query.where(eq(activities.user_id, userId));
@@ -2299,7 +1313,7 @@ export class DatabaseStorage implements IStorage {
       timestamp: new Date()
     };
     
-    const [newActivity] = await db.insert(activities).values(activityData).returning();
+    const [newActivity] = await this.db.insert(activities).values(activityData).returning();
     return newActivity;
   }
   
@@ -2313,7 +1327,7 @@ export class DatabaseStorage implements IStorage {
       // but for now returning all tags is the best approach
       
       // Get all tags directly - no joins
-      const allTags = await db
+      const allTags = await this.db
         .select()
         .from(tags)
         .orderBy(desc(tags.count)); // Order by popularity (most used first)
@@ -2326,7 +1340,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getTag(id: string): Promise<Tag | undefined> {
-    const [tag] = await db.select().from(tags).where(eq(tags.id, id));
+    const [tag] = await this.db.select().from(tags).where(eq(tags.id, id));
     return tag;
   }
   
@@ -2334,7 +1348,7 @@ export class DatabaseStorage implements IStorage {
     if (!name) return undefined;
     
     // Use SQL LOWER function for case-insensitive comparison
-    const [tag] = await db
+    const [tag] = await this.db
       .select()
       .from(tags)
       .where(sql`LOWER(${tags.name}) = LOWER(${name})`);
@@ -2343,12 +1357,12 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createTag(tag: InsertTag): Promise<Tag> {
-    const [newTag] = await db.insert(tags).values(tag).returning();
+    const [newTag] = await this.db.insert(tags).values(tag).returning();
     return newTag;
   }
   
   async updateTag(id: string, tagUpdate: Partial<InsertTag>): Promise<Tag | undefined> {
-    const [updatedTag] = await db
+    const [updatedTag] = await this.db
       .update(tags)
       .set(tagUpdate)
       .where(eq(tags.id, id))
@@ -2358,10 +1372,10 @@ export class DatabaseStorage implements IStorage {
   }
   
   async incrementTagCount(id: string): Promise<Tag | undefined> {
-    const [tag] = await db.select().from(tags).where(eq(tags.id, id));
+    const [tag] = await this.db.select().from(tags).where(eq(tags.id, id));
     if (!tag) return undefined;
     
-    const [updatedTag] = await db
+    const [updatedTag] = await this.db
       .update(tags)
       .set({ count: tag.count + 1 })
       .where(eq(tags.id, id))
@@ -2371,10 +1385,10 @@ export class DatabaseStorage implements IStorage {
   }
   
   async decrementTagCount(id: string): Promise<Tag | undefined> {
-    const [tag] = await db.select().from(tags).where(eq(tags.id, id));
+    const [tag] = await this.db.select().from(tags).where(eq(tags.id, id));
     if (!tag) return undefined;
     
-    const [updatedTag] = await db
+    const [updatedTag] = await this.db
       .update(tags)
       .set({ count: Math.max(0, tag.count - 1) })
       .where(eq(tags.id, id))
@@ -2384,14 +1398,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteTag(id: string): Promise<boolean> {
-    const result = await db.delete(tags).where(eq(tags.id, id)).returning({ id: tags.id });
+    const result = await this.db.delete(tags).where(eq(tags.id, id)).returning({ id: tags.id });
     return result.length > 0;
   }
   
   // BookmarkTags
   async getTagsByBookmarkId(bookmarkId: string): Promise<Tag[]> {
     // Get tags from the normalized system
-    const joinResult = await db
+    const joinResult = await this.db
       .select({
         tag: tags
       })
@@ -2407,13 +1421,14 @@ export class DatabaseStorage implements IStorage {
     const bookmarkTagsMap: {[bookmarkId: string]: Tag[]} = {};
     
     // Construct the query to get all bookmark-tag relationships
-    let query = db
+    let query = this.db
       .select({
         bookmarkId: bookmarkTags.bookmark_id,
         tag: tags
       })
       .from(bookmarkTags)
-      .innerJoin(tags, eq(bookmarkTags.tag_id, tags.id));
+      .innerJoin(tags, eq(bookmarkTags.tag_id, tags.id))
+      .$dynamic();
     
     // If specific bookmark IDs are provided, filter by those
     if (bookmarkIds && bookmarkIds.length > 0) {
@@ -2436,7 +1451,7 @@ export class DatabaseStorage implements IStorage {
   
   async getBookmarksByTagId(tagId: string): Promise<Bookmark[]> {
     // Get bookmarks from the normalized system only
-    const joinResult = await db
+    const joinResult = await this.db
       .select({
         bookmark: bookmarks
       })
@@ -2448,7 +1463,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async addTagToBookmark(bookmarkId: string, tagId: string): Promise<BookmarkTag> {
-    const [newBookmarkTag] = await db
+    const [newBookmarkTag] = await this.db
       .insert(bookmarkTags)
       .values({ bookmark_id: bookmarkId, tag_id: tagId })
       .returning();
@@ -2462,10 +1477,14 @@ export class DatabaseStorage implements IStorage {
   async removeTagFromBookmark(bookmarkId: string, tagId: string): Promise<boolean> {
     try {
       // Use the same improved approach as in removeBookmarkFromCollection
-      const result = await db
+      const result = await this.db
         .delete(bookmarkTags)
-        .where(eq(bookmarkTags.bookmark_id, bookmarkId))
-        .where(eq(bookmarkTags.tag_id, tagId))
+        .where(
+          and(
+            eq(bookmarkTags.bookmark_id, bookmarkId),
+            eq(bookmarkTags.tag_id, tagId)
+          )
+        )
         .returning({ id: bookmarkTags.id });
       
       if (result.length > 0) {
@@ -2484,20 +1503,20 @@ export class DatabaseStorage implements IStorage {
   // Chat Sessions
   async getChatSessions(userId?: string): Promise<ChatSession[]> {
     if (userId) {
-      return await db
+      return await this.db
         .select()
         .from(chatSessions)
         .where(eq(chatSessions.user_id, userId))
         .orderBy(desc(chatSessions.updated_at));
     }
-    return await db
+    return await this.db
       .select()
       .from(chatSessions)
       .orderBy(desc(chatSessions.updated_at));
   }
 
   async getChatSession(id: string): Promise<ChatSession | undefined> {
-    const [session] = await db
+    const [session] = await this.db
       .select()
       .from(chatSessions)
       .where(eq(chatSessions.id, id));
@@ -2513,7 +1532,7 @@ export class DatabaseStorage implements IStorage {
       user_id: session.user_id || null // Make sure user_id is included
     };
     
-    const [newSession] = await db
+    const [newSession] = await this.db
       .insert(chatSessions)
       .values(sessionData)
       .returning();
@@ -2528,7 +1547,7 @@ export class DatabaseStorage implements IStorage {
       updated_at: new Date()
     };
 
-    const [updatedSession] = await db
+    const [updatedSession] = await this.db
       .update(chatSessions)
       .set(updates)
       .where(eq(chatSessions.id, id))
@@ -2542,7 +1561,7 @@ export class DatabaseStorage implements IStorage {
     await this.deleteChatMessagesBySessionId(id);
     
     // Then delete the session itself
-    const result = await db
+    const result = await this.db
       .delete(chatSessions)
       .where(eq(chatSessions.id, id))
       .returning({ id: chatSessions.id });
@@ -2552,7 +1571,7 @@ export class DatabaseStorage implements IStorage {
   
   // Chat Messages
   async getChatMessagesBySessionId(sessionId: string): Promise<ChatMessage[]> {
-    return await db
+    return await this.db
       .select()
       .from(chatMessages)
       .where(eq(chatMessages.session_id, sessionId))
@@ -2565,7 +1584,7 @@ export class DatabaseStorage implements IStorage {
       timestamp: new Date()
     };
     
-    const [newMessage] = await db
+    const [newMessage] = await this.db
       .insert(chatMessages)
       .values(messageData)
       .returning();
@@ -2577,7 +1596,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteChatMessagesBySessionId(sessionId: string): Promise<boolean> {
-    const result = await db
+    const result = await this.db
       .delete(chatMessages)
       .where(eq(chatMessages.session_id, sessionId))
       .returning({ id: chatMessages.id });
@@ -2588,20 +1607,20 @@ export class DatabaseStorage implements IStorage {
   // Settings
   async getSettings(userId?: string): Promise<Setting[]> {
     if (userId) {
-      return await db
+      return await this.db
         .select()
         .from(settings)
         .where(eq(settings.user_id, userId))
         .orderBy(settings.key);
     }
-    return await db
+    return await this.db
       .select()
       .from(settings)
       .orderBy(settings.key);
   }
   
   async getSetting(key: string): Promise<Setting | undefined> {
-    const result = await db
+    const result = await this.db
       .select()
       .from(settings)
       .where(eq(settings.key, key))
@@ -2611,7 +1630,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createSetting(setting: InsertSetting): Promise<Setting> {
-    const [newSetting] = await db
+    const [newSetting] = await this.db
       .insert(settings)
       .values({
         ...setting,
@@ -2624,7 +1643,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async updateSetting(key: string, value: string): Promise<Setting | undefined> {
-    const result = await db
+    const result = await this.db
       .update(settings)
       .set({
         value,
@@ -2637,7 +1656,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteSetting(key: string): Promise<boolean> {
-    const result = await db
+    const result = await this.db
       .delete(settings)
       .where(eq(settings.key, key))
       .returning({ id: settings.id });
@@ -2647,7 +1666,7 @@ export class DatabaseStorage implements IStorage {
   
   // X.com integration
   async createXCredentials(credentials: InsertXCredentials): Promise<XCredentials> {
-    const [newCredentials] = await db.insert(xCredentials)
+    const [newCredentials] = await this.db.insert(xCredentials)
       .values({
         ...credentials,
         created_at: new Date(),
@@ -2659,14 +1678,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getXCredentialsByUserId(userId: string): Promise<XCredentials | undefined> {
-    const [credentials] = await db.select()
+    const [credentials] = await this.db.select()
       .from(xCredentials)
       .where(eq(xCredentials.user_id, userId));
     return credentials;
   }
   
   async updateXCredentials(id: string, credentialsUpdate: Partial<XCredentials>): Promise<XCredentials | undefined> {
-    const [updatedCredentials] = await db.update(xCredentials)
+    const [updatedCredentials] = await this.db.update(xCredentials)
       .set({
         ...credentialsUpdate,
         updated_at: new Date()
@@ -2677,7 +1696,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createXFolder(folder: InsertXFolder): Promise<XFolder> {
-    const [newFolder] = await db.insert(xFolders)
+    const [newFolder] = await this.db.insert(xFolders)
       .values({
         ...folder,
         created_at: new Date(),
@@ -2689,13 +1708,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getXFoldersByUserId(userId: string): Promise<XFolder[]> {
-    return await db.select()
+    return await this.db.select()
       .from(xFolders)
       .where(eq(xFolders.user_id, userId));
   }
   
   async updateXFolderLastSync(id: string): Promise<XFolder | undefined> {
-    const [updatedFolder] = await db.update(xFolders)
+    const [updatedFolder] = await this.db.update(xFolders)
       .set({
         last_sync_at: new Date(),
         updated_at: new Date()
@@ -2707,14 +1726,14 @@ export class DatabaseStorage implements IStorage {
   
   async getStoredXFolders(userId: string): Promise<XFolder[]> {
     console.log(`DB: Getting stored X folders for user ${userId}`);
-    return await db.select()
+    return await this.db.select()
       .from(xFolders)
       .where(eq(xFolders.user_id, userId));
   }
   
   async updateXFolder(id: string, folderUpdate: Partial<XFolder>): Promise<XFolder | undefined> {
     console.log(`DB: Updating X folder ${id}`);
-    const [updatedFolder] = await db.update(xFolders)
+    const [updatedFolder] = await this.db.update(xFolders)
       .set({
         ...folderUpdate,
         updated_at: new Date()
@@ -2725,7 +1744,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async findBookmarkByExternalId(userId: string, externalId: string, source: string): Promise<Bookmark | undefined> {
-    const [bookmark] = await db.select()
+    const [bookmark] = await this.db.select()
       .from(bookmarks)
       .where(
         and(
@@ -2739,7 +1758,7 @@ export class DatabaseStorage implements IStorage {
   
   // Reports methods
   async getReportsByUserId(userId: string): Promise<Report[]> {
-    const userReports = await db.select()
+    const userReports = await this.db.select()
       .from(reports)
       .where(eq(reports.user_id, userId))
       .orderBy(desc(reports.created_at));
@@ -2758,7 +1777,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getReport(id: string): Promise<Report | undefined> {
-    const [report] = await db.select()
+    const [report] = await this.db.select()
       .from(reports)
       .where(eq(reports.id, id));
     
@@ -2777,7 +1796,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createReport(report: InsertReport): Promise<Report> {
-    const [newReport] = await db.insert(reports)
+    const [newReport] = await this.db.insert(reports)
       .values({
         ...report,
         created_at: new Date(),
@@ -2796,7 +1815,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async updateReport(id: string, reportUpdate: Partial<InsertReport>): Promise<Report | undefined> {
-    const [updatedReport] = await db.update(reports)
+    const [updatedReport] = await this.db.update(reports)
       .set(reportUpdate)
       .where(eq(reports.id, id))
       .returning();
@@ -2813,7 +1832,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async updateReportStatus(id: string, status: "generating" | "completed" | "failed"): Promise<Report | undefined> {
-    const [updatedReport] = await db.update(reports)
+    const [updatedReport] = await this.db.update(reports)
       .set({ status })
       .where(eq(reports.id, id))
       .returning();
@@ -2831,11 +1850,11 @@ export class DatabaseStorage implements IStorage {
   
   async deleteReport(id: string): Promise<boolean> {
     // First delete all bookmark associations
-    await db.delete(reportBookmarks)
+    await this.db.delete(reportBookmarks)
       .where(eq(reportBookmarks.report_id, id));
     
     // Then delete the report
-    const result = await db.delete(reports)
+    const result = await this.db.delete(reports)
       .where(eq(reports.id, id))
       .returning();
     return result.length > 0;
@@ -2843,13 +1862,13 @@ export class DatabaseStorage implements IStorage {
   
   // Report Bookmarks methods
   async getReportBookmarks(reportId: string): Promise<ReportBookmark[]> {
-    return await db.select()
+    return await this.db.select()
       .from(reportBookmarks)
       .where(eq(reportBookmarks.report_id, reportId));
   }
   
   async getBookmarksByReportId(reportId: string): Promise<Bookmark[]> {
-    const reportBookmarkRows = await db.select({
+    const reportBookmarkRows = await this.db.select({
       bookmarkId: reportBookmarks.bookmark_id
     })
     .from(reportBookmarks)
@@ -2861,7 +1880,7 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
     
-    return await db.select()
+    return await this.db.select()
       .from(bookmarks)
       .where(inArray(bookmarks.id, bookmarkIds));
   }
@@ -2872,7 +1891,7 @@ export class DatabaseStorage implements IStorage {
     tags: Tag[];
   }[]> {
     // 1. Get recent bookmarks first
-    let bookmarksQuery = db.select()
+    let bookmarksQuery = this.db.select()
       .from(bookmarks)
       .where(
         and(
@@ -2880,7 +1899,8 @@ export class DatabaseStorage implements IStorage {
           sql`${bookmarks.date_saved} >= ${since}`
         )
       )
-      .orderBy(desc(bookmarks.date_saved));
+      .orderBy(desc(bookmarks.date_saved))
+      .$dynamic();
     
     if (limit) {
       bookmarksQuery = bookmarksQuery.limit(limit);
@@ -2896,7 +1916,7 @@ export class DatabaseStorage implements IStorage {
     const bookmarkIds = recentBookmarks.map(bookmark => bookmark.id);
     
     // 3. Get insights for these bookmarks
-    const bookmarkInsights = await db.select()
+    const bookmarkInsights = await this.db.select()
       .from(insights)
       .where(inArray(insights.bookmark_id, bookmarkIds));
     
@@ -2907,7 +1927,7 @@ export class DatabaseStorage implements IStorage {
     });
     
     // 4. Get tags for these bookmarks
-    const bookmarkTagRelations = await db.select({
+    const bookmarkTagRelations = await this.db.select({
       bookmarkId: bookmarkTags.bookmark_id,
       tagId: bookmarkTags.tag_id
     })
@@ -2918,7 +1938,7 @@ export class DatabaseStorage implements IStorage {
     const tagIds = Array.from(new Set(bookmarkTagRelations.map(rel => rel.tagId)));
     
     // Get all tags
-    const allTags = await db.select()
+    const allTags = await this.db.select()
       .from(tags)
       .where(inArray(tags.id, tagIds));
     
@@ -2951,7 +1971,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async addBookmarkToReport(reportId: string, bookmarkId: string): Promise<ReportBookmark> {
-    const [newReportBookmark] = await db.insert(reportBookmarks)
+    const [newReportBookmark] = await this.db.insert(reportBookmarks)
       .values({
         report_id: reportId,
         bookmark_id: bookmarkId
@@ -2961,7 +1981,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async removeBookmarkFromReport(reportId: string, bookmarkId: string): Promise<boolean> {
-    const result = await db.delete(reportBookmarks)
+    const result = await this.db.delete(reportBookmarks)
       .where(
         and(
           eq(reportBookmarks.report_id, reportId),
@@ -2972,6 +1992,3 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 }
-
-// Use the database storage implementation 
-export const storage = new DatabaseStorage();

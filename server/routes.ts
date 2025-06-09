@@ -1,35 +1,31 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { extractMetadata } from "./lib/metadata-extractor";
-import { processContent, generateEmbedding, generateInsights, generateTags, summarizeContent, generateChatResponse } from "./lib/content-processor";
-import { z } from "zod";
+import { Storage } from "./storage";
+import { generateEmbedding, generateInsights, generateTags, summarizeContent, generateChatResponse } from "./lib/content-processor";
 import { 
   insertBookmarkSchema, insertNoteSchema, insertHighlightSchema, 
-  insertScreenshotSchema, insertInsightSchema, insertActivitySchema,
-  insertTagSchema, insertBookmarkTagSchema, 
+  insertScreenshotSchema, 
   insertChatSessionSchema, insertChatMessageSchema, insertSettingSchema,
-  insertXFoldersSchema
 } from "@shared/schema";
-import { normalizeUrl, areUrlsEquivalent } from "@shared/url-service";
-import { bookmarkService } from "./lib/bookmark-service";
+import { BookmarkService } from "./lib/bookmark-service";
 import { setupAuth } from "./auth";
 import { setupEmailAuthRoutes } from "./controllers/email-auth";
 import { setupReportRoutes } from "./controllers/reports";
-import { xService } from "./lib/x-service";
+import { XService } from "./lib/x-service";
+import { ReportService } from "./lib/report-service";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express, bookmarkService: BookmarkService, reportService: ReportService, storage: Storage, xService: XService): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
   // Set up authentication
-  setupAuth(app);
+  setupAuth(app, storage);
   
   // Set up email verification and password reset routes
-  setupEmailAuthRoutes(app);
+  setupEmailAuthRoutes(app, storage);
   
   // Set up report generation routes
-  setupReportRoutes(app);
+  setupReportRoutes(app, reportService, storage);
 
   // Bookmarks API endpoints
   app.get("/api/bookmarks", async (req, res) => {
@@ -249,8 +245,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await bookmarkService.createBookmark({
         url: bookmarkData.url,
         title: bookmarkData.title,
-        description: bookmarkData.description,
-        content_html: bookmarkData.content_html,
+        description: bookmarkData.description ?? undefined,
+        content_html: bookmarkData.content_html ?? undefined,
         notes: req.body.notes ? (Array.isArray(req.body.notes) ? req.body.notes[0]?.text : req.body.notes) : undefined,
         tags: req.body.tags || [], // Get tags from req.body.tags
         autoExtract: req.body.autoExtract === true || req.body.autoExtract === "true", // Ensure boolean conversion
@@ -264,7 +260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({
           ...result.bookmark,
           message: "URL already exists in bookmarks",
-          existingBookmarkId: result.bookmark.id
+          existingBookmarkId: result.bookmark!.id
         });
       }
       
@@ -314,8 +310,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create activity entry
         await storage.createActivity({
-          bookmark_id: updatedBookmark.id,
-          bookmark_title: updatedBookmark.title,
+          bookmark_id: updatedBookmark!.id,
+          bookmark_title: updatedBookmark!.title,
           user_id: userId,
           type: "bookmark_updated",
           content: activityContent,
@@ -323,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         res.json(updatedBookmark);
-      } catch (error) {
+      } catch (error: any) {
         if (error.message === "Bookmark not found") {
           return res.status(404).json({ error: "Bookmark not found" });
         }
@@ -341,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         await bookmarkService.deleteBookmark(req.params.id);
         res.status(204).send();
-      } catch (error) {
+      } catch (error: any) {
         if (error.message === "Bookmark not found") {
           return res.status(404).json({ error: "Bookmark not found" });
         }
@@ -741,7 +737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Content is required" });
       }
       
-      const tags = await generateTags(content);
+      const tags = await generateTags(storage, content);
       res.json({ tags });
     } catch (error) {
       res.status(500).json({ error: "Failed to generate tags" });
@@ -756,7 +752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Content is required" });
       }
       
-      const summary = await summarizeContent(content);
+      const summary = await summarizeContent(storage, content);
       res.json({ summary });
     } catch (error) {
       res.status(500).json({ error: "Failed to summarize content" });
@@ -783,10 +779,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.isAuthenticated() ? req.user.id : undefined;
       
       console.log(`Processing chat request with filters: ${JSON.stringify(filters)} for user: ${userId || 'anonymous'}`);
-      const response = await generateChatResponse(query, filters, userId);
+      const response = await generateChatResponse(storage, query, filters, userId);
       console.log("Chat response generated successfully");
       res.json({ response });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing chat request:", error);
       res.status(500).json({ error: "Failed to generate chat response", details: error.message });
     }
@@ -1190,7 +1186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.isAuthenticated() ? req.user.id : undefined;
       
       // Generate a response from the AI, passing the user ID to filter bookmarks
-      const response = await generateChatResponse(message, filters, userId);
+      const response = await generateChatResponse(storage, message, filters, userId);
       
       // If a session ID is provided, save the conversation
       if (sessionId) {

@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/resources/chat/completions";
-import { storage } from "../storage";
-import { processAITags } from "./tag-normalizer";
+import { Storage } from "../storage";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const MODEL = "gpt-4o";
@@ -96,11 +95,12 @@ export async function generateEmbedding(text: string): Promise<{ embedding: numb
  * This function supports two modes: URL-based or content-based analysis
  */
 export async function generateInsights(
+  storage: Storage,
   url: string,
   content?: string,
   depthLevel: number = 1,
   customSystemPrompt?: string,
-  mediaUrls?: string[]
+  mediaUrls?: string[],
 ): Promise<{ summary: string; sentiment: number; tags: string[] }> {
   try {
     // Check if this is an X.com URL
@@ -307,7 +307,7 @@ Format your response as valid JSON with these exact keys:
       } else if (Array.isArray(result.Tags)) {
         rawTags = result.Tags;
       } else if (typeof result.tags === 'string') {
-        rawTags = result.tags.split(',').map(tag => tag.trim());
+        rawTags = result.tags.split(',').map((tag: string) => tag.trim());
       }
       
       // First do basic cleaning
@@ -320,10 +320,10 @@ Format your response as valid JSON with these exact keys:
       const { normalizeTag } = await import("./tag-normalizer");
       // Map each tag through the normalizer to ensure lowercase and single-word format
       const tags = cleanedTags
-        .map(tag => normalizeTag(tag))
-        .filter(tag => tag.length > 0)
+        .map((tag: string) => normalizeTag(tag))
+        .filter((tag: string) => tag.length > 0)
         // Remove duplicates
-        .filter((tag, index, self) => self.indexOf(tag) === index);
+        .filter((tag: string, index: number, self: string[]) => self.indexOf(tag) === index);
       
       // Extract related links with fallbacks
       let relatedLinks = [];
@@ -339,9 +339,9 @@ Format your response as valid JSON with these exact keys:
       
       // Filter and clean related links
       relatedLinks = relatedLinks
-        .filter(link => link && typeof link === 'string')
-        .map(link => link.trim())
-        .filter(link => link.length > 0);
+        .filter((link: any) => link && typeof link === 'string')
+        .map((link: string) => link.trim())
+        .filter((link: string) => link.length > 0);
       
       return {
         summary,
@@ -424,7 +424,7 @@ ADDITIONAL IMPORTANT GUIDANCE:
 /**
  * Generate tags from content or URL
  */
-export async function generateTags(content: string, url?: string, customSystemPrompt?: string): Promise<string[]> {
+export async function generateTags(storage: Storage, content: string, url?: string, customSystemPrompt?: string): Promise<string[]> {
   try {
     // Check if this is an X.com URL
     const isXTweet = url && (url.includes('twitter.com') || url.includes('x.com'));
@@ -549,7 +549,7 @@ Additional User Instructions: ${userSystemPrompt}`;
 /**
  * Summarize content
  */
-export async function summarizeContent(content: string, customSystemPrompt?: string): Promise<string> {
+export async function summarizeContent(storage: Storage, content: string, customSystemPrompt?: string): Promise<string> {
   try {
     const contentToSummarize = content.slice(0, 8000); // Limit content to avoid token limits
     
@@ -620,6 +620,7 @@ User Instructions: ${userSystemPrompt}`;
  * Generate AI chat response based on query and bookmark context
  */
 export async function generateChatResponse(
+  storage: Storage,
   query: string,
   filters?: {
     tags?: string[];

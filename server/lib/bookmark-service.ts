@@ -6,15 +6,9 @@
  * metadata extraction, and AI-powered features.
  */
 
-import { IStorage, storage } from "../storage";
+import { Storage } from "../storage";
 import {
   InsertBookmark,
-  InsertInsight,
-  InsertNote,
-  InsertScreenshot,
-  InsertHighlight,
-  InsertTag,
-  Tag,
 } from "../../shared/schema";
 import { normalizeUrl, areUrlsEquivalent } from "../../shared/url-service";
 import {
@@ -49,9 +43,9 @@ export interface ProcessedUrlResult {
 }
 
 export class BookmarkService {
-  private storage: IStorage;
+  private storage: Storage;
 
-  constructor(storage: IStorage) {
+  constructor(storage: Storage) {
     this.storage = storage;
   }
 
@@ -144,13 +138,13 @@ export class BookmarkService {
         ) {
           // Filter for only Twitter/X image URLs
           const twitterImageUrls = bookmark.media_urls.filter(
-            (url) => typeof url === "string" && url.includes("pbs.twimg.com"),
+            (url: any) => typeof url === "string" && url.includes("pbs.twimg.com"),
           );
 
           if (twitterImageUrls.length > 0) {
             mediaSection = `
 Tweet media URLs:
-${twitterImageUrls.map((url) => `- ${url}`).join("\n")}
+${twitterImageUrls.map((url: string) => `- ${url}`).join("\n")}
 
 Media Instructions: The tweet contains images which you need to analyze in relation to the tweet content. Please describe the image(s) significance and how they relate to the tweet message.
 `;
@@ -322,7 +316,7 @@ ${summaryPrompt?.value || ""}
                 if (processedContent && processedContent.text) {
                   processedText = processedContent.text;
                 }
-              } catch (contentError) {
+              } catch (contentError: any) {
                 console.warn(
                   `Error processing content for tag generation: ${contentError.message}`,
                 );
@@ -341,9 +335,10 @@ ${summaryPrompt?.value || ""}
 
             // Pass the custom tagging prompt to the generateTags function
             const tags = await generateTags(
+              this.storage,
               processedText || "",
               url,
-              systemPrompts.taggingPrompt,
+              systemPrompts.taggingPrompt ?? undefined,
             );
             console.log(
               `Generated ${tags.length} AI tags for bookmark ${bookmarkId}: ${tags.join(", ")}`,
@@ -372,7 +367,7 @@ ${summaryPrompt?.value || ""}
                 if (processedContent && processedContent.text) {
                   processedText = processedContent.text;
                 }
-              } catch (contentError) {
+              } catch (contentError: any) {
                 console.warn(
                   `Error processing content for insight generation: ${contentError.message}`,
                 );
@@ -390,7 +385,7 @@ ${summaryPrompt?.value || ""}
             }
 
             // For X.com tweets with media, pass the media_urls to the insights generator
-            let mediaUrls = [];
+            let mediaUrls: string[] = [];
             if (
               isXTweet &&
               bookmark.media_urls &&
@@ -412,6 +407,7 @@ ${summaryPrompt?.value || ""}
 
             // Pass the custom summary prompt and media URLs to the generateInsights function
             const result = await generateInsights(
+              this.storage,
               url,
               processedText || "",
               insightDepth,
@@ -1231,5 +1227,3 @@ ${summaryPrompt?.value || ""}
   }
 }
 
-// Export a singleton instance
-export const bookmarkService = new BookmarkService(storage);

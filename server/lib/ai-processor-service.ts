@@ -5,10 +5,10 @@
  * Automatically processes bookmarks in pending state without requiring user intervention
  */
 
-import { bookmarkService } from './bookmark-service';
+import { BookmarkService } from './bookmark-service';
 import { bookmarks } from '@shared/schema';
-import { db } from '../db';
-import { eq, and, isNull } from 'drizzle-orm';
+import { Db } from '../db';
+import { eq, and } from 'drizzle-orm';
 import cron from 'node-cron';
 
 // Configuration
@@ -20,6 +20,8 @@ export class AIProcessorService {
   private isProcessing: boolean = false;
   private processingCount: number = 0;
   private recentRateLimitErrors: number = 0;
+
+  constructor(private readonly db: Db, private readonly bookmarkService: BookmarkService) {}
 
   /**
    * Set up scheduled background processing of unprocessed bookmarks
@@ -81,14 +83,14 @@ export class AIProcessorService {
         console.log(`Starting batch #${batchNumber} of AI processing...`);
         
         // Get pending bookmarks (ai_processing_status = 'pending')
-        let pendingBookmarksQuery = db
+        let pendingBookmarksQuery = this.db
           .select()
           .from(bookmarks)
           .where(eq(bookmarks.ai_processing_status, 'pending'));
         
         // Add user filter if provided
         if (userId) {
-          pendingBookmarksQuery = db
+          pendingBookmarksQuery = this.db
             .select()
             .from(bookmarks)
             .where(and(
@@ -172,13 +174,13 @@ export class AIProcessorService {
     
     try {
       // Update status to processing
-      await db
+      await this.db
         .update(bookmarks)
         .set({ ai_processing_status: 'processing' })
         .where(eq(bookmarks.id, bookmarkId));
       
       // Process the bookmark - use the existing service
-      await bookmarkService.processAiBookmarkData(
+      await this.bookmarkService.processAiBookmarkData(
         bookmarkId,
         url,
         contentHtml,
@@ -203,13 +205,10 @@ export class AIProcessorService {
       }
       
       // Update status to failed
-      await db
+      await this.db
         .update(bookmarks)
         .set({ ai_processing_status: 'failed' })
         .where(eq(bookmarks.id, bookmarkId));
     }
   }
 }
-
-// Export a singleton instance
-export const aiProcessorService = new AIProcessorService();
