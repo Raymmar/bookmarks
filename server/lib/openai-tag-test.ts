@@ -8,8 +8,8 @@
 
 import { DatabaseStorage } from '../storage';
 import { createProdDbConnection } from '../db';
-import { generateTags } from './content-processor';
 import { processAITags } from './tag-normalizer';
+import { ContentProcessor } from './content-processor';
 
 // Test URLs with different content types
 const TEST_URLS = [
@@ -23,12 +23,14 @@ async function testOpenAITagGeneration() {
   const db = createProdDbConnection();
   const storage = new DatabaseStorage(db);
   
+  const contentProcessor = new ContentProcessor(process.env.OPENAI_API_KEY || '');
+  
   for (const url of TEST_URLS) {
     try {
       console.log(`Testing tag generation for URL: ${url}`);
       
       // Generate tags directly from URL
-      const tags = await generateTags(storage, "", url);
+      const tags = await contentProcessor.generateTags(storage, "", url);
       
       console.log(`Generated tags: ${JSON.stringify(tags)}`);
       console.log(`Normalized tags: ${JSON.stringify(processAITags(tags))}`);

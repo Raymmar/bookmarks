@@ -1,20 +1,20 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { Express } from "express";
+import { createServer, Server } from "http";
+import { BookmarkService } from "./lib/bookmark-service";
 import { Storage } from "./storage";
-import { generateEmbedding, generateInsights, generateTags, summarizeContent, generateChatResponse } from "./lib/content-processor";
+import { XService } from "./lib/x-service";
+import { ReportService } from "./lib/report-service";
+import { ContentProcessor } from "./lib/content-processor";
 import { 
   insertBookmarkSchema, insertNoteSchema, insertHighlightSchema, 
   insertScreenshotSchema, 
   insertChatSessionSchema, insertChatMessageSchema, insertSettingSchema,
 } from "@shared/schema";
-import { BookmarkService } from "./lib/bookmark-service";
 import { setupAuth } from "./auth";
 import { setupEmailAuthRoutes } from "./controllers/email-auth";
 import { setupReportRoutes } from "./controllers/reports";
-import { XService } from "./lib/x-service";
-import { ReportService } from "./lib/report-service";
 
-export async function registerRoutes(app: Express, bookmarkService: BookmarkService, reportService: ReportService, storage: Storage, xService: XService): Promise<Server> {
+export async function registerRoutes(app: Express, bookmarkService: BookmarkService, reportService: ReportService, storage: Storage, xService: XService, contentProcessor: ContentProcessor): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
@@ -706,10 +706,11 @@ export async function registerRoutes(app: Express, bookmarkService: BookmarkServ
       if (!text) {
         return res.status(400).json({ error: "Text is required" });
       }
-      
-      const embedding = await generateEmbedding(text);
+
+      const embedding = await contentProcessor.generateEmbedding(text);
       res.json(embedding);
     } catch (error) {
+      console.error("Error generating embedding:", error);
       res.status(500).json({ error: "Failed to generate embedding" });
     }
   });
@@ -721,10 +722,11 @@ export async function registerRoutes(app: Express, bookmarkService: BookmarkServ
       if (!content) {
         return res.status(400).json({ error: "Content is required" });
       }
-      
-      const insights = await generateInsights(url, content, depthLevel || 1);
+
+      const insights = await contentProcessor.generateInsights(storage, url, content, depthLevel);
       res.json(insights);
     } catch (error) {
+      console.error("Error generating insights:", error);
       res.status(500).json({ error: "Failed to generate insights" });
     }
   });
@@ -736,10 +738,10 @@ export async function registerRoutes(app: Express, bookmarkService: BookmarkServ
       if (!content) {
         return res.status(400).json({ error: "Content is required" });
       }
-      
-      const tags = await generateTags(storage, content);
+      const tags = await contentProcessor.generateTags(storage, content);
       res.json({ tags });
     } catch (error) {
+      console.error("Error generating tags:", error);
       res.status(500).json({ error: "Failed to generate tags" });
     }
   });
@@ -752,9 +754,10 @@ export async function registerRoutes(app: Express, bookmarkService: BookmarkServ
         return res.status(400).json({ error: "Content is required" });
       }
       
-      const summary = await summarizeContent(storage, content);
+      const summary = await contentProcessor.summarizeContent(storage, content);
       res.json({ summary });
     } catch (error) {
+      console.error("Error summarizing content:", error);
       res.status(500).json({ error: "Failed to summarize content" });
     }
   });
@@ -779,7 +782,7 @@ export async function registerRoutes(app: Express, bookmarkService: BookmarkServ
       const userId = req.isAuthenticated() ? req.user.id : undefined;
       
       console.log(`Processing chat request with filters: ${JSON.stringify(filters)} for user: ${userId || 'anonymous'}`);
-      const response = await generateChatResponse(storage, query, filters, userId);
+      const response = await contentProcessor.generateChatResponse(storage, query, filters, userId);
       console.log("Chat response generated successfully");
       res.json({ response });
     } catch (error: any) {
@@ -1186,7 +1189,7 @@ export async function registerRoutes(app: Express, bookmarkService: BookmarkServ
       const userId = req.isAuthenticated() ? req.user.id : undefined;
       
       // Generate a response from the AI, passing the user ID to filter bookmarks
-      const response = await generateChatResponse(storage, message, filters, userId);
+      const response = await contentProcessor.generateChatResponse(storage, message, filters, userId);
       
       // If a session ID is provided, save the conversation
       if (sessionId) {

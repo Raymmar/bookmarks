@@ -7,9 +7,9 @@
  */
 
 import { createProdDbConnection } from '../db';
-import { generateInsights } from './content-processor';
 import { processAITags } from './tag-normalizer';
 import { DatabaseStorage } from '../storage';
+import { ContentProcessor } from './content-processor';
 
 // Test URL
 const TEST_URL = "https://developer.mozilla.org/en-US/docs/Web/JavaScript";
@@ -19,12 +19,13 @@ async function testOpenAIInsightsGeneration() {
 
   const db = createProdDbConnection();
   const storage = new DatabaseStorage(db);
+  const contentProcessor = new ContentProcessor(process.env.OPENAI_API_KEY || '');
 
   try {
     console.log(`Testing insights generation for URL: ${TEST_URL}`);
     
     // Generate insights directly from URL (empty content, pass URL)
-    const insights = await generateInsights(storage, TEST_URL, "");
+    const insights = await contentProcessor.generateInsights(storage, TEST_URL, "");
     
     console.log("\n=== GENERATED INSIGHTS ===\n");
     // Note: The insights object doesn't include a title field

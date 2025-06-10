@@ -9,15 +9,13 @@
 import { Storage } from "../storage";
 import {
   InsertBookmark,
+  bookmarks,
+  insights,
 } from "../../shared/schema";
 import { normalizeUrl, areUrlsEquivalent } from "../../shared/url-service";
-import {
-  processContent,
-  generateEmbedding,
-  generateTags,
-  generateInsights,
-} from "./content-processor";
+import { ContentProcessor } from "./content-processor";
 import { extractMetadata } from "./metadata-extractor";
+import { eq } from "drizzle-orm";
 
 export interface BookmarkCreationOptions {
   url: string;
@@ -44,9 +42,11 @@ export interface ProcessedUrlResult {
 
 export class BookmarkService {
   private storage: Storage;
+  private contentProcessor: ContentProcessor;
 
-  constructor(storage: Storage) {
+  constructor(storage: Storage, contentProcessor: ContentProcessor) {
     this.storage = storage;
+    this.contentProcessor = contentProcessor;
   }
 
   /**
@@ -276,10 +276,10 @@ ${summaryPrompt?.value || ""}
             if (content_html) {
               console.log(`Generating embedding for bookmark ${bookmarkId}`);
               // Process content to get clean text if we have HTML content
-              const processedContent = await processContent(content_html);
+              const processedContent = await this.contentProcessor.processContent(content_html);
 
               if (processedContent && processedContent.text) {
-                const result = await generateEmbedding(processedContent.text);
+                const result = await this.contentProcessor.generateEmbedding(processedContent.text);
                 console.log(
                   `Embedding generated for bookmark ${bookmarkId}: ${result.embedding.length} dimensions`,
                 );
@@ -312,7 +312,7 @@ ${summaryPrompt?.value || ""}
 
             if (content_html) {
               try {
-                const processedContent = await processContent(content_html);
+                const processedContent = await this.contentProcessor.processContent(content_html);
                 if (processedContent && processedContent.text) {
                   processedText = processedContent.text;
                 }
@@ -334,7 +334,7 @@ ${summaryPrompt?.value || ""}
             }
 
             // Pass the custom tagging prompt to the generateTags function
-            const tags = await generateTags(
+            const tags = await this.contentProcessor.generateTags(
               this.storage,
               processedText || "",
               url,
@@ -363,7 +363,7 @@ ${summaryPrompt?.value || ""}
 
             if (content_html) {
               try {
-                const processedContent = await processContent(content_html);
+                const processedContent = await this.contentProcessor.processContent(content_html);
                 if (processedContent && processedContent.text) {
                   processedText = processedContent.text;
                 }
@@ -406,7 +406,7 @@ ${summaryPrompt?.value || ""}
             }
 
             // Pass the custom summary prompt and media URLs to the generateInsights function
-            const result = await generateInsights(
+            const result = await this.contentProcessor.generateInsights(
               this.storage,
               url,
               processedText || "",
@@ -433,15 +433,14 @@ ${summaryPrompt?.value || ""}
       // 1. Update bookmark with embedding if available
       if (embedding && embedding.length > 0) {
         try {
-          // Update bookmark using SQL directly to avoid schema typing issues
-          // This is a known workaround until we update the schema definition
-          await this.storage.getDb().execute(
-            `UPDATE bookmarks 
-             SET vector_embedding = $1, 
-                 ai_processing_status = 'completed' 
-             WHERE id = $2`,
-            [embedding, bookmarkId],
-          );
+          await this.storage.getDb()
+            .update(bookmarks)
+            .set({
+              vector_embedding: embedding.map(String),
+              ai_processing_status: 'completed',
+            })
+            .where(eq(bookmarks.id, bookmarkId));
+
           console.log(
             `Updated bookmark ${bookmarkId} with embedding and set processing status to complete`,
           );

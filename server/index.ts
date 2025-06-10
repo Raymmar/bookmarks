@@ -8,6 +8,7 @@ import { AIProcessorService } from "./lib/ai-processor-service";
 import { DatabaseStorage } from "./storage";
 import { ReportService } from "./lib/report-service";
 import { BookmarkService } from "./lib/bookmark-service";
+import { ContentProcessor } from "./lib/content-processor";
 
 const app = express();
 app.use(express.json());
@@ -45,19 +46,22 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const xApiBaseUrl = "https://api.x.com";
+  const openAiApiKey = process.env.OPENAI_API_KEY || '';
+  
   // Wire up the services and their dependencies.
   // At some point we may want to do this with a dependency injection framework,
   // but for now this is okay while the app is small.
-  const xApiBaseUrl = "https://api.x.com";
   const db = createProdDbConnection();
   const storage = new DatabaseStorage(db);
-  const bookmarkService = new BookmarkService(storage);
+  const contentProcessor = new ContentProcessor(openAiApiKey);
+  const bookmarkService = new BookmarkService(storage, contentProcessor);
   const aiProcessorService = new AIProcessorService(db, bookmarkService);
   const reportService = new ReportService(storage);
   const xService = new XService(db, storage, aiProcessorService, bookmarkService, xApiBaseUrl);
 
   // Register all the routes
-  const server = await registerRoutes(app, bookmarkService, reportService, storage, xService);
+  const server = await registerRoutes(app, bookmarkService, reportService, storage, xService, contentProcessor);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
