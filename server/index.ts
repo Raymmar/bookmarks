@@ -45,13 +45,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Wire up the services and their dependencies
+  // Wire up the services and their dependencies.
+  // At some point we may want to do this with a dependency injection framework,
+  // but for now this is okay while the app is small.
+  const xApiBaseUrl = "https://api.x.com";
   const db = createProdDbConnection();
   const storage = new DatabaseStorage(db);
   const bookmarkService = new BookmarkService(storage);
   const aiProcessorService = new AIProcessorService(db, bookmarkService);
   const reportService = new ReportService(storage);
-  const xService = new XService(db, storage, aiProcessorService, bookmarkService);
+  const xService = new XService(db, storage, aiProcessorService, bookmarkService, xApiBaseUrl);
 
   // Register all the routes
   const server = await registerRoutes(app, bookmarkService, reportService, storage, xService);

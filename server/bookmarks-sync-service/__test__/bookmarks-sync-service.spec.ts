@@ -1,8 +1,7 @@
 import { expect } from 'chai';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { FakeXServer } from './fake-x-server';
 import { xCredentials, bookmarks, users } from '@shared/schema';
-import { v4 as uuidv4 } from 'uuid';
 import { createDb } from './create-db';
 import { XService } from 'server/lib/x-service';
 import { DatabaseStorage } from 'server/storage';
@@ -13,17 +12,22 @@ describe('X.com Bookmarks Sync', () => {
   let testDb: Awaited<ReturnType<typeof createDb>>;
   let fakeXServer: FakeXServer;
   let xService: XService;
-  const TEST_PORT = 3001;
-  const TEST_USER_ID = uuidv4();
+  const X_API_SERVER_PORT = 3001;
+  const TEST_USER_ID = '1';
   const TEST_X_USERNAME = 'testuser';
   const TEST_X_USER_ID = 'x-user-123';
 
   before(async () => {
+    // Start fake X API server
+    fakeXServer = new FakeXServer(X_API_SERVER_PORT);
+    await fakeXServer.start();
+
     testDb = await createDb();
+    const xApiBaseUrl = `http://localhost:${X_API_SERVER_PORT}`;
     const storage = new DatabaseStorage(testDb);
     const bookmarkService = new BookmarkService(storage);
     const aiProcessorService = new AIProcessorService(testDb, bookmarkService);
-    xService = new XService(testDb, storage, aiProcessorService, bookmarkService);
+    xService = new XService(testDb, storage, aiProcessorService, bookmarkService, xApiBaseUrl);
 
     // Create a test user
     await testDb.insert(users).values({
@@ -33,10 +37,6 @@ describe('X.com Bookmarks Sync', () => {
       password: 'hashed_password',
       email_verified: true
     });
-
-    // Start fake X server
-    fakeXServer = new FakeXServer(TEST_PORT);
-    await fakeXServer.start();
 
     // Set up test user credentials
     await testDb.insert(xCredentials).values({
@@ -50,11 +50,6 @@ describe('X.com Bookmarks Sync', () => {
   });
 
   after(async () => {
-    // Clean up test data
-    await testDb.delete(xCredentials).where(eq(xCredentials.user_id, TEST_USER_ID));
-    await testDb.delete(users).where(eq(users.id, TEST_USER_ID));
-    
-    // Stop fake X server
     await fakeXServer.stop();
   });
 
@@ -72,17 +67,17 @@ describe('X.com Bookmarks Sync', () => {
           id: '1',
           text: 'Test bookmark 1',
           created_at: '2024-01-01T00:00:00Z',
-          author_id: '456',
-          author_name: 'Test Author',
-          author_username: 'testauthor',
+          author_id: 'author-1',
+          author_name: 'Author 1',
+          author_username: 'testauthor1',
         },
         {
           id: '2',
           text: 'Test bookmark 2',
           created_at: '2024-01-02T00:00:00Z',
-          author_id: '789',
-          author_name: 'Another Author',
-          author_username: 'anotherauthor',
+          author_id: 'author-2',
+          author_name: 'Author 2',
+          author_username: 'testauthor2',
         },
       ];
 

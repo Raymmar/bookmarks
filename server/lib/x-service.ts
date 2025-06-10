@@ -36,7 +36,6 @@ const activeSyncs = new Set<string>();
 const X_CLIENT_ID = process.env.X_CLIENT_ID || '';
 const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET || '';
 const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'https://atmospr.replit.app/api/x/callback';
-const X_API_BASE = 'https://api.twitter.com';
 
 /**
  * Scopes needed for reading bookmarks
@@ -133,6 +132,7 @@ export class XService {
     private storage: Storage,
     private aiProcessorService: AIProcessorService,
     private bookmarkService: BookmarkService,
+    private xApiBaseUrl: string,
   ) {
     // Check API configuration
     if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
@@ -243,7 +243,7 @@ export class XService {
       
       // Create a Twitter API client
       console.log("X.com exchangeCodeForToken: Creating Twitter API client");
-      const client = new Client(this.authClient);
+      const client = new Client(this.authClient, { base_url: this.xApiBaseUrl });
       
       // Get the authenticated user's information
       console.log("X.com exchangeCodeForToken: Fetching user information");
@@ -359,7 +359,7 @@ export class XService {
       });
       
       // Create a Twitter API client
-      const client = new Client(this.authClient);
+      const client = new Client(this.authClient, { base_url: this.xApiBaseUrl });
       
       // Get user information using the SDK
       const userResponse = await client.users.findMyUser();
@@ -417,7 +417,7 @@ export class XService {
         }
       });
       
-      const client = new Client(this.authClient);
+      const client = new Client(this.authClient, { base_url: this.xApiBaseUrl });
       
       try {
         // Use the SDK to fetch bookmarks
@@ -530,7 +530,7 @@ export class XService {
       console.log(`X Folders: Fetching bookmarks from folder ${folderId} for user ${userId}`);
       
       // Create the authenticated URL using the user's credentials
-      const url = new URL(`${X_API_BASE}/2/users/${credentials.x_user_id}/bookmarks/folders/${folderId}`);
+      const url = new URL(`${this.xApiBaseUrl}/2/users/${credentials.x_user_id}/bookmarks/folders/${folderId}`);
       
       // The folder-specific endpoint is extremely restrictive on parameters
       // According to the API error response, it only accepts 'id' and 'folder_id'
@@ -788,7 +788,7 @@ export class XService {
       console.log(`X Folders: Fetching bookmark folders for user ${userId}${paginationToken ? ' with pagination token' : ''}`);
       
       // Create the authenticated URL using the user's credentials
-      let url = `${X_API_BASE}/2/users/${credentials.x_user_id}/bookmarks/folders`;
+      let url = `${this.xApiBaseUrl}/2/users/${credentials.x_user_id}/bookmarks/folders`;
       
       // Add pagination token if provided
       if (paginationToken) {
@@ -1925,7 +1925,7 @@ export class XService {
     
     try {
       // Create the authenticated URL for the tweets lookup endpoint
-      const url = new URL(`${X_API_BASE}/2/tweets`);
+      const url = new URL(`${this.xApiBaseUrl}/2/tweets`);
       
       // Add the tweet IDs as a comma-separated list
       const params = new URLSearchParams();
