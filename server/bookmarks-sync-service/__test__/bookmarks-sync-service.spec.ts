@@ -84,7 +84,7 @@ describe('X.com Bookmarks Sync', () => {
         },
       ];
 
-      fakeXServer.setUserBookmarks(TEST_USER_ID, TEST_X_USERNAME, testBookmarks);
+      fakeXServer.setUserBookmarks(TEST_X_USER_ID, TEST_X_USERNAME, testBookmarks);
 
       // Perform sync
       const result = await xService.syncBookmarks(TEST_USER_ID);

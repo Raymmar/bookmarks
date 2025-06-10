@@ -45,7 +45,7 @@ export class FakeXServer {
     this.app.use((req, res, next) => {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        return res.status(401).json({ error: 'FakeXServer: Unauthorized' });
       }
       const token = authHeader.split(' ')[1];
       // In a real implementation, we would validate the token
@@ -56,11 +56,12 @@ export class FakeXServer {
 
     // GET /2/users/:id/bookmarks
     this.app.get('/2/users/:id/bookmarks', (req, res) => {
+      console.log('FakeXServer: GET /2/users/:id/bookmarks', req.url);
       const userId = req.params.id;
       const user = this.users.get(userId);
 
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ error: 'FakeXServer: User not found' });
       }
 
       const response: XBookmarksResponse = {
