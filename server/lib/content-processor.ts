@@ -12,11 +12,9 @@ interface ProcessedContent {
 }
 
 export class ContentProcessor {
-  private openai: OpenAI;
-
-  constructor(apiKey: string) {
-    this.openai = new OpenAI({ apiKey });
-  }
+  constructor(
+    private readonly openAi: OpenAI,
+  ) {}
 
   /**
    * Processes HTML content to extract readable text
@@ -75,7 +73,7 @@ export class ContentProcessor {
    */
   public async generateEmbedding(text: string): Promise<{ embedding: number[] }> {
     try {
-      const embeddingResponse = await this.openai.embeddings.create({
+      const embeddingResponse = await this.openAi.embeddings.create({
         model: "text-embedding-ada-002",
         input: text.slice(0, 8000), // Limit the text to the model's token limit
       });
@@ -259,7 +257,7 @@ Format your response as valid JSON with these exact keys:
 
       console.log(`Sending request to OpenAI for insights on ${url}`);
       
-      const response = await this.openai.chat.completions.create({
+      const response = await this.openAi.chat.completions.create({
         model: MODEL,
         messages: messages,
         response_format: { type: "json_object" },
@@ -491,7 +489,7 @@ Additional User Instructions: ${userSystemPrompt}`;
 
       console.log(`Sending request to OpenAI for tag generation${url ? ` for URL: ${url}` : ''}`);
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.openAi.chat.completions.create({
         model: MODEL,
         messages: messages,
         response_format: { type: "json_object" },
@@ -591,7 +589,7 @@ Your summary should:
 
 User Instructions: ${userSystemPrompt}`;
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.openAi.chat.completions.create({
         model: MODEL,
         messages: [
           {
@@ -796,7 +794,7 @@ User Instructions: ${userSystemPrompt}`;
       }
       
       // Send query to OpenAI with enhanced system prompt
-      const response = await this.openai.chat.completions.create({
+      const response = await this.openAi.chat.completions.create({
         model: MODEL,
         messages: [
           {
@@ -832,3 +830,4 @@ ${context}`
     }
   }
 }
+

@@ -37,6 +37,14 @@ export class FakeXServer {
     this.setupRoutes();
   }
 
+  /**
+   * The base URL of the fake X server. Use this to set the base URL for the X 
+   * service's config.
+   */
+  public get baseUrl(): string {
+    return `http://localhost:${this.port}`;
+  }
+
   private setupRoutes() {
     // Middleware to parse JSON bodies
     this.app.use(express.json());

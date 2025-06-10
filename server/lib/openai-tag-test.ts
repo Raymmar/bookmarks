@@ -6,10 +6,9 @@
  * npx tsx server/lib/openai-tag-test.ts
  */
 
-import { DatabaseStorage } from '../storage';
 import { createProdDbConnection } from '../db';
 import { processAITags } from './tag-normalizer';
-import { ContentProcessor } from './content-processor';
+import { initSingletonServices } from 'server/init-singleton-services';
 
 // Test URLs with different content types
 const TEST_URLS = [
@@ -21,9 +20,16 @@ const TEST_URLS = [
 async function testOpenAITagGeneration() {
   console.log('\n==== OPENAI TAG GENERATION TESTS ====\n');
   const db = createProdDbConnection();
-  const storage = new DatabaseStorage(db);
-  
-  const contentProcessor = new ContentProcessor(process.env.OPENAI_API_KEY || '');
+  const { storage, contentProcessor } = initSingletonServices({
+    db,
+    openAiConfig: { apiKey: process.env.OPENAI_API_KEY || '' },
+    xConfig: {
+      clientId: '',
+      clientSecret: '',
+      redirectUri: '',
+      apiBaseUrl: '',
+    },
+  });
   
   for (const url of TEST_URLS) {
     try {

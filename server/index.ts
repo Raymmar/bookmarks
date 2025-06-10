@@ -1,14 +1,11 @@
-import express, { type Request, Response, type NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { setupSchedulers } from "./lib/scheduler";
-import { XService } from "./lib/x-service";
-import { createProdDbConnection } from "./db";
-import { AIProcessorService } from "./lib/ai-processor-service";
-import { DatabaseStorage } from "./storage";
-import { ReportService } from "./lib/report-service";
-import { BookmarkService } from "./lib/bookmark-service";
-import { ContentProcessor } from "./lib/content-processor";
+import express, { type Request, Response, type NextFunction } from 'express';
+import { registerRoutes } from './routes';
+import { setupVite, serveStatic, log } from './vite';
+import { setupSchedulers } from './lib/scheduler';
+import { createProdDbConnection } from './db';
+import { initSingletonServices } from './init-singleton-services';
+import { XConfig } from './lib/x-service';
+import { ClientOptions as OpenAIClientOptions } from 'openai';
 
 const app = express();
 app.use(express.json());
@@ -26,8 +23,8 @@ app.use((req, res, next) => {
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
-  res.on("finish", () => {
-    if (path.startsWith("/api")) {
+  res.on('finish', () => {
+    if (path.startsWith('/api')) {
       const duration = Date.now() - start;
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
@@ -35,7 +32,7 @@ app.use((req, res, next) => {
       }
 
       if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+        logLine = logLine.slice(0, 79) + '…';
       }
 
       log(logLine);
@@ -46,30 +43,34 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const xApiBaseUrl = "https://api.x.com";
-  const openAiApiKey = process.env.OPENAI_API_KEY || '';
-
-  if (!openAiApiKey) {
-    throw new Error("process.env.OPENAI_API_KEY is not set");
-  }
-  
   // Wire up the services and their dependencies.
-  // At some point we may want to do this with a dependency injection framework,
-  // but for now this is okay while the app is small.
   const db = createProdDbConnection();
-  const storage = new DatabaseStorage(db);
-  const contentProcessor = new ContentProcessor(openAiApiKey);
-  const bookmarkService = new BookmarkService(storage, contentProcessor);
-  const aiProcessorService = new AIProcessorService(db, bookmarkService);
-  const reportService = new ReportService(storage);
-  const xService = new XService(db, storage, aiProcessorService, bookmarkService, xApiBaseUrl);
+  const {
+    storage,
+    contentProcessor,
+    bookmarkService,
+    aiProcessorService,
+    reportService,
+    xService,
+  } = initSingletonServices({ 
+    db, 
+    openAiConfig: createOpenAiConfig(),
+    xConfig: createXConfig()
+  });
 
   // Register all the routes
-  const server = await registerRoutes(app, bookmarkService, reportService, storage, xService, contentProcessor);
+  const server = await registerRoutes(
+    app,
+    bookmarkService,
+    reportService,
+    storage,
+    xService,
+    contentProcessor
+  );
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const message = err.message || 'Internal Server Error';
 
     res.status(status).json({ message });
     throw err;
@@ -78,7 +79,7 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (app.get('env') === 'development') {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -91,7 +92,7 @@ app.use((req, res, next) => {
   server.listen(
     {
       port,
-      host: "0.0.0.0",
+      host: '0.0.0.0',
       reusePort: true,
     },
     () => {
@@ -99,10 +100,47 @@ app.use((req, res, next) => {
 
       // Set up all scheduled tasks
       setupSchedulers(db, aiProcessorService, xService)
-        .then(() => log("Background schedulers initialized successfully"))
-        .catch((err: Error) =>
-          log(`Error setting up schedulers: ${err.message}`),
-        );
-    },
+        .then(() => log('Background schedulers initialized successfully'))
+        .catch((err: Error) => log(`Error setting up schedulers: ${err.message}`));
+    }
   );
 })();
+
+/**
+ * Creates the X API configuration object for production usage.
+ */
+function createXConfig(): XConfig {
+  const X_CLIENT_ID = process.env.X_CLIENT_ID || '';
+  const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET || '';
+  const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'https://atmospr.replit.app/api/x/callback';
+  const X_API_BASE_URL = process.env.X_API_BASE_URL || 'https://api.x.com';
+
+  if (!X_CLIENT_ID) {
+    throw new Error('process.env.X_CLIENT_ID is not set');
+  }
+  if (!X_CLIENT_SECRET) {
+    throw new Error('process.env.X_CLIENT_SECRET is not set');
+  }
+
+  return {
+    clientId: X_CLIENT_ID,
+    clientSecret: X_CLIENT_SECRET,
+    redirectUri: X_REDIRECT_URI,
+    apiBaseUrl: X_API_BASE_URL,
+  };
+}
+
+/**
+ * Creates the OpenAI API configuration object for production usage.
+ */
+function createOpenAiConfig(): OpenAIClientOptions {
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+
+  if (!OPENAI_API_KEY) {
+    throw new Error('process.env.OPENAI_API_KEY is not set');
+  }
+
+  return {
+    apiKey: OPENAI_API_KEY,
+  };
+}

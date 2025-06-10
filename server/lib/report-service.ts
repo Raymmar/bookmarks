@@ -16,11 +16,6 @@ type ReportStatus = "generating" | "completed" | "failed";
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const MODEL = "gpt-4o";
 
-// Initialize OpenAI with API key
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 // Default system prompt for report generation
 const DEFAULT_SYSTEM_PROMPT = `You are a casual yet professional research assistant with a direct and straightforward tone.
 
@@ -71,7 +66,10 @@ export interface GenerateReportOptions {
  * Report Service for generating weekly insights
  */
 export class ReportService {
-  constructor(private readonly storage: Storage) {}
+  constructor(
+    private readonly storage: Storage,
+    private readonly openAi: OpenAI,
+  ) {}
 
   /**
    * Generate a report for the user's recent bookmarks
@@ -195,7 +193,7 @@ export class ReportService {
       );
 
       // Send to OpenAI for processing with increased token limits
-      const response = await openai.chat.completions.create({
+      const response = await this.openAi.chat.completions.create({
         model: MODEL,
         messages: [
           {
@@ -336,7 +334,7 @@ ${contentSample}
 IMPORTANT: Return ONLY the title text. No quotes, explanations, or additional text.`;
       
       // Send to OpenAI for title generation
-      const response = await openai.chat.completions.create({
+      const response = await this.openAi.chat.completions.create({
         model: MODEL,
         messages: [
           {

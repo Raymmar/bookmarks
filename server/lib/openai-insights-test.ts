@@ -8,8 +8,7 @@
 
 import { createProdDbConnection } from '../db';
 import { processAITags } from './tag-normalizer';
-import { DatabaseStorage } from '../storage';
-import { ContentProcessor } from './content-processor';
+import { initSingletonServices } from 'server/init-singleton-services';
 
 // Test URL
 const TEST_URL = "https://developer.mozilla.org/en-US/docs/Web/JavaScript";
@@ -18,8 +17,16 @@ async function testOpenAIInsightsGeneration() {
   console.log('\n==== OPENAI INSIGHTS GENERATION TEST ====\n');
 
   const db = createProdDbConnection();
-  const storage = new DatabaseStorage(db);
-  const contentProcessor = new ContentProcessor(process.env.OPENAI_API_KEY || '');
+  const { storage, contentProcessor } = initSingletonServices({
+    db,
+    openAiConfig: { apiKey: process.env.OPENAI_API_KEY || '' },
+    xConfig: {
+      clientId: '',
+      clientSecret: '',
+      redirectUri: '',
+      apiBaseUrl: '',
+    },
+  });
 
   try {
     console.log(`Testing insights generation for URL: ${TEST_URL}`);

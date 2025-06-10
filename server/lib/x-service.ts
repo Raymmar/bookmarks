@@ -33,9 +33,12 @@ const activeSyncs = new Set<string>();
  * X API configuration
  * These values should be obtained from the X Developer Portal
  */
-const X_CLIENT_ID = process.env.X_CLIENT_ID || '';
-const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET || '';
-const X_REDIRECT_URI = process.env.X_REDIRECT_URI || 'https://atmospr.replit.app/api/x/callback';
+export interface XConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  apiBaseUrl: string;
+}
 
 /**
  * Scopes needed for reading bookmarks
@@ -128,26 +131,20 @@ export class XService {
   private STATE = "state";
   
   constructor(
-    private db: Db,
-    private storage: Storage,
-    private aiProcessorService: AIProcessorService,
-    private bookmarkService: BookmarkService,
-    private xApiBaseUrl: string,
+    private readonly db: Db,
+    private readonly storage: Storage,
+    private readonly aiProcessorService: AIProcessorService,
+    private readonly bookmarkService: BookmarkService,
+    private readonly xConfig: XConfig,
   ) {
-    // Check API configuration
-    if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
-      console.error('XService: Missing OAuth credentials - X_CLIENT_ID or X_CLIENT_SECRET not set');
-    } else {
-      console.log('XService: X OAuth client credentials are configured');
-      console.log('XService: Redirect URI:', X_REDIRECT_URI);
-    }
+    console.log('XService: Redirect URI:', xConfig.redirectUri);
     
     // Initialize auth client with Twitter API SDK
     try {
       this.authClient = new auth.OAuth2User({
-        client_id: X_CLIENT_ID,
-        client_secret: X_CLIENT_SECRET,
-        callback: X_REDIRECT_URI,
+        client_id: xConfig.clientId,
+        client_secret: xConfig.clientSecret,
+        callback: xConfig.redirectUri,
         scopes: REQUIRED_SCOPES,
       });
       console.log('XService: Auth client initialized successfully');
@@ -155,9 +152,9 @@ export class XService {
       console.error('XService: Failed to initialize auth client:', error);
       // Initialize with empty values to prevent fatal errors
       this.authClient = new auth.OAuth2User({
-        client_id: X_CLIENT_ID || 'missing',
-        client_secret: X_CLIENT_SECRET || 'missing',
-        callback: X_REDIRECT_URI,
+        client_id: xConfig.clientId || 'missing',
+        client_secret: xConfig.clientSecret || 'missing',
+        callback: xConfig.redirectUri,
         scopes: REQUIRED_SCOPES,
       });
     }
@@ -169,7 +166,7 @@ export class XService {
   getAuthorizationUrl(): string {
     console.log("XService: Generating authorization URL");
 
-    if (!X_CLIENT_ID) {
+    if (!this.xConfig.clientId) {
       console.error("XService: X_CLIENT_ID environment variable is not set");
       throw new Error('X_CLIENT_ID environment variable is not set');
     }
@@ -215,7 +212,7 @@ export class XService {
   async exchangeCodeForToken(code: string, state: string): Promise<InsertXCredentials> {
     console.log("X.com exchangeCodeForToken: Starting token exchange process");
     
-    if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
+    if (!this.xConfig.clientId || !this.xConfig.clientSecret) {
       console.error("X.com exchangeCodeForToken: Missing OAuth client credentials in environment");
       throw new Error('X_CLIENT_ID or X_CLIENT_SECRET environment variables are not set');
     }
@@ -243,7 +240,7 @@ export class XService {
       
       // Create a Twitter API client
       console.log("X.com exchangeCodeForToken: Creating Twitter API client");
-      const client = new Client(this.authClient, { base_url: this.xApiBaseUrl });
+      const client = new Client(this.authClient, { base_url: this.xConfig.apiBaseUrl });
       
       // Get the authenticated user's information
       console.log("X.com exchangeCodeForToken: Fetching user information");
@@ -298,16 +295,16 @@ export class XService {
    * Refresh an access token using a refresh token
    */
   async refreshAccessToken(refreshToken: string): Promise<Partial<XCredentials>> {
-    if (!X_CLIENT_ID || !X_CLIENT_SECRET) {
+    if (!this.xConfig.clientId || !this.xConfig.clientSecret) {
       throw new Error('X_CLIENT_ID or X_CLIENT_SECRET environment variables are not set');
     }
 
     try {
       // Set up auth client with the refresh token
       this.authClient = new auth.OAuth2User({
-        client_id: X_CLIENT_ID,
-        client_secret: X_CLIENT_SECRET,
-        callback: X_REDIRECT_URI,
+        client_id: this.xConfig.clientId,
+        client_secret: this.xConfig.clientSecret,
+        callback: this.xConfig.redirectUri,
         scopes: REQUIRED_SCOPES,
         token: {
           refresh_token: refreshToken,
@@ -348,9 +345,9 @@ export class XService {
     try {
       // Set up auth client with the access token
       this.authClient = new auth.OAuth2User({
-        client_id: X_CLIENT_ID,
-        client_secret: X_CLIENT_SECRET,
-        callback: X_REDIRECT_URI,
+        client_id: this.xConfig.clientId,
+        client_secret: this.xConfig.clientSecret,
+        callback: this.xConfig.redirectUri,
         scopes: REQUIRED_SCOPES,
         token: {
           access_token: accessToken,
@@ -359,7 +356,7 @@ export class XService {
       });
       
       // Create a Twitter API client
-      const client = new Client(this.authClient, { base_url: this.xApiBaseUrl });
+      const client = new Client(this.authClient, { base_url: this.xConfig.apiBaseUrl });
       
       // Get user information using the SDK
       const userResponse = await client.users.findMyUser();
@@ -405,9 +402,9 @@ export class XService {
       
       // Create a Twitter API client with the stored credentials
       this.authClient = new auth.OAuth2User({
-        client_id: X_CLIENT_ID,
-        client_secret: X_CLIENT_SECRET,
-        callback: X_REDIRECT_URI,
+        client_id: this.xConfig.clientId,
+        client_secret: this.xConfig.clientSecret,
+        callback: this.xConfig.redirectUri,
         scopes: REQUIRED_SCOPES,
         token: {
           access_token: credentials.access_token,
@@ -417,7 +414,7 @@ export class XService {
         }
       });
       
-      const client = new Client(this.authClient, { base_url: this.xApiBaseUrl });
+      const client = new Client(this.authClient, { base_url: this.xConfig.apiBaseUrl });
       
       try {
         // Use the SDK to fetch bookmarks
@@ -530,7 +527,7 @@ export class XService {
       console.log(`X Folders: Fetching bookmarks from folder ${folderId} for user ${userId}`);
       
       // Create the authenticated URL using the user's credentials
-      const url = new URL(`${this.xApiBaseUrl}/2/users/${credentials.x_user_id}/bookmarks/folders/${folderId}`);
+      const url = new URL(`${this.xConfig.apiBaseUrl}/2/users/${credentials.x_user_id}/bookmarks/folders/${folderId}`);
       
       // The folder-specific endpoint is extremely restrictive on parameters
       // According to the API error response, it only accepts 'id' and 'folder_id'
@@ -788,7 +785,7 @@ export class XService {
       console.log(`X Folders: Fetching bookmark folders for user ${userId}${paginationToken ? ' with pagination token' : ''}`);
       
       // Create the authenticated URL using the user's credentials
-      let url = `${this.xApiBaseUrl}/2/users/${credentials.x_user_id}/bookmarks/folders`;
+      let url = `${this.xConfig.apiBaseUrl}/2/users/${credentials.x_user_id}/bookmarks/folders`;
       
       // Add pagination token if provided
       if (paginationToken) {
@@ -1925,7 +1922,7 @@ export class XService {
     
     try {
       // Create the authenticated URL for the tweets lookup endpoint
-      const url = new URL(`${this.xApiBaseUrl}/2/tweets`);
+      const url = new URL(`${this.xConfig.apiBaseUrl}/2/tweets`);
       
       // Add the tweet IDs as a comma-separated list
       const params = new URLSearchParams();
