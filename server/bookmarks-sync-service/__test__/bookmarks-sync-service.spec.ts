@@ -77,7 +77,7 @@ describe('X.com Bookmarks Sync', () => {
   });
 
   describe('syncBookmarks', () => {
-    it('should sync bookmarks from X.com to database', async () => {
+    it('when no bookmarks exist, should sync bookmarks from X.com to database', async () => {
       // Set up test bookmarks in fake X server
       const testBookmarks = [
         {
@@ -103,9 +103,11 @@ describe('X.com Bookmarks Sync', () => {
       const result = await xService.syncBookmarks(TEST_USER_ID);
 
       // Verify results
-      expect(result.added).to.equal(2);
-      expect(result.updated).to.equal(0);
-      expect(result.errors).to.equal(0);
+      expect(result).to.deep.equal({
+        added: 2,
+        updated: 0,
+        errors: 0,
+      });
 
       // Verify bookmarks were saved to database
       const savedBookmarks = await testDb
@@ -118,27 +120,30 @@ describe('X.com Bookmarks Sync', () => {
       expect(savedBookmarks[1].external_id).to.equal('2');
     });
 
-    //   it('should handle empty bookmarks list', async () => {
-    //     // Set up empty bookmarks list
-    //     fakeXServer.setUserBookmarks(TEST_USER_ID, TEST_X_USERNAME, []);
+    it('when the user has no bookmarks on X, should handle the empty bookmarks list by not syncing any bookmarks', async () => {
+      // Set up empty bookmarks list
+      fakeXServer.setUserBookmarks(TEST_X_USER_ID, TEST_X_USERNAME, []);
 
-    //     // Perform sync
-    //     const result = await xService.syncBookmarks(TEST_USER_ID);
+      // Perform sync
+      const result = await xService.syncBookmarks(TEST_USER_ID);
 
-    //     // Verify results
-    //     expect(result.added).to.equal(0);
-    //     expect(result.updated).to.equal(0);
-    //     expect(result.errors).to.equal(0);
+      // Verify results
+      expect(result).to.deep.equal({
+        added: 0,
+        updated: 0,
+        errors: 0,
+      });
 
-    //     // Verify no bookmarks were saved
-    //     const savedBookmarks = await testDb
-    //       .select()
-    //       .from(bookmarks)
-    //       .where(eq(bookmarks.user_id, TEST_USER_ID));
+      // Verify no bookmarks were saved
+      const savedBookmarks = await testDb
+        .select()
+        .from(bookmarks)
+        .where(eq(bookmarks.user_id, TEST_USER_ID));
 
-    //     expect(savedBookmarks).to.have.length(0);
-    //   });
+      expect(savedBookmarks).to.have.length(0);
+    });
 
+    // TODO: more tests, and do these AI-generated outline tests make sense
     //   it('should handle X.com API errors gracefully', async () => {
     //     // Set up test bookmarks with an invalid one to trigger an error
     //     const testBookmarks = [

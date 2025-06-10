@@ -1226,7 +1226,7 @@ export class XService {
             console.log(`X Sync: Using original media URLs for tweet ${tweet.id}`);
             
             // Create the new bookmark
-            const newBookmark = await this.storage.createBookmark(bookmarkData);
+            await this.storage.createBookmark(bookmarkData);
             added++;
             
             // Skip folder processing during main bookmark sync
