@@ -48,6 +48,10 @@ app.use((req, res, next) => {
 (async () => {
   const xApiBaseUrl = "https://api.x.com";
   const openAiApiKey = process.env.OPENAI_API_KEY || '';
+
+  if (!openAiApiKey) {
+    throw new Error("process.env.OPENAI_API_KEY is not set");
+  }
   
   // Wire up the services and their dependencies.
   // At some point we may want to do this with a dependency injection framework,

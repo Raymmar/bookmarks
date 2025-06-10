@@ -7,13 +7,15 @@ import { XService } from 'server/lib/x-service';
 import { DatabaseStorage } from 'server/storage';
 import { AIProcessorService } from 'server/lib/ai-processor-service';
 import { BookmarkService } from 'server/lib/bookmark-service';
+import { ContentProcessor } from 'server/lib/content-processor';
+import { v4 as uuidV4 } from 'uuid';
 
 describe('X.com Bookmarks Sync', () => {
   let testDb: Awaited<ReturnType<typeof createDb>>;
   let fakeXServer: FakeXServer;
   let xService: XService;
   const X_API_SERVER_PORT = 3001;
-  const TEST_USER_ID = '1';
+  const TEST_USER_ID = uuidV4();
   const TEST_X_USERNAME = 'testuser';
   const TEST_X_USER_ID = 'x-user-123';
 
@@ -25,7 +27,8 @@ describe('X.com Bookmarks Sync', () => {
     testDb = await createDb();
     const xApiBaseUrl = `http://localhost:${X_API_SERVER_PORT}`;
     const storage = new DatabaseStorage(testDb);
-    const bookmarkService = new BookmarkService(storage);
+    const contentProcessor = new ContentProcessor('');
+    const bookmarkService = new BookmarkService(storage, contentProcessor);
     const aiProcessorService = new AIProcessorService(testDb, bookmarkService);
     xService = new XService(testDb, storage, aiProcessorService, bookmarkService, xApiBaseUrl);
 
